@@ -161,6 +161,14 @@ jobs:
           cp "$ROOT/docs/licenses/zapretgui-MIT.txt" "$Z/LICENSE-ZapretGUI.txt"
           cp "$ROOT/docs/licenses/flowseal-MIT.txt" "$Z/LICENSE-Flowseal.txt"
 
+          # Каталог адресов из установки Zapret: имя — адреса, по которым
+          # сервис отвечал. Без него у окна пина нет раздела «сервисы
+          # каталога» — остаются только живой подбор и наш каталог. Файл
+          # собран на машине с установленным Zapret и положен в
+          # dist-template\; установщик его извлечь не даёт.
+          mkdir -p "$Z/system"
+          cp "$ROOT/dist-template/hosts_catalog.sqlite3" "$Z/system/hosts_catalog.sqlite3"
+
           # Личное не должно попасть в архив: подписка — это пароль,
           # отчёты и runtime описывают сеть этой машины.
           for bad in config/zephyron.json config/subscriptions.json \

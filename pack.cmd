@@ -252,9 +252,16 @@ rem The service catalogue: seven sets of proxy addresses for services that
 rem shut Russia out themselves. Without it that whole section is missing for
 rem anyone who has no separate Zapret installation - and those are exactly
 rem the people who cannot fall back on its own hosts editor either.
+rem
+rem Taken from the installation when there is one, and from dist-template\
+rem otherwise - so a build without Zapret installed still ships the section,
+rem the same way the CI archive does.
 if exist "%ZAPRET%\system\hosts_catalog.sqlite3" (
     mkdir "%ENGINES%\zapret\system" 2>nul
     copy /y "%ZAPRET%\system\hosts_catalog.sqlite3" "%ENGINES%\zapret\system\" >nul
+) else if exist "%ROOT%dist-template\hosts_catalog.sqlite3" (
+    mkdir "%ENGINES%\zapret\system" 2>nul
+    copy /y "%ROOT%dist-template\hosts_catalog.sqlite3" "%ENGINES%\zapret\system\" >nul
 )
 
 rem Licences of what we redistribute, and the one obligation that actually

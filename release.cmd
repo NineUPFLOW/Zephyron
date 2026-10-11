@@ -3,10 +3,19 @@ rem Packs the distribution and publishes it as a GitHub release.
 rem
 rem   release.cmd 0.1.0
 rem
-rem Runs here rather than in CI on purpose. The archive needs winws2.exe, and
-rem that comes from an installed Zapret 2 - a build server has no way to get
-rem it. CI keeps doing what it is good at: building and running the tests on
-rem every push.
+rem Runs on Windows, beside the sources.
+rem
+rem The same distribution is built in CI - .github\workflows\release.yml, one
+rem click in Actions - and that is the usual way now: the engines are fetched
+rem from their own releases instead of an installed Zapret, so no machine of
+rem ours has to be involved. This script stays for building and publishing from
+rem here, where the result can be run and tested before it goes out.
+rem
+rem The two are not identical. Only this script can read the service catalogue
+rem out of an installed Zapret (system\hosts_catalog.sqlite3); the CI archive
+rem ships without it. The catalogue is optional - the pin window falls back to
+rem a live lookup and our own catalogue - so the difference is a missing
+rem section, not a broken program.
 rem
 rem ASCII only on purpose: cmd.exe reads batch files in the OEM code page,
 rem and UTF-8 Cyrillic here breaks apart into bogus commands.
