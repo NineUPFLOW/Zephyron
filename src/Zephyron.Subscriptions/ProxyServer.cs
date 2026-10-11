@@ -83,7 +83,15 @@ public sealed record ProxyServer
 
     public string? Sni { get; init; }
 
-    /// <summary>Отпечаток uTLS: chrome, firefox, safari и т.п.</summary>
+    /// <summary>
+    /// Отпечаток uTLS: chrome, firefox, safari и т.п.
+    /// </summary>
+    /// <remarks>
+    /// В ссылках приходит словарь Xray, и там бывает <c>unsafe</c> — «подделку
+    /// выключить». sing-box такого имени не знает, оттого при сборке конфига
+    /// значение сверяется со словарём sing-box и чужое заменяется на chrome.
+    /// См. <c>SingBoxConfigCompiler.KnownFingerprint</c>.
+    /// </remarks>
     public string? Fingerprint { get; init; }
 
     public IReadOnlyList<string> Alpn { get; init; } = Array.Empty<string>();

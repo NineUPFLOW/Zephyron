@@ -1152,6 +1152,69 @@ public class SingBoxConfigCompilerTests
         Assert.Equal(server.Host, outbound.GetProperty("tls").GetProperty("server_name").GetString());
     }
 
+    /// <summary>
+    /// Чужое имя отпечатка не попадает в конфиг: sing-box падает на всём файле.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>fp=unsafe</c> — словарь Xray, где это значит «подделку выключить,
+    /// отпечаток родной». sing-box такого имени не знает:
+    /// <c>unknown uTLS fingerprint: unsafe</c>, и движок не поднимается ни
+    /// с одним сервером из подписки. Случай из отчёта 11.10.2026, 0.15.2.
+    /// </para>
+    /// <para>
+    /// Для не-REALITY родной отпечаток — это отсутствие <c>utls</c>: движок
+    /// идёт на своём TLS, как и просил Xray.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [InlineData("unsafe", null)]
+    [InlineData("UNSAFE", null)]
+    [InlineData("garbage", null)]
+    [InlineData("chrome_pq", "chrome")]
+    [InlineData("firefox", "firefox")]
+    [InlineData("random", "random")]
+    public void UnknownFingerprintIsReplacedInsteadOfReachingTheEngine(
+        string given,
+        string? expected)
+    {
+        var server = Server("NL", ProxyProtocol.Vless, "tcp") with
+        {
+            Fingerprint = given,
+            Security = "tls",
+            RealityPublicKey = null,
+            RealityShortId = null,
+        };
+
+        var root = CompileToJson("mode: selective\nrules: []", server);
+        var tls = root.GetProperty("outbounds").EnumerateArray()
+            .Single(o => o.GetProperty("type").GetString() == "vless")
+            .GetProperty("tls");
+
+        if (expected is null)
+        {
+            Assert.False(tls.TryGetProperty("utls", out _));
+            return;
+        }
+
+        Assert.Equal(expected, tls.GetProperty("utls").GetProperty("fingerprint").GetString());
+    }
+
+    [Fact]
+    public void RealityKeepsItsChromeWhenFingerprintIsForeign()
+    {
+        var server = Server("NL", ProxyProtocol.Trojan, "tcp") with { Fingerprint = "unsafe" };
+
+        var root = CompileToJson("mode: selective\nrules: []", server);
+        var outbound = root.GetProperty("outbounds").EnumerateArray()
+            .Single(o => o.GetProperty("type").GetString() == "trojan");
+
+        // REALITY без подделки не работает, оттого chrome остаётся.
+        var utls = outbound.GetProperty("tls").GetProperty("utls");
+        Assert.True(utls.GetProperty("enabled").GetBoolean());
+        Assert.Equal("chrome", utls.GetProperty("fingerprint").GetString());
+    }
+
     private static string? FindSingBox()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

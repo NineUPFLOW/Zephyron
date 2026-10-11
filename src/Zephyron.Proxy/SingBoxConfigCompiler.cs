@@ -1564,12 +1564,13 @@ public sealed class SingBoxConfigCompiler
 
         // uTLS подделывает отпечаток клиента. Для REALITY он обязателен:
         // без него сервер не отвечает.
-        if (!string.IsNullOrEmpty(server.Fingerprint) || reality)
+        var fingerprint = KnownFingerprint(server.Fingerprint);
+        if (fingerprint is not null || reality)
         {
             block["utls"] = new JsonObject
             {
                 ["enabled"] = true,
-                ["fingerprint"] = string.IsNullOrEmpty(server.Fingerprint) ? "chrome" : server.Fingerprint,
+                ["fingerprint"] = fingerprint ?? "chrome",
             };
         }
 
@@ -1587,6 +1588,45 @@ public sealed class SingBoxConfigCompiler
         }
 
         return block;
+    }
+
+    /// <summary>
+    /// Приводит отпечаток uTLS к значению, которое понимает sing-box.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Из ссылок приходит словарь Xray, и он не совпадает со словарём sing-box.
+    /// <c>fp=unsafe</c> у Xray значит «подделку выключить, отпечаток родной» —
+    /// в sing-box такого имени нет, и он на нём падает целиком: движок не
+    /// поднимается ни с одним сервером. Оттого чужое имя подставляет chrome,
+    /// а не едет в конфиг как есть.
+    /// </para>
+    /// <para>
+    /// <c>random</c> и <c>randomized</c> у обоих значат разное, но оба
+    /// допустимы, и переводить их не нужно. Имена сверены с
+    /// <c>uTLSClientHelloID</c> sing-box 1.14.1-extended-2.7.2.
+    /// </para>
+    /// </remarks>
+    private static string? KnownFingerprint(string? fingerprint)
+    {
+        if (string.IsNullOrEmpty(fingerprint))
+            return null;
+
+        return fingerprint.ToLowerInvariant() switch
+        {
+            "chrome" or "chrome_psk" or "chrome_psk_shuffle" or "chrome_padding_psk_shuffle"
+                or "chrome_pq" or "chrome_pq_psk" => "chrome",
+            "firefox" => "firefox",
+            "edge" => "edge",
+            "safari" => "safari",
+            "360" => "360",
+            "qq" => "qq",
+            "ios" => "ios",
+            "android" => "android",
+            "random" => "random",
+            "randomized" => "randomized",
+            _ => null,
+        };
     }
 
     private static JsonObject? BuildTransport(ProxyServer server)
