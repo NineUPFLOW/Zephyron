@@ -1,0 +1,22 @@
+{
+  // «Лавандовая», встроенная. Мягкий фиолет с сиреневым акцентом.
+  "name": "Лавандовая",
+  "author": "Zephyron",
+  "base": "dark",
+  "colors": {
+    "backdrop": "#15111F",
+    "surface": "#1E1830",
+    "raised": "#271F3E",
+    "border": "#3A2E56",
+    "text": "#F1ECFB",
+    "muted": "#B3A6CE",
+    "faint": "#8A7DA8",
+    "accent": "#B79CFF",
+    "accent-dim": "#5A4A8F",
+    "danger": "#FF8A9C",
+    "warn": "#FFC978",
+    "accent-fill": "#9B7BE8",
+    "on-accent": "#150A2A",
+    "warn-fill": "#FFC978"
+  }
+}

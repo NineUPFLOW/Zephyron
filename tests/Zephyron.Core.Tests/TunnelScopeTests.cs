@@ -1,0 +1,296 @@
+using System.Text.Json;
+using Zephyron.Core.Rules;
+using Zephyron.Proxy;
+using Zephyron.Subscriptions;
+using Xunit;
+
+namespace Zephyron.Core.Tests;
+
+/// <summary>
+/// Выборочный перехват: в туннель должен заходить только трафик прокси,
+/// чтобы десинк работал на исходных потоках приложений.
+/// </summary>
+public class TunnelScopeTests
+{
+    private static ProxyServer Server() => new()
+    {
+        Protocol = ProxyProtocol.Hysteria2,
+        Tag = "node",
+        Host = "example.com",
+        Port = 4443,
+        Credential = "PLACEHOLDER",
+        Security = "tls",
+    };
+
+    private static JsonElement Compile(string yaml, SingBoxOptions options)
+    {
+        var engine = RuleSetLoader.Load(yaml);
+        var json = new SingBoxConfigCompiler().Compile(engine.RuleSet, [Server()], options).Json;
+
+        return JsonDocument.Parse(json).RootElement.Clone();
+    }
+
+    private const string Rules = """
+        mode: selective
+        rules:
+          - match: domain
+            value: "*.rutracker.org"
+            mode: proxy
+          - match: domain
+            value: "*.youtube.com"
+            mode: desync
+          - match: ip
+            value: "203.0.113.0/24"
+            mode: proxy
+        """;
+
+    [Fact]
+    public void ProxyOnlyCapturesFakeIpRangesOnly()
+    {
+        var root = Compile(Rules, new SingBoxOptions { Scope = TunnelScope.ProxyOnly });
+        var captured = root.GetProperty("inbounds")[0].GetProperty("route_address")
+            .EnumerateArray().Select(e => e.GetString()).ToList();
+
+        Assert.Contains("198.18.0.0/15", captured);
+        Assert.Contains("fc00::/18", captured);
+
+        // Правило mode: proxy по адресу тоже обязано попасть в туннель:
+        // fakeip ему не выдаётся, домена у него нет.
+        Assert.Contains("203.0.113.0/24", captured);
+    }
+
+    /// <summary>
+    /// Сети игровых серверов Roblox (обсуждение №16, ошибка 279) через VPN —
+    /// в route_address, включая IPv6: матч идёт по голым адресам.
+    /// </summary>
+    [Fact]
+    public void RobloxGameServersGoIntoTheTunnelWhenRoutedThere()
+    {
+        string? root = null;
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+        {
+            if (File.Exists(Path.Combine(dir.FullName, "Zephyron.sln")))
+            {
+                root = dir.FullName;
+                break;
+            }
+        }
+
+        if (root is null)
+            return;
+
+        var engine = RuleSetLoader.Load("""
+            mode: selective
+            rules:
+              - match: ipset
+                value: "config/lists/roblox-network.txt"
+                mode: proxy
+            """);
+
+        Zephyron.Zapret.RuleSetExpander.Expand(engine.RuleSet, root);
+
+        var json = new SingBoxConfigCompiler().Compile(engine.RuleSet, [Server()],
+            new SingBoxOptions { Scope = TunnelScope.ProxyOnly }).Json;
+
+        var captured = JsonDocument.Parse(json).RootElement
+            .GetProperty("inbounds")[0].GetProperty("route_address")
+            .EnumerateArray().Select(e => e.GetString()).ToList();
+
+        Assert.Contains("128.116.0.0/17", captured);
+        Assert.Contains("2620:135:6000::/40", captured);
+    }
+
+    [Fact]
+    public void ProxyOnlyCapturesAddressListsGoingThroughTheTunnel()
+    {
+        // 01.10: часть Discord «Звук голоса (адреса)» через VPN — список
+        // discord-voice-net.txt. Правило в маршрутах движка стояло, а сети
+        // в route_address не было: звук разговора до TUN не доходил, и голос
+        // при десинке не работал ни через VPN, ни правилом программы.
+        var engine = RuleSetLoader.Load("""
+            mode: selective
+            rules:
+              - match: ipset
+                value: "config/lists/discord-voice-net.txt"
+                mode: proxy
+              - match: ipset
+                value: "config/lists/ipset-discord.txt"
+                mode: desync
+            """);
+
+        engine.RuleSet.Rules[0].LoadIpSet(["104.29.158.0/24"]);
+        engine.RuleSet.Rules[1].LoadIpSet(["104.17.0.0/16"]);
+
+        var json = new SingBoxConfigCompiler().Compile(engine.RuleSet, [Server()], new SingBoxOptions
+        {
+            Scope = TunnelScope.ProxyOnly,
+
+            // Та же сеть секцией capture — в route_address она должна быть одна.
+            CaptureAddresses = ["104.29.158.0/24"],
+        }).Json;
+
+        var captured = JsonDocument.Parse(json).RootElement
+            .GetProperty("inbounds")[0].GetProperty("route_address")
+            .EnumerateArray().Select(e => e.GetString()).ToList();
+
+        Assert.Single(captured, c => c == "104.29.158.0/24");
+
+        // Список десинка в туннель не заходит: WinDivert должен видеть
+        // исходный поток.
+        Assert.DoesNotContain("104.17.0.0/16", captured);
+    }
+
+    [Fact]
+    public void ProxyOnlyCapturesResolverAddressesSoFakeIpHasSomethingToRewrite()
+    {
+        var root = Compile(Rules, new SingBoxOptions
+        {
+            Scope = TunnelScope.ProxyOnly,
+            DnsServerAddresses = ["192.168.1.1/32"],
+        });
+
+        var captured = root.GetProperty("inbounds")[0].GetProperty("route_address")
+            .EnumerateArray().Select(e => e.GetString()).ToList();
+
+        Assert.Contains("192.168.1.1/32", captured);
+    }
+
+    [Fact]
+    public void ProxyOnlyGivesFakeIpToProxyDomainsOnly()
+    {
+        // Смысл схемы: десинк-домены получают настоящий адрес и в туннель
+        // не заходят, поэтому WinDivert видит исходный поток.
+        var root = Compile(Rules, new SingBoxOptions { Scope = TunnelScope.ProxyOnly });
+        var dnsRules = root.GetProperty("dns").GetProperty("rules").EnumerateArray().ToList();
+
+        var suffixes = dnsRules
+            .SelectMany(r => r.GetProperty("domain_suffix").EnumerateArray())
+            .Select(e => e.GetString())
+            .ToList();
+
+        Assert.Contains("rutracker.org", suffixes);
+        Assert.DoesNotContain("youtube.com", suffixes);
+        Assert.Equal("remote", root.GetProperty("dns").GetProperty("final").GetString());
+    }
+
+    [Fact]
+    public void EverythingScopeKeepsBlanketCaptureAndBlanketFakeIp()
+    {
+        var root = Compile(Rules, new SingBoxOptions { Scope = TunnelScope.Everything });
+        var tun = root.GetProperty("inbounds")[0];
+
+        Assert.False(tun.TryGetProperty("route_address", out _));
+
+        var dnsRule = root.GetProperty("dns").GetProperty("rules")[0];
+        Assert.False(dnsRule.TryGetProperty("domain_suffix", out _));
+        Assert.Equal("fake", dnsRule.GetProperty("server").GetString());
+    }
+
+    [Fact]
+    public void PresetSubnetsBecomeRouteExclusions()
+    {
+        var root = Compile(Rules, new SingBoxOptions
+        {
+            DesyncAddresses = ["64.233.161.0/24", "185.68.247.42/32"],
+        });
+
+        var excluded = root.GetProperty("inbounds")[0].GetProperty("route_exclude_address")
+            .EnumerateArray().Select(e => e.GetString()).ToList();
+
+        Assert.Equal(2, excluded.Count);
+        Assert.Contains("185.68.247.42/32", excluded);
+    }
+
+    [Fact]
+    public void WildcardDomainsAreNotSentToFakeIpAsSuffixes()
+    {
+        // domain_suffix не понимает звёздочку в середине: такое правило
+        // молча не сработало бы, а fakeip выдал бы адрес не тому домену.
+        var root = Compile("""
+            mode: selective
+            rules:
+              - match: domain
+                value: "cdn-*.example.com"
+                mode: proxy
+            """, new SingBoxOptions { Scope = TunnelScope.ProxyOnly });
+
+        Assert.Empty(root.GetProperty("dns").GetProperty("rules").EnumerateArray());
+    }
+
+    [Fact]
+    public void ProxyAllModeIgnoresSelectiveCapture()
+    {
+        // В режиме «весь трафик через VPN» выборочный перехват бессмыслен:
+        // доменных правил нет, и fakeip некому выдавать.
+        var root = Compile("""
+            mode: proxy
+            rules: []
+            """, new SingBoxOptions { Scope = TunnelScope.ProxyOnly });
+
+        Assert.Empty(root.GetProperty("dns").GetProperty("rules").EnumerateArray());
+    }
+
+    [Fact]
+    public void LocalProxyModeHasNoTunAtAll()
+    {
+        var root = Compile(Rules, new SingBoxOptions { UseTun = false, LocalListenPort = 21080 });
+        var inbound = root.GetProperty("inbounds")[0];
+
+        Assert.Equal("mixed", inbound.GetProperty("type").GetString());
+        Assert.Equal(21080, inbound.GetProperty("listen_port").GetInt32());
+    }
+
+    [Fact]
+    public void TunWithoutHealthInboundHasTunOnly()
+    {
+        var root = Compile(Rules, new SingBoxOptions { UseTun = true });
+        var inbounds = root.GetProperty("inbounds");
+
+        Assert.Equal(1, inbounds.GetArrayLength());
+        Assert.Equal("tun", inbounds[0].GetProperty("type").GetString());
+    }
+
+    [Fact]
+    public void TunWithHealthInboundKeepsBoth()
+    {
+        // Ради этого инварианта правка и делалась: прежде инбаунды TUN и mixed
+        // были взаимоисключающи, супервизор стучался на несуществующий порт
+        // и убивал исправный движок, пока не исчерпывал перезапуски.
+        var root = Compile(Rules, new SingBoxOptions { UseTun = true, HealthInbound = true });
+        var inbounds = root.GetProperty("inbounds");
+
+        Assert.Equal(2, inbounds.GetArrayLength());
+        Assert.Equal("tun", inbounds[0].GetProperty("type").GetString());
+        Assert.Equal("mixed", inbounds[1].GetProperty("type").GetString());
+        Assert.Equal(SingBoxOptions.DefaultHealthPort, inbounds[1].GetProperty("listen_port").GetInt32());
+    }
+
+    [Fact]
+    public void HealthInboundGoesIntoTheTunnelBeforeAnyRule()
+    {
+        // Замер 28.09: без своего правила вход проверки шёл по общим правилам,
+        // в выборочном режиме — напрямую, и сторож проверял домашнюю сеть.
+        var root = Compile(Rules, new SingBoxOptions { UseTun = true, HealthInbound = true, Scope = TunnelScope.ProxyOnly });
+        var rules = root.GetProperty("route").GetProperty("rules").EnumerateArray().ToList();
+
+        int health = rules.FindIndex(r => r.TryGetProperty("inbound", out var i)
+            && i.EnumerateArray().Any(x => x.GetString() == "health-in"));
+
+        Assert.True(health >= 0, "у health-in нет правила");
+        Assert.Equal("auto", rules[health].GetProperty("outbound").GetString());
+
+        // Раньше всех правил с выходом: иначе частное правило перехватит проверку.
+        int firstRouted = rules.FindIndex(r => r.TryGetProperty("outbound", out _));
+        Assert.Equal(health, firstRouted);
+    }
+
+    [Fact]
+    public void HealthInboundDoesNotCollideWithProbePort()
+    {
+        // Замер серверов занимает 21080 и раздаёт параллельным замерам соседние
+        // порты: при обычной пятёрке это 21080..21084. Совпадение означало бы,
+        // что «Замерить все» не стартует, пока поднят туннель, поэтому запас
+        // берётся с двойным перекрытием — на случай большего --parallel.
+        Assert.True(SingBoxOptions.DefaultHealthPort >= 21080 + 10);
+    }
+}

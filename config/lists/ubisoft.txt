@@ -1,0 +1,9 @@
+# Ubisoft.
+#
+# ubi.com опущен: это короткий алиас ubisoft.com. Вторым — Ubisoft Connect,
+# то есть лаунчер: он ломается отдельно от сайта и замечают это раньше.
+ubisoft.com
+ubisoftconnect.com
+uplay.com
+ubisoftclub.com
+ubi.com

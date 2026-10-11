@@ -1,0 +1,22 @@
+{
+  // «Розовая», встроенная. Тёплая роза с акцентом цвета сахарной ваты.
+  "name": "Розовая",
+  "author": "Zephyron",
+  "base": "dark",
+  "colors": {
+    "backdrop": "#1A0F14",
+    "surface": "#25161D",
+    "raised": "#301D27",
+    "border": "#4A2E3C",
+    "text": "#F7E9EF",
+    "muted": "#BF9BAB",
+    "faint": "#94707F",
+    "accent": "#FF9EC4",
+    "accent-dim": "#7A2F52",
+    "danger": "#FF7A8A",
+    "warn": "#FFC978",
+    "accent-fill": "#F27BAE",
+    "on-accent": "#2A0A18",
+    "warn-fill": "#FFC978"
+  }
+}

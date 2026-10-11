@@ -1,0 +1,115 @@
+using Zephyron.Core.Rules;
+using Zephyron.Core.Services;
+using Xunit;
+
+namespace Zephyron.Core.Tests;
+
+/// <summary>
+/// Часть внутри более широкого списка — раньше его правила (29.09, деление Discord).
+/// </summary>
+public sealed class ServicePartOrderTests
+{
+    [Fact]
+    public void A_narrow_part_is_written_before_its_wider_list()
+    {
+        // Движок берёт первое совпавшее правило. «Картинки» Discord лежат
+        // внутри discordapp.net из «Сайта и переписки»; записанные после,
+        // они не сработали бы никогда.
+        var path = Path.Combine(Path.GetTempPath(), $"zephyron-rules-{Guid.NewGuid():N}.yaml");
+
+        try
+        {
+            var file = UserRulesFile.Load(path);
+            file.Set(MatchKind.HostList, "config/lists/discord.txt", RoutingMode.Desync);
+            file.Set(MatchKind.HostList, "config/lists/steam.txt", RoutingMode.Direct);
+            file.Set(MatchKind.HostList, "config/lists/discord-images.txt", RoutingMode.Proxy,
+                before: "config/lists/discord.txt");
+
+            Assert.Equal(
+                ["config/lists/discord-images.txt", "config/lists/discord.txt", "config/lists/steam.txt"],
+                file.Entries.Select(e => e.Value));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <remarks>
+    /// До 01.10 широкий список обязан был быть того же сервиса. «Капчи»
+    /// лежат в чужих: hCaptcha — в списке Discord, Turnstile — в Cloudflare,
+    /// Arkose — в Roblox. Важно же другое: чтобы широкий список вообще был
+    /// в каталоге — иначе «раньше его правила» не найдёт ничего, и часть
+    /// встанет в конец, где до неё не дойдёт очередь.
+    /// </remarks>
+    [Fact]
+    public void Every_within_names_a_list_of_the_catalog()
+    {
+        var lists = ServiceCatalog.All.SelectMany(s => s.Parts).Select(p => p.List).ToHashSet();
+
+        foreach (var part in ServiceCatalog.All.SelectMany(s => s.Parts).Where(p => p.Within is not null))
+            Assert.Contains(part.Within!, lists);
+    }
+
+    /// <summary>
+    /// Голос ARC Raiders (07.10) — выключен до выбора, а выбранный встаёт раньше Epic.
+    /// </summary>
+    /// <remarks>
+    /// Его зона rtcp.on.epicgames.com лежит внутри epicgames.com, а Epic у всех
+    /// идёт «напрямую»: записанное после правило голоса не сработало бы никогда.
+    /// </remarks>
+    [Fact]
+    public void Arc_raiders_voice_is_off_and_goes_before_epic()
+    {
+        var part = Assert.Single(ServiceCatalog.All.SelectMany(s => s.Parts),
+            p => p.List == "config/lists/arc-raiders-voice.txt");
+
+        Assert.True(part.DefaultOff);
+        Assert.Equal("config/lists/epicgames-fortnite.txt", part.Within);
+        Assert.EndsWith(".rtcp.on.epicgames.com", part.Probe);
+
+        var path = Path.Combine(Path.GetTempPath(), $"zephyron-rules-{Guid.NewGuid():N}.yaml");
+
+        try
+        {
+            var file = UserRulesFile.Load(path);
+            file.Set(MatchKind.HostList, "config/lists/epicgames-fortnite.txt", RoutingMode.Direct);
+            file.Set(MatchKind.HostList, part.List, RoutingMode.Proxy, before: part.Within);
+
+            Assert.Equal(
+                ["config/lists/arc-raiders-voice.txt", "config/lists/epicgames-fortnite.txt"],
+                file.Entries.Select(e => e.Value));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// Капча, выбранная отдельно, встаёт раньше списка, где её имя лежало прежде.
+    /// </summary>
+    [Fact]
+    public void A_chosen_captcha_is_written_before_its_old_list()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"zephyron-rules-{Guid.NewGuid():N}.yaml");
+
+        try
+        {
+            var file = UserRulesFile.Load(path);
+            file.Set(MatchKind.HostList, "config/lists/discord.txt", RoutingMode.Proxy);
+
+            // Капчу выбрали отдельно — она встаёт раньше Discord и решает сама.
+            file.Set(MatchKind.HostList, "config/lists/captcha-hcaptcha.txt", RoutingMode.Direct,
+                before: "config/lists/discord.txt");
+
+            Assert.Equal(
+                ["config/lists/captcha-hcaptcha.txt", "config/lists/discord.txt"],
+                file.Entries.Select(e => e.Value));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+}

@@ -1,0 +1,736 @@
+<UserControl x:Class="Zephyron.Gui.Views.RoutesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:gui="clr-namespace:Zephyron.Gui"
+             Background="{DynamicResource Chrome}">
+
+    <UserControl.Resources>
+        <!-- Кнопка отбора по маршруту: выбранная залита цветом темы, прочие — голый текст. -->
+        <Style x:Key="RouteFilter" TargetType="RadioButton">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+            <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Shape" Background="Transparent" CornerRadius="8" Padding="12,0" MinHeight="30">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Raised}" />
+                                <Setter Property="Foreground" Value="{DynamicResource Text}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentFill}" />
+                                <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <!--
+        Три полосы вместо одного свитка на весь раздел, и это вынужденно,
+        а не ради вида. Свиток снаружи отдаёт вложенному списку бесконечную
+        высоту, а на бесконечной высоте VirtualizingStackPanel строит все
+        строки разом — виртуализация выключается сама и молча. Сервисов
+        пятьдесят пять, карточек под семьдесят, и в каждой список выбора,
+        кнопка и картинка: об это прокрутка и спотыкалась.
+
+        Прокручивается теперь один список — он и занимает всё, что осталось
+        от полос сверху и снизу. Поиск с кнопками остаётся на виду, и это
+        скорее к лучшему: прежде строка поиска уезжала вверх ровно тогда,
+        когда доходили до найденного.
+
+        Плата за это — две карточки, которые пришлось сделать сворачиваемыми:
+        прибитые к верху во всю высоту, они съедали список. «Порядок
+        вычисления» сворачивался и раньше, «Свой домен» — теперь тоже, тем же
+        приёмом и с тем же значком.
+    -->
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" MinWidth="470" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <Grid Grid.Column="0" Margin="32,28,32,28">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0">
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!--
+                        Пояснение под заголовком переехало в подсказку.
+                        Решение владельца 21.09: список маршрутов занимал
+                        треть полосы, а прочитывают эти строки один раз
+                        и больше к ним не возвращаются.
+                    -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal"
+                                VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Маршруты" Style="{StaticResource Title}" />
+
+                        <ContentControl Style="{StaticResource Info}" Margin="6,0,0,0"
+                                        Content="Куда идёт каждый сервис: напрямую, через десинк или через туннель. Выбор пишется в config\rules.user.yaml и применяется при следующем запуске движков." />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!--
+                            Список, а не кнопка. Кнопка подписывалась
+                            действием — «По алфавиту», — и какой порядок
+                            стоит сейчас, по ней было не понять; с третьим
+                            вариантом стало бы вовсе не угадать.
+                        -->
+                        <ComboBox x:Name="Sort" Width="164" SelectedIndex="0" Margin="0,0,8,0"
+                                  VerticalAlignment="Center" SelectionChanged="OnSort"
+                                  ToolTip="Порядок каталога сверху ставит то, что ломается чаще. Алфавит удобнее, когда ищешь конкретный сервис. По методу — когда хочешь увидеть, что у тебя вообще идёт через VPN.">
+                            <ComboBoxItem Content="по умолчанию" />
+                            <ComboBoxItem Content="по алфавиту" />
+                            <ComboBoxItem Content="по методу" />
+                        </ComboBox>
+
+                        <Button x:Name="ExpandButton" Style="{StaticResource Ghost}"
+                                Content="Раскрыть всё" Click="OnExpandAll" Margin="0,0,8,0"
+                                ToolTip="Раскрывает все папки разом. Разворачиваются только те пять сервисов, у которых части ломаются врозь." />
+
+                        <!-- Как «Настройки» у вкладки VPN (владелец, 05.10): то, что задают однажды. -->
+                        <Button Style="{StaticResource Ghost}" Content="Настройки" Click="OnSettings" Margin="0,0,8,0"
+                                ToolTip="Перезапуск Discord после смены маршрута, пополнение адресов его голоса." />
+
+                        <Button x:Name="ReloadButton" Style="{StaticResource Ghost}"
+                                Content="Перечитать" Click="OnReload"
+                                ToolTip="Перечитывает правила, пресет и файл hosts с диска. Нужно, если правили их снаружи программы." />
+                    </StackPanel>
+                </Grid>
+
+                <!--
+                    Свой домен. Каталог покрывает то, что мы предусмотрели,
+                    а сайтов миллион: без этой строки направить seriesgraph.com
+                    было нечем.
+
+                    Не сворачивается, и это решение владельца от 20.09.
+                    Свёрнутым он был, пока держал в себе перечень своих
+                    правил и занимал треть полосы над списком. Перечень
+                    переехал в общий список сервисов, и осталась форма
+                    в одну строку — прятать её под щелчок значит ставить
+                    щелчок между человеком и единственным тут действием.
+                -->
+                <!--
+                    Поля те же, что у стиля Choice, которым карточка была
+                    кнопкой: 16,13 против 18,16 у Card. Разница в три точки
+                    заметна — карточка стоит в ряду с такими же, и смена
+                    стиля не должна двигать её относительно соседей.
+                -->
+                <Border Style="{StaticResource Card}" Margin="0,16,0,0" Padding="16,11">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!--
+                            Программа — кнопкой с меню, как «Добавить…» в Happ
+                            (владелец 01.10, снимки): из запущенных или файлом.
+                            Вписать имя в поле по-прежнему можно, но угадать
+                            это было нельзя.
+
+                            С 04.10 выключена, с подсказкой «На переработке»
+                            (владелец: «мы их обманываем»): в «Гибриде» правило
+                            по программе не уводило её в VPN — см.
+                            Rules.ProgramRulesOff. Подсказка видна и у
+                            неактивной (ShowOnDisabled).
+                        -->
+                        <Button Grid.Column="1" x:Name="AddProgramButton" Style="{StaticResource Ghost}"
+                                Margin="12,0,0,0" VerticalAlignment="Center" Click="OnAddProgram"
+                                IsEnabled="False" ToolTip="На переработке" ToolTipService.ShowOnDisabled="True">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE710;" FontSize="13"
+                                           VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBlock Text="Добавить программу" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                    <StackPanel Grid.Column="0">
+                        <StackPanel Orientation="Horizontal">
+                            <!--
+                                «и программа» — с 01.10. Программу сюда можно
+                                было вписать с 29.09 (обсуждение №10), но ни
+                                заголовок, ни подсказка об этом не говорили,
+                                и человек с Diablo 4 так и не нашёл, где
+                                «отдельно добавлять процессы, как в Happ».
+                            -->
+                            <TextBlock Text="Свой сайт или программа" FontWeight="SemiBold" VerticalAlignment="Center" />
+
+                            <!--
+                                Два абзаца оговорок, стоявшие под формой,
+                                теперь здесь. Оба нужны — «десинк» без них
+                                обещает больше, чем делает, — но занимали
+                                они семьдесят точек высоты постоянно, ради
+                                текста, который читают однажды.
+                            -->
+                            <ContentControl Style="{StaticResource Info}" Margin="4,0,0,0"
+                                            Content="Имя означает зону: example.com покрывает и www.example.com, и cdn.example.com.&#x0a;&#x0a;Правила по программе — на переработке: в «Гибриде» «через VPN» для программы уводило в туннель только то, что и так шло туда по другим правилам, а серверы игр шли мимо. Добавить программу сейчас нельзя, прежние такие правила сняты.&#x0a;&#x0a;«Десинк» означает «мимо туннеля, чинит пресет»: рецепт не назначается, и если имя не попало ни в один список пресета, с ним не сделают ничего.&#x0a;&#x0a;«Напрямую» — мимо туннеля и мимо десинка: имя уходит в исключения, и winws2 его не трогает вовсе, как и прибитое в hosts.&#x0a;&#x0a;Проверить, что применится, можно в «Проверке блокировок»." />
+                        </StackPanel>
+
+                        <TextBlock x:Name="OwnSummary" Style="{StaticResource Caption}"
+                                   Margin="0,4,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!--
+                    Одно поле на поиск и на свой домен (владелец, 23.09).
+                    Прежде их было два, и вписать имя значило сперва решить,
+                    ищешь ты его или добавляешь. Теперь вписанное ищется,
+                    а если такого нет и это похоже на имя сайта, под полем
+                    появляется предложение добавить. Добавленное встаёт
+                    «напрямую» — самым безобидным — и правится в своей строке
+                    списка, как любая часть: режим, рецепт, пин.
+                -->
+                <!--
+                    Отбор по маршруту рядом с поиском (макет владельца 04.10):
+                    «Все», «Через VPN», «Десинк», «Напрямую» — с числом частей.
+                    Отбираются части, а не сервисы: у YouTube три части на
+                    разных путях, и папка в отборе показывает только
+                    подходящие, раскрытой, как при поиске. Отбор и поиск
+                    складываются. В узком окне отбор уходит под поле
+                    (OnSearchRowSize): рядом поле сжималось до пары слов.
+                -->
+                <Grid x:Name="SearchRow" Margin="0,10,0,0" SizeChanged="OnSearchRowSize">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBox x:Name="Search" TextChanged="OnSearch" KeyDown="OnSearchKey"
+                             gui:Hint.Text="Сервис или сайт — найти или добавить" />
+
+                    <Border x:Name="RouteFilters" Grid.Column="1" Margin="10,0,0,0" CornerRadius="11" Padding="3"
+                            HorizontalAlignment="Left"
+                            Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="FilterAll" Style="{StaticResource RouteFilter}" GroupName="RouteFilter" Tag="" IsChecked="True" Click="OnRouteFilter">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Все" />
+                                    <TextBlock x:Name="CountAll" Margin="6,0,0,0" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton Style="{StaticResource RouteFilter}" GroupName="RouteFilter" Tag="2" Click="OnRouteFilter" Margin="3,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Через VPN" />
+                                    <TextBlock x:Name="CountVpn" Margin="6,0,0,0" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton Style="{StaticResource RouteFilter}" GroupName="RouteFilter" Tag="1" Click="OnRouteFilter" Margin="3,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Десинк" />
+                                    <TextBlock x:Name="CountDesync" Margin="6,0,0,0" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton Style="{StaticResource RouteFilter}" GroupName="RouteFilter" Tag="0" Click="OnRouteFilter" Margin="3,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Напрямую" />
+                                    <TextBlock x:Name="CountDirect" Margin="6,0,0,0" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </RadioButton>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Border x:Name="AddOffer" Style="{StaticResource Card}" Margin="0,10,0,0"
+                        Padding="16,11" Visibility="Collapsed">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock x:Name="AddOfferText" VerticalAlignment="Center" TextWrapping="Wrap" />
+
+                        <Button Grid.Column="1" Style="{StaticResource Primary}" Margin="12,0,0,0"
+                                Content="Добавить" Click="OnAddOwn" />
+                    </Grid>
+                </Border>
+
+                <TextBlock x:Name="Status" Style="{StaticResource Caption}" Margin="4,12,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!--
+                Единственное, что здесь прокручивается, и единственное, чему
+                нужна виртуализация. Собственный свиток внутри шаблона — затем,
+                что у ItemsControl своего нет вовсе, а без него список меряется
+                на бесконечной высоте и строит все строки сразу.
+
+                Переиспользование контейнеров, а не пересоздание: карточка
+                части — это список выбора, кнопка и картинка, и заново собирать
+                её на каждый оборот колеса ровно то же расточительство,
+                от которого уходим.
+
+                Шаг прокрутки в точках, а не в строках: строки разной высоты —
+                свёрнутая папка в одну карточку и раскрытая в шесть, — и шаг
+                строкой перепрыгивал бы через полэкрана.
+            -->
+            <ItemsControl Grid.Row="1" x:Name="Services" Margin="0,14,0,0"
+                          VirtualizingPanel.IsVirtualizing="True"
+                          VirtualizingPanel.VirtualizationMode="Recycling"
+                          VirtualizingPanel.ScrollUnit="Pixel">
+                <ItemsControl.Template>
+                    <ControlTemplate TargetType="ItemsControl">
+                        <ScrollViewer CanContentScroll="True" Focusable="False"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <ItemsPresenter />
+                        </ScrollViewer>
+                    </ControlTemplate>
+                </ItemsControl.Template>
+
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <!--
+                            Шаг задают сами строки, не эта стопка: у папки
+                            шапка, у одиночного его единственная строка,
+                            и у обеих снизу одинаковые шесть. Стопка со
+                            своим полем добавляла их второй раз, и под
+                            одиночным сервисом выходило вдвое больше,
+                            чем под свёрнутой папкой.
+                        -->
+                        <StackPanel>
+
+                            <!--
+                                Папка сервиса. Свёрнутая, но не немая:
+                                в заголовке видно, куда идут её части, —
+                                иначе, чтобы узнать про YouTube, пришлось бы
+                                открывать YouTube, а чтобы окинуть взглядом
+                                всё — открыть все двадцать две.
+                            -->
+                            <Button Style="{StaticResource Folder}" Click="OnFolder"
+                                    Margin="0,0,0,6"
+                                    Visibility="{Binding HeaderShown}">
+                                <!--
+                                    Резиновая колонка — у итога, а не у числа
+                                    частей. Было наоборот, и у Discord итог
+                                    («3 десинк: … · 1 десинк: по имени секции
+                                    нет, по адресам — может сработать») не влез:
+                                    колонка «по содержимому» берёт сколько
+                                    просит, число частей сжалось в ноль,
+                                    итог прилип к имени и обрезался справа
+                                    без многоточия (владелец, 01.10).
+                                -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!--
+                                        Поле в 24 точки сохранено от прежней
+                                        надписи: на нём выверено, что заголовок
+                                        не ёрзает при раскрытии.
+                                    -->
+                                    <Path Grid.Column="0" Style="{StaticResource Chevron}"
+                                          Margin="7,0,12,0">
+                                        <Path.RenderTransform>
+                                            <RotateTransform Angle="{Binding ChevronAngle}" />
+                                        </Path.RenderTransform>
+                                    </Path>
+
+                                    <!--
+                                        Значок той же меры, что у строки части.
+                                        Без него шапка выходила ниже, и список
+                                        шёл ступеньками: у папки одна высота,
+                                        у одиночного сервиса другая.
+                                    -->
+                                    <Grid Grid.Column="1" Width="22" Height="22"
+                                          Margin="0,0,12,0" VerticalAlignment="Center">
+                                        <Border Background="{DynamicResource Raised}"
+                                                CornerRadius="5"
+                                                Visibility="{Binding LetterShown}">
+                                            <TextBlock Text="{Binding Letter}" FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource Muted}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center" />
+                                        </Border>
+
+                                        <Image Source="{Binding Icon}" Stretch="Uniform"
+                                               RenderOptions.BitmapScalingMode="HighQuality"
+                                               Visibility="{Binding IconShown}" />
+                                    </Grid>
+
+                                    <TextBlock Grid.Column="2" Text="{Binding Name}"
+                                               FontWeight="SemiBold" FontSize="14"
+                                               VerticalAlignment="Center" />
+
+                                    <TextBlock Grid.Column="3" Text="{Binding Count}"
+                                               Style="{StaticResource Caption}" Margin="10,0,12,0"
+                                               VerticalAlignment="Center" />
+
+                                    <TextBlock Grid.Column="4" Text="{Binding Summary}"
+                                               Style="{StaticResource Mono}"
+                                               Foreground="{Binding Color}"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding Summary}" />
+                                </Grid>
+                            </Button>
+
+                            <!--
+                                Отступ слева только у вложенных: одиночный
+                                сервис показывается без шапки, и сдвигать
+                                его не от чего.
+                            -->
+                            <ItemsControl ItemsSource="{Binding Parts}"
+                                          Visibility="{Binding PartsShown}"
+                                          Margin="{Binding PartsMargin}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <!--
+                                            Высота задана явно и одна на всех.
+                                            Список выбора внутри строки выше
+                                            простого текста в шапке папки,
+                                            и без этого строки шли ступеньками.
+                                        -->
+                                        <Border Style="{StaticResource Card}" Margin="0,0,0,6"
+                                                Padding="14,10" MinHeight="64">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <!--
+                                                    Значок сайта, если он у нас есть.
+                                                    Тянется с самого сайта и лежит
+                                                    в кэше; чужим службам список имён
+                                                    не отдаётся.
+                                                -->
+                                                <Grid Grid.Column="0" Width="22" Height="22"
+                                                      Margin="{Binding IconMargin}"
+                                                      VerticalAlignment="Center">
+                                                    <Border Background="{DynamicResource Raised}"
+                                                            CornerRadius="5"
+                                                            Visibility="{Binding LetterShown}">
+                                                        <TextBlock Text="{Binding Letter}" FontSize="11"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource Muted}"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center" />
+                                                    </Border>
+
+                                                    <Image Source="{Binding Icon}" Stretch="Uniform"
+                                                           RenderOptions.BitmapScalingMode="HighQuality"
+                                                           Visibility="{Binding IconShown}" />
+                                                </Grid>
+
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                                                    <!--
+                                                        Ссылка на сам список вместо «например …»
+                                                        (владелец, 26.09): открывает файл
+                                                        в Блокноте, посмотреть и поправить.
+                                                    -->
+                                                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Caption}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Style="{StaticResource Caption}"
+                                                                   Visibility="{Binding ListShown}">
+                                                            <Run Text=" · " />
+                                                            <Hyperlink Click="OnOpenList"
+                                                                       Foreground="{DynamicResource Accent}"
+                                                                       TextDecorations="{x:Null}"
+                                                                       ToolTip="{Binding ListPath}">список</Hyperlink>
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Mode}" Style="{StaticResource Mono}"
+                                                               Foreground="{Binding Color}"
+                                                               VerticalAlignment="Center"
+                                                               TextAlignment="Right" MinWidth="72" Margin="0,0,12,0" />
+
+                                                    <ComboBox Width="132" SelectedIndex="{Binding Choice}"
+                                                              Tag="{Binding Key}"
+                                                              SelectionChanged="OnRoute"
+                                                              DropDownClosed="OnRouteClosed"
+                                                              IsEnabled="{Binding CanRoute}">
+                                                        <ComboBoxItem Content="напрямую" />
+                                                        <ComboBoxItem Content="десинк" />
+                                                        <ComboBoxItem Content="через VPN" />
+                                                        <!-- Владелец 06.10: правила частей пересекаются, и
+                                                             часть надо уметь снять целиком (RoutingRule.Off). -->
+                                                        <ComboBoxItem Content="выключено" />
+                                                    </ComboBox>
+
+                                                    <!--
+                                                        Пин у части, а не у сервиса: адрес
+                                                        прибивается конкретным именам, и
+                                                        у Discord голос лечится отдельно
+                                                        от картинок.
+                                                    -->
+                                                    <!--
+                                                        Значком, а не словом. Слово «пин»
+                                                        занимало девяносто две точки ширины
+                                                        в каждой из семидесяти строк, а сам
+                                                        значок — двадцать.
+
+                                                        Что именно случится, говорит подсказка:
+                                                        у значка два состояния, и «снять» от
+                                                        «поставить» по одной картинке
+                                                        не отличить.
+                                                    -->
+                                                    <Button Style="{StaticResource Ghost}"
+                                                            Padding="8,7" Margin="8,0,0,0"
+                                                            Tag="{Binding Key}" Click="OnPin"
+                                                            IsEnabled="{Binding CanPin}"
+                                                            ToolTip="{Binding PinHint}">
+                                                        <Path Data="{StaticResource PinGlyph}"
+                                                              Fill="{Binding PinColor}"
+                                                              Stretch="Uniform" Width="14" Height="14" />
+                                                    </Button>
+
+                                                    <!--
+                                                        Убрать можно только своё. У каталожной
+                                                        части убирать нечего: она не добавлена
+                                                        человеком и никуда не денется — ей
+                                                        меняют маршрут, а не существование.
+                                                    -->
+                                                    <Button Style="{StaticResource Ghost}"
+                                                            Content="убрать" Padding="12,7"
+                                                            Margin="8,0,0,0"
+                                                            Tag="{Binding Key}" Click="OnRemoveOwn"
+                                                            Visibility="{Binding RemoveShown}" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <StackPanel Grid.Row="2">
+
+                <!--
+                    Порядок вычисления и «сохранить / загрузить» — одной
+                    полосой, и это исправление 23.09.
+
+                    Отдельной карточкой над порядком нижняя полоса выросла
+                    вдвое. Растёт она за счёт списка: тот берёт всё, что
+                    осталось от полос сверху и снизу, и у владельца на окне
+                    в 877 точек от него остались две с половиной строки.
+
+                    До 30.09 здесь была «Книга» — свой формат «имя: маршрут»
+                    с переводом туда и обратно. Владелец: делиться самим
+                    файлом правил (RulesShare) — это одно и то же, а перевод
+                    отстал от правил для программ и своих списков.
+
+                    Порядок вычисления: список выше сгруппирован по сервисам —
+                    так о маршрутах и думают, — но группировка прячет главное:
+                    побеждает правило, до которого очередь доходит раньше.
+                    Свёрнут по умолчанию: правил под сотню, и разворачивают
+                    их, когда правило написано, а не срабатывает.
+                -->
+                <Grid Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button Grid.Column="0" Style="{StaticResource Choice}" Click="OnOrderToggle">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Path x:Name="OrderChevron" Grid.Column="0"
+                                  Style="{StaticResource Chevron}" Margin="0,0,12,0" />
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Порядок вычисления" FontWeight="SemiBold" />
+                                <TextBlock x:Name="OrderSummary" Style="{StaticResource Caption}"
+                                           Margin="0,5,0,0" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Grid>
+                    </Button>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                VerticalAlignment="Center" Margin="12,0,0,0">
+                        <TextBlock Text="Маршруты файлом" FontWeight="SemiBold" VerticalAlignment="Center" />
+
+                        <ContentControl Style="{StaticResource Info}" Margin="2,0,8,0"
+                                        Content="Ваши маршруты — это файл config\rules.user.yaml: всё, что выбрано на этой вкладке, включая маршруты программ и правила по адресам. Его можно сохранить и отдать другому человеку: ссылок подписок и ключей в нём нет.&#x0a;&#x0a;Не едут с ним свои списки доменов (config\lists\own) и пины — их у каждой машины свои.&#x0a;&#x0a;Загрузка заменяет ваши маршруты целиком: перед этим покажет, что добавится, что уйдёт и что сменит маршрут, а прежний файл сохранит копией в runtime." />
+
+                        <Button x:Name="ExportButton" Style="{StaticResource Ghost}"
+                                Content="Сохранить" Click="OnSaveRoutes" Margin="0,0,8,0" Padding="12,7" />
+
+                        <Button x:Name="ImportButton" Style="{StaticResource Ghost}"
+                                Content="Загрузить" Click="OnLoadRoutes" Padding="12,7"
+                                ToolTip="Прочитать маршруты из файла. Покажет, что изменится, и спросит перед записью." />
+                    </StackPanel>
+                </Grid>
+
+                <!--
+                    Противоречия в своих правилах и пинах (RouteClashes).
+                    Показываются только когда есть: пустая строка
+                    «противоречий нет» на каждом заходе превратилась
+                    бы в шум, который перестают читать. Свой свиток —
+                    по той же причине, что у порядка: полоса под списком
+                    растёт за его счёт.
+                -->
+                <ScrollViewer x:Name="ClashesBox" MaxHeight="160" Margin="0,10,0,0"
+                              VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+                    <ItemsControl x:Name="Clashes">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource Raised}" CornerRadius="6"
+                                        Padding="10,8" Margin="0,0,0,6">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource Warn}" />
+                                        <TextBlock Text="{Binding Outcome}" Style="{StaticResource Caption}"
+                                                   Margin="0,4,0,0" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <StackPanel x:Name="OrderPanel" Visibility="Collapsed" Margin="0,10,0,0">
+                    <Grid Margin="16,0,16,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="44" />
+                            <ColumnDefinition Width="96" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="86" />
+                            <ColumnDefinition Width="96" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" Text="#" Style="{StaticResource Caption}" />
+                        <TextBlock Grid.Column="1" Text="ТИП" Style="{StaticResource Caption}" />
+                        <TextBlock Grid.Column="2" Text="ЗНАЧЕНИЕ" Style="{StaticResource Caption}" />
+                        <TextBlock Grid.Column="3" Text="РЕЖИМ" Style="{StaticResource Caption}" />
+                        <TextBlock Grid.Column="4" Text="СЕРВЕР" Style="{StaticResource Caption}" />
+                    </Grid>
+
+                    <!--
+                        Своя высота и свой свиток. Полоса под списком больше
+                        не растягивает раздел — растягивать некуда, — и сотня
+                        правил, развёрнутая целиком, выдавила бы список
+                        сервисов с экрана. Виртуализация здесь по той же
+                        причине, что и там: строк под сотню, а видно десяток.
+                    -->
+                    <ItemsControl x:Name="Order" MaxHeight="320"
+                                  VirtualizingPanel.IsVirtualizing="True"
+                                  VirtualizingPanel.VirtualizationMode="Recycling"
+                                  VirtualizingPanel.ScrollUnit="Pixel">
+                        <ItemsControl.Template>
+                            <ControlTemplate TargetType="ItemsControl">
+                                <ScrollViewer CanContentScroll="True" Focusable="False"
+                                              VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled">
+                                    <ItemsPresenter />
+                                </ScrollViewer>
+                            </ControlTemplate>
+                        </ItemsControl.Template>
+
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+
+                        <ItemsControl.ItemTemplate>
+                            <!--
+                                Свои правила таскаются за строку — в пределах
+                                своей группы движка (RuleEngine.Tier). Ручка
+                                слева видна только у них: заводские стоят
+                                в rules.yaml, и переставлять их отсюда нечем.
+                            -->
+                            <DataTemplate>
+                                <Border Style="{StaticResource Card}" Margin="0,0,0,4" Padding="16,9"
+                                        AllowDrop="True"
+                                        PreviewMouseLeftButtonDown="OnRulePress"
+                                        MouseMove="OnRuleDrag"
+                                        DragOver="OnRuleDragOver"
+                                        Drop="OnRuleDrop">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="44" />
+                                            <ColumnDefinition Width="96" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="86" />
+                                            <ColumnDefinition Width="96" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                            <TextBlock Text="⠿" Foreground="{DynamicResource Faint}"
+                                                       Margin="-10,0,4,0" Cursor="SizeNS"
+                                                       Visibility="{Binding GripShown}"
+                                                       ToolTip="Перетащите, чтобы поменять порядок" />
+                                            <TextBlock Text="{Binding Ordinal}"
+                                                       Style="{StaticResource Mono}"
+                                                       Foreground="{DynamicResource Muted}" />
+                                        </StackPanel>
+
+                                        <TextBlock Grid.Column="1" Text="{Binding Kind}"
+                                                   Style="{StaticResource Mono}"
+                                                   Foreground="{DynamicResource Muted}" />
+
+                                        <TextBlock Grid.Column="2" Text="{Binding Value}"
+                                                   Style="{StaticResource Mono}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding Value}" Margin="0,0,8,0" />
+
+                                        <TextBlock Grid.Column="3" Text="{Binding Mode}"
+                                                   Style="{StaticResource Mono}"
+                                                   Foreground="{Binding Color}" />
+
+                                        <TextBlock Grid.Column="4" Text="{Binding Server}"
+                                                   Style="{StaticResource Mono}"
+                                                   Foreground="{DynamicResource Muted}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock x:Name="OrderNote" Style="{StaticResource Caption}"
+                               Margin="4,10,0,0" TextWrapping="Wrap" />
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

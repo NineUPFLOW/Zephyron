@@ -1,0 +1,401 @@
+@echo off
+rem Builds the window and nz, and deploys both to build\.
+rem
+rem The window is the program; nz is the troubleshooting tool beside it. The
+rem console that used to be built here was removed on 23.09.
+rem
+rem Why the extra copy: running straight out of a project's bin\ folder makes
+rem every rebuild fail while it is running, because MSBuild writes into the very
+rem directory holding the loaded assemblies. Running from build\ instead means
+rem "dotnet build" always succeeds, and only this script needs it stopped.
+rem
+rem ASCII only on purpose: cmd.exe reads batch files in the OEM code page,
+rem and UTF-8 Cyrillic here breaks apart into bogus commands.
+setlocal
+
+set "ROOT=%~dp0"
+rem nz, not the old console: the console was removed on 23.09. nz is the
+rem troubleshooting tool that needs no administrator rights and holds no
+rem logic of its own - see tools\nz\Program.cs.
+set "NZ=%ROOT%tools\nz\bin\Debug\net8.0-windows"
+set "WINDOW=%ROOT%gui\Zephyron.Gui\bin\Debug\net8.0-windows"
+set "TARGET=%ROOT%build"
+
+set "DOTNET=C:\Program Files\dotnet\dotnet.exe"
+
+echo Building the libraries and nz...
+"%DOTNET%" build "%ROOT%Zephyron.sln" -v quiet --nologo
+if %errorlevel% neq 0 (
+    echo Build failed.
+    exit /b 1
+)
+
+rem The window lives in its own solution and is not part of Zephyron.sln:
+rem it must not be able to break the console build or CI.
+echo Building the window...
+"%DOTNET%" build "%ROOT%gui\Zephyron.Gui.sln" -v quiet --nologo
+if %errorlevel% neq 0 (
+    echo Build failed.
+    exit /b 1
+)
+
+rem ---------------------------------------------------------------------------
+rem Stop what is running before copying over it.
+rem
+rem Through the program's own --stop, not by killing names. The supervisor is
+rem the same executable as the window since 0.5.0, so "taskkill /im" would take
+rem the window with it - and leave the state file behind, after which the next
+rem start refuses, believing an instance is still up.
+rem
+rem From %ROOT%, not from wherever this was invoked: the state file lives at
+rem runtime\supervisor.state.json relative to the working directory. Called from
+rem elsewhere, --stop reports "not running" and leaves the engines holding the
+rem very files we are about to overwrite.
+rem ---------------------------------------------------------------------------
+rem Only names that cannot be confused with the current one. The old console
+rem was zephyron.exe, which differs from Zephyron.exe by case alone - and
+rem Windows does not distinguish case, so asking for the old one hands the
+rem window an argument it does not know. It then opens normally, and cmd waits
+rem for that window to be closed: the script hangs at this very line, having
+rem launched the program it was told to stop.
+rem
+rem The leftover console is not stopped by name at all. It cannot outlive its
+rem own supervisor, and the deploy step below removes it.
+rem
+rem Neither call is trusted to report success. Whether the stop mattered is
+rem answered by robocopy below, which is the only honest source.
+rem
+rem From %ROOT%, not from wherever this was invoked: the state file lives at
+rem runtime\supervisor.state.json relative to the working directory. Called from
+rem elsewhere, --stop reports "not running" and leaves the engines holding the
+rem very files we are about to overwrite.
+rem Nothing to stop is the common case, and it is answered by a file and a
+rem process name rather than by launching anything. The program asks for
+rem administrator rights through its manifest, so starting it from an ordinary
+rem shell just to learn there was nothing running cost a minute of waiting on
+rem elevation that was never going to be granted.
+rem
+rem Both, not the state file alone: the window hidden in the tray holds the
+rem deployed files with no engines up at all, and until 24.09 that meant
+rem closing the tray by hand before every build.
+set "RUNNING="
+if exist "%ROOT%runtime\supervisor.state.json" set "RUNNING=1"
+tasklist /fi "imagename eq Zephyron.exe" 2>nul | find /i "Zephyron.exe" >nul
+if not errorlevel 1 set "RUNNING=1"
+if not defined RUNNING goto :stopped
+
+echo Stopping the engines and closing the window...
+
+pushd "%ROOT%"
+
+rem --quit stops the engines and closes the window together with its tray
+rem icon. A build deployed before 24.09 does not know the switch and exits
+rem without doing anything, so if the engines are still up afterwards the old
+rem --stop takes care of them; its window then has to be closed by hand once.
+if exist "%TARGET%\Zephyron.exe" "%TARGET%\Zephyron.exe" --quit >nul 2>&1
+if exist "%ROOT%runtime\supervisor.state.json" if exist "%TARGET%\Zephyron.exe" "%TARGET%\Zephyron.exe" --stop >nul 2>&1
+if exist "%TARGET%\Zephyron.Gui.exe" "%TARGET%\Zephyron.Gui.exe" --stop >nul 2>&1
+
+popd
+
+rem The window takes a moment to go after it is asked to. Wait for the process
+rem itself, up to fifteen seconds, instead of guessing a fixed delay.
+set /a WAITED=0
+
+:waitexit
+tasklist /fi "imagename eq Zephyron.exe" 2>nul | find /i "Zephyron.exe" >nul
+if errorlevel 1 goto :stopped
+if %WAITED% geq 15 goto :stopped
+ping -n 2 127.0.0.1 >nul 2>&1
+set /a WAITED+=1
+goto :waitexit
+
+:stopped
+
+rem Give the engines a moment to release WinDivert and the TUN adapter.
+rem "ping" rather than "timeout": the latter fails outright when this script
+rem runs with redirected input, which is how it runs from other tools.
+ping -n 3 127.0.0.1 >nul 2>&1
+
+rem The open window holds the deployed assemblies just as firmly as the
+rem supervisor does. --quit closes it, but an older build or an instance that
+rem did not answer can still be there. Say so plainly, because robocopy's
+rem failure alone does not point at the open window.
+rem Both names, because a working copy updated across the rename still runs the
+rem old one. tasklist filters by exact image name, so Zephyron.Gui.exe is not
+rem covered by asking about Zephyron.exe - and the deploy then failed with
+rem robocopy's "something is holding the files", which does not point at the
+rem open window at all.
+tasklist /fi "imagename eq Zephyron.exe" 2>nul | find /i "Zephyron.exe" >nul
+if not errorlevel 1 goto :open
+
+tasklist /fi "imagename eq Zephyron.Gui.exe" 2>nul | find /i "Zephyron.Gui.exe" >nul
+if not errorlevel 1 goto :open
+
+goto :deploy
+
+:open
+echo.
+echo ============================================================
+echo  BUILD NOT DONE: Zephyron is still running.
+echo ============================================================
+echo.
+echo  Most likely the window is hidden in the tray. The close
+echo  button hides it rather than exits - the process lives on
+echo  and holds the files.
+echo.
+echo  Exit from the tray icon: right-click - the exit item.
+echo  Then run the build again.
+echo.
+echo  If the tray is empty, an elevated instance is left over -
+echo  only a console with the same rights can stop it.
+echo.
+exit /b 1
+
+:deploy
+
+rem Files from before the rename go first, and it has to be before the copy,
+rem not after. After the rename the old console and the new window are the same
+rem names to the file system: zephyron.exe and Zephyron.exe differ only in
+rem case, and Windows does not distinguish. Cleaning up afterwards deleted the
+rem very file just deployed, and build\ came out with no window in it at all.
+rem
+rem Zephyron.Gui.exe is the unambiguous marker of an old layout, so the whole
+rem cleanup runs only when one is actually there - once, and never again.
+if exist "%TARGET%\Zephyron.Gui.exe" (
+    echo Removing files from before the rename
+    del /q "%TARGET%\Zephyron.Gui.*" >nul 2>&1
+    del /q "%TARGET%\zephyron.exe" "%TARGET%\zephyron.dll" >nul 2>&1
+    del /q "%TARGET%\zephyron.deps.json" "%TARGET%\zephyron.runtimeconfig.json" >nul 2>&1
+    del /q "%TARGET%\zephyron.pdb" >nul 2>&1
+)
+
+rem The console was removed on 23.09; its files in build\ would otherwise stay
+rem forever and keep looking like part of the program.
+del /q "%TARGET%\ZephyronOld.*" >nul 2>&1
+
+echo Deploying to %TARGET%
+
+rem /R and /W are not optional here. Robocopy defaults to one million retries
+rem with a thirty second wait, so a single locked file hangs the script for
+rem what is effectively forever. Observed exactly that when a stray instance
+rem held the deployed assemblies. Two quick retries, then fail loudly.
+robocopy "%NZ%" "%TARGET%" /E /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
+if %errorlevel% geq 8 goto :held
+
+rem The window second, and never renamed on the way. The apphost looks for its
+rem library by the name baked in at build time, and the runtime config must be
+rem named after it too. Both parts share the same libraries, built from the same
+rem sources, so overwriting them changes nothing.
+robocopy "%WINDOW%" "%TARGET%" /E /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
+if %errorlevel% geq 8 goto :held
+
+rem ---------------------------------------------------------------------------
+rem Build number - for the developer, never for a release.
+rem
+rem The version does not change for days while the program is built ten times
+rem an evening: looking at "0.5.8" alone there is no telling a fresh build from
+rem the one left over from yesterday. The window shows this number next to the
+rem version when the file is there.
+rem
+rem It cannot reach a release by construction: pack.cmd builds the archive from
+rem a fresh publish, where this file does not exist. Nothing needs hiding -
+rem it is enough not to create it.
+rem ---------------------------------------------------------------------------
+
+set "COUNTER=%TARGET%\build-number.txt"
+set /a NUMBER=1
+
+if exist "%COUNTER%" (
+    for /f "usebackq delims=" %%N in ("%COUNTER%") do set /a NUMBER=%%N+1
+)
+
+> "%COUNTER%" echo %NUMBER%
+echo Build %NUMBER%
+
+rem ---------------------------------------------------------------------------
+rem Engines, bundled next to the program) so build\ runs on its own.
+rem
+rem Copied at build time rather than committed. Two reasons. The lists are
+rem Zapret's data and change with it - a copy in git would be a stale fork of
+rem someone else's work within weeks. And they are third-party binaries: keeping
+rem them out of the repository keeps the licences out of it too, which matters
+rem because WinDivert is LGPL/GPL.
+rem
+rem Only what the engine actually reads gets copied. The installation is 219 MB,
+rem of which _internal is the GUI's Python runtime and logs\ is its history;
+rem neither is any use to us.
+rem ---------------------------------------------------------------------------
+
+set "ENGINES=%TARGET%\engines"
+
+rem The whole folder, not just the executable. sing-box ships with wintun.dll,
+rem and without it the TUN adapter never comes up - a bundle carrying only the
+rem .exe would build cleanly and then fail at runtime for no visible reason.
+rem libcronet.dll and LICENSE travel with it for the same kind of reason.
+rem
+rem Found by search because the release unpacks into a versioned directory
+rem (sing-box-1.13.19-windows-amd64), and pinning that name would break on
+rem the next upgrade.
+set "SINGBOX_DIR="
+for /f "delims=" %%F in ('dir /s /b "%ROOT%tools\sing-box.exe" 2^>nul') do set "SINGBOX_DIR=%%~dpF"
+
+if defined SINGBOX_DIR (
+    echo Bundling sing-box
+    robocopy "%SINGBOX_DIR%." "%ENGINES%\sing-box" /E /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
+    if errorlevel 8 (
+        echo Failed to bundle sing-box
+        exit /b 1
+    )
+) else (
+    echo sing-box not found in tools\ - VPN will be unavailable in this build.
+)
+
+rem The Telegram proxy (tg-ws-proxy-rs, the "TG Proxy" tab): one executable and
+rem its licence, from wherever its release was unpacked under tools\. Optional -
+rem without it the tab says the proxy is missing and nothing else changes.
+set "TGWS_DIR="
+for /f "delims=" %%F in ('dir /s /b "%ROOT%tools\tg-ws-proxy.exe" 2^>nul') do set "TGWS_DIR=%%~dpF"
+
+if defined TGWS_DIR (
+    echo Bundling tg-ws-proxy
+    robocopy "%TGWS_DIR%." "%ENGINES%\tg-ws-proxy" /E /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
+    if errorlevel 8 (
+        echo Failed to bundle tg-ws-proxy
+        exit /b 1
+    )
+) else (
+    echo tg-ws-proxy not found in tools\ - the TG Proxy tab will have no proxy.
+)
+
+rem xray is deliberately left out: it is not wired up yet, and its geoip and
+rem geosite databases alone are 27 MB of dead weight.
+
+set "ZAPRET="
+if exist "C:\Zapret\Dev\lists" set "ZAPRET=C:\Zapret\Dev"
+if not defined ZAPRET if exist "C:\Zapret\lists" set "ZAPRET=C:\Zapret"
+
+if not defined ZAPRET (
+    echo.
+    echo Zapret not found - desync engine not bundled. Everything else works.
+    goto :done
+)
+
+echo Bundling Zapret from %ZAPRET%
+
+rem exe    - winws2 itself, WinDivert and the Cygwin runtime the GUI's copy needs
+rem lists  - hostlists and ipsets the presets reference
+rem lua    - desync recipes loaded by --lua-init and --lua-desync
+rem bin    - blobs referenced by --blob=
+rem windivert.filter - filter templates
+for %%D in (exe lists lua bin windivert.filter) do (
+    if exist "%ZAPRET%\%%D" (
+        robocopy "%ZAPRET%\%%D" "%ENGINES%\zapret\%%D" /E /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
+        if errorlevel 8 (
+            echo Failed to bundle %%D
+            exit /b 1
+        )
+    )
+)
+
+rem ---------------------------------------------------------------------------
+rem Our own winws2 from tools\, over the copy from the Zapret GUI.
+rem
+rem The Zapret GUI ships winws2 v1.0.3. In it every profile search checks the
+rem modification time of every hostlist file of every profile before it even
+rem looks at the port, and under Cygwin that is ~0.3 ms of kernel time a file.
+rem Measured 03.10 on Universal V10: a new connection cost winws2 28-38 ms of
+rem CPU in its single thread. v1.0.5.1 checks the port first ("optimize
+rem profile search. fast checks first"); on port 444 the cost fell from 34-39
+rem to 14-22 ms, and the desync opened the same sites.
+rem
+rem Since 07.10 it is loop-uh's native build of the same engine
+rem (git.zapret.moe/zapretdiscordyoutube/zapret2-fork): bol-van's sources with
+rem the Cygwin layer replaced, no cygwin1.dll. Measured 07.10 on V11 Lite
+rem against bol-van's v1.0.5.2, same rules: a new connection on port 443 cost
+rem 10-12 ms of CPU instead of 27-32, upload at ~200 Mbit/s held 46-47 % of
+rem the core instead of 69-77 %, speed the same.
+rem
+rem Only the executable; WinDivert.dll stays the Zapret GUI one, which loads
+rem Monkey64.sys. Put the winws2.exe anywhere under tools\ - one copy, since
+rem the last one listed wins; without it the build keeps the Zapret GUI copy.
+rem cygwin1.dll goes only when the chosen winws2 does not import it: bol-van's
+rem own release still needs it, and so does the Zapret GUI copy.
+rem ---------------------------------------------------------------------------
+set "WINWS2="
+for /f "delims=" %%F in ('dir /s /b "%ROOT%tools\winws2.exe" 2^>nul') do set "WINWS2=%%F"
+
+if defined WINWS2 (
+    echo Bundling winws2 from %WINWS2%
+    copy /y "%WINWS2%" "%ENGINES%\zapret\exe\winws2.exe" >nul
+    if errorlevel 1 (
+        echo Failed to bundle winws2
+        exit /b 1
+    )
+    findstr /m /i /c:"cygwin1.dll" "%WINWS2%" >nul || del /q "%ENGINES%\zapret\exe\cygwin1.dll" 2>nul
+)
+
+rem ---------------------------------------------------------------------------
+rem Our own lists, delivered where the engine looks for them.
+rem
+rem Preset sections reference hostlists as "lists/<name>" relative to the Zapret
+rem root, and winws2 resolves them there - not next to our config. So a section
+rem pointing at config\lists\proton.txt would load nothing and match nothing.
+rem
+rem Prefixed with nz- so they cannot collide with Zapret's own files. Without
+rem the prefix our discord.txt would quietly replace theirs, and the preset
+rem would start matching a different set of names than its author wrote.
+rem
+rem Needed because --hostlist-domains is a FIXED list: it matches the written
+rem name and nothing under it. Only the file form carries "subdomains auto
+rem apply", so anything that has to cover a zone must ship as a file.
+rem ---------------------------------------------------------------------------
+
+echo Bundling our lists
+for %%F in ("%ROOT%config\lists\*.txt") do (
+    copy /y "%%F" "%ENGINES%\zapret\lists\nz-%%~nxF" >nul
+)
+
+
+rem Presets are ours and come from presets\ in the repository. Nothing is taken
+rem from the Zapret installation any more: it keeps two folders and a hundred
+rem and fifty files, mostly sweeps of one strategy, so which of them to show
+rem had to be decided on the user's behalf - and every such choice was
+rem arguable. They also changed underneath us whenever Zapret updated.
+rem
+rem Lists still come from Zapret, above: a preset refers to them relative to
+rem the working directory, which stays the installation root when winws2 runs.
+if exist "%ROOT%presets" (
+    robocopy "%ROOT%presets" "%TARGET%\presets" *.txt /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
+    if errorlevel 8 (
+        echo Failed to bundle presets
+        exit /b 1
+    )
+)
+
+rem Stale copies from a build made before the move would otherwise be found
+rem first and quietly shadow the new folder.
+if exist "%ENGINES%\zapret\presets" rd /s /q "%ENGINES%\zapret\presets"
+
+:done
+echo.
+echo Done. Nothing is running now - start Zephyron.exe from build\.
+exit /b 0
+
+:held
+echo.
+echo ============================================================
+echo  BUILD NOT DONE: files in %TARGET% are in use.
+echo ============================================================
+echo.
+echo  The engines were stopped above, so something else holds them.
+echo  Most often it is the window itself, hidden in the tray: the
+echo  close button hides it rather than exits.
+echo.
+echo  Who holds them:
+echo    tasklist ^| findstr /i "zephyron sing-box winws2"
+echo.
+echo  An instance started as administrator can only be stopped
+echo  from a console with the same rights.
+echo.
+exit /b 1

@@ -1,0 +1,22 @@
+{
+  // «Ванильная», встроенная. Светлая тёплая — для тех, кому белый режет глаз.
+  "name": "Ванильная",
+  "author": "Zephyron",
+  "base": "light",
+  "colors": {
+    "backdrop": "#FBF3E6",
+    "surface": "#FFFCF6",
+    "raised": "#F5E9D5",
+    "border": "#E4D2B6",
+    "text": "#3B3225",
+    "muted": "#6E6151",
+    "faint": "#9C8D77",
+    "accent": "#955200",
+    "accent-dim": "#EAD9BE",
+    "danger": "#B3261E",
+    "warn": "#7A5200",
+    "accent-fill": "#C27A2A",
+    "on-accent": "#2A1800",
+    "warn-fill": "#A87B00"
+  }
+}

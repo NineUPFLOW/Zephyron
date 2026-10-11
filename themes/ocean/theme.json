@@ -1,0 +1,22 @@
+{
+  // «Морская», встроенная. Тёмная бирюза с мятным акцентом — свежая и тихая.
+  "name": "Морская",
+  "author": "Zephyron",
+  "base": "dark",
+  "colors": {
+    "backdrop": "#0C1719",
+    "surface": "#132225",
+    "raised": "#1A2E32",
+    "border": "#274248",
+    "text": "#E9F6F4",
+    "muted": "#9FC2BE",
+    "faint": "#779894",
+    "accent": "#6FE3C4",
+    "accent-dim": "#1F5A52",
+    "danger": "#FF8A80",
+    "warn": "#FFD07A",
+    "accent-fill": "#38C4A6",
+    "on-accent": "#04191A",
+    "warn-fill": "#FFD07A"
+  }
+}

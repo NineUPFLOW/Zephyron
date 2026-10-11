@@ -1,0 +1,433 @@
+<UserControl x:Class="Zephyron.Gui.Views.OnboardingView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{DynamicResource Chrome}">
+
+    <UserControl.Resources>
+        <!-- Карточка режима на шаге «Режим работы NZ»: выбранная обведена цветом темы. -->
+        <Style x:Key="ModeCard" TargetType="RadioButton">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Shape" Background="{DynamicResource Surface}"
+                                BorderBrush="{DynamicResource Border}" BorderThickness="1.5"
+                                CornerRadius="12" Padding="16,13">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Raised}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                                <Setter TargetName="Shape" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Shape" Property="Opacity" Value="0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <!--
+        Кнопки шагов — внизу, вне прокрутки (владелец, 06.10, по снимкам
+        сборки 7: в окне 1330×890 при масштабе 125 % «Начать» на первом шаге
+        и «Дальше» на шаге режима уходили под край). Прокручивается только
+        содержимое шага. Обе части — на всю ширину окна (владелец 07.10:
+        «каждое окно что мы делаем должно растягиваться на весь экран»;
+        до того мастер был не шире 680, и на широком окне по бокам пустовало).
+    -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+    <ScrollViewer Grid.Row="0" Style="{StaticResource PageScroll}" Padding="32,28,32,12">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Добро пожаловать" Style="{StaticResource Title}" />
+                    <TextBlock x:Name="StepLabel" Style="{StaticResource Caption}" Margin="0,6,0,0" />
+                </StackPanel>
+
+                <!--
+                    Пропускает шаг, на котором сейчас стоите, а не весь
+                    мастер — подпись меняется на «Готово» на последнем шаге,
+                    где пропускать уже нечего.
+                -->
+                <Button Grid.Column="1" x:Name="HeaderSkip" Style="{StaticResource Ghost}"
+                        Content="Пропустить" Click="OnHeaderSkip" VerticalAlignment="Top" />
+            </Grid>
+
+            <!-- Полоса шагов: пройденные и текущий — цветом акцента. -->
+            <UniformGrid Grid.Row="1" x:Name="Progress" Rows="1" Margin="0,16,0,0" Height="4" />
+
+            <Grid Grid.Row="2" Margin="0,26,0,0">
+
+                <!-- Шаг 1: знакомство -->
+                <StackPanel x:Name="Step1">
+                    <TextBlock Text="Что делает Zephyron" FontSize="17" FontWeight="SemiBold" />
+                    <TextBlock Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap"
+                               Text="Каждому сайту — свой путь. Незаблокированное идёт напрямую и не трогается; где хватает десинка — напрямую, но неузнанным; забаненное по IP — через ваш VPN; закрытое по стране — через посредника по пину." />
+
+                    <!--
+                        Схема пути, живая. Рисуется в коде (StartHero): пакеты
+                        выходят из компьютера одинаковыми, «Маршруты» раскладывают
+                        их по четырём дорогам — напрямую, десинк, VPN, пин — и
+                        каждая по-своему проходит ТСПУ. Подпись выше называет
+                        дороги в том же порядке.
+                    -->
+                    <Border Style="{StaticResource Card}" Margin="0,18,0,0" Padding="0,6">
+                        <Viewbox Stretch="Uniform" MaxHeight="300">
+                            <Canvas x:Name="Hero" Width="700" Height="298" ClipToBounds="True" />
+                        </Viewbox>
+                    </Border>
+
+                    <UniformGrid x:Name="Features" Columns="3" Margin="-5,14,-5,0">
+                        <Border Style="{StaticResource Card}" Margin="5,0" Opacity="0">
+                            <StackPanel>
+                                <TextBlock Text="Десинк" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" />
+                                <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                           Text="Режет и переставляет первые пакеты, чтобы ТСПУ не узнал сайт. Работает без подписки." />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Card}" Margin="5,0" Opacity="0">
+                            <StackPanel>
+                                <TextBlock Text="VPN по маршрутам" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" />
+                                <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                           Text="В туннель уходит только то, что назвали. Банки, игры и российские сайты идут как шли." />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Card}" Margin="5,0" Opacity="0">
+                            <StackPanel>
+                                <TextBlock Text="Разбор" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" />
+                                <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                           Text="Проверка блокировок и диагностика говорят, что сломалось и чем лечится, а не «не работает»." />
+                            </StackPanel>
+                        </Border>
+                    </UniformGrid>
+                </StackPanel>
+
+                <!-- Шаг 2: оформление -->
+                <StackPanel x:Name="Step2" Visibility="Collapsed">
+                    <TextBlock Text="Как будет выглядеть" FontSize="17" FontWeight="SemiBold" />
+                    <TextBlock Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap"
+                               Text="Тема применяется сразу — щёлкните и посмотрите. Сменить её, настроить фон и шрифты или собрать свою можно потом в «Оформлении»." />
+
+                    <ItemsControl x:Name="ThemeList" Margin="0,18,0,0" Focusable="False">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+
+                        <!-- Та же плитка, что в «Оформлении» (ThemeTile). -->
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Tag="{Binding Id}" Click="OnTheme" Margin="0,0,14,10" Cursor="Hand"
+                                        ToolTip="{Binding Tip}" Opacity="{Binding Fade}">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <ContentPresenter />
+                                        </ControlTemplate>
+                                    </Button.Template>
+
+                                    <StackPanel Width="112">
+                                        <Border Height="84" CornerRadius="12" BorderThickness="2"
+                                                Background="{Binding Backdrop}" BorderBrush="{Binding Edge}">
+                                            <Grid>
+                                                <Rectangle RadiusX="10" RadiusY="10" Fill="{Binding Image}" />
+                                                <Rectangle RadiusX="10" RadiusY="10" Fill="{Binding Backdrop}"
+                                                           Opacity="{Binding Dim}" />
+
+                                                <Border Background="{Binding Surface}" CornerRadius="5"
+                                                        Width="52" Height="14" Margin="10,10,0,0"
+                                                        HorizontalAlignment="Left" VerticalAlignment="Top" />
+                                                <Border Background="{Binding Fill}" CornerRadius="5"
+                                                        Width="44" Height="14" Margin="0,30,10,0"
+                                                        HorizontalAlignment="Right" VerticalAlignment="Top" />
+
+                                                <Grid Width="18" Height="18" Margin="0,0,0,9"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Bottom">
+                                                    <Ellipse Stroke="{Binding Ring}" StrokeThickness="1.5" />
+                                                    <Ellipse Width="10" Height="10" Fill="{Binding Dot}"
+                                                             Visibility="{Binding DotShown}" />
+                                                </Grid>
+                                            </Grid>
+                                        </Border>
+
+                                        <TextBlock Text="{Binding Name}" Foreground="{Binding NameColor}"
+                                                   HorizontalAlignment="Center" Margin="0,7,0,0"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock x:Name="ThemeStatus" Style="{StaticResource Caption}" Margin="4,6,0,0" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <!-- Шаг 3: подписка на VPN -->
+                <StackPanel x:Name="Step3" Visibility="Collapsed">
+                    <TextBlock Text="Есть подписка на VPN?" FontSize="17" FontWeight="SemiBold" />
+                    <TextBlock Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap"
+                               Text="Своя подписка — та же ссылка, что вставляют в Happ или другой клиент. Программа её не выдаёт: десинк работает и без неё, но открывает не всё — то, что ТСПУ банит по IP (например Telegram), лечится только через VPN." />
+
+                    <TextBlock Text="Ссылка на подписку" Style="{StaticResource Caption}" Margin="4,18,0,4" />
+
+                    <!--
+                        Пароль, не текст: ссылка на подписку равносильна
+                        паролю, выдаёт весь список серверов с ключами.
+                    -->
+                    <PasswordBox x:Name="SubLink" Padding="10,8" />
+
+                    <TextBlock x:Name="Step3Status" Style="{StaticResource Caption}"
+                               Margin="4,10,0,0" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <!--
+                    Шаг 4: режим работы (владелец, 05.10: «шаг с режимом работы НЗ,
+                    который объясняет, как работает каждый»). После подписки —
+                    «Туннелю» нужен выход, и без подписки он недоступен.
+                    Выбор пишется при «Дальше» (WorkModes.Choose).
+                -->
+                <StackPanel x:Name="StepMode" Visibility="Collapsed">
+                    <TextBlock Text="Режим работы NZ" FontSize="17" FontWeight="SemiBold" />
+                    <TextBlock Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap"
+                               Text="Как программа обходит блокировки. Режим меняется в любой момент — на «Главной» и в меню значка в трее." />
+
+                    <StackPanel Margin="0,18,0,0">
+                        <RadioButton x:Name="PickDesync" Style="{StaticResource ModeCard}" GroupName="OnboardingMode" Tag="Desync" Checked="OnModePicked">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource IconTile}" Margin="0,0,14,0">
+                                    <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE9E9;" Foreground="{DynamicResource Accent}" />
+                                </Border>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="PickDesyncName" FontWeight="SemiBold" FontSize="15" />
+                                    <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
+                                               Text="Чинит блокировки прямо в вашем соединении: портит рукопожатие так, что фильтр оператора не узнаёт имя сайта. Трафик идёт напрямую, адрес остаётся домашним, подписка не нужна. Не поможет там, где отказывают по стране (ChatGPT) или режут по адресу (Telegram, Instagram)." />
+                                </StackPanel>
+                            </Grid>
+                        </RadioButton>
+
+                        <RadioButton x:Name="PickTunnel" Style="{StaticResource ModeCard}" GroupName="OnboardingMode" Tag="Tunnel" Checked="OnModePicked">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource IconTile}" Margin="0,0,14,0">
+                                    <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE774;" Foreground="{DynamicResource Accent}" />
+                                </Border>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="PickTunnelName" FontWeight="SemiBold" FontSize="15" />
+                                    <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
+                                               Text="Весь трафик — через VPN, кроме поставленного «напрямую». Как обычный VPN-клиент: адрес зарубежный, открывается всё, что открывается через ваш сервер. Российские сайты тоже увидят зарубежный адрес. Нужна подписка или WARP." />
+                                    <TextBlock x:Name="PickTunnelNote" Style="{StaticResource Caption}" Margin="0,4,0,0"
+                                               TextWrapping="Wrap" Foreground="{DynamicResource Warn}" Visibility="Collapsed"
+                                               Text="Подписки нет — этот режим поднимать нечем. Подключить её можно на вкладке VPN." />
+                                </StackPanel>
+                            </Grid>
+                        </RadioButton>
+
+                        <RadioButton x:Name="PickRoute" Style="{StaticResource ModeCard}" GroupName="OnboardingMode" Tag="Route" Checked="OnModePicked">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource IconTile}" Margin="0,0,14,0">
+                                    <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE8AB;" Foreground="{DynamicResource Accent}" />
+                                </Border>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="PickRouteName" FontWeight="SemiBold" FontSize="15" />
+                                    <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
+                                               Text="Оба сразу. Что в «Маршрутах» стоит «через VPN», уходит в туннель — с зарубежным адресом; остальное идёт напрямую, и закрытое по имени чинит десинк. Российские сервисы видят домашний адрес. Без подписки работает как «Десинк»." />
+                                </StackPanel>
+                            </Grid>
+                        </RadioButton>
+                    </StackPanel>
+
+                    <!--
+                        Путь DNS (владелец, 06.10: «добавь в мастер выбор днс напрямую,
+                        через туннель или авто»). Здесь, а не отдельным шагом: цена пути
+                        зависит от режима — без туннеля «через туннель» значит «через
+                        движок», — и пояснение меняется вместе с выбранной карточкой.
+                        Те же три пункта и те же слова, что на вкладке DNS
+                        (DnsRoutes.Explain); пишется при «Дальше» вместе с режимом.
+                        Строкой, цена пути — под «i»: карточкой шаг выходил выше окна
+                        (снимок владельца 06.10, сборка 7: окно 1330×890 при масштабе
+                        125 %), а с кнопками внизу строка короче и не спорит с режимами.
+                    -->
+                    <!--
+                        Прокси Telegram (владелец, 07.10: «по аналогии с настройкой днс
+                        так же и включение тг вс прокси на вкладке с выбором режима»).
+                        Стоит то, что в настройках; пишется при «Дальше» вместе с режимом
+                        и DNS (TgWsProxy.Switch). Под «i» — нужен ли он при выбранном режиме.
+                        Выключатель на подложке той же ширины и вида, что список DNS
+                        (владелец 07.10: «сделай фон для прокси телеграм» — голый
+                        выключатель терялся на арте темы), подписи — одной колонкой,
+                        чтобы поле и подложка начинались с одного места.
+                    -->
+                    <Grid Margin="4,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Text="DNS" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <ComboBox Grid.Column="1" x:Name="DnsPick" Width="260" VerticalAlignment="Center"
+                                  SelectionChanged="OnDnsPicked"
+                                  ToolTip="Через что программа узнаёт адреса сайтов. Сменить можно на вкладке DNS.">
+                            <ComboBoxItem Content="авто: через туннель, пока он жив" Tag="Auto" />
+                            <ComboBoxItem Content="спрашивать напрямую" Tag="Direct" />
+                            <ComboBoxItem Content="спрашивать через туннель" Tag="Tunnel" />
+                        </ComboBox>
+                        <ContentControl Grid.Column="2" x:Name="DnsInfo" Style="{StaticResource Info}" Margin="4,0,0,0" />
+
+                        <TextBlock Grid.Row="1" Text="Прокси Telegram" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,10,12,0" />
+                        <Border Grid.Row="1" Grid.Column="1" Width="260" Margin="0,10,0,0" Padding="12,4,8,4"
+                                Background="{DynamicResource Raised}" BorderBrush="{DynamicResource Border}"
+                                BorderThickness="1.5" CornerRadius="10"
+                                ToolTip="Telegram Desktop без VPN. Сменить можно на вкладке «TG Proxy».">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="TgPickState" VerticalAlignment="Center" Text="выключен" />
+                                <ToggleButton Grid.Column="1" x:Name="TgPick" Style="{StaticResource Switch}" VerticalAlignment="Center"
+                                              ToolTipService.ShowOnDisabled="True"
+                                              Checked="OnTgPicked" Unchecked="OnTgPicked" />
+                            </Grid>
+                        </Border>
+                        <ContentControl Grid.Row="1" Grid.Column="2" x:Name="TgInfo" Style="{StaticResource Info}" Margin="4,10,0,0" />
+                    </Grid>
+                </StackPanel>
+
+                <!--
+                    Шаг 5: запуск и проверка. До 07.10 — два шага, «Пробный запуск»
+                    и «Результат»; владелец: «шаги 5 и 6 в мастере стоит объединить».
+                    Проверка сети идёт сама, как только движки поднялись; не стали
+                    запускать — «Проверить» меряет сеть как есть.
+                -->
+                <StackPanel x:Name="Step4" Visibility="Collapsed">
+                    <TextBlock Text="Запуск и проверка" FontSize="17" FontWeight="SemiBold" />
+                    <TextBlock x:Name="Step4Detail" Style="{StaticResource Caption}"
+                               Margin="0,8,0,0" TextWrapping="Wrap" />
+
+                    <Border Style="{StaticResource Card}" Margin="0,18,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Движки" FontWeight="SemiBold" />
+                            <TextBlock x:Name="Step4Status" Style="{StaticResource Caption}" Margin="0,6,0,0"
+                                       TextWrapping="Wrap" Text="Ничего ещё не запускалось." />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Margin="0,10,0,0">
+                        <StackPanel>
+                            <TextBlock x:Name="ResultTitle" FontWeight="SemiBold" TextWrapping="Wrap" />
+
+                            <TextBlock x:Name="ResultVerdict" Style="{StaticResource Mono}"
+                                       Margin="0,8,0,0" />
+
+                            <TextBlock x:Name="ResultBody" Style="{StaticResource Caption}"
+                                       Margin="0,6,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <!--
+                        Канал — здесь, на последнем шаге (владелец, 28.09):
+                        блокировки меняются, и новый выпуск с починкой
+                        человек узнаёт оттуда раньше, чем заглянет в программу.
+                    -->
+                    <Border Style="{StaticResource Card}" Margin="0,10,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Margin="0,0,16,0" VerticalAlignment="Center">
+                                <TextBlock Text="Новости — в телеграм-канале" FontWeight="SemiBold" />
+                                <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,0" TextWrapping="Wrap"
+                                           Text="Блокировки меняются, и починка приходит новым выпуском. В канале — что вышло и зачем обновляться, коротко." />
+                            </StackPanel>
+
+                            <Button Grid.Column="1" Style="{StaticResource Ghost}" Content="Открыть канал"
+                                    Click="OnTelegram" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+            </Grid>
+        </Grid>
+    </ScrollViewer>
+
+    <!-- Кнопки шага: видна полоса текущего (Show), прочие свёрнуты. -->
+    <Grid Grid.Row="1" Margin="32,10,32,24">
+        <StackPanel x:Name="Step1Buttons" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Style="{StaticResource Primary}" Content="Начать" Click="OnIntroNext" />
+        </StackPanel>
+
+        <StackPanel x:Name="Step2Buttons" Orientation="Horizontal" HorizontalAlignment="Right" Visibility="Collapsed">
+            <Button Style="{StaticResource Ghost}" Content="Назад" Margin="0,0,8,0" Click="OnBack" />
+            <Button Style="{StaticResource Primary}" Content="Дальше" Click="OnThemeNext" />
+        </StackPanel>
+
+        <StackPanel x:Name="Step3Buttons" Orientation="Horizontal" HorizontalAlignment="Right" Visibility="Collapsed">
+            <Button Style="{StaticResource Ghost}" Content="Назад" Margin="0,0,8,0" Click="OnBack" />
+            <Button Style="{StaticResource Ghost}" Content="Нет подписки" Margin="0,0,8,0" Click="OnNoSubscription" />
+            <Button x:Name="Step3Next" Style="{StaticResource Primary}"
+                    Content="Загрузить и продолжить" Click="OnAddSubscription" />
+        </StackPanel>
+
+        <StackPanel x:Name="StepModeButtons" Orientation="Horizontal" HorizontalAlignment="Right" Visibility="Collapsed">
+            <Button Style="{StaticResource Ghost}" Content="Назад" Margin="0,0,8,0" Click="OnBack" />
+            <Button Style="{StaticResource Primary}" Content="Дальше" Click="OnModeNext" />
+        </StackPanel>
+
+        <!--
+            «Запустить» — главная, пока движки не поднялись; поднялись — она
+            уходит, и главной становится «Готово» (ShowTrialButtons).
+        -->
+        <StackPanel x:Name="Step4Buttons" Orientation="Horizontal" HorizontalAlignment="Right" Visibility="Collapsed">
+            <Button Style="{StaticResource Ghost}" Content="Назад"
+                    Margin="0,0,8,0" Click="OnBack" />
+            <Button x:Name="RecheckButton" Style="{StaticResource Ghost}" Content="Проверить"
+                    Margin="0,0,8,0" Click="OnRecheck" />
+            <Button x:Name="Step4Start" Style="{StaticResource Primary}"
+                    Content="Запустить" Margin="0,0,8,0" Click="OnStep4Start" />
+            <Button x:Name="FinishButton" Style="{StaticResource Ghost}" Content="Готово" Click="OnFinish" />
+        </StackPanel>
+    </Grid>
+    </Grid>
+</UserControl>

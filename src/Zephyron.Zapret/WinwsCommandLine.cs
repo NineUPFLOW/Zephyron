@@ -1,0 +1,658 @@
+using System.Net;
+using System.Text;
+
+namespace Zephyron.Zapret;
+
+/// <summary>
+/// Свой профиль десинка: имена, которым рецепт выбран руками.
+/// </summary>
+/// <remarks>
+/// Нужен затем, что режим <c>desync</c> в правилах до сих пор означал одно —
+/// «мимо туннеля». Что с именем сделает winws2, решал пресет, и если имя
+/// не попадало ни в один его список, не делалось ничего. Снаружи это
+/// неотличимо от неработающего десинка.
+/// </remarks>
+public sealed record OwnDesyncProfile
+{
+    public required string Name { get; init; }
+
+    /// <summary>Шаги <c>--lua-desync</c> по порядку, без ключа.</summary>
+    public required IReadOnlyList<string> Steps { get; init; }
+
+    /// <summary>Полный путь к списку имён для этого профиля.</summary>
+    public required string HostListPath { get; init; }
+
+    /// <summary>
+    /// Порты для <c>--filter-tcp</c>; пусто — <see cref="PresetPorts.Default"/>.
+    /// </summary>
+    /// <remarks>
+    /// Берутся у секции пресета, которую профиль подменяет, — см.
+    /// <see cref="PresetPorts.ForDomains"/>. Прежде тут стояло зашитое
+    /// <c>80,443</c>, и на Discord это значило, что половина его портов
+    /// оставалась без обработки вовсе.
+    /// </remarks>
+    public string? Ports { get; init; }
+}
+
+/// <summary>
+/// Собирает командную строку winws2 из пресета.
+/// </summary>
+public static class WinwsCommandLine
+{
+    /// <summary>
+    /// Разворачивает пресет в список аргументов запуска.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Аргументы берутся как есть, включая разделители <c>--new</c>: winws2
+    /// разбирает их сам, и полагаться на полноту нашей модели при запуске
+    /// нельзя. Незнакомый ключ должен дойти до движка нетронутым, иначе
+    /// пресет поедет молча и не так, как задумывал автор.
+    /// </para>
+    /// <para>
+    /// Пути к спискам в пресете относительные (<c>lists/youtube.txt</c>),
+    /// поэтому процесс обязан запускаться с рабочим каталогом в корне Zapret.
+    /// Переписывать их в абсолютные здесь нельзя: тогда сломается перенос
+    /// установки, а winws2 всё равно резолвит их сам.
+    /// </para>
+    /// </remarks>
+    /// <param name="excludeList">
+    /// Файл имён, которые десинку трогать нельзя. <c>null</c> либо пустой
+    /// путь — ключ не добавляется вовсе, и командная строка остаётся ровно
+    /// такой, какой её задумал автор пресета.
+    /// </param>
+    /// <param name="own">
+    /// Свои профили: имена, которым человек выбрал рецепт руками.
+    /// </param>
+    /// <param name="gameFilter">
+    /// Дописать секции game filter (см. <see cref="GameFilter"/>). Выключенный
+    /// не меняет в строке ничего — ни секций, ни перехвата.
+    /// </param>
+    /// <param name="tunnelServers">
+    /// Адреса серверов туннеля: их пакеты winws2 не перехватывает вовсе
+    /// (см. <see cref="TunnelCapture"/>). Без адресов строка остаётся как была.
+    /// </param>
+    /// <param name="tunnelFakeRange">
+    /// Диапазон подменных адресов туннеля: соединения на них идут в VPN,
+    /// и десинк их тоже не перехватывает.
+    /// </param>
+    /// <param name="udpOff">
+    /// Сети, UDP к которым десинк не перехватывает (<see cref="UdpOffDesync"/>).
+    /// </param>
+    /// <param name="tunAddresses">
+    /// Адреса нашего TUN: пакеты по дороге в туннель и из него десинк не видит,
+    /// они пройдут через него на выходе из sing-box.
+    /// </param>
+    /// <param name="capture">
+    /// Ширина перехвата поверх пресета (<see cref="PresetCapture"/>). Ставится
+    /// до game filter: тот расширяет уже выбранный уровень, а не наоборот.
+    /// </param>
+    /// <param name="keepList">
+    /// Дыры в щите: имена внутри его зон, которым человек оставил десинк
+    /// (<see cref="DefaultKeepListPath"/>). Пустой или <c>null</c> — щит как был.
+    /// </param>
+    public static IReadOnlyList<string> Build(
+        ZapretPreset preset,
+        string? excludeList = null,
+        IReadOnlyList<OwnDesyncProfile>? own = null,
+        bool gameFilter = false,
+        IReadOnlyList<IPAddress>? tunnelServers = null,
+        string? tunnelFakeRange = null,
+        IReadOnlyList<string>? udpOff = null,
+        IReadOnlyList<IPAddress>? tunAddresses = null,
+        Core.CaptureWidth capture = Core.CaptureWidth.Preset,
+        string? keepList = null)
+    {
+        var arguments = BuildPreset(preset, excludeList, own, keepList);
+
+        PresetCapture.Apply(arguments, capture);
+
+        if (gameFilter)
+            GameFilter.Apply(arguments);
+
+        TunnelCapture.Apply(arguments, tunnelServers, tunnelFakeRange, udpOff, tunAddresses);
+
+        return arguments;
+    }
+
+    private static List<string> BuildPreset(
+        ZapretPreset preset,
+        string? excludeList,
+        IReadOnlyList<OwnDesyncProfile>? own,
+        string? keepList = null)
+    {
+        var arguments = new List<string>();
+
+        // Щит «не трогать» — самым первым профилем, раньше и пресета, и своих
+        // рецептов (Shield). До первого --new у пресета лежат вперемешку
+        // глобальные ключи и его первый профиль; глобальные от места не зависят,
+        // поэтому идут вперёд, а первый профиль — после щита, своим --new.
+        // Без щита голова остаётся ровно как в файле.
+        bool shielded = HasEntries(excludeList);
+
+        if (shielded)
+        {
+            var (globals, firstProfile) = SplitGlobals(preset.GlobalArguments);
+
+            arguments.AddRange(globals);
+            arguments.AddRange(Shield(excludeList!, HasEntries(keepList) ? keepList : null));
+
+            if (firstProfile.Count > 0)
+            {
+                arguments.Add("--new");
+                arguments.AddRange(firstProfile);
+            }
+        }
+        else
+        {
+            arguments.AddRange(preset.GlobalArguments);
+        }
+
+        // Свои профили идут перед пресетовскими, и это единственное место,
+        // где порядок решает всё: winws2 отдаёт пакет первому профилю,
+        // чей фильтр совпал, и дальше не смотрит. Стоя после, наш рецепт
+        // никогда бы не сработал на именах, которые пресет уже забрал себе
+        // под «пропустить» — а это ровно тот случай, ради которого выбор
+        // рецепта и заведён.
+        foreach (var profile in own ?? [])
+        {
+            if (profile.Steps.Count == 0 || string.IsNullOrWhiteSpace(profile.HostListPath))
+                continue;
+
+            arguments.Add("--new");
+            arguments.Add($"--name=Zephyron: {profile.Name}");
+
+            // Порты те же, что у подменяемой секции. Зашитое 80,443 стоило
+            // дорого: у Discord секция объявлена на восьми портах, и пять
+            // из них — запасные HTTPS у Cloudflare, куда клиент уходит сам,
+            // когда сеть ведёт себя плохо. Профиль забирал имя себе, а его
+            // трафик на 2053 или 8443 не видел вовсе.
+            //
+            // Кроме «не трогать»: у него фильтры щита, весь TCP и QUIC. Рецепт
+            // чинит то, что чинила бы секция, и её портов ему довольно; pass
+            // обещает, что имя не тронет никто, — а соединение на порт вне
+            // списка секции и QUIC прошли бы мимо него к пресету.
+            if (RecipeCatalog.IsPass(profile.Steps))
+            {
+                arguments.Add("--filter-tcp=*");
+                arguments.Add("--filter-udp=443");
+            }
+            else
+            {
+                arguments.Add("--filter-tcp="
+                    + (string.IsNullOrWhiteSpace(profile.Ports) ? PresetPorts.Default : profile.Ports));
+            }
+
+            // Прямые слэши, а не обратные. winws2 разбирает аргументы по правилам
+            // Cygwin (родная сборка с 07.10 их повторяет), и обратный слэш
+            // проходит у него как знак экранирования: путь доезжал без
+            // разделителей вовсе. Прямые понимают и Windows, и Cygwin.
+            arguments.Add($"--hostlist={Forward(profile.HostListPath)}");
+            arguments.Add(OutRange);
+
+            // Свой профиль — весь TCP и QUIC, то есть под щитом целиком
+            // (NeedsOwnExclude); копия списка нужна, только когда щита нет.
+            if (!string.IsNullOrWhiteSpace(excludeList) && !shielded)
+                arguments.Add($"--hostlist-exclude={Forward(excludeList)}");
+
+            foreach (var step in profile.Steps)
+                arguments.Add($"--lua-desync={step}");
+        }
+
+        foreach (var section in preset.Sections)
+        {
+            arguments.Add("--new");
+
+            // Исключение повторяется в каждой секции намеренно: winws2
+            // разбирает --hostlist-exclude в пределах профиля, и один ключ
+            // в начале накрыл бы только первый из полутора десятков.
+            //
+            // Ставится сразу после --new, до аргументов секции: так его
+            // не перекроет собственный --hostlist-exclude пресета, если тот
+            // однажды появится, — последний в профиле побеждает.
+            //
+            // Но только там, где секция и сама работает по именам. Исключение
+            // по имени в профиле, который отбирает трафик по адресам либо
+            // по классификатору L7, означать не может ничего: имени в таких
+            // пакетах нет. Зато оно превращает профиль в хостлистовый, а такой
+            // ждёт разобранного имени — и пакет без имени может ему уже
+            // не достаться. Под это попадают ровно голосовые секции Discord:
+            // «Голосовые звонки/чаты» отбирает по stun и discord, «Discord UDP»
+            // по ipset, и в обеих имени не бывает никогда.
+            //
+            // Это и оказалось единственным, чем наш запуск отличался от чужих
+            // на том же пресете: 51 лишний ключ и ни одной потерянной строки.
+            //
+            // И не там, где секцию накрывает щит (NeedsOwnExclude, 03.10).
+            // Щит стоит первым и забирает имя раньше любой секции, так что
+            // копия списка в ней ничего не решает — а стоит дорого: winws2
+            // v1.0.3–1.0.5.2 при каждом поиске профиля проверяет время изменения
+            // каждого файла списков у подходящих профилей, под Cygwin это
+            // ~0,3 мс на файл, и наша копия удваивала число таких проверок
+            // в секциях по именам. Замер 03.10: новое соединение стоило
+            // winws2 28–38 мс процессора на V10 и 1,6–2 мс на пресете
+            // из семи профилей.
+            if (!string.IsNullOrWhiteSpace(excludeList) && FiltersByName(section) && NeedsOwnExclude(section, shielded))
+                arguments.Add($"--hostlist-exclude={Forward(excludeList)}");
+
+            arguments.AddRange(section.RawArguments);
+        }
+
+        return arguments;
+    }
+
+    /// <summary>
+    /// Профиль-щит: имена «не трогать» проходят мимо всего десинка.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Прежде «напрямую» было только <c>--hostlist-exclude</c> в секциях
+    /// по именам. Секции по адресам его не видят, и трафик, выпавший из своей
+    /// секции, они подбирали. 23.09 так лёг Valorant (VAL 43): Riot поставили
+    /// «напрямую», исключение выключило щит <c>pass</c> секции Riot, а платформа
+    /// Riot стоит на Cloudflare 104.18.0.0/16 — целиком в <c>ipset-discord</c>,
+    /// и её забрала секция «discord.com (IP fallback)» с поддельными пакетами.
+    /// </para>
+    /// <para>
+    /// Теперь то же, что спасало Riot в пресете, — секция <c>pass</c>, — стоит
+    /// первой на весь список «не трогать»: пакет с таким именем забирает она,
+    /// и дальше по пресету он не идёт вовсе. Исключения в секциях остаются
+    /// запасом. Трафик без имени (игровой UDP по голым адресам) щит не узнаёт —
+    /// у него нет имени, — но его и прежде вели секции пресета по адресам.
+    /// </para>
+    /// <para>
+    /// Форма та же, что у секции Riot в пресете, под которой Valorant работал:
+    /// список имён, <c>--out-range=-d8</c>, <c>pass</c>. Шире только фильтр —
+    /// все порты TCP вместо <c>80,443-65535</c> и QUIC. По справке winws2
+    /// заданные вместе фильтры TCP и UDP пропускают оба протокола.
+    /// </para>
+    /// <para>
+    /// Дыры (<paramref name="keepList"/>) — <c>--hostlist-exclude</c> того же
+    /// профиля: имя из них щит не берёт, и оно идёт дальше, к своему рецепту
+    /// или секции пресета (владелец 03.10, см. HostsFile.CollectShieldHoles).
+    /// </para>
+    /// </remarks>
+    private static IReadOnlyList<string> Shield(string excludeList, string? keepList = null)
+    {
+        var shield = new List<string>
+        {
+            "--name=Zephyron: не трогать",
+            "--filter-tcp=*",
+            "--filter-udp=443",
+            $"--hostlist={Forward(excludeList)}",
+        };
+
+        if (keepList is not null)
+            shield.Add($"--hostlist-exclude={Forward(keepList)}");
+
+        shield.Add(OutRange);
+        shield.Add("--lua-desync=pass");
+
+        return shield;
+    }
+
+    /// <summary>
+    /// Есть ли в списке хоть одно имя.
+    /// </summary>
+    /// <remarks>
+    /// Щит ставится только над непустым списком. Как winws2 обходится
+    /// с пустым <c>--hostlist</c>, не проверено, и цена ошибки несоразмерна:
+    /// прочти он пустой список как «все имена», <c>pass</c> выключил бы
+    /// десинк целиком.
+    /// </remarks>
+    private static bool HasEntries(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            return false;
+
+        try
+        {
+            return File.ReadLines(path).Any(line =>
+                line.Trim() is { Length: > 0 } text && !text.StartsWith('#'));
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Ключи winws2, общие для всех профилей, — от места в строке не зависят.</summary>
+    private static readonly string[] GlobalKeys =
+        ["--blob", "--lua-init", "--wf-", "--ipcache-", "--ctrack-", "--debug"];
+
+    /// <summary>
+    /// Делит голову пресета (всё до первого --new) на глобальные ключи и первый профиль.
+    /// </summary>
+    /// <remarks>
+    /// Во всех пятнадцати пресетах до первого --new стоят и глобальные
+    /// ключи, и первая секция (у V9 — git.zapret.moe). Незнакомый ключ
+    /// считается ключом профиля и остаётся при нём на своём месте: так
+    /// профиль заведомо не развалится, а глобальный ключ глобален где угодно.
+    /// </remarks>
+    private static (List<string> Globals, List<string> FirstProfile) SplitGlobals(IReadOnlyList<string> head)
+    {
+        var globals = new List<string>();
+        var profile = new List<string>();
+
+        foreach (var argument in head)
+        {
+            if (GlobalKeys.Any(key => argument.StartsWith(key, StringComparison.OrdinalIgnoreCase)))
+                globals.Add(argument);
+            else
+                profile.Add(argument);
+        }
+
+        return (globals, profile);
+    }
+
+    /// <summary>
+    /// Отбирает ли секция трафик по именам.
+    /// </summary>
+    /// <remarks>
+    /// Только таким есть смысл передавать список исключений: он написан
+    /// именами, и сверять его не с чем там, где имя не участвует в отборе.
+    /// Секция без хостлиста берёт трафик по адресам, портам либо
+    /// классификатору — и это ровно те случаи, где имени в пакете нет.
+    /// </remarks>
+    public static bool FiltersByName(ZapretSection section) =>
+        section.HostListPaths.Count > 0 || section.InlineDomains.Count > 0;
+
+    /// <summary>
+    /// Нужна ли секции своя копия списка «не трогать» — или её трафик целиком под щитом.
+    /// </summary>
+    /// <remarks>
+    /// Щит (<see cref="Shield"/>) берёт весь TCP и UDP 443. Секция, чей трафик
+    /// в этих пределах, получает имя только после щита, и копия ей не нужна.
+    /// Нужна она там, куда щит не дотягивается, — по UDP вне 443, — и всюду,
+    /// когда щита нет вовсе: список был пуст при запуске, а «Сайт не
+    /// открывается?» дописывает в него имена на ходу, и winws2 перечитывает
+    /// файл сам. Тогда только копии в секциях эти имена и увидят.
+    /// </remarks>
+    internal static bool NeedsOwnExclude(ZapretSection section, bool shielded)
+    {
+        if (!shielded)
+            return true;
+
+        var udp = string.Join(',', section.RawArguments
+            .Where(a => a.StartsWith("--filter-udp=", StringComparison.OrdinalIgnoreCase))
+            .Select(a => a["--filter-udp=".Length..]));
+
+        return PresetCapture.Ranges(udp).Any(r => r.First != 443 || r.Last != 443);
+    }
+
+    /// <summary>
+    /// Насколько глубоко в соединение пускать рецепт.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Из встроенной справки winws2: <c>d</c> — номер исходящего пакета
+    /// <i>с данными</i>, поэтому <c>-d8</c> означает «первые девять, считая
+    /// с нуля». Рукопожатие TLS укладывается в них с запасом, а дальше идёт
+    /// уже полезная нагрузка, которую корёжить незачем.
+    /// </para>
+    /// <para>
+    /// Пропуск этого ключа стоил дорого и выглядел загадочно. Без него рецепт
+    /// применяется к каждому исходящему пакету соединения подряд. Домен при
+    /// этом открывался в браузере и curl, но sing-box получал от Cloudflare
+    /// <c>tls: handshake failure</c> — мгновенно, не по таймауту. То есть
+    /// имя было открыто, а пользоваться им движок не мог, и по симптомам
+    /// это неотличимо от нерабочего рецепта.
+    /// </para>
+    /// <para>
+    /// Почему именно восемь: столько стоит у профилей пресета, чинящих
+    /// рукопожатие TLS. Там, где рецепт из нескольких шагов и ему нужно окно
+    /// шире, автор ставит <c>-d10</c> — но это его решение для его секций,
+    /// а не общее правило.
+    /// </para>
+    /// </remarks>
+    private const string OutRange = "--out-range=-d8";
+
+    /// <summary>
+    /// Тот же ключ для проверки рецептов.
+    /// </summary>
+    /// <remarks>
+    /// Открыт наружу затем, чтобы проверка собирала профиль ровно теми же
+    /// ключами, что уйдут в работу. Разойдись они — она мерила бы не то,
+    /// что потом применится.
+    /// </remarks>
+    public static string ProbeOutRange => OutRange;
+
+    /// <summary>Где лежит список имён, которые десинку трогать нельзя.</summary>
+    public static string DefaultExcludeListPath => Path.Combine("runtime", "desync-exclude.txt");
+
+    /// <summary>Где лежат дыры в щите: имена внутри его зон, которым оставлен десинк.</summary>
+    public static string DefaultKeepListPath => Path.Combine("runtime", "desync-keep.txt");
+
+    /// <summary>Каталог для списков своих профилей.</summary>
+    public static string OwnListsDirectory => Path.Combine("runtime", "desync");
+
+    /// <summary>
+    /// Раскладывает имена по рецептам и пишет их списки на диск.
+    /// </summary>
+    /// <remarks>
+    /// Файл на рецепт, а не на имя: у winws2 профиль принимает один список,
+    /// и десять имён с одним рецептом должны попасть в один профиль, иначе
+    /// их стало бы десять — с десятикратным разбором каждого пакета.
+    /// </remarks>
+    /// <param name="byRecipe">Рецепт (имя и шаги) → имена, которые им чинить.</param>
+    public static IReadOnlyList<OwnDesyncProfile> WriteOwnLists(
+        IReadOnlyList<(
+            string Name,
+            IReadOnlyList<string> Steps,
+            IReadOnlyList<string> Domains,
+            string? Ports)> byRecipe,
+        string? directory = null)
+    {
+        var root = directory ?? OwnListsDirectory;
+        var profiles = new List<OwnDesyncProfile>();
+
+        try
+        {
+            Directory.CreateDirectory(root);
+
+            // Прежние списки убираем: рецепт могли переименовать или снять,
+            // и осиротевший файл остался бы лежать. Сам по себе он безвреден —
+            // на него никто не сошлётся, — но разбираться в каталоге, где
+            // половина файлов ничья, придётся уже человеку.
+            foreach (var stale in Directory.EnumerateFiles(root, "*.txt"))
+                File.Delete(stale);
+
+            foreach (var (name, steps, domains, ports) in byRecipe)
+            {
+                if (steps.Count == 0 || domains.Count == 0)
+                    continue;
+
+                var path = Path.Combine(root, Sanitize(name) + ".txt");
+
+                File.WriteAllText(
+                    path,
+                    string.Join(Environment.NewLine, domains) + Environment.NewLine,
+                    new UTF8Encoding(false));
+
+                profiles.Add(new OwnDesyncProfile
+                {
+                    Name = name,
+                    Steps = steps,
+                    HostListPath = Path.GetFullPath(path),
+                    Ports = ports,
+                });
+            }
+        }
+        catch (IOException)
+        {
+            // Не записалось — работаем без своих профилей: пресет остаётся
+            // как был. Хуже, чем задумано, но не хуже, чем до этой возможности.
+        }
+
+        return profiles;
+    }
+
+    /// <summary>
+    /// Путь в том виде, в каком его не испортит разбор аргументов winws2.
+    /// </summary>
+    /// <remarks>
+    /// Он разбирает аргументы по правилам Cygwin, где обратный слэш — знак
+    /// экранирования; родная сборка с 07.10 повторяет их дословно. Путь
+    /// доезжал до движка без разделителей вовсе: <c>C:UsersrogfaProjects…</c>.
+    /// Прямые слэши понимают обе стороны.
+    /// </remarks>
+    public static string Forward(string path) => path.Replace('\\', '/');
+
+    /// <summary>
+    /// Создаёт папку над <c>--writable</c> пресета, считая от корня Zapret.
+    /// </summary>
+    /// <remarks>
+    /// <c>--writable=user/winws2</c> — папка, куда lua пишет своё состояние
+    /// (пресет Zapret GUI «white sni (circular)» держит там, какой рецепт
+    /// у какого сайта сработал). Саму папку winws2 создаёт, а путь до неё
+    /// разбирает <c>realpath_any</c>: когда её ещё нет, родитель обязан быть.
+    /// В установке Zapret GUI <c>user</c> есть — там его настройки, — а в нашей
+    /// поставке нет, и winws2 падал на старте: «bad file 'user/winws2'», код 1
+    /// (08.10, сборка 1 версии 0.14.4).
+    /// </remarks>
+    /// <param name="arguments">Готовая строка запуска.</param>
+    /// <param name="zapretRoot">Рабочий каталог winws2 — от него считается путь.</param>
+    public static void PrepareWritable(IEnumerable<string> arguments, string zapretRoot)
+    {
+        const string key = "--writable=";
+
+        foreach (var argument in arguments)
+        {
+            if (!argument.StartsWith(key, StringComparison.Ordinal))
+                continue;
+
+            var dir = argument[key.Length..].Trim().Trim('"');
+
+            if (dir.Length == 0)
+                continue;
+
+            try
+            {
+                var parent = Path.GetDirectoryName(Path.GetFullPath(Path.Combine(zapretRoot, dir)));
+
+                if (!string.IsNullOrEmpty(parent))
+                    Directory.CreateDirectory(parent);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+            {
+                // Не вышло — winws2 скажет сам («bad file»), и это будет видно в журнале.
+            }
+        }
+    }
+
+    /// <summary>
+    /// Имя рецепта в имя файла — строго латиницей и цифрами.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Осторожность не про файловую систему: Windows приняла бы и кириллицу,
+    /// и скобки. Их не принимает winws2: путь проходит через разбор аргументов
+    /// по правилам Cygwin (у родной сборки с 07.10 — тех же), где обратный
+    /// слэш — знак экранирования.
+    /// На имени «googlevideo.com-(CDN-сервера).txt» разбор срабатывал, и до
+    /// движка доезжало <c>C:UsersrogfaProjects…</c> — без единого разделителя.
+    /// В журнале это выглядело как «cannot access hostlist file», а снаружи —
+    /// как неработающий рецепт: профиль есть, список к нему не прицеплен,
+    /// имя не совпадает ни с чем.
+    /// </para>
+    /// <para>
+    /// Хвост из восьми знаков — чтобы «Голосовые звонки» и «Голосовые чаты»,
+    /// от которых после отсева кириллицы не остаётся ничего, не превратились
+    /// в один и тот же файл. Считается от полного имени, поэтому у одного
+    /// рецепта он всегда один и тот же.
+    /// </para>
+    /// </remarks>
+    public static string Sanitize(string name)
+    {
+        var safe = new StringBuilder();
+
+        foreach (char c in name.Trim())
+        {
+            if (char.IsAsciiLetterOrDigit(c) || c is '.' or '-' or '_')
+                safe.Append(c);
+            else if (safe.Length > 0 && safe[^1] != '-')
+                safe.Append('-');
+        }
+
+        var head = safe.ToString().Trim('-', '.');
+
+        // Устойчивый хвост: у одного имени всегда один, у разных — разные.
+        uint hash = 2166136261;
+
+        foreach (char c in name)
+            hash = (hash ^ c) * 16777619;
+
+        return (head.Length == 0 ? "recipe" : head) + "-" + hash.ToString("x8");
+    }
+
+    /// <summary>
+    /// Пишет список исключений; <c>null</c> — исключать нечего.
+    /// </summary>
+    /// <remarks>
+    /// Пустой файл не оставляется: winws2 принял бы его молча, а пустой ключ
+    /// в командной строке потом читался бы как «исключения настроены» — тогда
+    /// как их нет. Отсутствие файла честнее.
+    /// </remarks>
+    public static string? WriteExcludeList(IReadOnlyList<string> names, string? path = null) =>
+        WriteList(names, path ?? DefaultExcludeListPath);
+
+    /// <summary>Пишет дыры в щите; <c>null</c> — дыр нет, и файла тоже.</summary>
+    public static string? WriteKeepList(IReadOnlyList<string> names, string? path = null) =>
+        WriteList(names, path ?? DefaultKeepListPath);
+
+    private static string? WriteList(IReadOnlyList<string> names, string path)
+    {
+        var target = Path.GetFullPath(path);
+
+        try
+        {
+            if (names.Count == 0)
+            {
+                if (File.Exists(target))
+                    File.Delete(target);
+
+                return null;
+            }
+
+            var directory = Path.GetDirectoryName(target);
+
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+
+            File.WriteAllLines(target, names);
+            return target;
+        }
+        catch (Exception)
+        {
+            // Не записалось — запускаемся без исключений: десинк без них
+            // работает как прежде, а отказ от запуска стоил бы дороже.
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Проверяет, что все файлы, на которые ссылается пресет, существуют.
+    /// </summary>
+    /// <returns>Пути, которых не хватает; пустой список — всё на месте.</returns>
+    /// <remarks>
+    /// Отсутствующий список winws2 переживает молча, просто не сопоставив
+    /// ничего в этой секции. Такую поломку лучше увидеть до запуска.
+    /// </remarks>
+    public static IReadOnlyList<string> FindMissingFiles(ZapretPreset preset, string zapretRoot)
+    {
+        var missing = new List<string>();
+
+        foreach (var section in preset.Sections)
+        {
+            foreach (var relative in section.HostListPaths.Concat(section.IpSetPaths))
+            {
+                var path = Path.Combine(zapretRoot, relative.Replace('/', Path.DirectorySeparatorChar));
+
+                if (!File.Exists(path))
+                    missing.Add(relative);
+            }
+        }
+
+        return missing;
+    }
+}

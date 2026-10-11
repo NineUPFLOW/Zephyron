@@ -1,0 +1,338 @@
+using System.Text;
+
+namespace Zephyron.Core.Rules;
+
+/// <summary>
+/// Пользовательский слой правил: читается и перезаписывается программой.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Отдельный файл от базового набора намеренно. Базовый обновляется вместе
+/// с программой, и правки человека в нём затирались бы; кроме того, он
+/// написан руками, с комментариями и осмысленным порядком, а перезапись
+/// из меню всё это уничтожает.
+/// </para>
+/// <para>
+/// Этот файл, наоборот, целиком принадлежит программе: комментариев в нём
+/// не держат, порядок задаётся кодом. Записи хранятся вместе с признаком
+/// включённости, чтобы выбор можно было отключить, не потеряв.
+/// </para>
+/// </remarks>
+public sealed class UserRulesFile
+{
+    private readonly List<UserRuleEntry> _entries;
+
+    private UserRulesFile(string path, List<UserRuleEntry> entries)
+    {
+        Path = path;
+        _entries = entries;
+    }
+
+    public string Path { get; }
+
+    public IReadOnlyList<UserRuleEntry> Entries => _entries;
+
+    public static string DefaultPath => System.IO.Path.Combine("config", "rules.user.yaml");
+
+    public static UserRulesFile Load(string? path = null)
+    {
+        var target = path ?? DefaultPath;
+
+        if (!File.Exists(target))
+            return new UserRulesFile(target, []);
+
+        try
+        {
+            // Через LoadRawRules, а не через движок: тот отбрасывает выключенные
+            // правила, и они пропали бы при первом же сохранении.
+            var entries = RuleSetLoader.LoadRawRules(target)
+                .Select(r => new UserRuleEntry
+                {
+                    Match = r.Match,
+                    Value = r.Value,
+                    Mode = r.Mode,
+                    Recipe = r.Recipe,
+                    Enabled = r.Enabled,
+                    Off = r.Off,
+                })
+                .ToList();
+
+            return new UserRulesFile(target, entries);
+        }
+        catch (RuleConfigurationException)
+        {
+            // Испорченный файл не должен мешать работе, но и пропадать
+            // не должен: следующее сохранение перезаписало бы его пустым,
+            // и правки человека исчезли бы вместе с опечаткой, из-за которой
+            // файл не разобрался. Отодвигаем в сторону — починить или
+            // подсмотреть можно, работе не мешает.
+            SetAside(target);
+            return new UserRulesFile(target, []);
+        }
+    }
+
+    /// <summary>Расширение, под которым сохраняется неразобранный файл.</summary>
+    public const string BrokenSuffix = ".broken";
+
+    private static void SetAside(string path)
+    {
+        try
+        {
+            if (!File.Exists(path))
+                return;
+
+            var broken = path + BrokenSuffix;
+
+            // Затираем предыдущий сохранённый: две поломки подряд означают,
+            // что чинят прямо сейчас, и интересна последняя.
+            if (File.Exists(broken))
+                File.Delete(broken);
+
+            File.Move(path, broken);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
+    /// <summary>
+    /// Добавляет или заменяет запись. Совпадением считается пара «тип + значение».
+    /// </summary>
+    /// <param name="recipe">
+    /// Чем чинить имя при <see cref="RoutingMode.Desync"/>; <c>null</c> —
+    /// решает пресет, как было до появления выбора.
+    /// </param>
+    /// <param name="before">
+    /// Значение более широкого правила того же типа, раньше которого встаёт
+    /// новая запись. Часть сервиса, лежащая внутри другого списка
+    /// (<c>ServicePart.Within</c>), иначе встала бы после него и не сработала
+    /// никогда: движок берёт первое совпавшее правило.
+    /// </param>
+    public void Set(MatchKind match, string value, RoutingMode mode, string? recipe = null, string? before = null) =>
+        Put(new UserRuleEntry
+        {
+            Match = match,
+            Value = value.Trim(),
+            Mode = mode,
+
+            // Рецепт хранится только у десинка: у прочих режимов ему нечего
+            // означать, а оставленный при смене режима он всплыл бы потом
+            // необъяснимой строкой в файле.
+            Recipe = mode == RoutingMode.Desync ? recipe : null,
+            Enabled = true,
+        }, before);
+
+    /// <summary>
+    /// Выключает часть: не действует ни своё правило, ни базовое на тот же список.
+    /// </summary>
+    /// <remarks>См. <see cref="RoutingRule.Off"/>. Место в файле — как у <see cref="Set"/>.</remarks>
+    public void SetOff(MatchKind match, string value, string? before = null) =>
+        Put(new UserRuleEntry
+        {
+            Match = match,
+            Value = value.Trim(),
+            Mode = RoutingMode.Direct,
+            Enabled = true,
+            Off = true,
+        }, before);
+
+    private void Put(UserRuleEntry entry, string? before)
+    {
+        int index = _entries.FindIndex(e => e.Match == entry.Match && e.Matches(entry.Value));
+
+        if (index >= 0)
+        {
+            _entries[index] = entry;
+            return;
+        }
+
+        int wider = before is null ? -1 : _entries.FindIndex(e => e.Match == entry.Match && e.Matches(before.Trim()));
+
+        if (wider >= 0)
+            _entries.Insert(wider, entry);
+        else
+            _entries.Add(entry);
+    }
+
+    public bool Remove(MatchKind match, string value)
+    {
+        int index = _entries.FindIndex(e => e.Match == match && e.Matches(value.Trim()));
+
+        if (index < 0)
+            return false;
+
+        _entries.RemoveAt(index);
+        return true;
+    }
+
+    /// <summary>
+    /// Удаляет запись по номеру в списке.
+    /// </summary>
+    /// <remarks>
+    /// Отдельно от <see cref="Remove(MatchKind, string)"/>: тот ищет по паре
+    /// «тип и значение», а редактор показывает нумерованный список, и
+    /// восстанавливать по номеру пару ради поиска — лишний шаг, на котором
+    /// можно ошибиться.
+    /// </remarks>
+    public UserRuleEntry? RemoveAt(int index)
+    {
+        if (index < 0 || index >= _entries.Count)
+            return null;
+
+        var removed = _entries[index];
+        _entries.RemoveAt(index);
+        return removed;
+    }
+
+    /// <summary>
+    /// Переставляет запись: вынимает с места <paramref name="from"/>
+    /// и ставит на место <paramref name="to"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Для перетаскивания в «Порядке вычисления» (владелец, 26.09). Внутри
+    /// своей группы движок проверяет правила в порядке файла, и прежде
+    /// поменять его можно было только руками — а файл ведёт программа.
+    /// </para>
+    /// <para>
+    /// Порядок переживает дальнейшие правки: <see cref="Set"/> заменяет
+    /// запись на её же месте, а новая встаёт в конец.
+    /// </para>
+    /// </remarks>
+    public bool Move(int from, int to)
+    {
+        if (from < 0 || from >= _entries.Count || to < 0 || to >= _entries.Count)
+            return false;
+
+        if (from == to)
+            return true;
+
+        var entry = _entries[from];
+        _entries.RemoveAt(from);
+        _entries.Insert(to, entry);
+        return true;
+    }
+
+    /// <summary>Заменяет запись на её же месте.</summary>
+    public void ReplaceAt(int index, UserRuleEntry entry) => _entries[index] = entry;
+
+    /// <summary>Заменяет все записи чужими — загрузка маршрутов из файла (<see cref="RulesShare"/>).</summary>
+    public void ReplaceAll(IEnumerable<UserRuleEntry> entries)
+    {
+        _entries.Clear();
+        _entries.AddRange(entries);
+    }
+
+    public bool Toggle(int index)
+    {
+        if (index < 0 || index >= _entries.Count)
+            return false;
+
+        _entries[index] = _entries[index] with { Enabled = !_entries[index].Enabled };
+        return true;
+    }
+
+    public void Save()
+    {
+        var directory = System.IO.Path.GetDirectoryName(Path);
+
+        if (!string.IsNullOrEmpty(directory))
+            Directory.CreateDirectory(directory);
+
+        var builder = new StringBuilder();
+
+        builder.AppendLine("# Ваши маршруты.");
+        builder.AppendLine("#");
+        builder.AppendLine("# Файл ведёт программа: правьте его на вкладке «Маршруты».");
+        builder.AppendLine("# Комментарии, добавленные вручную, при следующей записи пропадут.");
+        builder.AppendLine("#");
+        builder.AppendLine("# Эти правила проверяются раньше базовых из rules.yaml, поэтому");
+        builder.AppendLine("# ваш выбор перекрывает заводскую настройку. Выключенная запись");
+        builder.AppendLine("# (enabled: false) сохраняется, но не применяется — действует");
+        builder.AppendLine("# заводская. mode: off выключает часть целиком: не действует");
+        builder.AppendLine("# ни эта запись, ни заводское правило на тот же список.");
+        builder.AppendLine();
+
+        if (_entries.Count == 0)
+        {
+            builder.AppendLine("rules: []");
+        }
+        else
+        {
+            builder.AppendLine("rules:");
+
+            foreach (var entry in _entries)
+            {
+                builder.AppendLine($"  - match: {Describe(entry.Match)}");
+                builder.AppendLine($"    value: {Quote(entry.Value)}");
+                builder.AppendLine($"    mode: {(entry.Off ? "off" : Describe(entry.Mode))}");
+
+                if (!string.IsNullOrWhiteSpace(entry.Recipe))
+                    builder.AppendLine($"    recipe: {Quote(entry.Recipe)}");
+
+                if (!entry.Enabled)
+                    builder.AppendLine("    enabled: false");
+            }
+        }
+
+        File.WriteAllText(Path, builder.ToString(), new UTF8Encoding(false));
+    }
+
+    private static string Describe(MatchKind match) => match switch
+    {
+        MatchKind.Process => "process",
+        MatchKind.Domain => "domain",
+        MatchKind.IpSet => "ipset",
+        MatchKind.HostList => "hostlist",
+        _ => "ip",
+    };
+
+    /// <summary>Строка YAML в двойных кавычках — с экранированием и косой черты.</summary>
+    /// <remarks>
+    /// Прежде экранировалась одна кавычка. Путь программы вида
+    /// <c>C:\Program Files\App\app.exe</c> YAML читает как управляющие
+    /// последовательности <c>\P</c>, <c>\A</c> — и отвергает файл целиком:
+    /// одно правило по программе стоило бы всех своих маршрутов. Нашлось
+    /// 23.09 на тесте, где список лёг путём Windows.
+    /// </remarks>
+    private static string Quote(string value) =>
+        "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+
+    private static string Describe(RoutingMode mode) => mode switch
+    {
+        RoutingMode.Proxy => "proxy",
+        RoutingMode.Desync => "desync",
+        _ => "direct",
+    };
+}
+
+public sealed record UserRuleEntry
+{
+    public required MatchKind Match { get; init; }
+
+    public required string Value { get; init; }
+
+    public required RoutingMode Mode { get; init; }
+
+    /// <summary>Чем чинить имя; <c>null</c> — решает пресет.</summary>
+    public string? Recipe { get; init; }
+
+    public bool Enabled { get; init; } = true;
+
+    /// <summary>Часть выключена целиком (<see cref="RoutingRule.Off"/>); <see cref="Mode"/> тогда не значит ничего.</summary>
+    public bool Off { get; init; }
+
+    public bool Matches(string value) =>
+        string.Equals(Value, value, StringComparison.OrdinalIgnoreCase);
+
+    public string DescribeMode() => Off ? "выключено" : Mode switch
+    {
+        RoutingMode.Proxy => "VPN",
+        RoutingMode.Desync => "десинк",
+        _ => "напрямую",
+    };
+
+}

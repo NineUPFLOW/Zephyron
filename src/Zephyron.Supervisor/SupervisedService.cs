@@ -1,0 +1,1321 @@
+using System.Diagnostics;
+using System.Text;
+using Zephyron.Core;
+using Zephyron.Proxy;
+
+namespace Zephyron.Supervisor;
+
+/// <summary>
+/// Чем кончилась функциональная проверка службы.
+/// </summary>
+/// <remarks>
+/// Главное здесь — что <see cref="UpstreamDown"/> отделён от
+/// <see cref="Broken"/>. Снаружи оба выглядят одинаково: трафик не идёт.
+/// Но лечатся они противоположным, и перезапуск во втором случае — чистый
+/// вред: движок гаснет на восемнадцать секунд и поднимается в ту же
+/// мёртвую подписку.
+/// </remarks>
+public enum ServiceCheck
+{
+    /// <summary>Работает.</summary>
+    Healthy,
+
+    /// <summary>Сломан сам движок — перезапуск уместен.</summary>
+    Broken,
+
+    /// <summary>
+    /// Движок исправен, но наружу не доходит: выход мёртв.
+    /// </summary>
+    /// <remarks>
+    /// Распознаётся по тому, что Clash API движка отвечает. Отвечает —
+    /// значит процесс жив, слушает и обрабатывает запросы; всё, что
+    /// не доходит дальше, лежит за пределами нашей власти.
+    /// </remarks>
+    UpstreamDown,
+}
+
+public enum ServiceHealth
+{
+    /// <summary>Не запускался или остановлен намеренно.</summary>
+    Stopped,
+
+    /// <summary>Процесс жив и функциональная проверка пройдена.</summary>
+    Healthy,
+
+    /// <summary>Процесс жив, но функциональная проверка не проходит.</summary>
+    Degraded,
+
+    /// <summary>Процесс умер.</summary>
+    Dead,
+
+    /// <summary>Перезапуски исчерпаны, служба сдалась.</summary>
+    Faulted,
+}
+
+/// <summary>
+/// Служба под присмотром супервизора.
+/// </summary>
+/// <remarks>
+/// Проверка живости двухуровневая намеренно. «Процесс существует» — слабая
+/// гарантия: sing-box успевает подняться и умереть по существу, оставаясь
+/// живым процессом. Поэтому у каждой службы есть ещё и функциональная
+/// проверка, своя для каждой.
+/// </remarks>
+public abstract class SupervisedService
+{
+    public abstract string Name { get; }
+
+    protected Process? Process { get; set; }
+
+    /// <summary>
+    /// Куда складывать вывод службы. Если не задан, вывод отбрасывается,
+    /// но всё равно вычитывается.
+    /// </summary>
+    public string? OutputLogPath
+    {
+        get => _outputLogPath;
+        set
+        {
+            _outputLogPath = value;
+            _log?.Dispose();
+            _log = value is null ? null : new RollingLog(value);
+        }
+    }
+
+    private string? _outputLogPath;
+    private RollingLog? _log;
+
+    public int? ProcessId => Process is { HasExited: false } ? Process.Id : null;
+
+    public DateTimeOffset? StartedAt { get; private set; }
+
+    public int RestartCount { get; private set; }
+
+    public string? LastError { get; protected set; }
+
+    /// <summary>
+    /// Что стоит знать о службе, которая работает; <c>null</c> — нечего.
+    /// </summary>
+    /// <remarks>
+    /// Не ошибка: у sing-box это «временная замена выбранному серверу» —
+    /// туннель здоров, но идёт не через то, что выбрал человек, и узнать
+    /// об этом только из журнала было бы поздно.
+    /// </remarks>
+    public string? Remark { get; protected set; }
+
+    /// <summary>Процесс существует и не завершился.</summary>
+    public bool IsProcessAlive => Process is { HasExited: false };
+
+    /// <summary>
+    /// Функциональная проверка: слушается ли порт, отвечает ли API.
+    /// Для служб без наблюдаемого признака возвращает <see cref="ServiceCheck.Healthy"/>.
+    /// </summary>
+    /// <remarks>
+    /// Исходов три, а не два, и третий добавлен по замеру 20.09: у владельца
+    /// семь из девяти серверов подписки перестали отвечать, проверка трафика
+    /// честно проваливалась, и супервизор перезапускал исправный движок.
+    /// Восемнадцать секунд тишины, потом снова — это и есть жалоба «туннель
+    /// отваливается на пару секунд». Перезапуск не чинил ничего: мёртвые
+    /// серверы подписки от него не оживают.
+    /// </remarks>
+    public abstract Task<ServiceCheck> CheckFunctionalAsync(CancellationToken cancellationToken);
+
+    protected abstract ProcessStartInfo BuildStartInfo();
+
+    /// <summary>Проверяет, что всё нужное для запуска на месте.</summary>
+    public abstract string? ValidatePrerequisites();
+
+    /// <summary>
+    /// Задание, в которое включаются запущенные процессы, чтобы они
+    /// не пережили супервизор.
+    /// </summary>
+    public ProcessJob? Job { get; set; }
+
+    /// <summary>Имена процессов движка — для поиска осиротевших экземпляров.</summary>
+    public abstract IReadOnlyList<string> EngineProcessNames { get; }
+
+    /// <summary>
+    /// Забыть всё, что относилось к прежнему запуску.
+    /// </summary>
+    /// <remarks>
+    /// Базовая служба не помнит ничего; переопределяют те, кто помнит.
+    /// Вызывается перед каждым стартом — в том числе перед перезапуском,
+    /// который и есть тот случай, когда старая память вреднее всего.
+    /// </remarks>
+    protected virtual void ForgetRunState()
+    {
+    }
+
+    /// <summary>
+    /// Движок поднялся и отвечает — можно сказать ему то, чего он не помнит
+    /// или помнит неверно.
+    /// </summary>
+    /// <remarks>
+    /// Зовётся при каждом удачном старте, и перезапуск после сбоя — тоже
+    /// старт. Неудача здесь старта не отменяет: движок уже работает.
+    /// </remarks>
+    protected virtual Task OnReadyAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    /// <summary>Движок остановлен — прибрать то, что после него осталось снаружи.</summary>
+    protected virtual void OnStopped()
+    {
+    }
+
+    public async Task<bool> StartAsync(TimeSpan readinessTimeout, CancellationToken cancellationToken)
+    {
+        var problem = ValidatePrerequisites();
+
+        if (problem is not null)
+        {
+            LastError = problem;
+            return false;
+        }
+
+        // Новый процесс — новое положение. Всё, что служба помнит о прежнем
+        // запуске, к нему не относится: память о прежнем обходе заставила бы
+        // нас считать трафик уведённым, когда он идёт в туннель. Группу
+        // выбора свежий движок берёт из своего кэша, а не из конфига, —
+        // её на место ставит OnReadyAsync.
+        ForgetRunState();
+
+        try
+        {
+            Process = Process.Start(BuildStartInfo());
+        }
+        catch (Exception ex)
+        {
+            LastError = ex.GetBaseException().Message;
+            return false;
+        }
+
+        if (Process is null)
+        {
+            LastError = "процесс не запустился";
+            return false;
+        }
+
+        // Включаем в задание сразу после запуска: если супервизор умрёт
+        // аварийно, система погасит движок вместе с ним.
+        Job?.Assign(Process);
+
+        // Вывод обязан вычитываться. Перенаправленный и никем не читаемый
+        // конвейер заполняется и намертво блокирует дочерний процесс на записи
+        // в stdout — служба при этом выглядит живой и проходит проверку порта.
+        StartOutputPump(Process.StandardOutput);
+        StartOutputPump(Process.StandardError);
+
+        StartedAt = DateTimeOffset.Now;
+
+        var deadline = DateTime.UtcNow + readinessTimeout;
+
+        while (DateTime.UtcNow < deadline)
+        {
+            if (!IsProcessAlive)
+            {
+                LastError = $"процесс завершился с кодом {Process.ExitCode}";
+                return false;
+            }
+
+            // На старте годится и мёртвый выход: движок поднялся, а чинить
+            // чужие серверы не его забота. Отказать здесь значило бы вовсе
+            // не дать туннелю встать, пока подписка не оживёт.
+            if (await CheckFunctionalAsync(cancellationToken) is not ServiceCheck.Broken)
+            {
+                LastError = null;
+                await OnReadyAsync(cancellationToken);
+                return true;
+            }
+
+            await Task.Delay(300, cancellationToken);
+        }
+
+        LastError = "функциональная проверка не прошла за отведённое время";
+        return false;
+    }
+
+    public async Task StopAsync(CancellationToken cancellationToken)
+    {
+        if (Process is null || Process.HasExited)
+        {
+            Process = null;
+            StartedAt = null;
+            return;
+        }
+
+        try
+        {
+            Process.Kill(entireProcessTree: true);
+            await Process.WaitForExitAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+        }
+        catch (Exception)
+        {
+            // Мог завершиться сам между проверкой и вызовом.
+        }
+        finally
+        {
+            Process?.Dispose();
+            Process = null;
+            StartedAt = null;
+            OnStopped();
+        }
+    }
+
+    internal void NoteRestart() => RestartCount++;
+
+    /// <summary>Служба снова здорова: прежняя причина больше не действует.</summary>
+    internal void Recovered() => LastError = null;
+
+    private void StartOutputPump(StreamReader reader)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (await reader.ReadLineAsync() is { } line)
+                {
+                    Observe(line);
+                    RecordOutput(line);
+                }
+            }
+            catch (Exception)
+            {
+                // Поток закрывается вместе с процессом — это штатное завершение насоса.
+            }
+        });
+    }
+
+    /// <summary>
+    /// Пишет в журнал движка строку от самого супервизора.
+    /// </summary>
+    /// <remarks>
+    /// Нужна, когда супервизор принимает решение молча: без отметки в журнале
+    /// отличить «проверка пройдена» от «проверка пропущена» можно только по
+    /// исходникам, а ищут причину обычно как раз по журналу.
+    /// </remarks>
+    protected void Note(string line) => RecordOutput($"[супервизор] {line}");
+
+    /// <summary>Строка вывода движка — для тех, кто по ней судит о готовности.</summary>
+    protected virtual void Observe(string line)
+    {
+    }
+
+    /// <remarks>
+    /// Зовётся на каждую строку вывода движка, а winws2 пишет строку
+    /// на соединение — то есть это горячий путь, и лишней работы здесь
+    /// быть не должно.
+    ///
+    /// Её тут и было: строки складывались в очередь на сотню, под замком,
+    /// с подрезкой на каждой записи. Читать эту очередь было некому —
+    /// свойство, ради которого она велась, не вызывалось ни разу
+    /// ни в консоли, ни в окне, ни в проверках.
+    /// </remarks>
+    private void RecordOutput(string line) => _log?.AppendLine(line);
+}
+
+/// <summary>
+/// Прокси-движок sing-box.
+/// </summary>
+/// <remarks>
+/// Функциональная проверка — доступность Clash API. Порт указан в самом
+/// конфиге, так что проверка работает одинаково и для TUN-конфига,
+/// и для проверочного с локальным инбаундом.
+/// </remarks>
+public sealed class SingBoxService : SupervisedService
+{
+    private readonly string _executablePath;
+    private readonly string _configPath;
+    private readonly int _healthPort;
+    private readonly int? _trafficPort;
+    private readonly int _trafficCheckEvery;
+
+    private int _checkCounter;
+    private bool _lastTrafficOk = true;
+    private DateTime? _trafficPortMissingSince;
+    private bool _trafficPortMissingNoted;
+    private bool _upstreamNoted;
+
+    /// <summary>
+    /// Сколько ждать порт проверки, прежде чем счесть, что его нет в конфиге.
+    /// </summary>
+    /// <remarks>
+    /// Clash API и вход проверки открываются независимо, и на старте один
+    /// успевает раньше другого. Без выдержки первый же опрос принял бы
+    /// неподнявшийся порт за отсутствующий. Держится заметно короче таймаута
+    /// готовности, иначе выдержка не успела бы истечь и отказ выглядел бы
+    /// по-старому — молчаливым.
+    /// </remarks>
+    private static readonly TimeSpan TrafficPortGrace = TimeSpan.FromSeconds(5);
+
+    /// <param name="healthPort">Порт Clash API — быстрая проверка живости.</param>
+    /// <param name="trafficPort">
+    /// Порт локального прокси для глубокой проверки. Если задан, раз в
+    /// <paramref name="trafficCheckEvery"/> опросов делается настоящий запрос
+    /// через прокси. Слушающий порт означает лишь, что движок поднялся;
+    /// он ничего не говорит о том, доходит ли трафик до сервера.
+    /// </param>
+    /// <param name="bypassWhenDead">
+    /// Уводить ли трафик мимо туннеля, когда его выходы перестали отвечать.
+    /// </param>
+    /// <param name="preferredExit">
+    /// Закреплённый в настройках выход; <c>null</c> — автоподбор.
+    /// </param>
+    /// <param name="replacePinned">
+    /// Подменять ли закреплённый выход, пока он молчит (AppSettings.ReplaceSilentServer).
+    /// </param>
+    /// <param name="dnsOnly">
+    /// Движок без выхода, только ради DNS (<see cref="DnsEngine"/>): группы выбора
+    /// нет, прогревать и сторожить нечего, живость — по Clash API.
+    /// </param>
+    /// <param name="dnsViaAuto">
+    /// DNS «авто» (AppSettings.DnsVia): переключатель пути DNS в конфиге ставится
+    /// по проходу трафика через туннель — см. <see cref="ApplyDnsPathAsync"/>.
+    /// </param>
+    public SingBoxService(
+        string executablePath,
+        string configPath,
+        int healthPort = 9090,
+        int? trafficPort = null,
+        int trafficCheckEvery = 6,
+        bool bypassWhenDead = true,
+        string? preferredExit = null,
+        int exitCheckSeconds = 30,
+        bool replacePinned = false,
+        bool dnsOnly = false,
+        bool dnsViaAuto = false,
+        string? watchUrl = null)
+    {
+        _watchUrl = string.IsNullOrWhiteSpace(watchUrl) ? Ping.Cloudflare : watchUrl;
+        _dnsOnly = dnsOnly;
+        _dnsViaAuto = dnsViaAuto;
+        _exitCheckSeconds = exitCheckSeconds;
+        _executablePath = executablePath;
+        _configPath = configPath;
+        _healthPort = healthPort;
+        _trafficPort = trafficPort;
+        _trafficCheckEvery = Math.Max(1, trafficCheckEvery);
+        _bypassWhenDead = bypassWhenDead;
+        _preferredExit = string.IsNullOrWhiteSpace(preferredExit) ? null : preferredExit;
+        _watch = new ExitWatch(_preferredExit, replacePinned);
+    }
+
+    private readonly string? _preferredExit;
+
+    /// <summary>Движок только ради DNS — см. параметр конструктора.</summary>
+    private readonly bool _dnsOnly;
+
+    /// <summary>DNS «авто»: путь резолвера ставит надзор (<see cref="ApplyDnsPathAsync"/>).</summary>
+    private readonly bool _dnsViaAuto;
+
+    /// <summary>Куда сейчас смотрит переключатель пути DNS; <c>null</c> — не ставили, в конфиге «напрямую».</summary>
+    private bool? _dnsViaTunnel;
+
+    /// <summary>Счёт опросов для своей проверки «авто», когда «Проверка прохода» выключена.</summary>
+    private int _dnsCheckCounter;
+
+    /// <summary>Итог своей проверки «авто».</summary>
+    private bool _dnsLastOk;
+
+    /// <summary>
+    /// Ставит путь DNS: через туннель, пока он пропускает трафик, иначе напрямую.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Владелец 05.10: «апстрим туннеля — режим авто, который ведёт напрямую,
+    /// если туннель не работает или мёртв, и через туннель, если с ним всё
+    /// в порядке». 30.09 при «через туннель» заминка выхода клала DNS всей
+    /// машины, а при «напрямую» оператор может перекрыть DoH.
+    /// </para>
+    /// <para>
+    /// При запуске переключатель стоит «напрямую» (так собран конфиг), и
+    /// туннель получает DNS только после настоящей проверки прохода — пока
+    /// он прогревается, имена разрешаются. Неудача переключения не беда:
+    /// попробуем на следующем опросе, состояние не запоминается.
+    /// </para>
+    /// </remarks>
+    private async Task ApplyDnsPathAsync(bool tunnelWorks, CancellationToken cancellationToken)
+    {
+        // Ещё не ставили и туннель молчит — переключатель и так «напрямую».
+        if (_dnsViaTunnel is null && !tunnelWorks)
+        {
+            _dnsViaTunnel = false;
+            return;
+        }
+
+        if (_dnsViaTunnel == tunnelWorks)
+            return;
+
+        using var api = new ClashApi($"127.0.0.1:{_healthPort}", Talk, EngineKeys.Current(_configPath));
+
+        if (!await api.SelectAsync(SingBoxOptions.DnsPathTag, tunnelWorks ? SelectorGroup : "direct", cancellationToken))
+            return;
+
+        _dnsViaTunnel = tunnelWorks;
+
+        Note(tunnelWorks
+            ? "DNS (авто): туннель пропускает трафик — имена спрашиваются через него."
+            : "DNS (авто): туннель не пропускает трафик — имена спрашиваются напрямую, пока он не оживёт.");
+    }
+
+    /// <summary>Решения сторожа: когда искать замену и когда возвращать закреплённый выход.</summary>
+    private readonly ExitWatch _watch;
+
+    /// <summary>
+    /// Закреплённый выход есть в конфиге и встал на старте.
+    /// </summary>
+    /// <remarks>
+    /// Пропавший из подписки сервер возвращать некуда, и мерить его незачем:
+    /// каждый замер лёг бы в файл замеров промахом сервера, которого нет.
+    /// </remarks>
+    private bool _pinnedPlaced;
+
+    /// <summary>Как часто проверять подключённый выход, с; 0 — не проверять (AppSettings.ExitCheckSeconds).</summary>
+    private readonly int _exitCheckSeconds;
+
+    /// <summary>
+    /// Куда ставить группу выбора на старте, по порядку попыток.
+    /// </summary>
+    /// <remarks>
+    /// Закреплённый выход мог пропасть из подписки — тогда автоподбор,
+    /// а не то, что движок помнил.
+    /// </remarks>
+    public static IReadOnlyList<string> StartExits(string? preferredExit) =>
+        string.IsNullOrWhiteSpace(preferredExit) || preferredExit == LatencyGroup
+            ? [LatencyGroup]
+            : [preferredExit, LatencyGroup];
+
+    /// <summary>
+    /// Ставит группу выбора туда, куда велят настройки.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// У селектора в конфиге есть <c>default</c>, но движок его перебивает:
+    /// кэш, заведённый ради учётной записи MASQUE, хранит заодно и выбор
+    /// в группах и переживает и перезапуск, и пересборку конфига. Отключить
+    /// это нечем — поля <c>store_selected</c> сборка 1.14 не знает
+    /// и отвергает конфиг целиком.
+    /// </para>
+    /// <para>
+    /// Прежде выбор подтверждало окно, и только закреплённый: при «авто»
+    /// оно молчало. Замер 23.09: в настройках «авто», в кэше движка —
+    /// Cloudflare WARP, и Instagram, WhatsApp и Telegram шли через WARP,
+    /// который под нагрузкой держит одно-два соединения; в журнале движка
+    /// 3762 обрыва за запуск. Раньше так же залипал и прямой выход — в нём
+    /// Instagram уходил на заглушку провайдера. Окно к тому же не видело
+    /// ни автозапуска, ни перезапуска после сбоя, а супервизор видит всё.
+    /// </para>
+    /// </remarks>
+    protected override async Task OnReadyAsync(CancellationToken cancellationToken)
+    {
+        ForgetFakeAddresses();
+
+        // Без выхода ставить и прогревать нечего: группы выбора в конфиге нет,
+        // и попытка лишь записала бы в журнал отказ, которого не было.
+        if (_dnsOnly)
+        {
+            _warm = true;
+            return;
+        }
+
+        using var api = new ClashApi($"127.0.0.1:{_healthPort}", Talk, EngineKeys.Current(_configPath));
+
+        bool placed = false;
+
+        foreach (var exit in StartExits(_preferredExit))
+        {
+            if (await api.SelectAsync(SelectorGroup, exit, cancellationToken))
+            {
+                placed = true;
+                _pinnedPlaced = exit == _preferredExit;
+                break;
+            }
+        }
+
+        if (!placed)
+        {
+            Note("не удалось поставить группу выбора на место — движок остался на том, "
+                + "что помнит в своём кэше.");
+        }
+
+        // Прогрев: серверы автоподбора проверяются по одному, первый ответивший ставится,
+        // и только потом сторож и проверка трафика начинают судить. 28.09
+        // первая проверка шла через 5 с после старта, когда автоподбор никого
+        // ещё не мерил и стоял на первом в списке («🛡 ByPass»), — туннель был
+        // объявлен мёртвым и полторы минуты шёл в обход.
+        //
+        // В фоне: надзор поднимает десинк только после этого метода, и ждать
+        // пять секунд замера значило бы на столько же задержать десинк.
+        if (_preferredExit is null)
+        {
+            // Номер запуска: прогрев прошлого движка, закончившийся после
+            // перезапуска, не должен объявить прогретым новый.
+            int run = _run;
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    // По одному, не залпом, — и сразу ставим лучшего: первая
+                    // проверка трафика пойдёт через заведомо ответивший сервер.
+                    using var warm = new ClashApi($"127.0.0.1:{_healthPort}", Talk, EngineKeys.Current(_configPath));
+
+                    if (await PickOneByOneAsync(warm, cancellationToken) is { } best && run == _run)
+                        await warm.SelectAsync(SelectorGroup, best, cancellationToken);
+                }
+                catch (Exception)
+                {
+                    // Не вышло — останется автоподбор, как было до прогрева.
+                }
+                finally
+                {
+                    if (run == _run)
+                        _warm = true;
+                }
+            }, CancellationToken.None);
+        }
+        else
+        {
+            _warm = true;
+        }
+    }
+
+    /// <summary>
+    /// Прогрев после старта закончен: можно проверять трафик и следить за выходом.
+    /// </summary>
+    /// <remarks>
+    /// Готовность надзор проверяет той же <see cref="CheckFunctionalAsync"/>,
+    /// что и здоровье, и зовёт её раньше <see cref="OnReadyAsync"/>. До прогрева
+    /// она отвечает только по Clash API — иначе судила бы о выходе, которого
+    /// автоподбор ещё не выбрал.
+    /// </remarks>
+    private volatile bool _warm;
+
+    /// <summary>Номер запуска движка — растёт с каждым стартом.</summary>
+    private volatile int _run;
+
+    /// <summary>
+    /// Обход туннеля, пока его выходы мертвы.
+    /// </summary>
+    /// <remarks>
+    /// Живёт у службы, а не у супервизора: только она делает проверку
+    /// прохода трафика и только она знает, чем та кончилась. Супервизору
+    /// достаётся итог — <see cref="ServiceCheck"/>, — и по нему решение
+    /// об обходе принять уже нельзя: <c>Healthy</c> при включённом обходе
+    /// означает «сеть работает мимо туннеля», а не «туннель в порядке».
+    /// </remarks>
+    private readonly TunnelBypass _bypass = new();
+
+    private readonly bool _bypassWhenDead;
+
+    /// <summary>
+    /// Один клиент на все разговоры с движком.
+    /// </summary>
+    /// <remarks>
+    /// Свой <see cref="HttpClient"/> на каждый вызов — известная ловушка:
+    /// закрытое соединение остаётся в TIME_WAIT на две минуты, и порты
+    /// кончаются. Обращений тут немного, зато цикл присмотра работает
+    /// сутками, а это как раз та разница, на которой ловушка и срабатывает.
+    ///
+    /// Срок ответа короткий намеренно: движок отвечает по петле, и ждать
+    /// его сорок секунд — значит задержать весь цикл присмотра на столько же.
+    /// </remarks>
+    private static readonly HttpClient Talk = new() { Timeout = TimeSpan.FromSeconds(15) };
+
+    protected override void OnStopped() => ForgetFakeAddresses();
+
+    /// <summary>
+    /// Сбрасывает кэш DNS Windows — после подъёма движка и после остановки.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Именам, уведённым в VPN, движок раздаёт подменные адреса по порядку —
+    /// 198.18.0.2, .3 и дальше, fc00::2 и дальше, — и после перезапуска
+    /// раздаёт заново: своего кэша у него нет (его файл хранит и выбор
+    /// в селекторе, из-за чего 23.09 залипал WARP, и заводится только
+    /// ради MASQUE). А Windows держит ответ десять минут: замер 26.09 —
+    /// www.cometapi.com → 198.18.0.3, TTL 600.
+    /// </para>
+    /// <para>
+    /// Вот и выходило: после перезапуска браузер ещё до десяти минут ходил
+    /// по старому адресу, который движок уже отдал другому имени. Только
+    /// за 26.09 fc00::2 побывал virustotalcloud.firebaseapp.com,
+    /// claudeusercontent.com и www.cometapi.com. Соединение уходило не туда —
+    /// сброс, чужой сертификат, пустая страница: cometapi дал
+    /// ERR_CONNECTION_RESET через минуту после перезапуска, у Claude «иногда
+    /// не работает при поднятых движках». После остановки то же: подменный
+    /// адрес ведёт в туннель, которого уже нет.
+    /// </para>
+    /// <para>
+    /// Сброс кэша — не правка настроек DNS: его делает и ipconfig /flushdns,
+    /// и программа после каждой правки hosts. У Chrome кэш имён свой, короткий;
+    /// что он сбрасывает его сам при смене адаптеров — по его устройству
+    /// ожидаемо, но не проверено.
+    /// </para>
+    /// </remarks>
+    private void ForgetFakeAddresses()
+    {
+        if (!Zephyron.Proxy.HostsEditor.FlushDns())
+            Note("кэш DNS Windows не сброшен — до десяти минут после перезапуска "
+                + "имена в VPN могут вести по старым подменным адресам.");
+    }
+
+    protected override void ForgetRunState()
+    {
+        _bypass.Forget();
+
+        // Заодно и остальная память о прежнем запуске. Держать её врозь
+        // незачем: вся она об одном — о процессе, которого больше нет.
+        _lastTrafficOk = true;
+        _checkCounter = 0;
+        _warm = false;
+        _run++;
+        _watchCounter = 0;
+        _watch.Forget();
+        _pinnedPlaced = false;
+        Remark = null;
+        _upstreamNoted = false;
+        _trafficPortMissingSince = null;
+        _trafficPortMissingNoted = false;
+        _dnsViaTunnel = null;
+        _dnsCheckCounter = 0;
+    }
+
+    // Ради DNS — своё имя: по «sing-box» окно узнаёт туннель (DnsEngine.ServiceName).
+    public override string Name => _dnsOnly ? DnsEngine.ServiceName : "sing-box";
+
+    public override IReadOnlyList<string> EngineProcessNames => ["sing-box"];
+
+    public override string? ValidatePrerequisites()
+    {
+        if (!File.Exists(_executablePath))
+            return $"движок не найден: {_executablePath}";
+
+        if (!File.Exists(_configPath))
+            return $"конфиг не найден: {_configPath}";
+
+        return null;
+    }
+
+    protected override ProcessStartInfo BuildStartInfo() => new()
+    {
+        FileName = _executablePath,
+        ArgumentList = { "run", "-c", Path.GetFullPath(_configPath) },
+        WorkingDirectory = Path.GetDirectoryName(Path.GetFullPath(_executablePath)) ?? ".",
+        UseShellExecute = false,
+        CreateNoWindow = true,
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+
+        // Кодировка задаётся явно, иначе .NET разбирает вывод движка в кодовой
+        // странице консоли — на русской Windows это не UTF-8, и байты имени
+        // сервера превращаются в кашу, которую журнал честно записывает
+        // обратно. Получалось двойное перекодирование: в файле лежало
+        // «рџ‡єрџ‡ё Hysteria2 | РЎРЁРђ» вместо флага и слова «США».
+        //
+        // Стало заметно, когда журнал перестал быть свалкой и начал читаться:
+        // проверка достаёт оттуда, через какой выход шло имя и что ответила
+        // труба, — и имя выхода в отчёте было нечитаемым.
+        StandardOutputEncoding = new UTF8Encoding(false),
+        StandardErrorEncoding = new UTF8Encoding(false),
+    };
+
+    public override async Task<ServiceCheck> CheckFunctionalAsync(CancellationToken cancellationToken)
+    {
+        // Clash API — единственный признак, отделяющий сломанный движок
+        // от мёртвой подписки. Не отвечает — процесс жив, но не работает:
+        // такое перезапуском и лечится.
+        if (!await SingBoxRunner.IsPortAcceptingAsync(_healthPort, TimeSpan.FromSeconds(2), cancellationToken))
+            return ServiceCheck.Broken;
+
+        // Ради DNS сторожить выход и проверять проход трафика нечем: выхода нет.
+        if (!_warm || _dnsOnly)
+            return ServiceCheck.Healthy;
+
+        await WatchExitAsync(cancellationToken);
+
+        if (_trafficPort is null)
+        {
+            // «Авто» для DNS решает по проходу трафика и без «Проверки
+            // прохода» в настройках: своей проверкой через вход health-in,
+            // так же редко. Здоровья службы она не меняет.
+            if (_dnsViaAuto)
+            {
+                if (_dnsCheckCounter++ % _trafficCheckEvery == 0)
+                    _dnsLastOk = await CheckTrafficAsync(SingBoxOptions.DefaultHealthPort, cancellationToken);
+
+                await ApplyDnsPathAsync(_dnsLastOk, cancellationToken);
+            }
+
+            return ServiceCheck.Healthy;
+        }
+
+        // Порт проверки есть не во всяком конфиге: собранный прежней версией
+        // или руками, он может не содержать входа вовсе. Настаивать в таком
+        // случае нельзя — проверка не пройдёт никогда, и супервизор будет
+        // убивать исправный движок, пока не исчерпает попытки перезапуска.
+        // Именно так и было: с TUN локального входа не существовало,
+        // и рабочий туннель гасился по кругу.
+        if (!await SingBoxRunner.IsPortAcceptingAsync(_trafficPort.Value, TimeSpan.FromSeconds(1), cancellationToken))
+        {
+            _trafficPortMissingSince ??= DateTime.UtcNow;
+
+            if (DateTime.UtcNow - _trafficPortMissingSince < TrafficPortGrace)
+                return ServiceCheck.Broken;
+
+            if (!_trafficPortMissingNoted)
+            {
+                _trafficPortMissingNoted = true;
+                Note(
+                    $"на порту {_trafficPort} никто не слушает — в конфиге нет входа проверки. " +
+                    "Проход трафика не проверяется, движок считается живым по Clash API. " +
+                    "Пересоберите конфиг командой config.");
+            }
+
+            return ServiceCheck.Healthy;
+        }
+
+        _trafficPortMissingSince = null;
+
+        // Глубокая проверка делается редко: она уходит в сеть и стоит секунды.
+        // Между проверками используется её последний результат.
+        if (_checkCounter++ % _trafficCheckEvery != 0)
+        {
+            if (_dnsViaAuto)
+                await ApplyDnsPathAsync(_lastTrafficOk && !_bypass.Engaged, cancellationToken);
+
+            return _lastTrafficOk ? ServiceCheck.Healthy : ServiceCheck.UpstreamDown;
+        }
+
+        // Пока обход включён, общая проверка отвечать на наш вопрос перестаёт:
+        // она идёт через прямой выход и удаётся всегда. Мерить надо сами
+        // выходы — иначе нас вернуло бы в мёртвый туннель на следующем же
+        // шаге, и так по кругу.
+        _lastTrafficOk = _bypass.Engaged
+            ? await ExitsAliveAsync(cancellationToken)
+            : await CheckTrafficAsync(_trafficPort.Value, cancellationToken);
+
+        await ApplyBypassAsync(_lastTrafficOk, cancellationToken);
+
+        if (_dnsViaAuto)
+            await ApplyDnsPathAsync(_lastTrafficOk && !_bypass.Engaged, cancellationToken);
+
+        if (_lastTrafficOk)
+            return ServiceCheck.Healthy;
+
+        // При включённом обходе сеть работает — мимо туннеля, но работает.
+        // Называть это здоровьем нельзя: трафик идёт не туда, куда просили,
+        // и сказать об этом должно состояние, а не только журнал.
+        if (_bypass.Engaged)
+        {
+            LastError = "выходы подписки не отвечают — трафик идёт мимо туннеля";
+            return ServiceCheck.UpstreamDown;
+        }
+
+        // Движок отвечает по своему API, а наружу не доходит. Перезапуск
+        // тут бесполезен и вреден: восемнадцать секунд тишины, и подъём
+        // в ту же мёртвую подписку.
+        //
+        // Замер 20.09 у владельца: семь из девяти серверов не отвечали,
+        // в журнале движка подряд «stream error: INTERNAL_ERROR; received
+        // from peer» и «report handshake success: connection timed out».
+        // Супервизор при этом исправно гасил здоровый движок.
+        LastError = "трафик через прокси не проходит — похоже, мёртв выход подписки, а не движок";
+
+        if (!_upstreamNoted)
+        {
+            _upstreamNoted = true;
+            Note(
+                "трафик не проходит, но движок отвечает по Clash API. "
+                + "Перезапускать его незачем: скорее всего не отвечают серверы подписки. "
+                + "Проверьте их в разделе «VPN».");
+        }
+
+        return ServiceCheck.UpstreamDown;
+    }
+
+    /// <summary>
+    /// Переключает группу выбора, если положение изменилось.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Через Clash API, а не пересборкой конфига: переключение мгновенно
+    /// и не рвёт того, что ещё работало. Пересборка означала бы перезапуск
+    /// движка — полминуты тишины ради того, чтобы починить тишину.
+    /// </para>
+    /// <para>
+    /// Неудача переключения не считается бедой службы. Движок мог как раз
+    /// перезапускаться; на следующей проверке попробуем снова, а состояние
+    /// <see cref="TunnelBypass"/> при неудаче откатывается — иначе мы бы
+    /// считали трафик уведённым, когда он по-прежнему идёт в мёртвый туннель.
+    /// </para>
+    /// </remarks>
+    private async Task ApplyBypassAsync(bool tunnelWorks, CancellationToken cancellationToken)
+    {
+        if (!_bypassWhenDead)
+            return;
+
+        var action = _bypass.Observe(tunnelWorks);
+
+        if (action == BypassAction.Keep)
+            return;
+
+        using var api = new ClashApi($"127.0.0.1:{_healthPort}", Talk, EngineKeys.Current(_configPath));
+
+        // Возврат из обхода — прямо на живой сервер, найденный по одному,
+        // а не в автоподбор, который мог стоять на мёртвом.
+        var target = _bypass.TargetFor(action, _returnTo ?? LatencyGroup);
+
+        if (!await api.SelectAsync(SelectorGroup, target, cancellationToken))
+        {
+            // Откат: положение осталось прежним, и помнить надо прежнее.
+            _bypass.Forget();
+            return;
+        }
+
+        Note(action == BypassAction.Engage
+            ? "выходы подписки не отвечают три проверки подряд — трафик уведён мимо туннеля, "
+                + "чтобы не легла вся сеть. Он идёт открыто и с домашнего адреса. "
+                + "Вернём в туннель, как только выход оживёт; отключается настройкой."
+            : "выход подписки ожил — трафик возвращён в туннель.");
+    }
+
+    /// <summary>
+    /// Ожил ли хоть один выход.
+    /// </summary>
+    /// <remarks>
+    /// Спрашивается у самого движка: он замеряет группу автоподбора тем же
+    /// способом, каким выбирает быстрейший, и меряет то, через что пойдёт
+    /// трафик, а не его копию. Свой пробник здесь не годится — он поднял бы
+    /// второй sing-box, а учётная запись MASQUE лежит в кэше работающего,
+    /// и файл занят им же.
+    /// </remarks>
+    private async Task<bool> ExitsAliveAsync(CancellationToken cancellationToken)
+    {
+        using var api = new ClashApi($"127.0.0.1:{_healthPort}", Talk, EngineKeys.Current(_configPath));
+
+        // Выбранный руками — первым: снять обход на него, а не в автоподбор
+        // (до 01.10 выбор человека так терялся до перезапуска).
+        if (_pinnedPlaced)
+        {
+            var pinned = await api.MeasureAsync(_preferredExit!, _watchUrl, CheckTimeout, cancellationToken);
+            Record(_preferredExit!, pinned);
+
+            if (pinned is not null)
+            {
+                _returnTo = _preferredExit;
+                return true;
+            }
+
+            if (!_watch.MayLeaveBypassElsewhere)
+            {
+                _returnTo = null;
+                return false;
+            }
+        }
+
+        // В обходе селектор стоит на direct — меряем автоподбор, а не его.
+        if (await api.MeasureAsync(LatencyGroup, _watchUrl, CheckTimeout, cancellationToken) is not null)
+        {
+            _returnTo = null;
+            return true;
+        }
+
+        // Выбранный автоподбором молчит — ищем живого по одному. Найден —
+        // обход снимется, и селектор встанет прямо на него (_returnTo).
+        _returnTo = await PickOneByOneAsync(api, cancellationToken);
+        return _returnTo is not null;
+    }
+
+    /// <summary>Куда вернуть трафик при выходе из обхода; <c>null</c> — в автоподбор.</summary>
+    private string? _returnTo;
+
+    /// <summary>Сколько ждать ответа одной проверки — как наблюдатель Xray у Trust в Happ.</summary>
+    private static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(3);
+
+    /// <summary>Раз во сколько опросов (по 5 с) проверять текущий выход.</summary>
+    private int ExitWatchEvery => Math.Max(1, _exitCheckSeconds / 5);
+
+    private int _watchCounter;
+
+    /// <summary>Идёт подбор замены — второй не начинаем.</summary>
+    private int _picking;
+
+    /// <summary>Адрес проверки выхода — тот, что выбран в «Настройках туннеля» (<see cref="Ping"/>).</summary>
+    private readonly string _watchUrl;
+
+    /// <summary>
+    /// Проверяет серверы автоподбора строго по одному и ставит первый ответивший.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// По очереди, а не залпом (владелец 28.09: «поочерёдная проверка была бы
+    /// логичнее»). Групповой перезамер (/group/…/delay) бил по всем разом:
+    /// 16 соединений в один вход Trust, и в тот вечер вход не принимал
+    /// соединения — 763 таймаута в журнале движка. Happ с той же подпиской
+    /// проверяет 2–4 сервера раз в минуту.
+    /// </para>
+    /// <para>
+    /// Найденный ставится в селектор прямо, мимо автоподбора: тот выбирает
+    /// быстрейший и после перезамера снова хватал «мигающий» сервер — быстрый,
+    /// пока жив, — и 28.09 туннель качало: 22:49 мёртв, 22:51 жив, 22:51:54 мёртв.
+    /// </para>
+    /// </remarks>
+    /// <param name="except">Кого не проверять: закреплённый сервер, которому ищем замену.</param>
+    /// <returns>Поставленный сервер; <c>null</c> — живых нет.</returns>
+    private async Task<string?> PickOneByOneAsync(
+        ClashApi api, CancellationToken cancellationToken, string? except = null)
+    {
+        var members = await api.MembersAsync(LatencyGroup, cancellationToken);
+
+        if (members is null || members.Count == 0)
+            return null;
+
+        // Первый ответивший, в порядке последних замеров, — а не лучший из
+        // всех. Владелец 29.09: «туннель очень долго переключается при смерти
+        // сервера». Перебор всех по 3 с — до полуминуты без сети сверх
+        // полуминуты ожидания проверки; в порядке замеров первый живой
+        // обычно и есть быстрейший, и находится за секунды.
+        var known = ServerHealthCache.Load().Latencies();
+
+        var ordered = members
+            .Where(tag => tag != except)
+            .OrderBy(tag => known.TryGetValue(tag, out var ms) ? ms : double.MaxValue)
+            .ToList();
+
+        foreach (var tag in ordered)
+        {
+            var delay = await api.MeasureAsync(tag, _watchUrl, CheckTimeout, cancellationToken);
+            Record(tag, delay);
+
+            if (delay is not null)
+                return tag;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Кладёт проверку в общий файл замеров — тот, что показывает вкладка VPN.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Владелец 30.09: «почему если настройка раз в минуту, последний замер
+    /// 32 минуты назад». Проверки сторожа шли, но оставались в нём: вкладка
+    /// показывала только свои замеры, а «мигающие» считались по ним одним
+    /// (пункт «Открытого» с 29.09).
+    /// </para>
+    /// <para>
+    /// Новых соединений это не добавляет — пишется то, что сторож и так
+    /// проверил. Файл общий с окном; перезаписать чужое не даёт сам кэш
+    /// (<see cref="ServerHealthCache.Save"/>).
+    /// </para>
+    /// </remarks>
+    private static void Record(string tag, TimeSpan? delay)
+    {
+        try
+        {
+            var cache = ServerHealthCache.Load();
+
+            cache.Set(new ServerHealth
+            {
+                Tag = tag,
+                Success = delay is not null,
+                LatencyMs = delay?.TotalMilliseconds,
+                CheckedAt = DateTimeOffset.Now,
+            });
+
+            cache.Save();
+        }
+        catch (Exception)
+        {
+            // Замер не записался — надзору до этого дела нет.
+        }
+    }
+
+    /// <summary>
+    /// Выход, через который идёт трафик: выбранный в селекторе, а если там
+    /// автоподбор — выбранный им. <c>null</c> — движок не ответил.
+    /// </summary>
+    private static async Task<string?> CurrentExitAsync(ClashApi api, CancellationToken cancellationToken)
+    {
+        var selected = await api.SelectedAsync(SelectorGroup, cancellationToken);
+
+        return selected == LatencyGroup
+            ? await api.SelectedAsync(LatencyGroup, cancellationToken)
+            : selected;
+    }
+
+    /// <summary>
+    /// Следит за подключённым выходом; умер — по одному ищет живой и ставит его.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Решение владельца 28.09: проверять только подключённый сервер. Одно
+    /// соединение через селектор — то есть ровно тем путём, каким идёт трафик,
+    /// — раз в <see cref="AppSettings.ExitCheckSeconds"/> секунд.
+    /// </para>
+    /// <para>
+    /// Промах — перепроверка на следующем опросе, через 5 с: разовый отказ
+    /// бывает и у живого сервера. Два подряд — подбор замены по одному
+    /// (<see cref="PickOneByOneAsync"/>), в фоне, чтобы надзор не ждал.
+    /// </para>
+    /// <para>
+    /// Закреплённый выход меряем, но не меняем — он выбран человеком. До 30.09
+    /// его не мерили вовсе, и при выбранном руками сервере настройка «проверять
+    /// каждую минуту» не действовала ни на что: вкладка VPN показывала замер
+    /// получасовой давности. Обход не трогаем: его ведёт своя проверка
+    /// (<see cref="ExitsAliveAsync"/>).
+    /// </para>
+    /// <para>
+    /// С настройкой «подменять выбранный сервер» (<see cref="ExitWatch"/>)
+    /// молчащему закреплённому ищется замена тем же порядком, а сам он
+    /// проверяется дальше — одним соединением за плановую проверку — и
+    /// возвращается, ответив дважды подряд.
+    /// </para>
+    /// <para>
+    /// Меряется сам выход, а не селектор: путь тот же, а результат ложится
+    /// под тег сервера (<see cref="Record"/>). Не ответил движок на вопрос,
+    /// какой выход выбран, — меряем селектор, как прежде, без записи.
+    /// </para>
+    /// </remarks>
+    private async Task WatchExitAsync(CancellationToken cancellationToken)
+    {
+        // В обходе трафик идёт мимо туннеля — о замене говорить нечего.
+        if (_bypass.Engaged)
+            Remark = null;
+
+        if (_bypass.Engaged || _exitCheckSeconds <= 0 || _picking != 0)
+            return;
+
+        // После промаха — на каждом опросе, иначе по настройке.
+        bool planned = !_watch.Rechecking;
+
+        if (planned && _watchCounter++ % ExitWatchEvery != 0)
+            return;
+
+        using var api = new ClashApi($"127.0.0.1:{_healthPort}", Talk, EngineKeys.Current(_configPath));
+
+        var exit = await CurrentExitAsync(api, cancellationToken);
+        var delay = await api.MeasureAsync(exit ?? SelectorGroup, _watchUrl, CheckTimeout, cancellationToken);
+
+        if (exit is not null)
+            Record(exit, delay);
+
+        bool replaced = _pinnedPlaced && _watch.Replaced(exit);
+
+        // Окну и nz: туннель здоров, но идёт не через то, что выбрано.
+        Remark = replaced ? StandInRemark : null;
+
+        // Стоит замена — заодно спрашиваем закреплённый сервер. Только
+        // на плановой проверке: перепроверка через 5 с — про замену, а два
+        // ответа закреплённого с разницей в 5 с — это один ответ.
+        if (planned && replaced)
+        {
+            var pinned = await api.MeasureAsync(_preferredExit!, _watchUrl, CheckTimeout, cancellationToken);
+            Record(_preferredExit!, pinned);
+
+            if (_watch.OnPinned(pinned is not null) == ExitAction.Restore
+                && await api.SelectAsync(SelectorGroup, _preferredExit!, cancellationToken))
+            {
+                Remark = null;
+                Note($"выбранный сервер «{_preferredExit}» снова отвечает — трафик возвращён на него.");
+                return;
+            }
+        }
+
+        if (_watch.OnCurrent(delay is not null) != ExitAction.Replace)
+            return;
+
+        // Молчит сам закреплённый — замена временная, и сказать об этом надо
+        // сразу: иначе в журнале это выглядит как самовольная смена сервера.
+        bool standIn = _pinnedPlaced && exit == _preferredExit;
+
+        StartPick(
+            standIn
+                ? $"выбранный сервер «{exit}» не ответил дважды подряд"
+                : $"выход «{exit}» не ответил дважды подряд",
+            except: standIn ? exit : null,
+            promise: standIn ? $" Вернём «{exit}», как только ответит дважды подряд." : string.Empty);
+    }
+
+    /// <summary>Примечание, пока вместо закреплённого сервера стоит замена.</summary>
+    private string StandInRemark => $"временная замена — выбранный «{_preferredExit}» не отвечал";
+
+    /// <summary>Подбор замены в фоне; итог — в журнал.</summary>
+    /// <param name="except">
+    /// Закреплённый сервер, которому ищем замену, — его среди кандидатов нет:
+    /// ответь он при подборе, «заменой» стал бы он сам.
+    /// </param>
+    /// <param name="promise">Что добавить к записи о замене.</param>
+    private void StartPick(string why, string? except = null, string promise = "")
+    {
+        if (Interlocked.Exchange(ref _picking, 1) != 0)
+            return;
+
+        int run = _run;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var api = new ClashApi($"127.0.0.1:{_healthPort}", Talk, EngineKeys.Current(_configPath));
+                var best = await PickOneByOneAsync(api, CancellationToken.None, except);
+
+                // Пока искали, движок могли перезапустить — тогда не наше дело.
+                if (run != _run)
+                    return;
+
+                if (best is not null && await api.SelectAsync(SelectorGroup, best, CancellationToken.None))
+                    Note($"{why} — поставлен «{best}», первый ответивший при проверке по одному.{promise}");
+                else if (best is null)
+                    Note($"{why}, и ни один сервер автоподбора не ответил.");
+            }
+            catch (Exception)
+            {
+                // Не вышло сейчас — выйдет на следующем промахе.
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _picking, 0);
+            }
+        }, CancellationToken.None);
+    }
+
+    /// <summary>Группа выбора в конфиге — та, что переключается.</summary>
+    /// <remarks>
+    /// Совпадает с <c>SingBoxOptions.SelectorTag</c>. Держать её здесь
+    /// строкой неприятно, но тянуть сюда весь компилятор конфига ради
+    /// двух имён — хуже: супервизор о сборке конфига ничего не знает
+    /// и знать не должен.
+    /// </remarks>
+    private const string SelectorGroup = "auto";
+
+    /// <summary>Группа автоподбора — куда возвращаемся.</summary>
+    private const string LatencyGroup = "auto-latency";
+
+    private async Task<bool> CheckTrafficAsync(int proxyPort, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // С 27.09 вход проверки под паролем (EngineKeys) — без учётки
+            // он отвечает 407, и сторож объявил бы туннель мёртвым.
+            var keys = EngineKeys.Current(_configPath);
+
+            using var handler = new HttpClientHandler
+            {
+                // SOCKS5: учётку по HTTP .NET 8 шлёт повтором после 407,
+                // и sing-box это соединение рвёт (см. EngineKeys.Proxy).
+                Proxy = EngineKeys.Loopback(proxyPort, keys),
+                UseProxy = true,
+            };
+
+            using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
+            var text = await http.GetStringAsync("https://api.ipify.org", cancellationToken);
+
+            return System.Net.IPAddress.TryParse(text.Trim(), out _);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+}
+
+/// <summary>
+/// Десинк winws2.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Функциональной проверки нет: winws2 не слушает портов и не имеет API —
+/// он висит на фильтре WinDivert. Единственный доступный признак — живость
+/// процесса, что и отражено возвратом <c>true</c>.
+/// </para>
+/// </remarks>
+public sealed class WinwsService : SupervisedService
+{
+    private readonly string _executablePath;
+    private readonly IReadOnlyList<string> _arguments;
+    private readonly string _workingDirectory;
+
+    public WinwsService(string executablePath, IReadOnlyList<string> arguments, string workingDirectory)
+    {
+        _executablePath = executablePath;
+        _arguments = arguments;
+        _workingDirectory = workingDirectory;
+    }
+
+    public override string Name => "winws2";
+
+    public override IReadOnlyList<string> EngineProcessNames => ["winws2", "winws"];
+
+    public override string? ValidatePrerequisites() =>
+        File.Exists(_executablePath) ? null : $"движок не найден: {_executablePath}";
+
+    protected override ProcessStartInfo BuildStartInfo()
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = _executablePath,
+            WorkingDirectory = _workingDirectory,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+
+            // См. выше: без явной кодировки вывод разбирается кодовой страницей
+            // консоли, и журнал получает перекодированную дважды кашу вместо
+            // текста. Здесь это winws2, и его сообщения тоже читаются.
+            StandardOutputEncoding = new UTF8Encoding(false),
+            StandardErrorEncoding = new UTF8Encoding(false),
+        };
+
+        foreach (var argument in _arguments)
+            startInfo.ArgumentList.Add(argument);
+
+        return startInfo;
+    }
+
+    /// <summary>
+    /// Перехват уже идёт: winws2 сказал «capture is started».
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Готовность winws2 — не живой процесс, а начатый перехват: прежде чем
+    /// снимать пакеты, он читает списки (в V10 — 117 тысяч имён), и это
+    /// секунды. Надзор поднимал sing-box первым, и всё, что туннель открывал
+    /// в эти секунды, шло мимо десинка. У WARP это первое соединение с узлом:
+    /// без десинка оно замерзает (замер 01.10), и на каждом запуске WARP
+    /// около полуминуты молчал — до обрыва на 19-й секунде и нового
+    /// соединения, уже под десинком. Отдельный WARP, поднятый при работающем
+    /// десинке, ответил с первых пяти секунд.
+    /// </para>
+    /// <para>
+    /// Строки может не оказаться в другой сборке winws2 — тогда готовым
+    /// считается живой процесс через <see cref="CaptureGrace"/>: лучше поздно,
+    /// чем никогда.
+    /// </para>
+    /// </remarks>
+    private volatile bool _capturing;
+
+    /// <summary>Сколько ждать строки о перехвате, прежде чем поверить живому процессу.</summary>
+    public static readonly TimeSpan CaptureGrace = TimeSpan.FromSeconds(10);
+
+    /// <summary>Строка winws2 о начатом перехвате.</summary>
+    public const string CaptureStarted = "capture is started";
+
+    protected override void Observe(string line)
+    {
+        if (line.Contains(CaptureStarted, StringComparison.OrdinalIgnoreCase))
+            _capturing = true;
+    }
+
+    protected override void ForgetRunState() => _capturing = false;
+
+    public override Task<ServiceCheck> CheckFunctionalAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(Ready(IsProcessAlive, _capturing, StartedAt, DateTimeOffset.Now)
+            ? ServiceCheck.Healthy
+            : ServiceCheck.Broken);
+
+    /// <summary>Готов ли winws2: жив и перехват начат — либо жив дольше срока.</summary>
+    public static bool Ready(bool alive, bool capturing, DateTimeOffset? started, DateTimeOffset now) =>
+        alive && (capturing || started is null || now - started >= CaptureGrace);
+}

@@ -1,0 +1,23 @@
+{
+  // «Карамельная», встроенная. Тёплая тёмная с карамельным акцентом —
+  // как чашка какао.
+  "name": "Карамельная",
+  "author": "Zephyron",
+  "base": "dark",
+  "colors": {
+    "backdrop": "#1A130E",
+    "surface": "#241A13",
+    "raised": "#2F2219",
+    "border": "#473528",
+    "text": "#F5EDE4",
+    "muted": "#C4B29E",
+    "faint": "#97846F",
+    "accent": "#FFC078",
+    "accent-dim": "#7A4E28",
+    "danger": "#FF8A72",
+    "warn": "#FFD48A",
+    "accent-fill": "#E0A055",
+    "on-accent": "#221204",
+    "warn-fill": "#FFD48A"
+  }
+}

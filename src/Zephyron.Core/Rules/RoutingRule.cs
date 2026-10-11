@@ -1,0 +1,417 @@
+using System.Net;
+using System.Net.Sockets;
+using Zephyron.Core.Connections;
+
+namespace Zephyron.Core.Rules;
+
+/// <summary>
+/// Одно правило маршрутизации из конфига.
+/// </summary>
+public sealed class RoutingRule
+{
+    public required MatchKind Match { get; init; }
+
+    /// <summary>Шаблон: имя exe, доменная маска или CIDR — в зависимости от <see cref="Match"/>.</summary>
+    public required string Value { get; init; }
+
+    public required RoutingMode Mode { get; init; }
+
+    /// <summary>
+    /// Тег исходящего для <see cref="RoutingMode.Proxy"/>: конкретный сервер подписки
+    /// либо "auto" (селектор с проверкой задержки). Игнорируется для прочих режимов.
+    /// </summary>
+    public string? Server { get; init; }
+
+    /// <summary>
+    /// Имя рецепта десинка для <see cref="RoutingMode.Desync"/>. Игнорируется
+    /// для прочих режимов.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Ровно то же по смыслу, что <see cref="Server"/> у прокси: режим
+    /// говорит «куда», а это — «чем именно». Без него <c>mode: desync</c>
+    /// означает лишь «мимо туннеля», и чинить имя будет пресет — если оно
+    /// вообще попало хоть в один его список. Не попало — не сделают ничего,
+    /// и снаружи это неотличимо от «десинк не работает».
+    /// </para>
+    /// <para>
+    /// <c>null</c> — прежнее поведение: решает пресет. Имя рецепта берётся
+    /// из его же секций, потому что там лежат выверенные на этой сети
+    /// наборы, а не придуманные нами.
+    /// </para>
+    /// </remarks>
+    public string? Recipe { get; init; }
+
+    /// <summary>
+    /// Индекс в исходном списке — для диагностики. Проставляется при загрузке
+    /// конфига и перезаписывается в <see cref="RuleEngine.Build"/>, чтобы номера
+    /// в логе всегда соответствовали порядку строк в файле.
+    /// </summary>
+    public int Ordinal { get; set; }
+
+    /// <summary>
+    /// Выключенное правило хранится, но не применяется.
+    /// </summary>
+    /// <remarks>
+    /// Нужно, чтобы можно было отключить свой выбор, не теряя его: иначе
+    /// человеку пришлось бы удалять запись и заводить заново.
+    /// </remarks>
+    public bool Enabled { get; init; } = true;
+
+    /// <summary>
+    /// Часть выключена: не действует ни это правило, ни базовое на тот же список.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Не то же, что <see cref="Enabled"/>. Выключенная запись снимает только
+    /// выбор человека — базовое правило под ней продолжает действовать.
+    /// «Выключено» снимает часть целиком: имена её списка решают другие
+    /// правила, а нет таких — умолчание режима. Владелец 06.10: правила частей
+    /// пересекаются («Запасной путь по адресам» Discord и соседние), и
+    /// развести их было нечем, кроме как выбрать одной из них чужой режим.
+    /// </para>
+    /// <para>
+    /// В движок такое правило не попадает (<see cref="RuleEngine.Build"/>),
+    /// поэтому у <see cref="Mode"/> здесь нет смысла и отдельного режима
+    /// маршрута для «выключено» не заводится: туннель, десинк и проверки
+    /// просто не видят ни этого правила, ни подавленного им базового.
+    /// </para>
+    /// </remarks>
+    public bool Off { get; init; }
+
+    /// <summary>Откуда правило пришло — для показа в выводе.</summary>
+    public RuleSource Source { get; set; } = RuleSource.Base;
+
+    // Скомпилированные представления Value. Считаются один раз при загрузке конфига,
+    // потому что Matches вызывается на каждое новое соединение.
+    private GlobMatcher? _glob;
+    private IpCidrRange? _cidr;
+    private IReadOnlyList<IpCidrRange>? _cidrSet;
+
+    /// <summary>
+    /// Подсети, загруженные из файла для <see cref="MatchKind.IpSet"/>.
+    /// </summary>
+    /// <remarks>
+    /// Пусто, пока не вызван <see cref="LoadIpSet"/>: загрузка требует знания
+    /// корня Zapret, а модель правил о нём не знает и знать не должна.
+    /// Непрогруженное правило просто не совпадает ни с чем.
+    /// </remarks>
+    public IReadOnlyList<string> IpSetCidrs { get; private set; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Домены, загруженные из файла для <see cref="MatchKind.HostList"/>.
+    /// </summary>
+    /// <remarks>
+    /// Как и подсети выше, пусто до вызова <see cref="LoadHostList"/>:
+    /// путь разрешается относительно корня Zapret, о котором модель правил
+    /// не знает.
+    /// </remarks>
+    public IReadOnlyList<string> HostListDomains { get; private set; } = Array.Empty<string>();
+
+    private IReadOnlyList<GlobMatcher>? _hostGlobs;
+
+    /// <summary>Зоны списка без звёздочек внутри — для поиска по множеству.</summary>
+    private HashSet<string>? _hostZones;
+
+    /// <summary>
+    /// Готовит правило к использованию и валидирует <see cref="Value"/>.
+    /// Бросает <see cref="RuleConfigurationException"/> на неразбираемом значении.
+    /// </summary>
+    public void Compile()
+    {
+        switch (Match)
+        {
+            case MatchKind.Process:
+            case MatchKind.Domain:
+                _glob = GlobMatcher.Compile(Value);
+                break;
+
+            case MatchKind.Ip:
+                _cidr = IpCidrRange.Parse(Value);
+                break;
+
+            case MatchKind.IpSet:
+            case MatchKind.HostList:
+                // Путь к файлу проверяется при загрузке списка, а не здесь.
+                break;
+
+            default:
+                throw new RuleConfigurationException($"Неизвестный тип правила '{Match}' (правило #{Ordinal}).");
+        }
+    }
+
+    /// <summary>
+    /// Проверяет соединение против правила.
+    /// </summary>
+    /// <param name="connection">Наблюдаемое соединение.</param>
+    /// <param name="reason">Что именно совпало — для лога.</param>
+    public bool Matches(ConnectionEvent connection, out string reason)
+    {
+        reason = string.Empty;
+
+        switch (Match)
+        {
+            case MatchKind.Process:
+            {
+                // Сопоставляем и с полным путём, и с одним именем файла: в конфиге
+                // удобно писать "somegame.exe", но иногда нужно различить два
+                // одноимённых exe из разных каталогов.
+                var path = connection.ExecutablePath;
+                if (path is null)
+                    return false;
+
+                if (_glob!.IsMatch(path))
+                {
+                    reason = $"process path ~ {Value}";
+                    return true;
+                }
+
+                var name = connection.ExecutableName;
+                if (name is not null && _glob.IsMatch(name))
+                {
+                    reason = $"process name ~ {Value}";
+                    return true;
+                }
+
+                return false;
+            }
+
+            case MatchKind.Domain:
+            {
+                var host = connection.Hostname;
+                if (host is null)
+                    return false;
+
+                if (!_glob!.IsMatch(host))
+                    return false;
+
+                reason = $"domain {host} ~ {Value}";
+                return true;
+            }
+
+            case MatchKind.Ip:
+            {
+                var addr = connection.RemoteAddress;
+                if (addr is null)
+                    return false;
+
+                if (!_cidr!.Contains(addr))
+                    return false;
+
+                reason = $"ip {addr} in {Value}";
+                return true;
+            }
+
+            case MatchKind.HostList:
+            {
+                var host = connection.Hostname;
+                if (host is null || _hostGlobs is null)
+                    return false;
+
+                if (_hostZones is not null && InZones(_hostZones, host))
+                {
+                    reason = $"domain {host} в списке {Value}";
+                    return true;
+                }
+
+                for (int i = 0; i < _hostGlobs.Count; i++)
+                {
+                    if (!_hostGlobs[i].IsMatch(host))
+                        continue;
+
+                    reason = $"domain {host} в списке {Value}";
+                    return true;
+                }
+
+                return false;
+            }
+
+            case MatchKind.IpSet:
+            {
+                var addr = connection.RemoteAddress;
+                if (addr is null || _cidrSet is null)
+                    return false;
+
+                foreach (var range in _cidrSet)
+                {
+                    if (!range.Contains(addr))
+                        continue;
+
+                    reason = $"ip {addr} в списке {Value}";
+                    return true;
+                }
+
+                return false;
+            }
+
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
+    /// Загружает подсети для правила по списку.
+    /// </summary>
+    public void LoadIpSet(IReadOnlyList<string> cidrs)
+    {
+        if (Match != MatchKind.IpSet)
+            throw new InvalidOperationException($"Правило #{Ordinal} не ссылается на список адресов.");
+
+        IpSetCidrs = cidrs;
+        _cidrSet = cidrs.Select(IpCidrRange.Parse).ToList();
+    }
+
+    /// <summary>
+    /// Загружает домены для правила по списку.
+    /// </summary>
+    /// <remarks>
+    /// Каждое имя из списка Zapret считается зоной: там пишут <c>discord.media</c>,
+    /// подразумевая и его поддомены — голосовые серверы называются
+    /// <c>russia1234.discord.media</c>. Толковать записи буквально значило бы
+    /// не поймать ровно то, ради чего список и нужен.
+    /// </remarks>
+    public void LoadHostList(IReadOnlyList<string> domains)
+    {
+        if (Match != MatchKind.HostList)
+            throw new InvalidOperationException($"Правило #{Ordinal} не ссылается на список доменов.");
+
+        HostListDomains = domains;
+
+        // Обычная запись — зона без звёздочек внутри — ищется по множеству,
+        // а не своим выражением. Прежде у каждой записи было своё Regex,
+        // и имя прогонялось через все подряд: замер 24.09 — открытие
+        // «Маршрутов» стоило 650 мс в потоке окна, из них около 370 мс
+        // уходило на сотню таких оценок, то есть 3,7 мс на одно имя.
+        // Смысл тот же: «*.зона» покрывает и саму зону, и любой поддомен,
+        // без учёта регистра. Записи со звёздочкой или «?» внутри остаются
+        // выражениями — множеством их не выразить.
+        var zones = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var globs = new List<GlobMatcher>();
+
+        foreach (var entry in domains)
+        {
+            var trimmed = entry.Trim();
+
+            if (trimmed.Length == 0)
+                continue;
+
+            var zone = trimmed.StartsWith("*.", StringComparison.Ordinal) ? trimmed[2..] : trimmed;
+
+            if (zone.Length > 0 && zone.IndexOfAny(['*', '?']) < 0)
+                zones.Add(zone);
+            else
+                globs.Add(GlobMatcher.Compile(trimmed.StartsWith("*.", StringComparison.Ordinal) ? trimmed : "*." + trimmed));
+        }
+
+        _hostZones = zones;
+        _hostGlobs = globs;
+    }
+
+    /// <summary>Само имя или любой его хвост после точки — в множестве зон.</summary>
+    private static bool InZones(HashSet<string> zones, string host)
+    {
+        if (zones.Contains(host))
+            return true;
+
+        for (int dot = host.IndexOf('.'); dot >= 0; dot = host.IndexOf('.', dot + 1))
+        {
+            if (zones.Contains(host[(dot + 1)..]))
+                return true;
+        }
+
+        return false;
+    }
+
+    public override string ToString() => $"#{Ordinal} {Match.ToString().ToLowerInvariant()}:{Value} -> {Mode.ToString().ToLowerInvariant()}";
+}
+
+/// <summary>
+/// Слой, из которого пришло правило.
+/// </summary>
+/// <remarks>
+/// Пользовательские правила проверяются раньше базовых внутри своего класса
+/// совпадения: выбор человека должен перекрывать заводскую настройку,
+/// а не спорить с ней.
+/// </remarks>
+public enum RuleSource
+{
+    /// <summary>Базовый набор: то, что заблокировано наверняка.</summary>
+    Base,
+
+    /// <summary>Выбор пользователя.</summary>
+    User,
+
+    /// <summary>
+    /// Включено выключателем в настройках, а не записано в файле
+    /// (<see cref="VpnHiding"/>). В порядке вычисления — как базовое:
+    /// своё правило человека главнее.
+    /// </summary>
+    Setting,
+}
+
+/// <summary>
+/// Минимальный разбор CIDR.
+/// </summary>
+/// <remarks>
+/// Не <see cref="System.Net.IPNetwork"/> намеренно: тот появился только в .NET 8
+/// и требует, чтобы адрес был точным началом подсети, тогда как в конфиге удобно
+/// писать <c>192.168.1.10/24</c>. Заодно здесь принимается голый адрес без маски.
+/// Имя отличается от системного типа, чтобы не приходилось разрешать конфликт
+/// в каждом файле с <c>using System.Net;</c>.
+/// </remarks>
+public sealed class IpCidrRange
+{
+    private readonly byte[] _prefix;
+    private readonly int _prefixLength;
+    private readonly AddressFamily _family;
+
+    private IpCidrRange(byte[] prefix, int prefixLength, AddressFamily family)
+    {
+        _prefix = prefix;
+        _prefixLength = prefixLength;
+        _family = family;
+    }
+
+    public static IpCidrRange Parse(string value)
+    {
+        var text = value.Trim();
+        var slash = text.IndexOf('/');
+
+        string addressPart = slash < 0 ? text : text[..slash];
+        if (!IPAddress.TryParse(addressPart, out var address))
+            throw new RuleConfigurationException($"'{value}' не разбирается как IP или CIDR.");
+
+        int maxBits = address.AddressFamily == AddressFamily.InterNetworkV6 ? 128 : 32;
+        int prefixLength = maxBits;
+
+        if (slash >= 0)
+        {
+            if (!int.TryParse(text[(slash + 1)..], out prefixLength) || prefixLength < 0 || prefixLength > maxBits)
+                throw new RuleConfigurationException($"'{value}': длина префикса должна быть в диапазоне 0..{maxBits}.");
+        }
+
+        return new IpCidrRange(address.GetAddressBytes(), prefixLength, address.AddressFamily);
+    }
+
+    public bool Contains(IPAddress address)
+    {
+        if (address.AddressFamily != _family)
+            return false;
+
+        var bytes = address.GetAddressBytes();
+        int fullBytes = _prefixLength / 8;
+        int remainingBits = _prefixLength % 8;
+
+        for (int i = 0; i < fullBytes; i++)
+        {
+            if (bytes[i] != _prefix[i])
+                return false;
+        }
+
+        if (remainingBits == 0)
+            return true;
+
+        int mask = 0xFF << (8 - remainingBits);
+        return (bytes[fullBytes] & mask) == (_prefix[fullBytes] & mask);
+    }
+}

@@ -1,0 +1,132 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Оконный вид. Собирается своим решением, gui\Zephyron.Gui.sln, и в
+    Zephyron.sln не входит: пока интерфейс недоделан, он не должен ронять
+    ни сборку консоли, ни CI, ни архив выпуска.
+
+    Общие настройки приходят из Directory.Build.props в корне — та же версия,
+    тот же запрет на сборку не под x64, та же детерминированность.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+
+    <!--
+      WinForms подключён ради одного NotifyIcon: своего значка в трее у WPF
+      нет, а Shell_NotifyIcon вручную — это двести строк вместе с невидимым
+      окном для сообщений. Замер 2026-09-10: единый файл вырос со 156,9
+      до 157,0 МБ, то есть на сто килобайт.
+    -->
+    <UseWindowsForms>true</UseWindowsForms>
+
+    <!--
+      WFAC010 советует убрать настройки DPI из манифеста и задать их через
+      Application.SetHighDpiMode. Совет для программ на WinForms; у нас WPF,
+      и осведомлённость о DPI он читает именно из манифеста. Выполнить совет
+      значит получить мыльное окно на мониторе с масштабом.
+    -->
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+
+    <!--
+      Значок появляется, когда файл положат: без условия сборка падала бы
+      у всякого, кто клонировал репозиторий до того.
+    -->
+    <ApplicationIcon Condition="Exists('Assets\app.ico')">Assets\app.ico</ApplicationIcon>
+    <!--
+      Окно и есть программа, поэтому носит её имя. Прежде оно звалось
+      Zephyron.Gui, чтобы не столкнуться с консольной zephyron.dll: оба
+      файла кладутся в одну папку, а Windows не различает регистр, и две
+      библиотеки с одинаковым именем оказывались одним файлом. Запускатор
+      ищет свою по зашитому имени, подхватывал консоль и запускал её без
+      аргументов — со стороны «спросили права и молча закрылось».
+
+      Столкновения больше нет: консоль сперва переименовали в ZephyronOld,
+      а 23.09 удалили вовсе. Рядом с окном в build\ теперь лежит nz.exe —
+      имя другое, и повторить ту беду ему нечем.
+    -->
+    <AssemblyName>Zephyron</AssemblyName>
+    <RootNamespace>Zephyron.Gui</RootNamespace>
+
+    <!--
+      Права администратора запрашиваются манифестом, а не повышением на ходу.
+      Без них не поставить драйвер перехвата и не поднять TUN, то есть окно
+      открылось бы и не смогло сделать ровно то, ради чего открывалось.
+    -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <!--
+      Отменяет InvariantGlobalization из корневого Directory.Build.props —
+      именно здесь, а не там: консоли он не мешает и правится не ради нас.
+
+      WPF без данных о языках падает при разборе шрифта, и падает не сразу,
+      а на первом же тексте, которому нужна типографика посложнее латиницы:
+      «MS.Internal.FontCache.MajorLanguages threw an exception». У нас это
+      имена серверов подписки — они с эмодзи-флагами. Раздел «Состояние»
+      их не рисовал и потому работал, а «Серверы» роняли окно.
+    -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <!--
+    Библиотеки берутся как есть и не правятся. В них двенадцать тысяч строк
+    выверенной работы: правила, десинк, туннель, hosts, подписка, супервизор.
+    Интерфейс — второй вид поверх той же основы, и всё, что чинится в консоли,
+    достаётся ему само.
+  -->
+  <!--
+    Флаги стран картинками. Windows их не рисует, шрифта с ними не поставляет,
+    а тащить чужую гарнитуру ради двадцати значков — лишняя лицензия в архиве.
+    Файлы зовутся по коду страны: de.png, ru.png, us.png.
+
+    Папки может не быть вовсе — это рабочее состояние: тогда вместо флага
+    остаётся значок с буквами.
+  -->
+  <ItemGroup>
+    <!--
+      Только PNG верхнего уровня. Рядом лежит распакованный исходный пак
+      с полутысячей SVG и файлов репозитория — они ни к чему ни в сборке,
+      ни в архиве, а рекурсивный шаблон тащил бы их все.
+    -->
+    <Content Include="Assets\flags\*.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\flags\NOTICE.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!--
+    Неявные using от WinForms сняты. Иначе UserControl и Brush становятся
+    двусмысленными между System.Windows.Forms/System.Drawing и WPF — сразу
+    по всему коду, во всех разделах, а WinForms здесь нужен ровно ради
+    значка в трее.
+  -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <!--
+    Тесты видят внутреннее. Сборка конфига, запуск движков и разделы окна
+    объявлены internal и останутся такими: наружу они не нужны никому,
+    а публичность — обещание, которого мы не давали. Проверять их при этом
+    нужно, и нужнее прочего: почти всё, что ломалось за вечер 16.09, лежит
+    именно здесь.
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Zephyron.Gui.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Zephyron.Core\Zephyron.Core.csproj" />
+
+    <!--
+      Ради раздела «Наблюдение»: события о соединениях берутся из ETW.
+      Тянет за собой TraceEvent, но он и так едет в поставке — им же
+      пользуется консольный watch.
+    -->
+    <ProjectReference Include="..\..\src\Zephyron.Etw\Zephyron.Etw.csproj" />
+    <ProjectReference Include="..\..\src\Zephyron.Proxy\Zephyron.Proxy.csproj" />
+    <ProjectReference Include="..\..\src\Zephyron.Zapret\Zephyron.Zapret.csproj" />
+    <ProjectReference Include="..\..\src\Zephyron.Subscriptions\Zephyron.Subscriptions.csproj" />
+    <ProjectReference Include="..\..\src\Zephyron.Supervisor\Zephyron.Supervisor.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,366 @@
+using Zephyron.Core.Connections;
+using Zephyron.Core.Rules;
+using Xunit;
+
+namespace Zephyron.Core.Tests;
+
+/// <summary>
+/// Два слоя правил: выверенный базовый набор и выбор пользователя поверх него.
+/// </summary>
+public sealed class LayeredRulesTests : IDisposable
+{
+    private readonly string _directory = Path.Combine(Path.GetTempPath(), $"zephyron-layers-{Guid.NewGuid():N}");
+    private readonly string _basePath;
+    private readonly string _userPath;
+
+    public LayeredRulesTests()
+    {
+        Directory.CreateDirectory(_directory);
+        _basePath = Path.Combine(_directory, "rules.yaml");
+        _userPath = Path.Combine(_directory, "rules.user.yaml");
+
+        File.WriteAllText(_basePath, """
+            mode: selective
+            capture:
+              - lists/ipset-telegram.txt
+            rules:
+              - match: domain
+                value: "*.rutracker.org"
+                mode: proxy
+              - match: domain
+                value: "*.youtube.com"
+                mode: desync
+            default:
+              mode: desync
+            """);
+    }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_directory))
+            Directory.Delete(_directory, recursive: true);
+    }
+
+    private static ConnectionEvent Connection(string hostname) => new()
+    {
+        Timestamp = DateTimeOffset.UnixEpoch,
+        Protocol = ProtocolKind.Tcp,
+        RemoteAddress = System.Net.IPAddress.Parse("203.0.113.7"),
+        RemotePort = 443,
+        Hostname = hostname,
+    };
+
+    [Fact]
+    public void WithoutUserFileOnlyBaseRulesApply()
+    {
+        var engine = RuleSetLoader.LoadLayered(_basePath, _userPath);
+
+        Assert.Equal(RoutingMode.Proxy, engine.Evaluate(Connection("rutracker.org")).Mode);
+        Assert.Equal(RoutingMode.Desync, engine.Evaluate(Connection("www.youtube.com")).Mode);
+    }
+
+    [Fact]
+    public void UserChoiceOverridesTheBaseSetting()
+    {
+        // Ради этого разделение и делалось: человек может решить иначе,
+        // не правя выверенный набор.
+        var file = UserRulesFile.Load(_userPath);
+        file.Set(MatchKind.Domain, "www.youtube.com", RoutingMode.Proxy);
+        file.Save();
+
+        var engine = RuleSetLoader.LoadLayered(_basePath, _userPath);
+        var decision = engine.Evaluate(Connection("www.youtube.com"));
+
+        Assert.Equal(RoutingMode.Proxy, decision.Mode);
+        Assert.Equal(RuleSource.User, decision.Rule!.Source);
+    }
+
+    /// <summary>
+    /// Свой домен побеждает список сервиса, даже записанный ниже него.
+    /// </summary>
+    /// <remarks>
+    /// 23.09: «*.downloads.claude.ai → через VPN» молча проигрывал списку
+    /// Claude «напрямую» — тот стоял в файле выше. Решение владельца: своё
+    /// правило побеждает.
+    /// </remarks>
+    [Fact]
+    public void OwnDomainBeatsServiceListWrittenAboveIt()
+    {
+        var list = Path.Combine(_directory, "claude.txt");
+        File.WriteAllText(list, "claude.ai\n");
+
+        var file = UserRulesFile.Load(_userPath);
+        file.Set(MatchKind.HostList, list, RoutingMode.Direct);
+        file.Set(MatchKind.Domain, "*.downloads.claude.ai", RoutingMode.Proxy);
+        file.Save();
+
+        var engine = RuleSetLoader.LoadLayered(_basePath, _userPath);
+
+        // Без раскрытия список не совпадает ни с чем, и тест прошёл бы
+        // и при прежнем порядке — ничего не доказав.
+        Assert.Empty(Zapret.RuleSetExpander.Expand(engine.RuleSet, null));
+
+        Assert.Equal(RoutingMode.Proxy, engine.Evaluate(Connection("downloads.claude.ai")).Mode);
+
+        // Остальной Claude по-прежнему идёт по своему списку.
+        Assert.Equal(RoutingMode.Direct, engine.Evaluate(Connection("claude.ai")).Mode);
+    }
+
+    /// <summary>
+    /// Правило по программе с путём Windows переживает запись и чтение.
+    /// Обратная косая черта не экранировалась, и файл с таким правилом
+    /// не разбирался вовсе — вместе со всеми прочими своими маршрутами.
+    /// </summary>
+    [Fact]
+    public void ProcessPathWithBackslashesSurvivesTheFile()
+    {
+        var file = UserRulesFile.Load(_userPath);
+        file.Set(MatchKind.Process, @"C:\Program Files\App\app.exe", RoutingMode.Direct);
+        file.Save();
+
+        var reread = UserRulesFile.Load(_userPath);
+
+        Assert.Equal(@"C:\Program Files\App\app.exe", Assert.Single(reread.Entries).Value);
+        _ = RuleSetLoader.LoadLayered(_basePath, _userPath);
+    }
+
+    [Fact]
+    public void DisabledUserRuleFallsBackToTheBase()
+    {
+        // Выключение должно возвращать заводское поведение, а не удалять выбор.
+        var file = UserRulesFile.Load(_userPath);
+        file.Set(MatchKind.Domain, "www.youtube.com", RoutingMode.Proxy);
+        file.Toggle(0);
+        file.Save();
+
+        var engine = RuleSetLoader.LoadLayered(_basePath, _userPath);
+
+        Assert.Equal(RoutingMode.Desync, engine.Evaluate(Connection("www.youtube.com")).Mode);
+
+        // Но сама запись никуда не делась.
+        Assert.Single(UserRulesFile.Load(_userPath).Entries);
+    }
+
+    [Fact]
+    public void BaseModeAndDefaultAreKept()
+    {
+        // Пользовательский файл описывает только отдельные маршруты;
+        // режим и умолчание живут в базовом наборе.
+        var file = UserRulesFile.Load(_userPath);
+        file.Set(MatchKind.Domain, "example.com", RoutingMode.Proxy);
+        file.Save();
+
+        var engine = RuleSetLoader.LoadLayered(_basePath, _userPath);
+
+        Assert.Equal(OperatingMode.Selective, engine.RuleSet.Operating);
+        Assert.Equal(RoutingMode.Desync, engine.RuleSet.DefaultMode);
+    }
+
+    [Fact]
+    public void CaptureSectionsFromBothLayersAreCombined()
+    {
+        File.WriteAllText(_userPath, """
+            rules: []
+            capture:
+              - 91.108.4.0/22
+            """);
+
+        var engine = RuleSetLoader.LoadLayered(_basePath, _userPath);
+
+        Assert.Equal(2, engine.RuleSet.CaptureEntries.Count);
+    }
+
+    [Fact]
+    public void ProcessRuleStillBeatsUserDomainRule()
+    {
+        // Слой меняет приоритет только внутри своего класса совпадения.
+        // Программа по-прежнему важнее домена — иначе правило «эта игра
+        // напрямую» перестало бы работать.
+        File.WriteAllText(_basePath, """
+            mode: selective
+            rules:
+              - match: process
+                value: "game.exe"
+                mode: direct
+            default:
+              mode: desync
+            """);
+
+        var file = UserRulesFile.Load(_userPath);
+        file.Set(MatchKind.Domain, "example.com", RoutingMode.Proxy);
+        file.Save();
+
+        var engine = RuleSetLoader.LoadLayered(_basePath, _userPath);
+
+        var decision = engine.Evaluate(Connection("example.com") with { ExecutablePath = "game.exe" });
+
+        Assert.Equal(RoutingMode.Direct, decision.Mode);
+    }
+
+    [Fact]
+    public void DeletedRuleIsGoneAfterReload()
+    {
+        // Отличие от выключения: выключенная запись остаётся в файле,
+        // удалённая исчезает, и базовое правило снова становится видно.
+        var file = UserRulesFile.Load(_userPath);
+        file.Set(MatchKind.Domain, "www.youtube.com", RoutingMode.Proxy);
+        file.Set(MatchKind.Domain, "example.com", RoutingMode.Direct);
+        file.Save();
+
+        var reopened = UserRulesFile.Load(_userPath);
+        var removed = reopened.RemoveAt(0);
+        reopened.Save();
+
+        Assert.Equal("www.youtube.com", removed!.Value);
+
+        var reloaded = UserRulesFile.Load(_userPath);
+
+        Assert.Single(reloaded.Entries);
+        Assert.Equal("example.com", reloaded.Entries[0].Value);
+        Assert.Equal(RoutingMode.Desync, RuleSetLoader.LoadLayered(_basePath, _userPath)
+            .Evaluate(Connection("www.youtube.com")).Mode);
+    }
+
+    [Fact]
+    public void DeletingOutsideTheListChangesNothing()
+    {
+        var file = UserRulesFile.Load(_userPath);
+        file.Set(MatchKind.Domain, "example.com", RoutingMode.Proxy);
+
+        Assert.Null(file.RemoveAt(5));
+        Assert.Null(file.RemoveAt(-1));
+        Assert.Single(file.Entries);
+    }
+
+    [Fact]
+    public void CorruptedUserFileDoesNotBreakLoading()
+    {
+        File.WriteAllText(_userPath, "это не yaml: [[[");
+
+        var file = UserRulesFile.Load(_userPath);
+
+        Assert.Empty(file.Entries);
+    }
+
+    [Fact]
+    public void CorruptedUserFileIsSetAsideRatherThanOverwritten()
+    {
+        // Иначе следующее сохранение перезапишет его пустым, и правки человека
+        // исчезнут вместе с опечаткой, из-за которой файл не разобрался.
+        File.WriteAllText(_userPath, "тут была опечатка: [[[");
+
+        var file = UserRulesFile.Load(_userPath);
+        file.Set(MatchKind.Domain, "example.com", RoutingMode.Proxy);
+        file.Save();
+
+        var broken = _userPath + UserRulesFile.BrokenSuffix;
+
+        Assert.True(File.Exists(broken), "неразобранный файл должен сохраниться рядом");
+        Assert.Contains("тут была опечатка", File.ReadAllText(broken));
+
+        // А новый файл при этом рабочий.
+        Assert.Single(UserRulesFile.Load(_userPath).Entries);
+    }
+
+    [Fact]
+    public void RepeatedChoiceReplacesRatherThanDuplicates()
+    {
+        var file = UserRulesFile.Load(_userPath);
+        file.Set(MatchKind.Domain, "example.com", RoutingMode.Proxy);
+        file.Set(MatchKind.Domain, "example.com", RoutingMode.Direct);
+        file.Save();
+
+        var reloaded = UserRulesFile.Load(_userPath);
+
+        Assert.Single(reloaded.Entries);
+        Assert.Equal(RoutingMode.Direct, reloaded.Entries[0].Mode);
+    }
+
+    [Fact]
+    public void SavedFileSurvivesRoundTripWithNonAsciiValues()
+    {
+        var file = UserRulesFile.Load(_userPath);
+        file.Set(MatchKind.Process, "Телеграм.exe", RoutingMode.Proxy);
+        file.Save();
+
+        var reloaded = UserRulesFile.Load(_userPath);
+
+        Assert.Equal("Телеграм.exe", reloaded.Entries[0].Value);
+    }
+
+    /// <summary>
+    /// Перестановка в «Порядке вычисления» меняет, какое правило побеждает.
+    /// </summary>
+    /// <remarks>
+    /// Два своих правила на одно имя: внутри группы решает порядок файла.
+    /// Переставили — победило другое, и после перезагрузки тоже.
+    /// </remarks>
+    [Fact]
+    public void Moving_an_own_rule_changes_which_one_wins()
+    {
+        var file = UserRulesFile.Load(_userPath);
+        file.Set(MatchKind.Domain, "*.example.com", RoutingMode.Direct);
+        file.Set(MatchKind.Domain, "www.example.com", RoutingMode.Proxy);
+        file.Save();
+
+        Assert.Equal(RoutingMode.Direct,
+            RuleSetLoader.LoadLayered(_basePath, _userPath).Evaluate(Connection("www.example.com")).Mode);
+
+        file = UserRulesFile.Load(_userPath);
+        Assert.True(file.Move(1, 0));
+        file.Save();
+
+        Assert.Equal("www.example.com", UserRulesFile.Load(_userPath).Entries[0].Value);
+        Assert.Equal(RoutingMode.Proxy,
+            RuleSetLoader.LoadLayered(_basePath, _userPath).Evaluate(Connection("www.example.com")).Mode);
+    }
+
+    /// <summary>Правка режима оставляет правило на его месте.</summary>
+    /// <remarks>Иначе всякая смена режима сбрасывала бы выставленный порядок.</remarks>
+    [Fact]
+    public void Changing_a_mode_keeps_the_place()
+    {
+        var file = UserRulesFile.Load(_userPath);
+        file.Set(MatchKind.Domain, "*.a.example", RoutingMode.Direct);
+        file.Set(MatchKind.Domain, "*.b.example", RoutingMode.Direct);
+        file.Move(1, 0);
+        file.Set(MatchKind.Domain, "*.b.example", RoutingMode.Proxy);
+
+        Assert.Equal("*.b.example", file.Entries[0].Value);
+        Assert.Equal(RoutingMode.Proxy, file.Entries[0].Mode);
+    }
+
+    [Fact]
+    public void An_impossible_move_changes_nothing()
+    {
+        var file = UserRulesFile.Load(_userPath);
+        file.Set(MatchKind.Domain, "*.a.example", RoutingMode.Direct);
+
+        Assert.False(file.Move(0, 5));
+        Assert.False(file.Move(-1, 0));
+        Assert.Single(file.Entries);
+    }
+
+    /// <summary>
+    /// Группы движка: окно разрешает перестановку только внутри одной.
+    /// </summary>
+    /// <remarks>
+    /// Своё имя раньше своего списка, свои раньше заводских, процесс
+    /// раньше домена, домен раньше адреса — ровно порядок сортировки Build.
+    /// </remarks>
+    [Fact]
+    public void Tiers_follow_the_engine_order()
+    {
+        int process = RuleEngine.Tier(MatchKind.Process, RuleSource.User);
+        int ownName = RuleEngine.Tier(MatchKind.Domain, RuleSource.User);
+        int ownList = RuleEngine.Tier(MatchKind.HostList, RuleSource.User);
+        int baseName = RuleEngine.Tier(MatchKind.Domain, RuleSource.Base);
+        int ip = RuleEngine.Tier(MatchKind.IpSet, RuleSource.User);
+
+        Assert.True(process < ownName);
+        Assert.True(ownName < ownList);
+        Assert.True(ownList < baseName);
+        Assert.True(baseName < ip);
+        Assert.Equal(baseName, RuleEngine.Tier(MatchKind.HostList, RuleSource.Base));
+    }
+}

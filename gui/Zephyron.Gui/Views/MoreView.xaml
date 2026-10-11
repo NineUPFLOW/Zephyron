@@ -1,0 +1,330 @@
+<UserControl x:Class="Zephyron.Gui.Views.MoreView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:gui="clr-namespace:Zephyron.Gui"
+             Background="{DynamicResource Chrome}">
+
+    <ScrollViewer Style="{StaticResource PageScroll}" Padding="32,28,32,28">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="470" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0">
+
+                <TextBlock Text="Ещё" Style="{StaticResource Title}" />
+                <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
+                           Text="Антивирус, выключатели, папки программы и обслуживание. Оформление — своим разделом, обновление — на «Главной», подписки — в «VPN»." />
+
+                <TextBlock x:Name="Status" Style="{StaticResource Caption}" Margin="4,16,0,0" TextWrapping="Wrap" />
+
+                <!--
+                    Первым в разделе (владелец 26.09: «подними разбор неисправностей
+                    выше») и отдельно от «Обслуживания»: там необратимое. Отчёт
+                    для разбора отсюда переехал в «Диагностику» (владелец 03.10).
+                -->
+                <TextBlock Text="Разбор неисправностей" FontWeight="SemiBold" FontSize="15" Margin="4,22,0,10" />
+
+                <!--
+                    «Сайт не открывается» — в «Ещё», пока в тестовом режиме
+                    (владелец 29.09: «спрячем в ещё, пока она в тестовом режиме»).
+                    Пробует как есть, напрямую, через VPN и записывает
+                    сработавший маршрут. Решение целиком в SiteFixer.
+                -->
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Сайт не открывается?" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Text="· проверка, тестовый режим" Style="{StaticResource Caption}"
+                                       VerticalAlignment="Center" Margin="6,0,0,0" />
+                        </StackPanel>
+
+                        <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,0" TextWrapping="Wrap"
+                                   Text="Вставьте ссылку или имя сайта. Программа попробует его как есть, напрямую — без десинка, — и через VPN, и сама запишет маршрут, который сработал. «Напрямую» действует сразу, «через VPN» — после перезапуска движков. Движки должны быть запущены." />
+
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox Grid.Column="0" x:Name="FixSite" Margin="0,0,8,0" KeyDown="OnFixKey"
+                                     gui:Hint.Text="https://aternos.org/go/ или просто aternos.org" />
+
+                            <Button Grid.Column="1" x:Name="FixButton" Style="{StaticResource Ghost}"
+                                    Content="Починить" Click="OnFix" MinWidth="110" />
+                        </Grid>
+
+                        <TextBlock x:Name="FixResult" Style="{StaticResource Caption}" Margin="0,8,0,0"
+                                   TextWrapping="Wrap" Visibility="Collapsed" />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Text="Первый запуск" FontWeight="SemiBold" FontSize="15" Margin="4,22,0,10" />
+
+                <Border Style="{StaticResource Card}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="Мастер первого запуска" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,0" TextWrapping="Wrap"
+                                       Text="Знакомство, выбор темы, подписка, пробный запуск и проверка сети — показывается один раз при первом открытии. Ничего из настроенного он не сбрасывает." />
+                        </StackPanel>
+
+                        <Button Grid.Column="1" Style="{StaticResource Ghost}"
+                                Content="Повторить" Click="OnRestartOnboarding" VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+
+                <TextBlock Text="Антивирус" FontWeight="SemiBold" FontSize="15" Margin="4,22,0,10" />
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                                <TextBlock Text="Папка программы в исключениях Defender" Style="{StaticResource Caption}" />
+                                <TextBlock x:Name="DefenderValue" FontSize="15" FontWeight="SemiBold" Margin="0,4,0,0" />
+                            </StackPanel>
+
+                            <Button Grid.Column="1" x:Name="DefenderButton" Style="{StaticResource Ghost}"
+                                    Content="Добавить" Click="OnExclude" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <TextBlock Style="{StaticResource Caption}" Margin="0,10,0,0" TextWrapping="Wrap"
+                                   Text="Исключается одна папка, а не отключается защита. Defender опознаёт в winws2.exe библиотеку WinDivert и удаляет файл — наблюдалось вживую. Снимать защиту со всей системы ради этого не нужно и нельзя: программа, глушащая антивирус, сама выглядит как вредонос." />
+                    </StackPanel>
+                </Border>
+
+
+                <TextBlock Text="Папки" FontWeight="SemiBold" FontSize="15" Margin="4,22,0,10" />
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <WrapPanel>
+                            <Button Style="{StaticResource Ghost}" Content="Программа" Tag="."
+                                    Click="OnOpen" Margin="0,0,8,8" />
+                            <Button Style="{StaticResource Ghost}" Content="Настройки" Tag="config"
+                                    Click="OnOpen" Margin="0,0,8,8" />
+                            <Button Style="{StaticResource Ghost}" Content="Отчёты" Tag="reports"
+                                    Click="OnOpen" Margin="0,0,8,8" />
+                            <Button Style="{StaticResource Ghost}" Content="Журналы" Tag="runtime"
+                                    Click="OnOpen" Margin="0,0,8,8" />
+                            <Button Style="{StaticResource Ghost}" Content="Пресеты" Tag="presets"
+                                    Click="OnOpen" Margin="0,0,8,8" />
+                        </WrapPanel>
+
+                        <TextBlock x:Name="RootValue" Style="{StaticResource Mono}"
+                                   Foreground="{DynamicResource Muted}" Margin="0,4,0,0"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <!--
+                    Просьба из обсуждения #2. Список компонентов приходит
+                    из About в библиотеке, а не пишется здесь: его сверяет
+                    с THIRD-PARTY.md тест, и окно не должно знать больше.
+                -->
+                <TextBlock Text="О программе" FontWeight="SemiBold" FontSize="15" Margin="4,22,0,10" />
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock x:Name="AuthorValue" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+
+                        <!--
+                            Скачивания с GitHub — единственное число о людях,
+                            которое программа показывает. Своего счётчика нет
+                            намеренно: запрос на свой сервер метил бы компьютер
+                            для провайдера (DownloadStats).
+                        -->
+                        <TextBlock x:Name="DownloadsValue" Style="{StaticResource Caption}" TextWrapping="Wrap"
+                                   Margin="0,6,0,0" Visibility="Collapsed" />
+
+                        <WrapPanel Margin="0,10,0,0">
+                            <Button x:Name="RepositoryLink" Style="{StaticResource Ghost}" Content="Репозиторий"
+                                    Click="OnLink" Margin="0,0,8,8" />
+                            <Button x:Name="IssuesLink" Style="{StaticResource Ghost}" Content="Сообщить о проблеме"
+                                    Click="OnLink" Margin="0,0,8,8" />
+                            <Button x:Name="DiscussionsLink" Style="{StaticResource Ghost}" Content="Обсуждения"
+                                    Click="OnLink" Margin="0,0,8,8" />
+                            <Button x:Name="TelegramLink" Style="{StaticResource Ghost}" Content="Телеграм-канал"
+                                    Click="OnLink" Margin="0,0,8,8" />
+                            <Button x:Name="SupportLink" Style="{StaticResource Ghost}" Content="Поддержать"
+                                    Click="OnLink" Margin="0,0,8,8" />
+                        </WrapPanel>
+
+                        <Border Height="1" Background="{DynamicResource Border}" Margin="0,8,0,14" />
+
+                        <TextBlock Text="В составе" FontWeight="SemiBold" />
+                        <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,4" TextWrapping="Wrap"
+                                   Text="Чужие движки едут в архиве как есть и запускаются отдельными процессами. Условия каждого — в docs/THIRD-PARTY.md в репозитории." />
+
+                        <ItemsControl x:Name="Components">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                            <TextBlock Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap">
+                                                <Run Text="{Binding Role, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding License, Mode=OneWay}" />
+                                            </TextBlock>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <!--
+                                                Сайт — у кого он отдельно от исходников.
+                                                Заведён ради Zapret GUI: владелец 30.09
+                                                просил ссылку на автора, а его дом —
+                                                wiki.zapret.moe, не только репозиторий.
+                                            -->
+                                            <Button Content="Сайт" Tag="{Binding Site}" Click="OnLink" Margin="0,0,8,0">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource Ghost}">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Site}" Value="{x:Null}">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+
+                                            <Button Style="{StaticResource Ghost}" Content="Исходники"
+                                                    Tag="{Binding Source}" Click="OnLink" />
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!--
+                    Обслуживание идёт последним намеренно: это разовые действия,
+                    и три из четырёх необратимы. Соседство с переключателями,
+                    которые нажимают мимоходом, им противопоказано.
+                -->
+                <TextBlock Text="Обслуживание" FontWeight="SemiBold" FontSize="15" Margin="4,22,0,10" />
+
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+
+                        <!--
+                            «Искать обновления при запуске» — здесь (владелец, 05.10).
+                            Утром того же дня переехала тумблером в заголовок карточки
+                            «Обновление» на «Главной» и там выглядела странно: тумблер
+                            теснил кнопку «Проверить».
+                        -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                                <TextBlock Text="Искать обновления при запуске" FontWeight="SemiBold" />
+                                <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,0" TextWrapping="Wrap"
+                                           Text="Только искать. Установка остаётся отдельным действием с отдельным согласием — кнопкой в карточке «Обновление» на «Главной»." />
+                            </StackPanel>
+
+                            <TextBlock Grid.Column="1" x:Name="UpdatesWord" Style="{StaticResource Caption}"
+                                       VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                            <ToggleButton Grid.Column="2" x:Name="UpdatesSwitch" Style="{StaticResource Switch}"
+                                          Click="OnUpdatesSwitch" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <Border Height="1" Background="{DynamicResource Border}" Margin="0,16,0,16" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                                <TextBlock Text="Сбросить настройки до заводских" FontWeight="SemiBold" />
+                                <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,0" TextWrapping="Wrap"
+                                           Text="Режим, пресет, выбранный сервер, свои маршруты и рабочие файлы. Ссылка подписки остаётся: её выдаёт поставщик, и восстановить её программа не может." />
+                            </StackPanel>
+
+                            <Button Grid.Column="1" x:Name="ResetSettingsButton" Style="{StaticResource Destructive}"
+                                    Content="Сбросить" Click="OnResetSettings" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <Border Height="1" Background="{DynamicResource Border}" Margin="0,16,0,16" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                                <TextBlock Text="Забыть маршруты" FontWeight="SemiBold" />
+                                <TextBlock x:Name="RoutesValue" Style="{StaticResource Caption}" Margin="0,5,0,0"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <Button Grid.Column="1" x:Name="ForgetRoutesButton" Style="{StaticResource Destructive}"
+                                    Content="Забыть" Click="OnForgetRoutes" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <Border Height="1" Background="{DynamicResource Border}" Margin="0,16,0,16" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                                <TextBlock Text="Очистить рабочие файлы" FontWeight="SemiBold" />
+                                <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,0" TextWrapping="Wrap"
+                                           Text="Журналы и конфиги от прошлых запусков из runtime. В собранных конфигах лежат пароли серверов открытым текстом — держать прошлогодние незачем. Действующий конфиг остаётся." />
+                            </StackPanel>
+
+                            <Button Grid.Column="1" x:Name="CleanButton" Style="{StaticResource Ghost}"
+                                    Content="Очистить" Click="OnClean" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <Border Height="1" Background="{DynamicResource Border}" Margin="0,16,0,16" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                                <TextBlock Text="Сбросить сетевой стек Windows" FontWeight="SemiBold" />
+                                <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,0" TextWrapping="Wrap"
+                                           Text="winsock и TCP/IP. Лечение для сети, оставшейся в странном состоянии после опытов с адаптерами и DNS. Потребуется перезагрузка компьютера: без неё сеть остаётся в переходном состоянии, то есть хуже исходного." />
+                            </StackPanel>
+
+                            <Button Grid.Column="1" x:Name="ResetNetworkButton" Style="{StaticResource Destructive}"
+                                    Content="Сбросить" Click="OnResetNetwork" VerticalAlignment="Center" />
+                        </Grid>
+
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

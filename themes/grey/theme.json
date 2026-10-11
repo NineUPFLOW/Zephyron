@@ -1,0 +1,23 @@
+{
+  // «Графитовая», встроенная. Нейтральный тёплый графит с пудровым акцентом:
+  // строгий, но не холодный.
+  "name": "Графитовая",
+  "author": "Zephyron",
+  "base": "dark",
+  "colors": {
+    "backdrop": "#1B1A20",
+    "surface": "#26242C",
+    "raised": "#312E38",
+    "border": "#443F4E",
+    "text": "#F0EEF3",
+    "muted": "#B6B1C0",
+    "faint": "#8A8595",
+    "accent": "#F2A0C4",
+    "accent-dim": "#6E3F58",
+    "danger": "#FF8A94",
+    "warn": "#F5C878",
+    "accent-fill": "#E78FB6",
+    "on-accent": "#2A1620",
+    "warn-fill": "#F5C878"
+  }
+}

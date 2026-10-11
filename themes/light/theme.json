@@ -1,0 +1,28 @@
+{
+  // «Кремовая» — основная светлая тема Zephyron и основа для чужих: "base": "light".
+  // Значения — те же, что в gui/Zephyron.Gui/Theme/Light.xaml;
+  // расхождение ловит тест ThemeFilesMatchXamlPalettes.
+  "name": "Кремовая",
+  "author": "Zephyron",
+  "colors": {
+    "backdrop": "#FFF5F8",
+    "surface": "#FFFFFF",
+    "raised": "#FBEAF1",
+    "border": "#F0D3E0",
+    "text": "#3A2E3F",
+    "muted": "#6E5F76",
+    "faint": "#9C89A5",
+    "accent": "#C2185B",
+    "accent-dim": "#F3C6DC",
+    "danger": "#C62828",
+    "warn": "#8A5200",
+    "accent-fill": "#D6336C",
+    "on-accent": "#FFFFFF",
+    "warn-fill": "#B26A00"
+  },
+  "fonts": {
+    "ui": "Comfortaa, Segoe UI",
+    "mono": "Cascadia Mono, Consolas",
+    "display": "Comfortaa, Segoe UI"
+  }
+}

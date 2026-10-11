@@ -1,0 +1,954 @@
+using Zephyron.Core.Rules;
+
+namespace Zephyron.Core.Services;
+
+/// <summary>
+/// Часть сервиса: то, что можно направить отдельно от остального.
+/// </summary>
+public sealed record ServicePart
+{
+    /// <summary>Что это по сути: «Голос», «Видео», «Текст и картинки».</summary>
+    public required string Name { get; init; }
+
+    /// <summary>
+    /// Наш список, задающий состав части.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Ссылка на файл, а не выписанные домены или подсети: список можно
+    /// поправить, не пересобирая программу.
+    /// </para>
+    /// <para>
+    /// Все пути ведут в <c>config/lists/</c> — то есть в наши файлы, которые
+    /// едут в архиве и обновляются вместе с программой. Прежде они вели
+    /// в <c>lists/</c> установки Zapret, и это выходило боком дважды. Во-первых,
+    /// правило молча переставало действовать, если установки нет: непрогруженный
+    /// список не совпадает ни с чем, а в меню часть по-прежнему числилась
+    /// направленной. Во-вторых, состав задавал не тот, кто отвечает за
+    /// последствия: в <c>discord.txt</c> лежало два десятка чужих сайтов
+    /// о Discord, в <c>roblox.txt</c> — зоны Akamai и Amazon целиком.
+    /// </para>
+    /// <para>
+    /// Доменный (<c>config/lists/discord-media.txt</c>) либо адресный
+    /// (<c>config/lists/ipset-telegram.txt</c>) — см. <see cref="ByAddress"/>.
+    /// </para>
+    /// </remarks>
+    public required string List { get; init; }
+
+    /// <summary>
+    /// Часть задана подсетями, а не доменами.
+    /// </summary>
+    /// <remarks>
+    /// Так устроен Telegram: у него в пресете вообще нет доменной секции —
+    /// клиент ходит по адресам, не спрашивая DNS. Различать это обязательно,
+    /// иначе показ врёт: спросив про домен там, где правило работает
+    /// по адресу, мы получим ответ про совсем другой трафик. Именно так
+    /// Telegram и показывался идущим через десинк, хотя шёл через VPN.
+    /// </remarks>
+    public bool ByAddress { get; init; }
+
+    /// <summary>
+    /// Имя, на котором проверять рецепты, если первая запись списка не годится.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Обычно проверять берут первую запись списка — она заведомо им покрыта,
+    /// и её же видно в подписи «например …». Но запись — это зона, а фильтр
+    /// стоит на имени, и одно с другим совпадает не всегда.
+    /// </para>
+    /// <para>
+    /// Голос Discord ровно такой случай. Замер с одного адреса, меняя только
+    /// SNI: <c>discord.media</c> отвечает за 133 мс, любой его поддомен молчит
+    /// шесть секунд, а три контрольных несуществующих имени в чужих зонах
+    /// отвечают за 55 мс. Фильтр стоит на суффиксе, и апекс из-под него
+    /// выпадает — то есть единственная запись списка это единственное имя
+    /// зоны, которое открывается само. Проверка на нём отвечала «рецепт
+    /// не нужен» и не начиналась вовсе.
+    /// </para>
+    /// <para>
+    /// Настоящее имя сюда не впишешь: голосовые серверы выдаются под звонок,
+    /// и <c>frankfurt1234.discord.media</c> сегодня не разрешается ни у кого —
+    /// DoH отвечает NOERROR без записей. Поэтому имя выдуманное, а проба
+    /// не спрашивает DNS: соединяется с адресом зоны и шлёт это имя в SNI.
+    /// Хостлист winws2 сопоставляет по зонам, так что профиль встанет тот же,
+    /// что на настоящий голосовой сервер.
+    /// </para>
+    /// </remarks>
+    public string? Probe { get; init; }
+
+    /// <summary>Пояснение, зачем эту часть трогать.</summary>
+    public string? Note { get; init; }
+
+    /// <summary>
+    /// Пока человек не выбрал режим, часть показана «выключено».
+    /// </summary>
+    /// <remarks>
+    /// Для частей, чей список шире самого сервиса. Заводского правила у таких
+    /// нет, и прежде «Маршруты» показывали режим, которым движок решает первый
+    /// адрес списка, — «напрямую» у запасного пути Discord, хотя части не
+    /// действовало ничего. Владелец 06.10, по разбору пересечений: запасной
+    /// путь — 3,4 млн адресов, из них ~791 тыс. Cloudflare и ~664 тыс. Google,
+    /// почти весь список YouTube QUIC и куски голоса Discord и X, — «вот это
+    /// выключи, остальное пока оставь».
+    /// </remarks>
+    public bool DefaultOff { get; init; }
+
+    /// <summary>
+    /// Более широкий список, внутри которого лежат имена этой части.
+    /// </summary>
+    /// <remarks>
+    /// updates.discord.com — внутри discord.com, картинки Discord — внутри
+    /// discordapp.net. Правило такой части записывается раньше правила
+    /// широкого списка, иначе движок, берущий первое совпадение, до неё
+    /// не дошёл бы (UserRulesFile.Set, <c>before</c>).
+    /// </remarks>
+    public string? Within { get; init; }
+}
+
+/// <summary>
+/// Сервис в том виде, в каком о нём думает человек.
+/// </summary>
+public sealed record ServiceDefinition
+{
+    public required string Name { get; init; }
+
+    public required IReadOnlyList<ServicePart> Parts { get; init; }
+
+    /// <summary>
+    /// Это полка с разными сервисами, а не один сервис из частей.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Разница видна сразу, как только её назвать. У Discord части — стороны
+    /// одного сервиса: голос, переписка, запасной путь. Они ломаются врозь,
+    /// и держать их вместе осмысленно. А «Мессенджеры» — это Signal и Viber,
+    /// два чужих друг другу сервиса, и общего у них ровно то, что мы положили
+    /// их на одну полку.
+    /// </para>
+    /// <para>
+    /// Показ от этого расходится. Одному сервису идёт папка со стрелкой:
+    /// свернул — и не мешает. Полке папка не идёт вовсе: человек ищет Signal,
+    /// а не «мессенджеры», и лишний щелчок стоит между ним и его сервисом.
+    /// Части такой полки показываются сразу, каждая своей строкой.
+    /// </para>
+    /// </remarks>
+    public bool Grouping { get; init; }
+}
+
+/// <summary>
+/// Какие домены к какому сервису относятся.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Разбиение на части взято из пресета Universal V6: там отдельные секции
+/// для голоса, переписки, видеопотока и интерфейса. Ценность появляется
+/// там, где части расходятся: у Discord голос ломается иначе, чем текст,
+/// и лечится иначе. Сервис без такого разделения смысла не добавляет —
+/// его и одной строкой можно направить.
+/// </para>
+/// <para>
+/// А вот состав частей теперь наш. Списки лежат в <c>config/lists/</c>
+/// и ведутся вместе с программой; за основу взяты списки Zapret, из которых
+/// убраны три группы записей. Чужие сайты о сервисе (disboard.org, top.gg,
+/// mee6.xyz у Discord) — они ломаются сами по себе, а в отчёте выглядели
+/// поломкой сервиса. Целые сети доставки (akamai.net, amazonaws.com
+/// у Roblox, akamaihd.net у Steam) — правило на такую зону уводит в туннель
+/// половину интернета. И зеркала: тридцать восемь страновых зон Microsoft,
+/// тринадцать доменов RuTracker, два десятка адресов Roblox.
+/// </para>
+/// <para>
+/// Часть списков не из Zapret вовсе, а написана с нуля: Spotify, Netflix,
+/// Reddit, Signal, Viber, Proton, Figma, Slack, Battle.net, PlayStation
+/// и прочие, которых там нет. Правило у них то же: сначала имя, по которому
+/// сервис узнают, затем его собственные зоны — раздача файлов, вход, поток, —
+/// и ни одной чужой сети доставки. Поэтому у Figma нет хранилища: оно лежит
+/// в S3 под именем Amazon, и правило на эту зону увело бы в туннель половину
+/// интернета.
+/// </para>
+/// <para>
+/// Заодно починены две молчаливые ошибки. У Discord второй прокси картинок
+/// записан как <c>mages-ext-2.discordapp.net</c> — без первой буквы, — и не
+/// совпадал ни с чем. У X и GitHub картинки и raw-файлы лежат на
+/// <c>twimg.com</c> и <c>githubusercontent.com</c>, которые в Zapret вынесены
+/// отдельными файлами, и на них не ссылалась ни одна часть.
+/// </para>
+/// </remarks>
+public static class ServiceCatalog
+{
+    /// <summary>
+    /// Видео Amazon IVS (live-video.net) — одна часть у Twitch и Kick.
+    /// </summary>
+    /// <remarks>
+    /// До 02.10 имя лежало и в списке Twitch, и в списке видео Kick, и у двух
+    /// правил выходили разные пути: у пользователя Twitch через VPN, видео Kick
+    /// напрямую — имя заходило в туннель и выходило из движка напрямую, видео
+    /// Kick и трансляция на Twitch рвались (отчёт 02.10). Правило пишется по
+    /// файлу списка, так что один файл в двух сервисах — один путь на оба.
+    /// </remarks>
+    /// <param name="name">
+    /// Название в сервисе: у Kick это само видео, у Twitch — приём трансляции
+    /// из OBS (смотрят Twitch с ttvnw.net, часть «Эфиры»). Файл один — путь один.
+    /// </param>
+    /// <param name="note">Пояснение под названием.</param>
+    private static ServicePart AmazonIvs(string name, string note) => new()
+    {
+        Name = name,
+        List = "config/lists/kick-video.txt",
+        Note = note,
+    };
+
+    public static IReadOnlyList<ServiceDefinition> All { get; } =
+    [
+        new ServiceDefinition
+        {
+            Name = "Discord",
+            Parts =
+            [
+                new ServicePart
+                {
+                    Name = "Голос",
+                    List = "config/lists/discord-media.txt",
+
+                    // Апекс зоны из блокировки выпадает, поддомены закрыты —
+                    // см. ServicePart.Probe. Проверять надо поддомен, любой.
+                    Probe = "probe.discord.media",
+                    Note = "голосовые серверы; ломается отдельно от переписки",
+                },
+
+                // Сам звук — UDP на голые адреса, которые Discord сообщает
+                // клиенту без DNS: правило «Голоса» по имени их не видит,
+                // и при десинке звук в туннель не попадал ни при «Голосе»,
+                // ни при Discord.exe через VPN (01.10, замер у владельца).
+                new ServicePart
+                {
+                    Name = "Звук голоса (адреса)",
+                    List = "config/lists/discord-voice-net.txt",
+                    ByAddress = true,
+                    Note = "сам разговор: UDP на адреса Cloudflare; чтобы голос шёл через VPN при десинке, "
+                        + "сюда — тот же путь, что у «Голоса»",
+                },
+                // Одной строкой, а не тремя, и это не упрощение показа.
+                // Записи в списках — зоны: discordapp.net в discord.txt
+                // покрывает и media.discordapp.net, и обе images-ext, а
+                // discord.com покрывает updates.discord.com. Отдельные части
+                // «Картинки» и «Обновления» решали судьбу имён, которые
+                // и так решены соседней строкой, — и какая из них победит,
+                // зависело от порядка правил в файле.
+                //
+                // Видно это стало, когда с «текста и входа» сняли рецепт:
+                // отвалился весь Discord разом, включая картинки и обновления,
+                // у которых свой маршрут стоял нетронутым.
+                new ServicePart
+                {
+                    Name = "Сайт и переписка",
+                    List = "config/lists/discord.txt",
+                    Note = "всё, кроме голоса: переписка, шлюз, приглашения, "
+                        + "картинки, вложения и обновления",
+                },
+                new ServicePart
+                {
+                    Name = "Картинки",
+                    List = "config/lists/discord-images.txt",
+                    Within = "config/lists/discord.txt",
+                    Note = "картинки и вложения в чатах; ломаются отдельно от переписки",
+                },
+                new ServicePart
+                {
+                    Name = "Обновления",
+                    List = "config/lists/discord-updates.txt",
+                    Within = "config/lists/discord.txt",
+                    Note = "обновления клиента; без них Discord зависает на запуске",
+                },
+                new ServicePart
+                {
+                    Name = "Vencord",
+                    List = "config/lists/vencord.txt",
+                    Note = "сторонний клиент-дополнение",
+                },
+                new ServicePart
+                {
+                    Name = "Запасной путь по адресам",
+                    List = "config/lists/ipset-discord.txt",
+                    ByAddress = true,
+                    Note = "3,4 млн адресов, среди них куски Google Cloud и Amazon — включать в крайнем случае",
+                    DefaultOff = true,
+                },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "YouTube",
+            Parts =
+            [
+                new ServicePart
+                {
+                    Name = "Видеопоток",
+                    List = "config/lists/googlevideo.txt",
+
+                    // Голое googlevideo.com — не сервер видео: уводит на
+                    // google.com или отдаёт чужой сертификат, и окно «Чем
+                    // чинить» отвечало про каждый рецепт «страницы нет»
+                    // (снимок пользователя 03.10). redirector — те же
+                    // фронтенды видео: 404 за 0,18 с напрямую (замер 04.10).
+                    Probe = "redirector.googlevideo.com",
+                    Note = "сам просмотр; отдельно от страницы",
+                },
+                new ServicePart
+                {
+                    Name = "Интерфейс",
+                    List = "config/lists/youtube.txt",
+                    Note = "страница, поиск, комментарии",
+                },
+                new ServicePart
+                {
+                    Name = "Превью",
+                    List = "config/lists/i-ytimg.txt",
+                },
+                new ServicePart
+                {
+                    Name = "QUIC по адресам",
+                    List = "config/lists/ipset-youtube.txt",
+                    ByAddress = true,
+                },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "Telegram",
+            Parts =
+            [
+                new ServicePart
+                {
+                    Name = "Приложение",
+                    List = "config/lists/ipset-telegram.txt",
+                    ByAddress = true,
+                    Note = "клиент ходит по адресам, не спрашивая DNS — поэтому подсети, а не домены",
+                },
+                new ServicePart
+                {
+                    Name = "Сайт и веб-версия",
+                    List = "config/lists/telegram.txt",
+                },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "Instagram и Facebook",
+            Grouping = true,
+            Parts =
+            [
+                new ServicePart { Name = "Instagram", List = "config/lists/instagram.txt" },
+                new ServicePart { Name = "Facebook", List = "config/lists/facebook.txt" },
+            ],
+        },
+
+        // Эфиры отдельно от сайта (03.10): сайт и gql на Fastly, а плейлисты,
+        // видео и hermes — на Amazon, и у пользователя с ошибкой #2000 Amazon
+        // напрямую не доходил и без Zephyron, когда сайт открывался.
+        new ServiceDefinition
+        {
+            Name = "Twitch",
+            Parts =
+            [
+                new ServicePart { Name = "Сайт и чат", List = "config/lists/twitch.txt" },
+                new ServicePart
+                {
+                    Name = "Эфиры",
+                    List = "config/lists/twitch-video.txt",
+                    Within = "config/lists/twitch.txt",
+                    Note = "плейлисты и видео; при ошибке #2000 — «десинк» или VPN, сайт не трогая",
+                },
+                AmazonIvs("Приём трансляции (Amazon IVS)", "общая с Kick: трансляция из OBS"),
+            ],
+        },
+
+        // Не заблокирован — по умолчанию «напрямую» (config/rules.yaml,
+        // владелец 01.10). Видео — у Amazon IVS, той же частью, что у Twitch.
+        new ServiceDefinition
+        {
+            Name = "Kick",
+            Parts =
+            [
+                new ServicePart { Name = "Сайт и чат", List = "config/lists/kick.txt" },
+                AmazonIvs("Видео (Amazon IVS)", "общая с Twitch: те же серверы, у Twitch — приём трансляции"),
+            ],
+        },
+
+        // Донаты и виджеты для стримов. Не заблокирован — по умолчанию
+        // «напрямую» (config/rules.yaml): десинку здесь чинить нечего.
+        new ServiceDefinition
+        {
+            Name = "DonationAlerts",
+            Parts = [new ServicePart { Name = "Всё", List = "config/lists/donationalerts.txt" }],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "Roblox",
+            Parts =
+            [
+                new ServicePart { Name = "Игра и сайт", List = "config/lists/roblox.txt" },
+                new ServicePart
+                {
+                    Name = "Превью предметов",
+                    List = "config/lists/roblox-cdn.txt",
+
+                    // Прежде здесь стояло «имя оборвано в DNS». Замер 2026-09-03
+                    // это опроверг: Roblox перевёл имя на Akamai, цепочка
+                    // разрешается до конца и адрес есть. Подстановка осталась
+                    // на случай, если поломка вернётся, но постоянной быть
+                    // перестала — иначе она замораживает адрес сети доставки,
+                    // который живёт днями.
+                    Note = "если превью не грузятся — пункт «Закрепить пин», вариант с честным резолвером",
+                },
+
+                // Матч — UDP на голые адреса серверов плейса, без DNS: правило
+                // «Игры и сайта» по имени их не видит (обсуждение №16, 04.10:
+                // ошибка 279, пока весь трафик не пущен в туннель).
+                new ServicePart
+                {
+                    Name = "Игровые серверы (адреса)",
+                    List = "config/lists/roblox-network.txt",
+                    ByAddress = true,
+                    Note = "сам матч: UDP на сети Roblox; при ошибке 279 — сюда тот же путь, что у «Игры и сайта»",
+                },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "Steam",
+            Parts =
+            [
+                new ServicePart
+                {
+                    Name = "Сайт и сообщество",
+                    List = "config/lists/steam-web.txt",
+                    Within = "config/lists/steam.txt",
+                    Note = "страницы; ломаются отдельно от загрузок и лечатся иначе",
+                },
+                new ServicePart
+                {
+                    Name = "Загрузки и всё прочее",
+                    List = "config/lists/steam.txt",
+                    Note = "игры идут десятками гигабайт — через туннель не стоит",
+                },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "Valheim",
+            Parts = [new ServicePart { Name = "Сайт", List = "config/lists/valheim.txt" }],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "Кино и сериалы",
+            Grouping = true,
+            Parts =
+            [
+                new ServicePart
+                {
+                    Name = "TMDB: постеры и описания",
+                    List = "config/lists/tmdb.txt",
+                    Note = "на нём держатся трекеры сериалов; без него страницы открываются без картинок",
+                },
+                new ServicePart
+                {
+                    Name = "Netflix",
+                    List = "config/lists/netflix.txt",
+                    Note = "поток отделён от интерфейса: каталог листается, а фильм не запускается",
+                },
+                new ServicePart { Name = "Vimeo", List = "config/lists/vimeo.txt" },
+                new ServicePart { Name = "Crunchyroll", List = "config/lists/crunchyroll.txt" },
+                new ServicePart
+                {
+                    Name = "SeriesGraph",
+                    List = "config/lists/seriesgraph.txt",
+                    Note = "по умолчанию десинк с рецептом pass: рецепт пресета рвал загрузку страницы",
+                },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            // Spotify сам себе сервис, а не полка. Полкой он был, пока
+            // назывался «Музыкой», и от этого в списке выходило две строки
+            // подряд, обе начинающиеся со слова Spotify: «Spotify — сайт
+            // и вход», «Spotify — музыка и обложки». Читалось это как
+            // задвоение, хотя частей и вправду две.
+            //
+            // Части здесь — стороны одного сервиса, и ломаются они врозь:
+            // страница открывается, вход проходит, плейлисты на месте —
+            // а трек не играет и обложки пустые. Ровно тот случай, ради
+            // которого папка и заведена.
+            Name = "Spotify",
+            Parts =
+            [
+                new ServicePart
+                {
+                    Name = "Сайт и вход",
+                    List = "config/lists/spotify.txt",
+                    Note = "страница, вход, поиск, плейлисты",
+                },
+
+                // Раздача вынесена отдельной частью, и это не дробление ради
+                // дробления. Ломается она врозь с сайтом: страница открывается,
+                // вход проходит, плейлисты на месте — а трек не играет
+                // и обложки пустые. Лечится тоже врозь, а выбор маршрута
+                // и рецепта в меню один на часть: пока они были одной строкой,
+                // выбрать разное было нечем.
+                //
+                // Картинки отдельной части не просят: они лежат на i.scdn.co,
+                // то есть под той же зоной. Но зона тут ничего не решает —
+                // в пресете эти имена перечислены поимённо, потому что
+                // --hostlist-domains у winws2 сопоставляет буквально
+                // и поддомены не покрывает.
+                new ServicePart
+                {
+                    Name = "Музыка и обложки",
+                    List = "config/lists/spotify-cdn.txt",
+                    Probe = "i.scdn.co",
+                    Note = "раздача: не играет звук, не грузятся обложки",
+                },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "Мессенджеры",
+            Grouping = true,
+            Parts =
+            [
+                new ServicePart { Name = "Signal", List = "config/lists/signal.txt" },
+                new ServicePart { Name = "Viber", List = "config/lists/viber.txt" },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "Pinterest",
+            Parts =
+            [
+                new ServicePart
+                {
+                    Name = "Сайт и картинки",
+                    List = "config/lists/pinterest.txt",
+                    Note = "в списках Zapret его нет, десинк к нему не применяется",
+                },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "TikTok",
+            Parts = [new ServicePart { Name = "Всё", List = "config/lists/tiktok.txt" }],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "SoundCloud",
+            Parts = [new ServicePart { Name = "Всё", List = "config/lists/soundcloud.txt" }],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "WhatsApp",
+            Parts = [new ServicePart { Name = "Всё", List = "config/lists/whatsapp.txt" }],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "GitHub",
+            Parts = [new ServicePart { Name = "Всё", List = "config/lists/github.txt" }],
+        },
+
+        // Владелец 26.09: вход через GitHub падал с auth/network-request-failed,
+        // документация открывалась пустой. Сайт закрыт по имени и лечится
+        // десинком — его берёт секция «Выбрано вручную: *.virustotal»
+        // в Universal V10. Три прочие части закрыты по адресу, и каждая
+        // лечится своим способом: окно входа только туннелем, API Google
+        // и CDN документации только пином. Замеры — в самих списках.
+        new ServiceDefinition
+        {
+            Name = "VirusTotal",
+            Parts =
+            [
+                new ServicePart { Name = "Сайт", List = "config/lists/virustotal.txt" },
+                new ServicePart
+                {
+                    Name = "Документация",
+                    List = "config/lists/virustotal-docs.txt",
+                    Probe = "cdn.readme.io",
+                    Note = "Закрыта по адресу — лечится пином, адрес подберёт автоподбор.",
+                },
+                new ServicePart
+                {
+                    Name = "Вход",
+                    List = "config/lists/virustotal-login.txt",
+                    Note = "Окно входа Firebase: живого адреса нет, только VPN.",
+                },
+                new ServicePart
+                {
+                    Name = "Вход — API Google",
+                    List = "config/lists/virustotal-google-api.txt",
+                    Note = "Только пин, не VPN: браузер не пускает страницу к адресам туннеля.",
+                },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "Нейросети",
+            Grouping = true,
+            Parts =
+            [
+                new ServicePart { Name = "ChatGPT", List = "config/lists/chatgpt.txt" },
+                new ServicePart { Name = "Gemini", List = "config/lists/gemini.txt" },
+                new ServicePart { Name = "DeepSeek", List = "config/lists/deepseek.txt" },
+                new ServicePart { Name = "Perplexity", List = "config/lists/perplexity.txt" },
+                new ServicePart { Name = "Grok", List = "config/lists/grok.txt" },
+                new ServicePart { Name = "Mistral", List = "config/lists/mistral.txt" },
+                new ServicePart
+                {
+                    Name = "Hugging Face",
+                    List = "config/lists/huggingface.txt",
+                    Note = "туда же ходят библиотеки при загрузке моделей",
+                },
+            ],
+        },
+
+        // Claude — своей папкой, а не строкой на полке «Нейросети» (владелец,
+        // 26.09): у него две части, которые ломаются врозь. Содержимое —
+        // артефакты и превью файлов — живёт на отдельном домене, и при своём
+        // правиле «через VPN» браузер не пускал к нему страницу claude.ai,
+        // открытую через пин (отказ за 14 мс). Список «Сайта» — прежний
+        // claude.txt, так что выбранный маршрут и пины сохраняются.
+        // downloads.claude.ai отдельной частью не вынесен: он под зоной
+        // claude.ai, и два списка спорили бы об одном имени.
+        new ServiceDefinition
+        {
+            Name = "Claude",
+            Parts =
+            [
+                new ServicePart { Name = "Сайт", List = "config/lists/claude.txt" },
+                new ServicePart
+                {
+                    Name = "Содержимое",
+                    List = "config/lists/claude-content.txt",
+                    Probe = "www.claudeusercontent.com",
+                    Note = "артефакты и превью файлов; тем же способом, что сайт — не VPN, если сайт на пине",
+                },
+            ],
+        },
+
+        // Riot — отдельной папкой с полки игр (владелец, 30.09): вход и игра
+        // ломаются врозь и лечатся врозь. Вход по именам, TCP — у части провайдеров
+        // без десинка или VPN не проходит. Игра — UDP по голым адресам сетей
+        // Riot Direct, и ей не нужно ни то, ни другое: игрокам советуют «VPN
+        // только на вход» (обсуждение №11). «Напрямую» у игровой части выводит
+        // её UDP из перехвата winws2 (UdpOffDesync) — щит по именам его
+        // не узнал бы. Имя папки — прежнее имя строки, чтобы выбранный
+        // порядок в «Маршрутах» не потерял её.
+        new ServiceDefinition
+        {
+            Name = "Riot и Valorant",
+            Parts =
+            [
+                new ServicePart
+                {
+                    Name = "Вход и клиент",
+                    List = "config/lists/riot-valorant.txt",
+                    Note = "по именам: вход, клиент, магазин, чат; античиты плохо переносят и десинк, и туннель",
+                },
+                new ServicePart
+                {
+                    Name = "Игровой UDP",
+                    List = ProgramCapture.RiotNetwork,
+                    ByAddress = true,
+                    Note = "сети Riot Direct, игровые серверы; «напрямую» — мимо десинка целиком",
+                },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "Игры",
+            Grouping = true,
+            Parts =
+            [
+                new ServicePart { Name = "Epic Games и Fortnite", List = "config/lists/epicgames-fortnite.txt" },
+
+                // Голос ARC Raiders — Epic Online Services, внутри зоны Epic.
+                // Выключена до выбора (владелец 07.10): из России, по сообщениям,
+                // голос идёт только через VPN, а игры для проверки нет. Зона сама
+                // адреса не имеет — рецепты пробуются на сигнальном сервере.
+                new ServicePart
+                {
+                    Name = "ARC Raiders — голос",
+                    List = "config/lists/arc-raiders-voice.txt",
+                    Within = "config/lists/epicgames-fortnite.txt",
+                    Probe = "signaling-service-prod.euc1.live.rtcp.on.epicgames.com",
+                    Note = "голосовой чат через Epic Online Services; из России, по сообщениям, работает только через VPN",
+                    DefaultOff = true,
+                },
+                new ServicePart { Name = "Ubisoft", List = "config/lists/ubisoft.txt" },
+                new ServicePart { Name = "itch.io", List = "config/lists/itch.txt" },
+                new ServicePart
+                {
+                    Name = "Battle.net и Blizzard",
+                    List = "config/lists/battlenet.txt",
+                    Note = "античиты плохо переносят и десинк, и туннель — как у Riot",
+                },
+                new ServicePart { Name = "PlayStation Network", List = "config/lists/playstation.txt" },
+                new ServicePart { Name = "Xbox Live", List = "config/lists/xbox.txt" },
+                new ServicePart { Name = "Nintendo", List = "config/lists/nintendo.txt" },
+                new ServicePart { Name = "EA и Origin", List = "config/lists/ea.txt" },
+                new ServicePart { Name = "GOG", List = "config/lists/gog.txt" },
+                new ServicePart { Name = "Rockstar", List = "config/lists/rockstar.txt" },
+                new ServicePart
+                {
+                    Name = "Minecraft",
+                    List = "config/lists/minecraft.txt",
+                    Note = "без mojang.com игра запускается только в оффлайне — похоже на слетевшую учётку",
+                },
+                new ServicePart { Name = "HoYoverse: Genshin и Honkai", List = "config/lists/hoyoverse.txt" },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "Google",
+            Parts =
+            [
+                new ServicePart
+                {
+                    Name = "Сервисы",
+                    List = "config/lists/google.txt",
+                    Note = "почта, диск, поиск — отдельно от YouTube",
+                },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "Соцсети",
+            Grouping = true,
+            Parts =
+            [
+                new ServicePart { Name = "Twitter / X", List = "config/lists/twitter.txt" },
+                new ServicePart
+                {
+                    Name = "Twitter / X по адресам",
+                    List = "config/lists/ipset-twitter.txt",
+                    ByAddress = true,
+                },
+                new ServicePart { Name = "LinkedIn", List = "config/lists/linkedin.txt" },
+                new ServicePart
+                {
+                    Name = "Reddit",
+                    List = "config/lists/reddit.txt",
+                    Note = "без redd.it страница открывается голой, и это выглядит поломкой самого Reddit",
+                },
+            ],
+        },
+
+        // Bluesky — своей папкой, а не строкой полки «Соцсети» (владелец,
+        // 26.09): картинки, скрипты и видео идут через сеть доставки Bunny,
+        // а она ломается отдельно от самого приложения. DNS отдаёт случайный
+        // узел, и 79.127.134.x в сети владельца мертвы для всех имён —
+        // страница висела на заставке, фото не грузились. Лечится пином
+        // на живой узел (кандидаты в config/catalog.yaml).
+        //
+        // Имена сети доставки лежат и под зоной bsky.app «Приложения»: маршрут
+        // у обеих частей держать одинаковым, иначе они заспорят.
+        new ServiceDefinition
+        {
+            Name = "Bluesky",
+            Parts =
+            [
+                new ServicePart { Name = "Приложение", List = "config/lists/bluesky.txt" },
+                new ServicePart
+                {
+                    Name = "Картинки и видео",
+                    List = "config/lists/bluesky-cdn.txt",
+                    Note = "узлы 79.127.134.x мертвы — прибейте живой; маршрут — как у «Приложения»",
+                },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "Торренты",
+            Grouping = true,
+            Parts =
+            [
+                new ServicePart { Name = "RuTracker", List = "config/lists/rutracker.txt" },
+                new ServicePart { Name = "Rutor", List = "config/lists/rutor.txt" },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "Работа и заметки",
+            Grouping = true,
+            Parts =
+            [
+                new ServicePart { Name = "Notion", List = "config/lists/notion.txt" },
+                new ServicePart { Name = "Obsidian", List = "config/lists/obsidian.txt" },
+                new ServicePart { Name = "Fandom", List = "config/lists/fandom.txt" },
+                new ServicePart { Name = "Figma", List = "config/lists/figma.txt" },
+                new ServicePart { Name = "Miro", List = "config/lists/miro.txt" },
+                new ServicePart
+                {
+                    Name = "Slack",
+                    List = "config/lists/slack.txt",
+                    Note = "переписка ломается отдельно от вложений",
+                },
+                new ServicePart { Name = "Zoom", List = "config/lists/zoom.txt" },
+                new ServicePart
+                {
+                    Name = "Atlassian: Jira, Confluence, Trello",
+                    List = "config/lists/atlassian.txt",
+                    Note = "на atlassian.net живут рабочие доски компаний, а не сайт производителя",
+                },
+                new ServicePart
+                {
+                    Name = "Dropbox",
+                    List = "config/lists/dropbox.txt",
+                    Note = "выдача файлов отдельно от интерфейса: папка открывается, файл не скачивается",
+                },
+                new ServicePart { Name = "Proton: почта и диск", List = "config/lists/proton.txt" },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "Разработка",
+            Grouping = true,
+            Parts =
+            [
+                new ServicePart { Name = "Stack Overflow", List = "config/lists/stackoverflow.txt" },
+                new ServicePart
+                {
+                    Name = "npm",
+                    List = "config/lists/npm.txt",
+                    Note = "туда ходит сама установка пакетов, а не только сайт",
+                },
+                new ServicePart
+                {
+                    Name = "PyPI и python.org",
+                    List = "config/lists/pypi.txt",
+                    Note = "pythonhosted.org раздаёт сами пакеты: pip находит версию и обрывается на скачивании",
+                },
+                new ServicePart { Name = "Docker Hub", List = "config/lists/docker.txt" },
+                new ServicePart { Name = "JetBrains", List = "config/lists/jetbrains.txt" },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "Знание и архивы",
+            Grouping = true,
+            Parts =
+            [
+                new ServicePart
+                {
+                    Name = "Википедия",
+                    List = "config/lists/wikipedia.txt",
+                    Note = "без wikimedia.org статьи открываются без иллюстраций",
+                },
+                new ServicePart { Name = "Интернет-архив", List = "config/lists/archive.txt" },
+                new ServicePart { Name = "Medium", List = "config/lists/medium.txt" },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "Платформы и CDN",
+            Grouping = true,
+            Parts =
+            [
+                new ServicePart
+                {
+                    Name = "Cloudflare",
+                    List = "config/lists/cloudflare.txt",
+                    Note = "за ним стоит множество сайтов; трогать с осторожностью",
+                },
+                new ServicePart { Name = "CloudFront", List = "config/lists/cloudfront.txt" },
+                new ServicePart { Name = "Amazon", List = "config/lists/amazon.txt" },
+                new ServicePart { Name = "Apple", List = "config/lists/apple.txt" },
+                new ServicePart { Name = "Microsoft Store", List = "config/lists/microsoft-store.txt" },
+            ],
+        },
+
+        // Владелец 01.10: «капча подозрительно отваливается, и не только
+        // reCAPTCHA, помнишь тот прикол с Discord?» Капча идёт путём того
+        // списка, где её имя оказалось, а не путём сайта, который её
+        // показывает: у VirusTotal сайт через VPN, а reCAPTCHA — с Google
+        // напрямую; у Discord 30.09 hCaptcha шла напрямую при Discord через
+        // VPN, и капча отказывала. Почему именно — не выяснено, догадка:
+        // сверка адреса.
+        //
+        // «Пока оставь всё как есть» — поэтому базовых правил у частей нет,
+        // а имена остались и в прежних списках. Без выбора капча идёт как
+        // раньше; выбранная, её правило встаёт раньше широкого списка
+        // (Within) — и действует для всех сайтов на этой капче.
+        new ServiceDefinition
+        {
+            Name = "Капчи",
+            Parts =
+            [
+                new ServicePart
+                {
+                    Name = "reCAPTCHA (Google)",
+                    List = "config/lists/captcha-recaptcha.txt",
+                    Within = "config/lists/google.txt",
+                    Probe = "www.recaptcha.net",
+                    Note = "только запасное имя recaptcha.net: основная капча Google живёт на www.google.com "
+                        + "и идёт путём Google — правила по пути не бывает",
+                },
+                new ServicePart
+                {
+                    Name = "hCaptcha",
+                    List = "config/lists/captcha-hcaptcha.txt",
+                    Within = "config/lists/discord.txt",
+                    Note = "Discord и многие сайты; без своего выбора идёт как Discord",
+                },
+                new ServicePart
+                {
+                    Name = "Cloudflare Turnstile",
+                    List = "config/lists/captcha-turnstile.txt",
+                    Within = "config/lists/cloudflare.txt",
+                    Note = "проверка «вы человек?» перед сайтами за Cloudflare; без своего выбора идёт как Cloudflare",
+                },
+                new ServicePart
+                {
+                    Name = "Arkose Labs (FunCaptcha)",
+                    List = "config/lists/captcha-arkose.txt",
+                    Within = "config/lists/roblox.txt",
+                    Note = "вход и регистрация в Roblox, Microsoft, EA, GitHub, OpenAI; без своего выбора идёт как Roblox",
+                },
+                new ServicePart
+                {
+                    Name = "GeeTest",
+                    List = "config/lists/captcha-geetest.txt",
+                    Note = "вход HoYoverse и китайских сервисов",
+                },
+            ],
+        },
+
+        new ServiceDefinition
+        {
+            Name = "Speedtest",
+            Parts = [new ServicePart { Name = "Всё", List = "config/lists/speedtest.txt" }],
+        },
+    ];
+
+    public static ServiceDefinition? Find(string name) =>
+        All.FirstOrDefault(s => string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase));
+}

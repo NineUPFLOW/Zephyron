@@ -1,0 +1,2056 @@
+using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization.Metadata;
+using Zephyron.Core;
+using Zephyron.Core.Rules;
+using Zephyron.Subscriptions;
+
+namespace Zephyron.Proxy;
+
+public sealed class SingBoxOptions
+{
+    public string TunInterfaceName { get; init; } = "zephyron0";
+
+    /// <summary>Адрес TUN-интерфейса.</summary>
+    public string TunAddress { get; init; } = "172.19.0.1/30";
+
+    /// <summary>
+    /// MTU туннеля.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Задаётся явно, потому что без этого адаптер поднимался с MTU 65535 при
+    /// физическом интерфейсе в 1500. Приложение отдавало в туннель огромные
+    /// сегменты, наружу они уходили по пути с обычным MTU и рассыпались:
+    /// мелкие запросы проходили, крупные загрузки — нет. В Telegram это
+    /// выглядело так, что переписка работает, а фотографии и видео не грузятся
+    /// вовсе, и на маршруты это не походило совершенно.
+    /// </para>
+    /// <para>
+    /// 1400 с запасом: из 1500 вычитаются заголовки IP и UDP плюс обвязка
+    /// QUIC у Hysteria2 — около восьмидесяти байт. У TCP-транспортов
+    /// накладные расходы меньше, так что значение годится и им.
+    /// </para>
+    /// </remarks>
+    public int TunMtu { get; init; } = 1400;
+
+    /// <summary>Адрес TUN-интерфейса для IPv6.</summary>
+    /// <remarks>
+    /// Без него <c>auto_route</c> не ставит ни одного маршрута IPv6, и всё,
+    /// что перечислено в <c>route_address</c> из адресов IPv6, туда не
+    /// попадает. На практике это означало, что резолвер провайдера
+    /// (адрес вида <c>fd7d:…::1</c>) оставался вне туннеля и отвечал
+    /// настоящими адресами в обход fakeip — то есть выборочный перехват
+    /// обходился через IPv6, даже когда с IPv4 всё было верно.
+    /// Диапазон взят из документации sing-box.
+    /// </remarks>
+    public string TunAddressV6 { get; init; } = "fdfe:dcba:9876::1/126";
+
+    /// <summary>Диапазон fakeip для IPv4 — по умолчанию зарезервированный под тесты.</summary>
+    public string FakeIpV4Range { get; init; } = "198.18.0.0/15";
+
+    public string FakeIpV6Range { get; init; } = "fc00::/18";
+
+    public string ClashApiListen { get; init; } = "127.0.0.1:9090";
+
+    /// <summary>
+    /// Пароли служебных входов: секрет Clash API и учётка <c>health-in</c>;
+    /// <c>null</c> — без паролей, как было до 27.09.
+    /// </summary>
+    /// <remarks>
+    /// Без них любая программа на машине пользуется входами движка —
+    /// см. <see cref="EngineKeys"/>. Необязательны, чтобы сборки для проверок
+    /// и тестов не таскали пароли, которые некому предъявлять.
+    /// </remarks>
+    public EngineKeys? Keys { get; init; }
+
+    /// <summary>
+    /// Куда движок кладёт своё: учётную запись MASQUE и выбор в селекторе.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Рядом с прочим рантаймом, а не в корне рабочего каталога, куда движок
+    /// положил бы <c>cache.db</c> по умолчанию. Файл появляется только у тех,
+    /// у кого включён MASQUE, — остальным он не нужен и не заводится.
+    /// </para>
+    /// <para>
+    /// В конфиг уходит полным путём, и это не придирка к аккуратности.
+    /// Относительный решается от текущего каталога <b>движка</b>, а не
+    /// нашего, и каталога <c>runtime</c> там может не оказаться вовсе —
+    /// сам движок его не создаёт. Стоило включить MASQUE, как sing-box падал
+    /// на старте с «cannot find the path specified», унося с собой весь
+    /// туннель: не запасной выход отваливался, а основной.
+    /// </para>
+    /// </remarks>
+    public string CachePath { get; init; } = Path.Combine("runtime", "engine-cache.db");
+
+    /// <summary>
+    /// Апстрим DNS. Указывается адресом, а не именем: имя потребовало бы
+    /// отдельного резолвера для его собственного разрешения.
+    /// </summary>
+    public string DnsServer { get; init; } = Zephyron.Core.AppSettings.GoogleDns;
+
+    public string DnsServerType { get; init; } = "https";
+
+    /// <summary>
+    /// Имя в сертификате апстрима; <c>null</c> — сертификат выписан на сам адрес.
+    /// </summary>
+    /// <remarks>
+    /// Обращение идёт по адресу, а сертификат у части резолверов выписан
+    /// только на имя: у Яндекса — common.dot.dns.yandex.net, у Comss.one —
+    /// dns.comss.one. Без имени проверка сертификата по адресу не пройдёт,
+    /// и разрешение имён умрёт целиком.
+    /// </remarks>
+    public string? DnsServerName { get; init; }
+
+    /// <summary>Путь DoH; <c>null</c> — умолчание движка, /dns-query.</summary>
+    public string? DnsServerPath { get; init; }
+
+    /// <summary>
+    /// Разрешать имена через туннель, а не напрямую.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Ответ на блокировку DoH и DoT у российских операторов: запрос,
+    /// уходящий внутри туннеля, для провайдера неотличим от прочего трафика,
+    /// и перекрыть его отдельно нельзя.
+    /// </para>
+    /// <para>
+    /// По умолчанию выключено, и намеренно. Включённое, оно ставит разрешение
+    /// имён в зависимость от туннеля: пока тот не поднялся или лёг, не
+    /// открывается вообще ничего, включая то, что прекрасно работало
+    /// на десинке. Это хуже исходной беды, поэтому включать стоит тогда,
+    /// когда прямой DoH уже перестал отвечать, а не заранее.
+    /// </para>
+    /// <para>
+    /// При включении добавляется отдельный резолвер <c>bootstrap</c> для имён
+    /// самих серверов подписки — иначе получается замкнутый круг: чтобы
+    /// разрешить имя сервера, нужен туннель, а чтобы поднять туннель, нужно
+    /// разрешить имя.
+    /// </para>
+    /// </remarks>
+    public bool DnsThroughTunnel { get; init; }
+
+    /// <summary>
+    /// «Авто»: резолвер ходит через переключатель пути DNS (<c>dns-path</c>) —
+    /// напрямую при запуске, через туннель, когда надзор увидит, что тот жив.
+    /// </summary>
+    /// <remarks>
+    /// Переключает надзор через Clash API (SingBoxService), а не пересборкой:
+    /// пересборка значила бы перезапуск движка. Имена серверов подписки и
+    /// панелей разрешаются через <c>bootstrap</c>, как при «через туннель».
+    /// </remarks>
+    public bool DnsViaAuto { get; init; }
+
+    /// <summary>Тег переключателя пути DNS при «авто».</summary>
+    public const string DnsPathTag = "dns-path";
+
+    /// <summary>
+    /// Имена панелей подписок: при <see cref="DnsThroughTunnel"/> они
+    /// разрешаются через <c>bootstrap</c>, в обход туннеля.
+    /// </summary>
+    /// <remarks>
+    /// Имена серверов bootstrap обходил и прежде — через
+    /// <c>default_domain_resolver</c>, которым sing-box разрешает адреса своих
+    /// исходящих. Панель же спрашивает программа, её запрос приходит в DNS
+    /// sing-box снаружи и шёл в туннель. См. <c>SubscriptionHosts</c>.
+    /// </remarks>
+    public IReadOnlyList<string> PanelHosts { get; init; } = [];
+
+    /// <summary>Тег селектора, к которому обращаются правила с <c>server: auto</c>.</summary>
+    public string SelectorTag { get; init; } = "auto";
+
+    /// <summary>
+    /// Не пускать отечественные серверы в автоподбор.
+    /// </summary>
+    /// <remarks>
+    /// Автоподбор идёт по задержке, а меньше всего она у ближайшего сервера —
+    /// своего же. Для обхода блокировок оператора он годится, а для сервисов,
+    /// закрывающихся от страны, бесполезен: адрес остаётся отечественным.
+    /// Закрепить конкретный сервер вручную это не мешает — селектор
+    /// по-прежнему знает их все.
+    /// </remarks>
+    public bool ForeignExitsOnly { get; init; }
+
+    /// <summary>
+    /// Адреса для имён, у которых своего адреса нет.
+    /// </summary>
+    /// <remarks>
+    /// Отвечает наш собственный резолвер, системный <c>hosts</c> не трогается.
+    /// Разница существенная: hosts требует прав администратора, переживает
+    /// удаление программы и виден всем приложениям, а это — одна строка
+    /// в нашем конфиге, снимаемая вместе с ним.
+    /// </remarks>
+    public IReadOnlyDictionary<string, string> AddressOverrides { get; init; } =
+        new Dictionary<string, string>();
+
+    /// <summary>
+    /// Адрес для замера задержки. Запрос уходит через сам прокси, поэтому
+    /// проверяется не доступность сайта, а работоспособность сервера.
+    /// </summary>
+    public string LatencyTestUrl { get; init; } = "https://www.gstatic.com/generate_204";
+
+    /// <summary>Фрагментация рукопожатия TLS с серверами (<see cref="SingBoxConfigCompiler.Fragment"/>).</summary>
+    public TlsFragment TlsFragment { get; init; }
+
+    /// <summary>
+    /// Как часто перезамерять задержку.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Было три минуты, 20.09 стала одна: после смерти выбранного сервера
+    /// туннель молчал до следующего замера.
+    /// </para>
+    /// <para>
+    /// С 28.09 — пять минут (решение владельца). Замер бьёт по всем серверам
+    /// группы разом: 24 соединения в минуту, из них 16 в один вход Trust
+    /// с одним ключом, круглые сутки, — и в тот же день вход Trust на минуту
+    /// перестал принимать даже TCP. Смерть выбранного теперь ловит сторож
+    /// движка (<c>SingBoxService</c>): текущий сервер раз в полминуты, промах —
+    /// перепроверка через 5 с, второй промах — перезамер группы. Здесь же
+    /// остаётся то, чего сторож не делает: переход на более быстрый сервер.
+    /// </para>
+    /// </remarks>
+    public string LatencyTestInterval { get; init; } = "5m";
+
+    /// <summary>
+    /// Через сколько безуспешных проверок подряд сервер выводится
+    /// из автоподбора.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Мёртвый сервер в группе не бесплатен: движок опрашивает его наравне
+    /// с живыми, а селектор может на нём осесть. У владельца 20.09 таких
+    /// было семеро из девяти — подписка при этом работала, но еле-еле.
+    /// </para>
+    /// <para>
+    /// Порог не единица: разовый отказ случается и у исправного сервера,
+    /// и выводить его по одной неудаче значило бы разбрасываться теми
+    /// немногими, что ещё живы.
+    /// </para>
+    /// </remarks>
+    public int DeadAfterFailures { get; init; } = 3;
+
+    /// <summary>
+    /// Теги серверов, выводимых из автоподбора как заведомо мёртвые.
+    /// </summary>
+    /// <remarks>
+    /// Заполняется тем, кто собирает конфиг, из <see cref="ServerHealthCache"/>:
+    /// сама сборка в сеть не ходит и судить о живости не может. Пусто —
+    /// значит замеров ещё не было, и это нормальное состояние первого запуска.
+    /// </remarks>
+    public IReadOnlySet<string> DeadServerTags { get; init; } =
+        new HashSet<string>(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Сколько серверов с одного входа (адрес:порт) берёт автоподбор; 0 — без предела.
+    /// </summary>
+    /// <remarks>См. <c>CapPerEntry</c>: 16 серверов Trust на одном входе били его пачкой.</remarks>
+    public int AutoPickPerEntry { get; init; } = 2;
+
+    /// <summary>Последние замеры по тегам, мс: какие два с одного входа брать.</summary>
+    public IReadOnlyDictionary<string, double> KnownLatency { get; init; } =
+        new Dictionary<string, double>(StringComparer.Ordinal);
+
+    /// <summary>
+    /// На сколько миллисекунд новый сервер должен опережать текущий,
+    /// чтобы произошло переключение.
+    /// </summary>
+    /// <remarks>
+    /// Без допуска соединения перескакивали бы между серверами при каждом
+    /// колебании сети, обрывая уже установленные сессии.
+    /// </remarks>
+    public int LatencyTolerance { get; init; } = 50;
+
+    /// <summary>
+    /// Закреплённый сервер: селектор будет указывать на него, а не на автоподбор.
+    /// <c>null</c> — выбирать по задержке.
+    /// </summary>
+    public string? PreferredServerTag { get; init; }
+
+    public string LogLevel { get; init; } = "warn";
+
+    /// <summary>
+    /// Поднимать TUN. Если выключено, вместо туннеля создаётся локальный
+    /// инбаунд <c>mixed</c> на <see cref="LocalListenPort"/>.
+    /// </summary>
+    /// <remarks>
+    /// Режим без TUN нужен для проверки и отладки: он не требует прав
+    /// администратора и не трогает маршруты. Правила маршрутизации при этом
+    /// работают ровно те же, так что поведение движка можно проверить
+    /// до того, как поднимать туннель.
+    /// </remarks>
+    public bool UseTun { get; init; } = true;
+
+    public int LocalListenPort { get; init; } = 21080;
+
+    /// <summary>
+    /// Порт локального входа для глубокой проверки супервизора.
+    /// </summary>
+    /// <remarks>
+    /// Намеренно не совпадает с <see cref="LocalListenPort"/>: замер серверов
+    /// занимает 21080 и раздаёт параллельным замерам соседние порты, а проверка
+    /// живёт одновременно с туннелем. Общий порт означал бы, что «Замерить все»
+    /// при поднятом туннеле не стартует.
+    /// </remarks>
+    public const int DefaultHealthPort = 21090;
+
+    /// <summary>
+    /// Поднимать рядом с TUN локальный инбаунд <c>mixed</c> на
+    /// <see cref="DefaultHealthPort"/> для глубокой проверки.
+    /// </summary>
+    /// <remarks>
+    /// Инбаунды TUN и локальный прокси взаимоисключающи по построению, поэтому
+    /// с туннелем проверять проход трафика было не через что: супервизор
+    /// стучался на несуществующий порт, получал отказ и убивал исправный движок
+    /// по кругу, пока не исчерпывал попытки перезапуска.
+    /// </remarks>
+    public bool HealthInbound { get; init; }
+
+    /// <summary>Что именно заводить в туннель.</summary>
+    public TunnelScope Scope { get; init; } = TunnelScope.Everything;
+
+    /// <summary>
+    /// Адреса резолверов, которые нужно завести в туннель при
+    /// <see cref="TunnelScope.ProxyOnly"/>.
+    /// </summary>
+    /// <remarks>
+    /// Без них fakeip не работает: чтобы подменить ответ, sing-box должен
+    /// увидеть запрос, а при выборочном перехвате запросы к резолверу
+    /// в туннель не попадают. Заводим только сами адреса резолверов —
+    /// перехват остаётся выборочным.
+    /// </remarks>
+    public IReadOnlyList<string> DnsServerAddresses { get; init; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Подсети, покрытые десинком: они выводятся из туннеля через
+    /// <c>route_exclude_address</c>. Источник — файлы <c>--ipset</c> пресета.
+    /// </summary>
+    public IReadOnlyList<string> DesyncAddresses { get; init; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Адреса, прибитые в hosts к доменам с правилом <c>mode: proxy</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Заводятся в туннель <b>и</b> получают правило на прокси — оба вместе,
+    /// одним полем, потому что порознь получается хуже, чем ничего.
+    /// </para>
+    /// <para>
+    /// Так и вышло в первой редакции: адрес заводился в перехват, правила
+    /// ему не доставалось, и он уходил в <c>direct</c> по умолчанию. То есть
+    /// трафик входил в туннель и выходил из него переоткрытым сокетом —
+    /// до VPN не доезжал, а десинк ломался, потому что WinDivert видел уже
+    /// не исходный поток приложения. Canva в логе давала на этом сотни
+    /// оборванных соединений подряд.
+    /// </para>
+    /// </remarks>
+    public IReadOnlyList<string> PinnedProxyAddresses { get; init; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Имена, ради которых <see cref="PinnedProxyAddresses"/> заведены в туннель.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Заданы — правило на прокси берёт соединение, только если совпали
+    /// и адрес, и имя. Адрес пина часто общий: посредник XBOX DNS
+    /// 87.228.47.204 держит в hosts все имена Claude, а на VPN из них 23.09
+    /// стояло одно — downloads.claude.ai. Правило по одному адресу увело
+    /// в туннель весь Claude, стоявший «напрямую», и с поднятыми движками
+    /// он не работал. Прочие имена на том же адресе теперь идут дальше,
+    /// к своим правилам.
+    /// </para>
+    /// <para>
+    /// Пусто — правило по одному адресу, как прежде.
+    /// </para>
+    /// </remarks>
+    public IReadOnlyList<string> PinnedProxyNames { get; init; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Дополнительные префиксы для перехвата: развёрнутая секция <c>capture</c>
+    /// из конфига правил.
+    /// </summary>
+    public IReadOnlyList<string> CaptureAddresses { get; init; } = Array.Empty<string>();
+}
+
+/// <summary>
+/// Какой трафик перехватывает TUN.
+/// </summary>
+public enum TunnelScope
+{
+    /// <summary>
+    /// Весь трафик, дальше решают правила маршрутизации.
+    /// </summary>
+    /// <remarks>
+    /// Простой вариант, но именно он ломает часть рецептов Zapret: трафик
+    /// десинка проходит через туннель и выходит переоткрытым сокетом sing-box,
+    /// а WinDivert рассчитывает увидеть исходный поток приложения.
+    /// </remarks>
+    Everything,
+
+    /// <summary>
+    /// Только то, что идёт в прокси.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Реализовано инверсией: вместо «исключить весь десинк» — «завести только
+    /// прокси». Опирается на fakeip: адрес из диапазона fakeip выдаётся лишь
+    /// доменам, у которых правило <c>mode: proxy</c>, а <c>route_address</c>
+    /// у TUN ограничен этим диапазоном. Всё прочее туннеля не касается вовсе,
+    /// и WinDivert видит исходные потоки.
+    /// </para>
+    /// <para>
+    /// Почему не через <c>route_exclude_address</c> по спискам пресета: из
+    /// 20 секций Universal V6 с рецептом <c>fake</c> четырнадцать сопоставляются
+    /// только по доменам, а поле принимает лишь адреса. Разрешать 117 тысяч
+    /// доменов заранее неосуществимо. Подробнее — docs/coexistence.md.
+    /// </para>
+    /// </remarks>
+    ProxyOnly,
+}
+
+/// <summary>
+/// Собирает конфиг sing-box из правил Zephyron и списка серверов.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Здесь встречаются две половины системы: правила, которыми владеет Zephyron,
+/// и транспорт, которым владеет sing-box. Соответствие режимов:
+/// </para>
+/// <list type="bullet">
+/// <item><see cref="RoutingMode.Proxy"/> — outbound с тегом сервера либо селектор.</item>
+/// <item><see cref="RoutingMode.Direct"/> — outbound <c>direct</c>.</item>
+/// <item><see cref="RoutingMode.Desync"/> — тоже <c>direct</c>: трафик выходит
+/// обычным сокетом на реальном интерфейсе, где его и видит WinDivert.
+/// Различие между ними станет содержательным, когда потребуется уводить
+/// такой трафик мимо TUN целиком.</item>
+/// </list>
+/// <para>
+/// Серверы, которые движок обслужить не может, пропускаются; их список
+/// возвращается в <see cref="CompilationResult.SkippedServers"/>. Xhttp
+/// в их число больше не входит — сборка extended его знает.
+/// </para>
+/// </remarks>
+public sealed class SingBoxConfigCompiler
+{
+    private static readonly JsonSerializerOptions SerializerOptions = new()
+    {
+        WriteIndented = true,
+        // Кириллица и флаги стран в тегах серверов должны остаться читаемыми,
+        // а не превратиться в \uXXXX.
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        // Обязателен: инициализатор коллекции JsonArray выбирает обобщённый
+        // Add<T>, а он оборачивает даже строки в JsonValueCustomized<T>,
+        // сериализация которого без резолвера типов падает.
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
+    };
+
+    public CompilationResult Compile(RuleSet ruleSet, IReadOnlyList<ProxyServer> servers, SingBoxOptions options)
+    {
+        var usable = servers.Where(s => s.IsUsableOutbound).ToList();
+        var skipped = servers.Where(s => !s.IsUsableOutbound).ToList();
+
+        var tags = AssignUniqueTags(usable);
+
+        var root = new JsonObject
+        {
+            ["log"] = new JsonObject { ["level"] = options.LogLevel },
+            ["dns"] = BuildDns(options, CollectProxyDomains(ruleSet, tags.Count > 0), tags.Count > 0),
+            ["inbounds"] = BuildInbounds(options, CollectProxyAddresses(ruleSet)),
+            ["outbounds"] = BuildOutbounds(usable, tags, options),
+            ["route"] = BuildRoute(ruleSet, tags, options),
+            ["experimental"] = new JsonObject
+            {
+                ["clash_api"] = new JsonObject { ["external_controller"] = options.ClashApiListen },
+            },
+        };
+
+        // Секрет Clash API: без него любая программа на машине переключает
+        // выход, читает список соединений и просит замерить задержку выхода
+        // до своего сервера — а тот видит адрес VPN (см. EngineKeys).
+        if (options.Keys is { ClashSecret.Length: > 0 } keys)
+            ((JsonObject)root["experimental"]!["clash_api"]!)["secret"] = keys.ClashSecret;
+
+        // Раздел заводится только при надобности: пустой массив endpoints
+        // движок принимает, но лишняя секция в конфиге — лишний повод
+        // разбираться, откуда она взялась.
+        var endpoints = BuildEndpoints(usable, tags);
+
+        if (endpoints.Count > 0)
+            root["endpoints"] = endpoints;
+
+        // Кэш движка нужен ровно одному выходу — MASQUE: движок заводит себе
+        // учётную запись Cloudflare сам и хранит её там. Без кэша он
+        // регистрировался бы заново при каждом запуске, плодя записи и теряя
+        // единственное, ради чего всё затевалось: работать, когда подписки
+        // уже нет. Включается вместе с ним, а не всем подряд — файл
+        // переживает удаление программы и хранит ещё и выбор в селекторе.
+        if (usable.Any(s => s.IsSelfRegistering))
+        {
+            var cache = Path.GetFullPath(options.CachePath);
+
+            // Каталог заводим мы: движок его не создаёт и просто падает,
+            // а падение на старте — это весь туннель, а не один выход.
+            var directory = Path.GetDirectoryName(cache);
+
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+
+            ((JsonObject)root["experimental"]!)["cache_file"] = new JsonObject
+            {
+                ["enabled"] = true,
+                ["path"] = cache,
+                ["store_masque_config"] = true,
+            };
+        }
+
+        return new CompilationResult
+        {
+            Json = root.ToJsonString(SerializerOptions),
+            UsedServers = usable,
+            SkippedServers = skipped,
+            ServerTags = tags,
+        };
+    }
+
+    /// <summary>
+    /// Собирает минимальный конфиг для проверки одного сервера.
+    /// </summary>
+    /// <remarks>
+    /// Ни TUN, ни fakeip, ни маршрутов: только локальный инбаунд <c>mixed</c>
+    /// (он же SOCKS, он же HTTP-прокси) и один исходящий. Такой конфиг
+    /// запускается без прав администратора и не трогает систему — именно то,
+    /// что нужно, чтобы отделить неисправность транспорта от проблем
+    /// маршрутизации.
+    /// </remarks>
+    private const string ProbeDnsServer = "8.8.8.8";
+
+    /// <summary>Тег автоподбора по задержке; спрятан за селектором.</summary>
+    private const string LatencyTag = "auto-latency";
+
+    /// <summary>Резолвер для имён самих серверов подписки, всегда в обход туннеля.</summary>
+    private const string BootstrapTag = "bootstrap";
+
+    private const string OverrideTag = "pinned";
+
+    /// <param name="resolvedAddress">
+    /// Адрес сервера, выясненный заранее и в обход системного резолвера.
+    /// <c>null</c> — оставить имя, пусть разрешает сам sing-box.
+    /// </param>
+    /// <param name="keys">
+    /// Учётка входа пробника; <c>null</c> — без пароля. Пробник живёт секунды,
+    /// но замер подписки из десятков серверов держит входы открытыми минутами,
+    /// и каждый из них — прямой путь через сервер подписки (см. EngineKeys).
+    /// </param>
+    public string CompileProbeConfig(
+        ProxyServer server,
+        int listenPort,
+        string? logPath,
+        string logLevel = "debug",
+        string? resolvedAddress = null,
+        EngineKeys? keys = null,
+        TlsFragment fragment = TlsFragment.Off)
+    {
+        var log = new JsonObject { ["level"] = logLevel, ["timestamp"] = true };
+
+        if (!string.IsNullOrEmpty(logPath))
+            log["output"] = Path.GetFullPath(logPath);
+
+        var probe = new JsonObject
+        {
+            ["type"] = "mixed",
+            ["tag"] = "probe-in",
+            ["listen"] = "127.0.0.1",
+            ["listen_port"] = listenPort,
+        };
+
+        if (keys is { User.Length: > 0 })
+        {
+            probe["users"] = new JsonArray
+            {
+                new JsonObject { ["username"] = keys.User, ["password"] = keys.Password },
+            };
+        }
+
+        var root = new JsonObject
+        {
+            ["log"] = log,
+            ["inbounds"] = new JsonArray { probe },
+            ["outbounds"] = server.IsEndpoint
+                ? new JsonArray { new JsonObject { ["type"] = "direct", ["tag"] = "direct" } }
+                : new JsonArray
+                {
+                    Fragment(PinAddress(BuildOutbound(server, "probe-out"), server, resolvedAddress), fragment),
+                    new JsonObject { ["type"] = "direct", ["tag"] = "direct" },
+                },
+            ["route"] = new JsonObject
+            {
+                ["rules"] = new JsonArray
+                {
+                    // Запросы к резолверу обязаны идти мимо прокси. Иначе выходит
+                    // замкнутый круг: чтобы разрешить имя сервера, нужен прокси,
+                    // а чтобы поднять прокси — разрешить имя.
+                    //
+                    // Через detour у DNS-сервера это не выражается: sing-box 1.13
+                    // отвергает detour в пустой direct-исходящий с формулировкой
+                    // «makes no sense». Поэтому развязка сделана правилом маршрута.
+                    new JsonObject
+                    {
+                        ["ip_cidr"] = new JsonArray { ProbeDnsServer + "/32" },
+                        ["outbound"] = "direct",
+                    },
+                },
+                ["final"] = "probe-out",
+                ["auto_detect_interface"] = true,
+                ["default_domain_resolver"] = new JsonObject { ["server"] = "probe-dns" },
+            },
+            ["dns"] = new JsonObject
+            {
+                ["servers"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["tag"] = "probe-dns",
+                        ["type"] = "udp",
+                        ["server"] = ProbeDnsServer,
+                    },
+                },
+            },
+        };
+
+        // Endpoint проверяется ровно так же, как исходящий: разница только
+        // в том, каким разделом он описан. Без этого «Замерить все» молча
+        // объявляло бы WARP мёртвым — конфиг проверки собирался бы с исходящим,
+        // которого для WireGuard не бывает.
+        if (server.IsEndpoint)
+            root["endpoints"] = BuildEndpoints(new[] { server }, new Dictionary<ProxyServer, string> { [server] = "probe-out" });
+
+        return root.ToJsonString(SerializerOptions);
+    }
+
+    /// <summary>
+    /// Пишет конфиг на диск в UTF-8 <b>без BOM</b>.
+    /// </summary>
+    /// <remarks>
+    /// Существенно: разборщик JSON в Go спотыкается о метку порядка байт и
+    /// падает с «invalid character 'ï' looking for beginning of value».
+    /// </remarks>
+    public static void WriteToFile(string path, string json)
+    {
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory))
+            Directory.CreateDirectory(directory);
+
+        File.WriteAllText(path, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+        WriteStamp(path);
+    }
+
+    /// <summary>Путь к отметке о том, кто собрал конфиг.</summary>
+    public static string StampPathFor(string configPath) => configPath + ".built-by";
+
+    /// <summary>
+    /// Оставляет рядом с конфигом отметку о собравшей его версии.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Отдельным файлом, а не полем внутри: sing-box разбирает свой конфиг
+    /// строго и на незнакомый ключ ругается.
+    /// </para>
+    /// <para>
+    /// Заведено потому, что развёрнутых копий бывает несколько, и старая молча
+    /// пересобирает конфиг по-своему. Трижды за один день выходило так, что
+    /// исправление внесено, конфиг свежий по времени, а собрала его прошлая
+    /// версия — и поле, которого она не знает, в файл не попадало. По времени
+    /// это не видно никак: конфиг пересобирается при каждом запуске.
+    /// </para>
+    /// </remarks>
+    private static void WriteStamp(string configPath)
+    {
+        try
+        {
+            var version = typeof(SingBoxConfigCompiler).Assembly.GetName().Version?.ToString() ?? "неизвестна";
+
+            File.WriteAllText(
+                StampPathFor(configPath),
+                $"{version}\n{DateTimeOffset.Now:O}\n",
+                new UTF8Encoding(false));
+        }
+        catch (Exception)
+        {
+            // Отметка — удобство, а не условие работы.
+        }
+    }
+
+    /// <summary>
+    /// Теги должны быть уникальны — sing-box адресует outbound'ы по ним, а имена
+    /// серверов в подписках повторяются.
+    /// </summary>
+    private static Dictionary<ProxyServer, string> AssignUniqueTags(IReadOnlyList<ProxyServer> servers)
+    {
+        var tags = new Dictionary<ProxyServer, string>();
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "direct", "auto" };
+
+        foreach (var server in servers)
+        {
+            var baseTag = string.IsNullOrWhiteSpace(server.Tag) ? $"{server.Host}:{server.Port}" : server.Tag.Trim();
+            var tag = baseTag;
+
+            for (int suffix = 2; !used.Add(tag); suffix++)
+                tag = $"{baseTag} #{suffix}";
+
+            tags[server] = tag;
+        }
+
+        return tags;
+    }
+
+    /// <summary>
+    /// Домены, которые по правилам уходят в прокси. При выборочном перехвате
+    /// только им выдаётся адрес fakeip — и только они попадают в туннель.
+    /// </summary>
+    /// <param name="haveServers">
+    /// Есть ли куда вести. Без серверов домен регистрации WARP получил бы
+    /// fakeip и ушёл в <c>direct</c> с подменённым адресом — то есть никуда.
+    /// </param>
+    private static IReadOnlyList<string> CollectProxyDomains(RuleSet ruleSet, bool haveServers)
+    {
+        if (ruleSet.Operating != OperatingMode.Selective)
+            return Array.Empty<string>();
+
+        var proxied = ruleSet.Rules.Where(r => r.Mode == RoutingMode.Proxy);
+
+        // Домены из правил по одному имени и из списков — вперемешку: для
+        // fakeip разницы нет, а для человека список это тот же набор доменов,
+        // только записанный одной строкой.
+        var domains = proxied
+            .Where(r => r.Match == MatchKind.Domain)
+            .Select(r => r.Value)
+            .Concat(proxied
+                .Where(r => r.Match == MatchKind.HostList)
+                .SelectMany(r => r.HostListDomains));
+
+        return domains
+            .Select(v => v.StartsWith("*.", StringComparison.Ordinal) ? v[2..] : v)
+            .Where(v => !v.Contains('*'))
+
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static IReadOnlyList<string> CollectProxyAddresses(RuleSet ruleSet)
+    {
+        if (ruleSet.Operating != OperatingMode.Selective)
+            return Array.Empty<string>();
+
+        var proxied = ruleSet.Rules.Where(r => r.Mode == RoutingMode.Proxy);
+
+        // Список адресов — то же правило по адресу, только файлом. До 01.10
+        // сюда шли одни одиночные адреса, и часть «Звук голоса (адреса)»
+        // через VPN в туннель ничего не заводила: правило в маршрутах
+        // движка стояло, а пакеты до TUN не доходили.
+        return proxied
+            .Where(r => r.Match == MatchKind.Ip)
+            .Select(r => r.Value)
+            .Concat(proxied
+                .Where(r => r.Match == MatchKind.IpSet)
+                .SelectMany(r => r.IpSetCidrs))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static JsonObject BuildDns(
+        SingBoxOptions options,
+        IReadOnlyList<string> proxyDomains,
+        bool haveServers)
+    {
+        var remote = new JsonObject
+        {
+            ["tag"] = "remote",
+            ["type"] = options.DnsServerType,
+            ["server"] = options.DnsServer,
+        };
+
+        if (options.DnsServerType == "https")
+        {
+            if (!string.IsNullOrEmpty(options.DnsServerName))
+                remote["tls"] = new JsonObject { ["server_name"] = options.DnsServerName };
+
+            if (!string.IsNullOrEmpty(options.DnsServerPath) && options.DnsServerPath != "/dns-query")
+                remote["path"] = options.DnsServerPath;
+        }
+
+        // Через туннель — только если ему есть куда вести. Иначе detour
+        // указывал бы на селектор без единого сервера, и разрешение имён
+        // умерло бы целиком.
+        bool throughTunnel = options.DnsThroughTunnel && haveServers;
+
+        // «Авто» — через переключатель пути DNS, который ставит надзор.
+        bool viaPath = options.DnsViaAuto && !options.DnsThroughTunnel && haveServers;
+
+        // Имена серверов подписки и панелей — мимо туннеля в обоих случаях.
+        bool bootstrap = throughTunnel || viaPath;
+
+        if (throughTunnel)
+            remote["detour"] = options.SelectorTag;
+        else if (viaPath)
+            remote["detour"] = SingBoxOptions.DnsPathTag;
+
+        var servers = new JsonArray
+        {
+            remote,
+            new JsonObject
+            {
+                ["tag"] = "fake",
+                ["type"] = "fakeip",
+                ["inet4_range"] = options.FakeIpV4Range,
+                ["inet6_range"] = options.FakeIpV6Range,
+            },
+        };
+
+        if (bootstrap)
+        {
+            // Имена самих серверов подписки разрешаются в обход туннеля,
+            // иначе замкнутый круг: чтобы поднять туннель, нужно разрешить
+            // имя сервера, а чтобы разрешить — уже иметь туннель.
+            servers.Add(new JsonObject
+            {
+                ["tag"] = BootstrapTag,
+                ["type"] = "local",
+            });
+        }
+
+        // Подставленные адреса идут отдельным резолвером типа hosts. Первым
+        // правилом, раньше fakeip: у такого имени настоящего адреса нет,
+        // и отдать вместо него fakeip значило бы завести соединение в туннель,
+        // где его точно так же не с кем установить.
+        if (options.AddressOverrides.Count > 0)
+        {
+            var predefined = new JsonObject();
+
+            foreach (var (host, address) in options.AddressOverrides)
+                predefined[host] = new JsonArray { address };
+
+            servers.Add(new JsonObject
+            {
+                ["tag"] = OverrideTag,
+                ["type"] = "hosts",
+                ["predefined"] = predefined,
+            });
+        }
+
+        // independent_cache не пишется: в 1.14.0 он объявлен устаревшим, а в
+        // 1.16.0 будет убран, и кэш там разделяется сам по резолверам. Держать
+        // ключ до последнего значило бы чинить его по чужому расписанию —
+        // в тот день, когда движок обновится и конфиг перестанет собираться.
+        var dns = new JsonObject
+        {
+            ["servers"] = servers,
+        };
+
+        // Fakeip выдаёт каждому домену собственный адрес, поэтому соответствие
+        // «адрес → домен» точное 1:1, и доменные правила работают без догадок
+        // по реальным адресам CDN.
+        var rules = new JsonArray();
+
+        if (options.AddressOverrides.Count > 0)
+        {
+            var names = new JsonArray();
+
+            foreach (var host in options.AddressOverrides.Keys)
+                names.Add(host);
+
+            rules.Add(new JsonObject
+            {
+                ["domain"] = names,
+                ["server"] = OverrideTag,
+            });
+        }
+
+        if (options.Scope == TunnelScope.ProxyOnly && proxyDomains.Count > 0)
+        {
+            // Выборочный fakeip: подменяем ответ только тем доменам, которые
+            // идут в прокси. Всем остальным отдаётся настоящий адрес, и их
+            // трафик в туннель не попадает — этим и достигается развод
+            // с десинком.
+            var suffixes = new JsonArray();
+            foreach (var domain in proxyDomains)
+                suffixes.Add(domain);
+
+            rules.Add(new JsonObject
+            {
+                ["domain_suffix"] = suffixes,
+                ["query_type"] = new JsonArray { "A", "AAAA" },
+                ["server"] = "fake",
+            });
+        }
+        else if (options.Scope != TunnelScope.ProxyOnly)
+        {
+            rules.Add(new JsonObject
+            {
+                ["query_type"] = new JsonArray { "A", "AAAA" },
+                ["server"] = "fake",
+            });
+        }
+
+        // Панели подписок — мимо туннеля, иначе при мёртвом выходе за новыми
+        // серверами не сходить: «Этот хост неизвестен» (жалоба 24.09).
+        //
+        // После fakeip, а не раньше. Панель, которую человек сам отправил
+        // в VPN, — а часть панелей в РФ закрыта, — должна получить fakeip
+        // и уйти в туннель, как он решил; иначе мы молча отменили бы его
+        // выбор ради случая, когда этот выбор и так не работает.
+        if (bootstrap && options.PanelHosts.Count > 0)
+        {
+            var panels = new JsonArray();
+
+            foreach (var host in options.PanelHosts)
+                panels.Add(host);
+
+            rules.Add(new JsonObject
+            {
+                ["domain"] = panels,
+                ["server"] = BootstrapTag,
+            });
+        }
+
+        dns["rules"] = rules;
+        dns["final"] = "remote";
+
+        return dns;
+    }
+
+    private static JsonArray BuildInbounds(SingBoxOptions options, IReadOnlyList<string> proxyAddresses)
+    {
+        var inbounds = options.UseTun
+            ? BuildTunInbound(options, proxyAddresses)
+            : new JsonArray
+            {
+                new JsonObject
+                {
+                    ["type"] = "mixed",
+                    ["tag"] = "local-in",
+                    ["listen"] = "127.0.0.1",
+                    ["listen_port"] = options.LocalListenPort,
+                },
+            };
+
+        // Вход для глубокой проверки добавляется поверх основного, а не вместо:
+        // с туннелем локального прокси нет вовсе, и проверять проход трафика
+        // было не через что. Порт один и тот же в обоих режимах, поэтому
+        // супервизору не нужно знать, с TUN поднят движок или без него.
+        if (options.HealthInbound)
+        {
+            var health = new JsonObject
+            {
+                ["type"] = "mixed",
+                ["tag"] = "health-in",
+                ["listen"] = "127.0.0.1",
+                ["listen_port"] = SingBoxOptions.DefaultHealthPort,
+            };
+
+            // С паролем: вход ведёт в туннель, и открытым он отдавал адрес VPN
+            // любой программе, перебравшей порты петли (см. EngineKeys).
+            // local-in выше — прокси для приложений человека, их он прописывает
+            // сам, и пароль там сломал бы им подключение: браузеры SOCKS
+            // с паролем не умеют.
+            if (options.Keys is { User.Length: > 0 } keys)
+            {
+                health["users"] = new JsonArray
+                {
+                    new JsonObject { ["username"] = keys.User, ["password"] = keys.Password },
+                };
+            }
+
+            inbounds.Add(health);
+        }
+
+        return inbounds;
+    }
+
+    /// <summary>
+    /// Адрес DNS адаптера TUN: следующий за адресом самого TUN, как и без ключа.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Задаётся явно и только IPv4 (03.10). sing-tun 0.9.3 без
+    /// <c>dns_address</c> ставит адаптеру DNS и по IPv4, и по IPv6
+    /// (<c>fdfe:dcba:9876::2</c>); с ним — только перечисленные, по семействам.
+    /// IPv6-адрес самого TUN и маршруты остаются как были.
+    /// </para>
+    /// <para>
+    /// Зачем: Java (JNDI) берёт DNS со всех адаптеров, IPv6 вперёд, и наш TUN
+    /// в этом списке первый. TLauncher запускает Minecraft с
+    /// <c>-Djava.net.preferIPv4Stack=true</c>, и с ним поиск SRV падает на первом
+    /// же IPv6-сервере — игра молча идёт на порт 25565 и получает «Connection
+    /// refused» (замер jshell'ом из рантайма игры у владельца, 03.10). У кого
+    /// дома IPv6 нет, эту поломку вносили мы.
+    /// </para>
+    /// <para>
+    /// Цена: с заданным адресом sing-box не перехватывает DNS к нему по адресу
+    /// (dnsHijackAddress пуст), и запрос идёт через маршрут — где правило
+    /// hijack-dns и так стоит первым после sniff.
+    /// </para>
+    /// </remarks>
+    internal static string TunDnsAddress(string tunAddress)
+    {
+        var address = System.Net.IPAddress.Parse(tunAddress.Split('/')[0]).GetAddressBytes();
+
+        for (int i = address.Length - 1; i >= 0 && ++address[i] == 0; i--)
+        {
+        }
+
+        return new System.Net.IPAddress(address).ToString();
+    }
+
+    private static JsonArray BuildTunInbound(SingBoxOptions options, IReadOnlyList<string> proxyAddresses)
+    {
+        var tun = new JsonObject
+        {
+            ["type"] = "tun",
+            ["tag"] = "tun-in",
+            ["interface_name"] = options.TunInterfaceName,
+            ["address"] = new JsonArray { options.TunAddress, options.TunAddressV6 },
+            ["mtu"] = options.TunMtu,
+            ["auto_route"] = true,
+            // strict_route выключен намеренно: он добавляет фильтры WFP,
+            // блокирующие трафик мимо туннеля, а нам нужно, чтобы direct
+            // и desync спокойно уходили на реальный интерфейс к WinDivert.
+            ["strict_route"] = false,
+            ["stack"] = "gvisor",
+
+            // Адаптеру TUN — только DNS по IPv4 (TunDnsAddress). Без ключа
+            // sing-tun ставит ему и IPv6-адрес DNS, а Java берёт DNS со всех
+            // адаптеров, IPv6 вперёд, и наш TUN в этом списке первый.
+            ["dns_address"] = new JsonArray { TunDnsAddress(options.TunAddress) },
+        };
+
+        if (options.Scope == TunnelScope.ProxyOnly)
+        {
+            var captured = new List<string>
+            {
+                options.FakeIpV4Range,
+                options.FakeIpV6Range,
+            };
+
+            // Адреса резолверов заводим в туннель намеренно: без перехвата
+            // запроса fakeip нечего подменять. Правило hijack-dns в маршрутах
+            // стоит раньше исключения приватных сетей, поэтому запрос к роутеру
+            // тоже будет перехвачен.
+            foreach (var address in options.DnsServerAddresses)
+                captured.Add(address);
+
+            // Правила mode: proxy по адресу тоже должны попадать в туннель:
+            // им fakeip не выдаётся, домена у них нет.
+            foreach (var cidr in proxyAddresses)
+                captured.Add(cidr);
+
+            // Секция capture из конфига: диапазоны приложений, которые ходят
+            // по голым адресам без DNS. Без них правило по процессу для такого
+            // приложения не сработает — его трафик просто не дойдёт до туннеля.
+            foreach (var cidr in options.CaptureAddresses)
+                captured.Add(cidr);
+
+            // Прибитые в hosts адреса проксируемых доменов. Правило на прокси
+            // для них добавляется в BuildRoute — заводить сюда без правила
+            // означает отправить их в direct переоткрытым сокетом.
+            foreach (var cidr in options.PinnedProxyAddresses)
+                captured.Add(cidr);
+
+            // Одна сеть приходит и правилом, и секцией capture: список
+            // Telegram через VPN стоит в обоих. Повтор движку не нужен.
+            var unique = new JsonArray();
+            foreach (var cidr in captured.Distinct(StringComparer.OrdinalIgnoreCase))
+                unique.Add(cidr);
+
+            tun["route_address"] = unique;
+        }
+
+        if (options.DesyncAddresses.Count > 0)
+        {
+            // Подсети из ipset-списков пресета. При выборочном перехвате они уже
+            // и так вне туннеля, но исключение остаётся страховкой: правило
+            // mode: proxy может случайно накрыть адрес, который чинит десинк.
+            var excluded = new JsonArray();
+            foreach (var cidr in options.DesyncAddresses)
+                excluded.Add(cidr);
+
+            tun["route_exclude_address"] = excluded;
+        }
+
+        return new JsonArray { tun };
+    }
+
+    private static JsonArray BuildOutbounds(
+        IReadOnlyList<ProxyServer> servers,
+        IReadOnlyDictionary<ProxyServer, string> tags,
+        SingBoxOptions options)
+    {
+        var outbounds = new JsonArray
+        {
+            new JsonObject { ["type"] = "direct", ["tag"] = "direct" },
+        };
+
+        // Endpoint'ы описаны отдельным разделом, но в группы входят наравне
+        // с исходящими: для urltest и селектора это такой же тег.
+        foreach (var server in servers.Where(s => !s.IsEndpoint))
+            outbounds.Add(Fragment(BuildOutbound(server, tags[server]), options.TlsFragment));
+
+        if (servers.Count == 0)
+            return outbounds;
+
+        // Домашние выходы можно вывести из автоподбора. Иначе он неизбежно
+        // на них и оседает: выбор идёт по задержке, а ближайший сервер —
+        // свой же. Для обхода блокировки оператора это годится, для сервисов,
+        // закрывающихся от страны, — нет: адрес остаётся отечественным,
+        // и отказ приходит тот же, что и без туннеля.
+        //
+        // WARP — тоже домашний, хоть флага в имени у него и нет: Cloudflare
+        // выпускает в ближайшем городе, из России — в Москве (замер 01.10:
+        // loc=RU, colo=DME, warp=on). До 01.10 «только зарубежные» его
+        // пропускали запасным.
+        var eligible = options.ForeignExitsOnly
+            ? servers.Where(s => !LooksDomestic(tags[s]) && !s.IsSelfRegistering).ToList()
+            : servers;
+
+        // Но не до пустоты: подписка может состоять из домашних серверов
+        // целиком, и группа без единого участника не даст конфигу
+        // запуститься вовсе.
+        if (eligible.Count == 0)
+            eligible = servers;
+
+        // Заведомо мёртвые — мимо автоподбора.
+        //
+        // Мёртвый сервер в группе не бесплатен: движок опрашивает его наравне
+        // с живыми, а осев на нём, молчит до следующего замера. У владельца
+        // 20.09 таких было семеро из девяти, и подписка работала еле-еле.
+        //
+        // Из селектора они при этом НЕ убираются: закрепить такой сервер
+        // руками — законное желание. Сервер мог подняться между нашими
+        // замерами, а мы бы лишили человека возможности это проверить.
+        //
+        // WARP в этом счёте не участвует, а в группу входит только запасным —
+        // когда живых серверов подписки нет. Замер 23.09: наравне с ними
+        // он выигрывал всегда. Одиночный запрос через него — 147 мс против
+        // 220–265 у серверов SecureWay, выход-то в Москве, а под нагрузкой
+        // он держит одно-два соединения: 575 соединений Telegram висели
+        // через него с нулём байт. Хуже того, пробником он не замеряется
+        // и мёртвым не числится никогда, так что прежняя защита «не до
+        // пустоты» видела в нём живого и выводила все девять серверов
+        // подписки — отмеченных мёртвыми по замерам, сделанным ещё
+        // с неверной набивкой XHTTP.
+        var primary = eligible.Where(s => !s.IsSelfRegistering).ToList();
+        var reserve = eligible.Where(s => s.IsSelfRegistering).ToList();
+
+        var alive = primary
+            .Where(s => !options.DeadServerTags.Contains(tags[s]))
+            .ToList();
+
+        // И снова не до пустоты. Подписка бывает мёртвой целиком — или
+        // отмеченной мёртвой по устаревшим замерам. Тогда пусть движок
+        // сам перебирает всех вместе с запасным: это лучше, чем конфиг,
+        // который не читается, и лучше, чем один WARP.
+        eligible = alive.Count > 0 ? alive : [.. primary, .. reserve];
+
+        eligible = CapPerEntry(eligible, options);
+
+        var members = new JsonArray();
+        foreach (var server in eligible)
+            members.Add(tags[server]);
+
+        // urltest сам опрашивает серверы и выбирает быстрейший из живых.
+        // Статический список этого не умеет: раньше по умолчанию брался
+        // первый сервер подписки, и если он мёртв — а у провайдера
+        // это обычное дело, — прокси не работал вовсе.
+        outbounds.Add(new JsonObject
+        {
+            ["type"] = "urltest",
+            ["tag"] = LatencyTag,
+            ["outbounds"] = members,
+            ["url"] = options.LatencyTestUrl,
+            ["interval"] = options.LatencyTestInterval,
+            ["tolerance"] = options.LatencyTolerance,
+        });
+
+        // Поверх — селектор: только он позволяет закрепить конкретный сервер
+        // вручную через Clash API. По умолчанию указывает на автоподбор.
+        var selectorMembers = new JsonArray { LatencyTag };
+        foreach (var server in servers)
+            selectorMembers.Add(tags[server]);
+
+        // Прямой выход — участник группы, и это не украшение.
+        //
+        // Когда выходы подписки перестают отвечать все разом, трафик,
+        // направленный в туннель, уходит в никуда; в режиме «всё через VPN»
+        // это вся сеть целиком. Переключить группу сюда — способ увести его
+        // мимо туннеля мгновенно, не пересобирая конфиг и не перезапуская
+        // движок, то есть не обрывая заодно и то, что ещё работало.
+        //
+        // Решает <see cref="TunnelBypass"/>; здесь только возможность.
+        // Последним в списке — чтобы в чужих панелях управления он стоял
+        // после серверов, а не перед ними: умолчание задаётся ниже явно
+        // и от порядка не зависит.
+        selectorMembers.Add("direct");
+
+        // Закреплённый сервер должен существовать: тег из настроек мог остаться
+        // от прежней подписки, а ссылка на отсутствующий outbound не даст
+        // конфигу даже запуститься.
+        var pinned = options.PreferredServerTag is { } wanted
+            ? servers.Select(s => tags[s]).FirstOrDefault(t => t.Equals(wanted, StringComparison.OrdinalIgnoreCase))
+            : null;
+
+        outbounds.Add(new JsonObject
+        {
+            ["type"] = "selector",
+            ["tag"] = options.SelectorTag,
+            ["outbounds"] = selectorMembers,
+            ["default"] = pinned ?? LatencyTag,
+        });
+
+        // «Авто» для DNS (владелец, 05.10): резолвер ходит через свой
+        // переключатель — при запуске напрямую, пока туннель не прогрет,
+        // дальше куда поставит надзор. Обрывать идущие соединения при
+        // переключении обязательно: DoH держит одно соединение HTTP/2
+        // часами, и без обрыва запросы так и шли бы прежним путём.
+        if (options.DnsViaAuto && !options.DnsThroughTunnel && tags.Count > 0)
+        {
+            outbounds.Add(new JsonObject
+            {
+                ["type"] = "selector",
+                ["tag"] = SingBoxOptions.DnsPathTag,
+                ["outbounds"] = new JsonArray { options.SelectorTag, "direct" },
+                ["default"] = "direct",
+                ["interrupt_exist_connections"] = true,
+            });
+        }
+
+        return outbounds;
+    }
+
+    /// <summary>
+    /// Собирает раздел <c>endpoints</c>: серверы, которые для движка не выход,
+    /// а сетевой интерфейс со своим адресом.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Единственный такой протокол у нас — WireGuard, и появился он ради WARP.
+    /// До sing-box 1.11 он описывался обычным исходящим; в 1.13 старая форма
+    /// убрана, и другого способа, кроме <c>endpoints</c>, нет.
+    /// </para>
+    /// <para>
+    /// Поле <c>reserved</c> у пира не пишется: в 1.14 его нет в структуре
+    /// вовсе — движок отвергает конфиг со словами <c>json: unknown field</c>.
+    /// Cloudflare кладёт туда идентификатор клиента, но и <c>wg-quick</c>,
+    /// которым WARP пользуются повсеместно, о таком поле не знает.
+    /// </para>
+    /// </remarks>
+    private static JsonArray BuildEndpoints(
+        IReadOnlyList<ProxyServer> servers,
+        IReadOnlyDictionary<ProxyServer, string> tags)
+    {
+        var endpoints = new JsonArray();
+
+        foreach (var server in servers.Where(s => s.IsEndpoint))
+        {
+            var addresses = new JsonArray();
+            foreach (var address in server.LocalAddresses)
+                addresses.Add(address);
+
+            var peer = new JsonObject
+            {
+                ["address"] = server.Host,
+                ["port"] = (int)server.Port,
+                ["public_key"] = server.PeerPublicKey ?? string.Empty,
+                ["allowed_ips"] = new JsonArray { "0.0.0.0/0", "::/0" },
+                ["persistent_keepalive_interval"] = server.KeepaliveSeconds,
+            };
+
+            if (!string.IsNullOrEmpty(server.PreSharedKey))
+                peer["pre_shared_key"] = server.PreSharedKey;
+
+            var endpoint = new JsonObject
+            {
+                ["type"] = "wireguard",
+                ["tag"] = tags[server],
+                ["mtu"] = server.Mtu,
+                ["address"] = addresses,
+                ["private_key"] = server.Credential,
+                ["peers"] = new JsonArray { peer },
+            };
+
+            // AmneziaWG — блок маскировки сборки extended; типы значений
+            // приведены при разборе (AmneziaSettings).
+            if (server.AmneziaOptions is { } amnezia)
+                endpoint["amnezia"] = JsonNode.Parse(amnezia);
+
+            endpoints.Add(endpoint);
+        }
+
+        return endpoints;
+    }
+
+    /// <summary>
+    /// Похож ли сервер на отечественный по его названию.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// По названию, потому что другого источника нет: страну выхода знает
+    /// только сам сервер, а спрашивать её у каждого — это подключение к каждому
+    /// перед сборкой конфига. Названия ставит поставщик подписки, и флаг
+    /// с «Россия» в них встречается у всех, кого доводилось видеть.
+    /// </para>
+    /// <para>
+    /// Способ приблизительный, и это признаётся вслух: «США (вход РФ)» назван
+    /// американским, а выходит, по замерам, в России. Поэтому исключение —
+    /// не гарантия, а отсев очевидного; страну выхода проверка блокировок
+    /// всё равно спрашивает отдельно и говорит, если та не та.
+    /// </para>
+    /// </remarks>
+    internal static bool LooksDomestic(string tag) =>
+        tag.Contains("🇷🇺", StringComparison.Ordinal)
+        || tag.Contains("Россия", StringComparison.OrdinalIgnoreCase)
+        || tag.Contains("Russia", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Ставит в исходящий готовый адрес вместо имени сервера.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Разрывает замкнутый круг проверки. Чтобы соединиться с сервером,
+    /// sing-box должен разрешить его имя; разрешает он обычным запросом
+    /// к 8.8.8.8, а при работающем движке этот запрос перехватывает TUN
+    /// и отвечает сам. В логе это выглядело так: <c>lookup failed for
+    /// holaris…sslip.io: context deadline exceeded</c> — при том что сервер
+    /// был жив и отзывался по TCP за семьдесят миллисекунд.
+    /// </para>
+    /// <para>
+    /// Имя при этом обязано остаться в <c>server_name</c>: по нему сервер
+    /// выбирает сертификат, и подстановка адреса без этого ломала бы TLS
+    /// вместо того, чтобы чинить разрешение имён.
+    /// </para>
+    /// </remarks>
+    private static JsonObject PinAddress(JsonObject outbound, ProxyServer server, string? resolvedAddress)
+    {
+        // У MASQUE узла нет: движок выбирает его сам и поле server не примет.
+        // Подставлять туда адрес — значит собрать конфиг, который не читается.
+        if (server.Protocol == ProxyProtocol.Masque)
+            return outbound;
+
+        if (string.IsNullOrEmpty(resolvedAddress)
+            || string.Equals(resolvedAddress, server.Host, StringComparison.OrdinalIgnoreCase))
+        {
+            return outbound;
+        }
+
+        outbound["server"] = resolvedAddress;
+
+        if (outbound["tls"] is JsonObject tls && tls["server_name"] is null)
+            tls["server_name"] = string.IsNullOrEmpty(server.Sni) ? server.Host : server.Sni;
+
+        return outbound;
+    }
+
+    private static JsonObject BuildOutbound(ProxyServer server, string tag)
+    {
+        // MASQUE поверх HTTP/2, а не QUIC, — так WARP ожил 23.09, на движке
+        // 1.14.1-extended-2.7.2. Замер на машине владельца, отдельный
+        // sing-box, рабочие движки не тронуты:
+        //
+        //   QUIC, как было         узел 162.159.198.2 молчит, трафика нет
+        //   HTTP/2, пустой кэш     регистрация напрямую прошла, warp=on, 204 мс
+        //   HTTP/2, запись в кэше  warp=on, 173 мс, без туннеля
+        //
+        // HTTP/2 — обычный TLS на TCP 443; QUIC до узла Cloudflare у этого
+        // оператора не доходит. Регистрация на 1.14.0 не проходила вовсе
+        // (приветствие Go), на 1.14.1 проходит напрямую — движок её переделал.
+        //
+        // Узел движок по-прежнему выбирает сам. Имя выхода не менять:
+        // учётная запись в кэше привязана к нему, и с другим именем движок
+        // пошёл бы регистрироваться заново. История — docs/warp.md.
+        if (server.Protocol == ProxyProtocol.Masque)
+        {
+            return new JsonObject
+            {
+                ["type"] = "masque",
+                ["tag"] = tag,
+                ["use_http2"] = true,
+            };
+        }
+
+        var outbound = new JsonObject
+        {
+            ["tag"] = tag,
+            ["server"] = server.Host,
+            // Приведение к int обязательно: у ushort нет неявного преобразования
+            // в JsonNode, и значение ушло бы через резолвер типов, которого нет.
+            ["server_port"] = (int)server.Port,
+        };
+
+        switch (server.Protocol)
+        {
+            case ProxyProtocol.Vless:
+                outbound["type"] = "vless";
+                outbound["uuid"] = server.Credential;
+                if (!string.IsNullOrEmpty(server.Flow))
+                    outbound["flow"] = server.Flow;
+                break;
+
+            case ProxyProtocol.Vmess:
+                outbound["type"] = "vmess";
+                outbound["uuid"] = server.Credential;
+                outbound["alter_id"] = server.AlterId;
+                outbound["security"] = "auto";
+                break;
+
+            case ProxyProtocol.Trojan:
+                outbound["type"] = "trojan";
+                outbound["password"] = server.Credential;
+                break;
+
+            case ProxyProtocol.Shadowsocks:
+                outbound["type"] = "shadowsocks";
+                outbound["method"] = server.Method ?? "aes-256-gcm";
+                outbound["password"] = server.Credential;
+                break;
+
+            case ProxyProtocol.Hysteria2:
+                outbound["type"] = "hysteria2";
+                outbound["password"] = server.Credential;
+
+                // Без этого блока сервер с обфускацией не отвечает вовсе:
+                // он отбрасывает пакеты, не прошедшие её, и делает это молча.
+                if (!string.IsNullOrEmpty(server.ObfsType))
+                {
+                    var obfs = new JsonObject { ["type"] = server.ObfsType };
+
+                    if (!string.IsNullOrEmpty(server.ObfsPassword))
+                        obfs["password"] = server.ObfsPassword;
+
+                    outbound["obfs"] = obfs;
+                }
+
+                break;
+
+            // Новые с 01.10: TUIC, Hysteria первой версии, AnyTLS. Собираются
+            // здесь, как прочие, а не выходом «parser» движка, который сам
+            // разбирает ссылку: проба на 1.14.1-extended-2.7.2 показала, что
+            // непонятая им ссылка — у Hysteria он ждёт up_mbps, а люди пишут
+            // upmbps — роняет весь конфиг, а с ним и все остальные серверы.
+            // И подставить адрес вместо имени (PinAddress) в ссылку нельзя.
+            case ProxyProtocol.Tuic:
+                outbound["type"] = "tuic";
+                outbound["uuid"] = server.Credential;
+                outbound["password"] = server.Password ?? string.Empty;
+
+                if (!string.IsNullOrEmpty(server.CongestionControl))
+                    outbound["congestion_control"] = server.CongestionControl;
+
+                if (!string.IsNullOrEmpty(server.UdpRelayMode))
+                    outbound["udp_relay_mode"] = server.UdpRelayMode;
+
+                break;
+
+            case ProxyProtocol.Hysteria:
+                outbound["type"] = "hysteria";
+                outbound["up_mbps"] = server.UpMbps;
+                outbound["down_mbps"] = server.DownMbps;
+
+                if (!string.IsNullOrEmpty(server.Credential))
+                    outbound["auth_str"] = server.Credential;
+
+                // У первой версии обфускация — просто пароль (xplus), без типа.
+                if (!string.IsNullOrEmpty(server.ObfsPassword))
+                    outbound["obfs"] = server.ObfsPassword;
+
+                break;
+
+            case ProxyProtocol.AnyTls:
+                outbound["type"] = "anytls";
+                outbound["password"] = server.Credential;
+                break;
+
+            case ProxyProtocol.Wireguard:
+                throw new InvalidOperationException(
+                    "WireGuard собирается в endpoints, а не в исходящие — см. BuildEndpoints.");
+
+            default:
+                throw new NotSupportedException($"Протокол {server.Protocol} не поддерживается генератором.");
+        }
+
+        var tls = BuildTls(server);
+        if (tls is not null)
+            outbound["tls"] = tls;
+
+        var transport = BuildTransport(server);
+        if (transport is not null)
+            outbound["transport"] = transport;
+
+        return outbound;
+    }
+
+    /// <summary>
+    /// Фрагментация рукопожатия TLS с сервером — если включена в настройках.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Владелец 07.10. Только у протоколов поверх TCP с TLS: VLESS, VMess,
+    /// Trojan, AnyTLS. У QUIC (Hysteria, Hysteria2, TUIC) рукопожатие идёт
+    /// в пакетах UDP, и резать там нечего; WireGuard и Shadowsocks без TLS.
+    /// </para>
+    /// <para>
+    /// «Записями» — <c>record_fragment</c>: приветствие несколькими записями TLS,
+    /// дёшево. «Пакетами» — <c>fragment</c>: несколькими пакетами TCP с паузой
+    /// между ними, сильнее и медленнее; на Windows паузу движок подбирает сам
+    /// с правами администратора, которые у программы есть. Конфиг с обоими
+    /// принимает sing-box check (1.14.1-extended-2.7.2); на живом сервере,
+    /// который режут, — не проверено, с REALITY — тоже.
+    /// </para>
+    /// </remarks>
+    internal static JsonObject Fragment(JsonObject outbound, TlsFragment mode)
+    {
+        if (mode == TlsFragment.Off
+            || outbound["type"]?.GetValue<string>() is not ("vless" or "vmess" or "trojan" or "anytls")
+            || outbound["tls"] is not JsonObject tls)
+        {
+            return outbound;
+        }
+
+        if (mode == TlsFragment.Records)
+            tls["record_fragment"] = true;
+        else
+            tls["fragment"] = true;
+
+        return outbound;
+    }
+
+    private static JsonObject? BuildTls(ProxyServer server)
+    {
+        bool reality = server.Security.Equals("reality", StringComparison.OrdinalIgnoreCase);
+        // TUIC, Hysteria и AnyTLS без TLS не бывают — он у них в протоколе.
+        bool tls = reality
+            || server.Security.Equals("tls", StringComparison.OrdinalIgnoreCase)
+            || server.Protocol is ProxyProtocol.Hysteria2 or ProxyProtocol.Trojan
+                or ProxyProtocol.Tuic or ProxyProtocol.Hysteria or ProxyProtocol.AnyTls;
+
+        if (!tls)
+            return null;
+
+        var block = new JsonObject { ["enabled"] = true };
+
+        if (!string.IsNullOrEmpty(server.Sni))
+            block["server_name"] = server.Sni;
+
+        if (server.AllowInsecure)
+            block["insecure"] = true;
+
+        // ALPN по умолчанию у протоколов на QUIC: серверы TUIC ждут h3,
+        // Hysteria первой версии — «hysteria», и без него рукопожатие
+        // не сходится. В ссылках его часто не пишут.
+        IReadOnlyList<string> alpnValues = server.Alpn.Count > 0 ? server.Alpn
+            : server.Protocol == ProxyProtocol.Tuic ? ["h3"]
+            : server.Protocol == ProxyProtocol.Hysteria ? ["hysteria"]
+            : [];
+
+        if (alpnValues.Count > 0)
+        {
+            var alpn = new JsonArray();
+            foreach (var value in alpnValues)
+                alpn.Add(value);
+
+            block["alpn"] = alpn;
+        }
+
+        // uTLS подделывает отпечаток клиента. Для REALITY он обязателен:
+        // без него сервер не отвечает.
+        if (!string.IsNullOrEmpty(server.Fingerprint) || reality)
+        {
+            block["utls"] = new JsonObject
+            {
+                ["enabled"] = true,
+                ["fingerprint"] = string.IsNullOrEmpty(server.Fingerprint) ? "chrome" : server.Fingerprint,
+            };
+        }
+
+        if (reality)
+        {
+            var realityBlock = new JsonObject { ["enabled"] = true };
+
+            if (!string.IsNullOrEmpty(server.RealityPublicKey))
+                realityBlock["public_key"] = server.RealityPublicKey;
+
+            if (!string.IsNullOrEmpty(server.RealityShortId))
+                realityBlock["short_id"] = server.RealityShortId;
+
+            block["reality"] = realityBlock;
+        }
+
+        return block;
+    }
+
+    private static JsonObject? BuildTransport(ProxyServer server)
+    {
+        switch (server.Transport.ToLowerInvariant())
+        {
+            case "ws":
+            {
+                var transport = new JsonObject { ["type"] = "ws" };
+
+                if (!string.IsNullOrEmpty(server.Path))
+                    transport["path"] = server.Path;
+
+                if (!string.IsNullOrEmpty(server.HostHeader))
+                    transport["headers"] = new JsonObject { ["Host"] = server.HostHeader };
+
+                return transport;
+            }
+
+            case "grpc":
+                return new JsonObject
+                {
+                    ["type"] = "grpc",
+                    ["service_name"] = server.ServiceName ?? string.Empty,
+                };
+
+            case "httpupgrade":
+            {
+                var transport = new JsonObject { ["type"] = "httpupgrade" };
+
+                if (!string.IsNullOrEmpty(server.Path))
+                    transport["path"] = server.Path;
+
+                if (!string.IsNullOrEmpty(server.HostHeader))
+                    transport["host"] = server.HostHeader;
+
+                return transport;
+            }
+
+            case "http":
+            {
+                var transport = new JsonObject { ["type"] = "http" };
+
+                if (!string.IsNullOrEmpty(server.Path))
+                    transport["path"] = server.Path;
+
+                return transport;
+            }
+
+            case "xhttp":
+            {
+                var transport = new JsonObject { ["type"] = "xhttp" };
+
+                if (!string.IsNullOrEmpty(server.Path))
+                    transport["path"] = server.Path;
+
+                if (!string.IsNullOrEmpty(server.HostHeader))
+                    transport["host"] = server.HostHeader;
+
+                if (server.XhttpMode is { } mode)
+                    transport["mode"] = mode;
+
+                // Настройки поставщика — набивка, мультиплексирование,
+                // заголовки. Их сервер сверяет: чужая длина набивки означает
+                // отказ на каждый запрос (замер 23.09, XhttpSettings).
+                if (server.XhttpOptions is { } options
+                    && JsonNode.Parse(options) is JsonObject extra)
+                {
+                    foreach (var (key, value) in extra)
+                        transport[key] = value?.DeepClone();
+                }
+
+                // Набивка обязательна: без неё движок отказывается разбирать
+                // конфиг со словами «x_padding_bytes cannot be disabled».
+                // Когда поставщик своей не назвал — значение по умолчанию
+                // из самого XHTTP; с сервером, настроенным иначе, оно
+                // не договорится.
+                if (!transport.ContainsKey("x_padding_bytes"))
+                    transport["x_padding_bytes"] = "100-1000";
+
+                return transport;
+            }
+
+            // tcp, udp и прочее транспортной секции не требуют.
+            default:
+                return null;
+        }
+    }
+
+    /// <summary>
+    /// Не больше <see cref="SingBoxOptions.AutoPickPerEntry"/> серверов с одного входа
+    /// в автоподборе — быстрейших по последнему замеру.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Общий замер движка бьёт по всем участникам группы разом. У Trust все
+    /// 45 стран сидят на одном входе 131.123.25.7:443 с одним ключом, и в
+    /// группе их было 16 — 16 соединений в один вход одной пачкой. 28.09 этот
+    /// вход не принимал соединения: 763 таймаута в журнале движка за вечер.
+    /// </para>
+    /// <para>
+    /// Happ с той же подпиской исполняет один выбранный конфиг, и его
+    /// наблюдатель проверяет 2–4 сервера раз в минуту; остальные страны не
+    /// проверяются вовсе, пока не нажать «Тест пинга». Здесь так же: страны
+    /// сверх двух остаются выбираемыми руками (селектор их держит), но
+    /// автоподбор их не гоняет. Вход — адрес и порт: всё, что на одном,
+    /// для продавца одно и то же подключение.
+    /// </para>
+    /// </remarks>
+    private static List<ProxyServer> CapPerEntry(IReadOnlyList<ProxyServer> servers, SingBoxOptions options)
+    {
+        if (options.AutoPickPerEntry <= 0)
+            return [.. servers];
+
+        double Rank(ProxyServer s) =>
+            options.KnownLatency.TryGetValue(s.Tag, out var ms) ? ms : double.MaxValue;
+
+        var keep = servers
+            .GroupBy(s => $"{s.Host.Trim().ToLowerInvariant()}:{s.Port}")
+            .SelectMany(g => g.OrderBy(Rank).Take(options.AutoPickPerEntry))
+            .ToHashSet();
+
+        // Порядок подписки сохраняется: по нему идут и замер, и показ.
+        return servers.Where(keep.Contains).ToList();
+    }
+
+    private static JsonObject BuildRoute(
+        RuleSet ruleSet,
+        IReadOnlyDictionary<ProxyServer, string> tags,
+        SingBoxOptions options)
+    {
+        bool haveServers = tags.Count > 0;
+        var rules = new JsonArray
+        {
+            // Определение протокола по содержимому — нужно, чтобы доменные
+            // правила срабатывали и на соединениях без обращения к DNS.
+            new JsonObject { ["action"] = "sniff" },
+            new JsonObject { ["protocol"] = "dns", ["action"] = "hijack-dns" },
+        };
+
+        foreach (var node in BuildDohRejects(options))
+            rules.Add(node);
+
+        // Вход проверки — всегда в туннель, мимо правил. Без этого запрос
+        // сторожа к api.ipify.org шёл по общим правилам, то есть в выборочном
+        // режиме напрямую: замер 28.09 — через health-in пришёл домашний
+        // адрес, тот же, что без прокси. «Проверка прохода трафика» проверяла
+        // домашнюю сеть, а не туннель.
+        if (options.HealthInbound && haveServers)
+        {
+            rules.Add(new JsonObject
+            {
+                ["inbound"] = new JsonArray { "health-in" },
+                ["outbound"] = options.SelectorTag,
+            });
+        }
+
+        rules.Add(new JsonObject { ["ip_is_private"] = true, ["outbound"] = "direct" });
+
+        // В режиме «всё через VPN» правила не отбрасываются целиком, как было
+        // раньше: исключения на прямой проход обязаны пережить его. Российские
+        // сервисы через зарубежный адрес не работают вовсе — банки и госуслуги
+        // потребуют подтверждений, часть откажет наотрез, — и «всё через VPN»
+        // без этой оговорки означает «интернет наполовину сломан».
+        // Остальные правила при этом действительно лишние: всё, что не выведено
+        // явно, и так уходит в туннель по final.
+        IReadOnlyList<RoutingRule> applicable = ruleSet.Operating switch
+        {
+            OperatingMode.Selective => ruleSet.Rules,
+
+            OperatingMode.ProxyAll => ruleSet.Rules
+                .Where(r => r.Mode == RoutingMode.Direct)
+                .ToList(),
+
+            // ProxyStrict — «без исключений» буквально: ни одного правила,
+            // включая прямые. Российские сервисы при этом сломаются, и это
+            // осознанный выбор режима, а не недосмотр.
+            _ => Array.Empty<RoutingRule>(),
+        };
+
+        // Раньше пользовательских правил: адрес прибит в hosts именно потому,
+        // что домен иначе не разрешается, и общее правило по подсети не должно
+        // перехватить его первым.
+        if (options.PinnedProxyAddresses.Count > 0 && ruleSet.Operating != OperatingMode.Off)
+        {
+            var pinned = new JsonArray();
+            foreach (var cidr in options.PinnedProxyAddresses)
+                pinned.Add(cidr);
+
+            var outbound = haveServers ? options.SelectorTag : "direct";
+
+            if (options.PinnedProxyNames.Count == 0)
+            {
+                rules.Add(new JsonObject { ["ip_cidr"] = pinned, ["outbound"] = outbound });
+            }
+            else
+            {
+                // «И адрес, и имя» — логическим правилом. В простом правиле
+                // sing-box складывает ip_cidr и domain через «или», и оно
+                // забрало бы и адрес целиком, и имя на любом адресе.
+                var names = new JsonArray();
+                foreach (var name in options.PinnedProxyNames)
+                    names.Add(name);
+
+                rules.Add(new JsonObject
+                {
+                    ["type"] = "logical",
+                    ["mode"] = "and",
+                    ["rules"] = new JsonArray
+                    {
+                        new JsonObject { ["ip_cidr"] = pinned },
+                        new JsonObject { ["domain"] = names },
+                    },
+                    ["outbound"] = outbound,
+                });
+            }
+        }
+
+        foreach (var rule in applicable)
+        {
+            var node = BuildRule(rule, tags, options, haveServers);
+            if (node is not null)
+                rules.Add(node);
+        }
+
+
+        return new JsonObject
+        {
+            ["rules"] = rules,
+            ["final"] = ResolveFinal(ruleSet, options, haveServers),
+            ["auto_detect_interface"] = true,
+
+            // Обязателен начиная с sing-box 1.12: без него запуск падает.
+            //
+            // Когда remote ходит через туннель, разрешать по нему имена самих
+            // серверов подписки нельзя — они нужны, чтобы туннель поднялся.
+            // Для этого и заведён bootstrap.
+            ["default_domain_resolver"] = new JsonObject
+            {
+                ["server"] = (options.DnsThroughTunnel || options.DnsViaAuto) && haveServers ? BootstrapTag : "remote",
+
+                // Сперва IPv4, IPv6 — запасным. Журнал владельца 25.09: сотни
+                // «dial tcp [2001:4860:…]:443: unreachable network» за 1 мс —
+                // у машины нет IPv6, а движок, узнав имя из соединения, брал
+                // первым его адрес AAAA. У кого IPv6 есть, он остаётся запасным
+                // путём; у кого нет — движок не тратит попытку впустую.
+                ["strategy"] = "prefer_ipv4",
+            },
+        };
+    }
+
+    /// <summary>
+    /// Закрывает DNS over HTTPS к системным резолверам, чтобы Windows
+    /// вернулась на обычный UDP, который мы умеем перехватывать.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Без этого вся схема выборочного перехвата рушится в первом звене.
+    /// Windows 11 включает DoH сама: запрос уходит по TCP/443 на dns.google,
+    /// правило <c>hijack-dns</c> его не видит (оно ловит DNS на UDP/53),
+    /// домен резолвится в настоящий адрес, fakeip не выдаётся, и трафик,
+    /// который должен был уйти в туннель, идёт напрямую под блокировку.
+    /// </para>
+    /// <para>
+    /// Отказ безопасен, потому что в системе стоит <c>DohFlags = 6</c> —
+    /// DoH с разрешённым откатом на открытый UDP. Получив RST, резолвер
+    /// переспрашивает по 53 порту, и запрос попадает к нам. Приватность
+    /// при этом не страдает: наружу запрос всё равно уходит по DoH, только
+    /// его делает sing-box, а не сама Windows.
+    /// </para>
+    /// <para>
+    /// Правило ограничено входящим <c>tun-in</c> намеренно. Наш собственный
+    /// DNS-сервер — тоже DoH и нередко на том же адресе; без этой оговорки отказ
+    /// накрыл бы его самого, и резолвить стало бы нечем.
+    /// </para>
+    /// </remarks>
+    private static IEnumerable<JsonObject> BuildDohRejects(SingBoxOptions options)
+    {
+        // Вне выборочного режима резолверы в туннель не заводятся,
+        // и перехватывать нечего.
+        if (options.Scope != TunnelScope.ProxyOnly || options.DnsServerAddresses.Count == 0)
+            yield break;
+
+        var addresses = new JsonArray();
+        foreach (var address in options.DnsServerAddresses)
+            addresses.Add(address);
+
+        // Адрес DoH-эндпоинта совпадает с адресом обычного резолвера:
+        // Windows поднимает 8.8.8.8 до https://dns.google/dns-query,
+        // а тот живёт там же. Поэтому отдельного списка не требуется.
+        yield return new JsonObject
+        {
+            ["inbound"] = new JsonArray { "tun-in" },
+            ["ip_cidr"] = addresses,
+            ["port"] = new JsonArray { 443 },
+            ["action"] = "reject",
+        };
+    }
+
+    private static JsonObject? BuildRule(
+        RoutingRule rule,
+        IReadOnlyDictionary<ProxyServer, string> tags,
+        SingBoxOptions options,
+        bool haveServers)
+    {
+        var outbound = ResolveOutbound(rule.Mode, rule.Server, tags, options, haveServers);
+        var node = new JsonObject();
+
+        switch (rule.Match)
+        {
+            case MatchKind.Process:
+            {
+                // sing-box различает имя файла и полный путь разными полями.
+                var value = rule.Value;
+                bool isPath = value.Contains('\\') || value.Contains('/');
+                var array = new JsonArray { value };
+
+                node[isPath ? "process_path" : "process_name"] = array;
+                break;
+            }
+
+            case MatchKind.Domain:
+            {
+                var value = rule.Value;
+
+                if (value.StartsWith("*.", StringComparison.Ordinal))
+                {
+                    // domain_suffix в sing-box покрывает и сам домен, что совпадает
+                    // с семантикой маски "*.example.com" в правилах Zephyron.
+                    node["domain_suffix"] = new JsonArray { value[2..] };
+                }
+                else if (value.Contains('*'))
+                {
+                    node["domain_regex"] = new JsonArray { GlobToRegex(value) };
+                }
+                else
+                {
+                    node["domain"] = new JsonArray { value };
+                }
+
+                break;
+            }
+
+            case MatchKind.HostList:
+            {
+                // Непрогруженный список означает, что файл не нашёлся.
+                // Правило без доменов совпало бы со всем подряд, поэтому
+                // выбрасываем его целиком — о пропаже уже сказал разворот.
+                if (rule.HostListDomains.Count == 0)
+                    return null;
+
+                var suffixes = new JsonArray();
+
+                foreach (var domain in rule.HostListDomains)
+                {
+                    // Записи в списках Zapret — это зоны: там пишут
+                    // discord.media, подразумевая и russia1234.discord.media.
+                    suffixes.Add(domain.StartsWith("*.", StringComparison.Ordinal) ? domain[2..] : domain);
+                }
+
+                node["domain_suffix"] = suffixes;
+                break;
+            }
+
+            case MatchKind.Ip:
+                node["ip_cidr"] = new JsonArray { rule.Value };
+                break;
+
+            case MatchKind.IpSet:
+            {
+                // Непрогруженный список означает, что файл не нашёлся.
+                // Правило без адресов совпало бы с чем попало, поэтому
+                // безопаснее его не выпускать вовсе.
+                if (rule.IpSetCidrs.Count == 0)
+                    return null;
+
+                var cidrs = new JsonArray();
+                foreach (var cidr in rule.IpSetCidrs)
+                    cidrs.Add(cidr);
+
+                node["ip_cidr"] = cidrs;
+                break;
+            }
+
+            default:
+                return null;
+        }
+
+        node["outbound"] = outbound;
+        return node;
+    }
+
+    private static string ResolveFinal(RuleSet ruleSet, SingBoxOptions options, bool haveServers) =>
+        ruleSet.Operating switch
+        {
+            // Десинк туннеля не касается вовсе, так что для sing-box этот
+            // режим неотличим от выключенного.
+            OperatingMode.Off or OperatingMode.DesyncOnly => "direct",
+            OperatingMode.ProxyAll or OperatingMode.ProxyStrict =>
+                haveServers ? options.SelectorTag : "direct",
+            _ => ResolveOutbound(ruleSet.DefaultMode, ruleSet.DefaultServer, null, options, haveServers),
+        };
+
+    private static string ResolveOutbound(
+        RoutingMode mode,
+        string? server,
+        IReadOnlyDictionary<ProxyServer, string>? tags,
+        SingBoxOptions options,
+        bool haveServers)
+    {
+        if (mode != RoutingMode.Proxy)
+            return "direct";
+
+        // Если серверов нет вовсе, прокси-правило превращается в direct:
+        // ссылка на несуществующий outbound не даст конфигу даже запуститься.
+        if (!haveServers)
+            return "direct";
+
+        if (string.IsNullOrWhiteSpace(server) || server.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            return options.SelectorTag;
+
+        if (tags is not null)
+        {
+            foreach (var (candidate, tag) in tags)
+            {
+                if (tag.Equals(server, StringComparison.OrdinalIgnoreCase)
+                    || candidate.Tag.Equals(server, StringComparison.OrdinalIgnoreCase))
+                {
+                    return tag;
+                }
+            }
+        }
+
+        // Имя сервера из конфига не нашлось среди подписки — безопаснее отдать
+        // селектор, чем сослаться на отсутствующий тег.
+        return options.SelectorTag;
+    }
+
+    private static string GlobToRegex(string glob)
+    {
+        var builder = new StringBuilder("^");
+
+        foreach (char c in glob)
+        {
+            if (c == '*')
+                builder.Append(".*");
+            else if (c == '?')
+                builder.Append('.');
+            else
+                builder.Append(System.Text.RegularExpressions.Regex.Escape(c.ToString()));
+        }
+
+        return builder.Append('$').ToString();
+    }
+}
+
+public sealed record CompilationResult
+{
+    public required string Json { get; init; }
+
+    public required IReadOnlyList<ProxyServer> UsedServers { get; init; }
+
+    /// <summary>Серверы, пропущенные из-за неподдерживаемого транспорта.</summary>
+    public required IReadOnlyList<ProxyServer> SkippedServers { get; init; }
+
+    public required IReadOnlyDictionary<ProxyServer, string> ServerTags { get; init; }
+}

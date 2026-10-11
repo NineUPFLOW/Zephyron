@@ -1,0 +1,342 @@
+using System.IO;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using Zephyron.Core.Themes;
+using Xunit;
+
+namespace Zephyron.Gui.Tests;
+
+/// <summary>
+/// Тема из файла собирается в словарь с теми же ключами, что Palette.xaml.
+/// </summary>
+/// <remarks>
+/// Стили берут кисти и шрифты по ключам. Ключ, которого нет в собранном
+/// словаре, в окне молча остаётся от прежней темы — и тема выходит смесью
+/// двух, чего по виду не понять.
+/// </remarks>
+public sealed class ThemesTests
+{
+    private static string? Themes()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (directory is not null)
+        {
+            var folder = Path.Combine(directory.FullName, "themes");
+
+            if (File.Exists(Path.Combine(directory.FullName, "Zephyron.sln")) && Directory.Exists(folder))
+                return folder;
+
+            directory = directory.Parent;
+        }
+
+        return null;
+    }
+
+    [Fact]
+    public void ABuiltThemeHasEveryKeyOfTheXamlPalette()
+    {
+        if (Themes() is not { } root)
+            return;
+
+        Sta.Run(() =>
+        {
+            var palette = new ResourceDictionary
+            {
+                Source = new Uri("pack://application:,,,/Zephyron;component/Theme/Palette.xaml", UriKind.Absolute),
+            };
+
+            foreach (var id in ThemeLoader.BuiltIn)
+            {
+                var theme = ThemeLoader.Load(id, root).Theme!;
+                var problems = new List<string>();
+
+                var built = Zephyron.Gui.Themes.Build(theme, problems);
+
+                Assert.Empty(problems);
+
+                foreach (var key in palette.Keys.Cast<object>())
+                    Assert.True(built.Contains(key), $"{id}: нет ключа {key}");
+            }
+        });
+    }
+
+    /// <summary>
+    /// Подпись главной кнопки — цвета OnAccent, а не общего цвета текста.
+    /// </summary>
+    /// <remarks>
+    /// Стиль TextBlock без ключа красил весь текст в Text и перебивал цвет
+    /// кнопки. В светлой теме SB с графитовой кнопкой подпись пропала вовсе
+    /// (снимок владельца 24.09), а проверка читаемости сверяла OnAccent,
+    /// которого окно не рисовало.
+    /// </remarks>
+    [Fact]
+    public void APrimaryButtonCaptionUsesOnAccent()
+    {
+        Sta.Run(() =>
+        {
+            var button = new System.Windows.Controls.Button
+            {
+                Style = (Style)Application.Current.FindResource("Primary"),
+                Content = "Создать тему",
+            };
+
+            button.Measure(new Size(400, 100));
+            button.Arrange(new Rect(0, 0, 400, 100));
+
+            // Привязка к предку досчитывается в очереди окна — дождаться
+            // её, как это происходит в живом окне до первой отрисовки.
+            System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(
+                () => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+
+            var caption = Find<System.Windows.Controls.TextBlock>(button);
+            var onAccent = (SolidColorBrush)Application.Current.FindResource("OnAccent");
+
+            Assert.NotNull(caption);
+            Assert.Equal(onAccent.Color, ((SolidColorBrush)caption!.Foreground).Color);
+        });
+    }
+
+    /// <summary>
+    /// Значок внутри кнопки показывается значком. Шаблон подписи из fc45186
+    /// применялся к любому содержимому, и пин в «Маршрутах» выводил строку
+    /// «System.Windows.Shapes.Path» (снимок владельца, 24.09).
+    /// </summary>
+    [Theory]
+    [InlineData("Ghost")]
+    [InlineData("Primary")]
+    public void AnIconButtonShowsTheIcon(string style)
+    {
+        Sta.Run(() =>
+        {
+            var icon = new System.Windows.Shapes.Path { Data = Geometry.Parse("M0,0 L10,10") };
+            var button = new System.Windows.Controls.Button
+            {
+                Style = (Style)Application.Current.FindResource(style),
+                Content = icon,
+            };
+
+            button.Measure(new Size(400, 100));
+            button.Arrange(new Rect(0, 0, 400, 100));
+
+            System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(
+                () => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+
+            Assert.Same(icon, Find<System.Windows.Shapes.Path>(button));
+            Assert.Null(Find<System.Windows.Controls.TextBlock>(button));
+        });
+    }
+
+    private static T? Find<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+
+            // Скрытое не в счёт: в шаблоне кнопки с 10.10 стоят значок
+            // и стрелка меню (ButtonGlyph), свёрнутые, пока их не задали.
+            if (child is UIElement { Visibility: not Visibility.Visible })
+                continue;
+
+            if (child is T found)
+                return found;
+
+            if (Find<T>(child) is { } deeper)
+                return deeper;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Выбор цвета и редактор темы создаются без исключения — как любой
+    /// раздел окна: ошибка разметки иначе всплыла бы только у человека.
+    /// </summary>
+    [Fact]
+    public void ThemeWindowsOpen()
+    {
+        if (Themes() is not { } root)
+            return;
+
+        Sta.Run(() =>
+        {
+            var picker = new Zephyron.Gui.Views.ColorPickerWindow(ThemeColor.Parse("#A01EEC"), "Главная кнопка");
+            Assert.Equal("#A01EEC", picker.Chosen.ToString());
+
+            var editor = new Zephyron.Gui.Views.ThemeEditorWindow(ThemeLoader.Load("dark", root).Theme!, editing: null);
+            Assert.Null(editor.SavedId);
+
+            picker.Close();
+            editor.Close();
+        });
+    }
+
+    /// <summary>
+    /// Стекло: есть при фоне и размытии, с плотностью карточки из темы,
+    /// пропадает вместе с картинкой, а нечитаемое — называется.
+    /// </summary>
+    [Fact]
+    public void GlassFollowsTheSettings()
+    {
+        if (Themes() is not { } repo)
+            return;
+
+        var root = Path.Combine(Path.GetTempPath(), $"zephyron-glass-{Guid.NewGuid():N}");
+
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "dark"));
+            File.Copy(Path.Combine(repo, "dark", "theme.json"), Path.Combine(root, "dark", "theme.json"));
+            Directory.CreateDirectory(Path.Combine(root, "glass"));
+
+            Sta.Run(() =>
+            {
+                // Полосы чёрного и белого под затемнением 0.92: заголовки
+                // читаются, а тёмное стекло поверх — тем более.
+                const int size = 64;
+                var pixels = new byte[size * size * 4];
+
+                for (int i = 0; i < size * size; i++)
+                {
+                    byte v = (i / size) % 16 < 8 ? (byte)0 : (byte)255;
+                    pixels[i * 4] = pixels[i * 4 + 1] = pixels[i * 4 + 2] = v;
+                    pixels[i * 4 + 3] = 255;
+                }
+
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(
+                    BitmapSource.Create(size, size, 96, 96, PixelFormats.Bgra32, null, pixels, size * 4)));
+
+                using (var file = File.Create(Path.Combine(root, "glass", "bg.png")))
+                    encoder.Save(file);
+
+                File.WriteAllText(Path.Combine(root, "glass", "theme.json"), """
+                    { "base": "dark", "colors": { "surface": "#33161B22" },
+                      "background": { "image": "bg.png", "dim": 0.92, "blur": 12 } }
+                    """);
+
+                var theme = ThemeLoader.Load("glass", root).Theme!;
+
+                var problems = new List<string>();
+                var glass = Zephyron.Gui.Themes.Build(theme, problems, new Appearance(true, true, 0));
+
+                Assert.Empty(problems);
+                Assert.NotNull(glass["GlassImage"]);
+                Assert.Equal(0x33, ((SolidColorBrush)glass["RailFill"]).Color.A);
+
+                var plain = Zephyron.Gui.Themes.Build(theme, [], new Appearance(false, true, 0));
+
+                Assert.Null(plain["GlassImage"]);
+                Assert.Equal(1.0, plain["BackdropDim"]);
+
+                // Светлое стекло под светлый текст: уплотнение его только
+                // белит, и тема обязана это назвать, а не молчать.
+                File.WriteAllText(Path.Combine(root, "glass", "theme.json"), """
+                    { "base": "dark", "colors": { "surface": "#40FFFFFF" },
+                      "background": { "image": "bg.png", "dim": 0.92, "blur": 12 } }
+                    """);
+
+                var pale = new List<string>();
+                Zephyron.Gui.Themes.Build(ThemeLoader.Load("glass", root).Theme!, pale, new Appearance(true, true, 0));
+
+                Assert.Contains(pale, p => p.Contains("стекле"));
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Живой фон (07.10): видео ложится кистью-рисунком, стекла под ним нет,
+    /// меню на плотной подложке, карточки — полупрозрачные поверх видео.
+    /// </summary>
+    /// <remarks>
+    /// Файл — не настоящее видео: проигрыватель откроет его позже и молча
+    /// не сыграет, а сборке темы это неважно. Кадра у такого файла проводник
+    /// не даст, и проверка по картинке пропускается, а не роняет тему.
+    /// </remarks>
+    [Fact]
+    public void AVideoBackgroundIsABrushWithoutGlass()
+    {
+        if (Themes() is not { } repo)
+            return;
+
+        var root = Path.Combine(Path.GetTempPath(), $"zephyron-video-{Guid.NewGuid():N}");
+
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "dark"));
+            File.Copy(Path.Combine(repo, "dark", "theme.json"), Path.Combine(root, "dark", "theme.json"));
+            Directory.CreateDirectory(Path.Combine(root, "video"));
+            File.WriteAllBytes(Path.Combine(root, "video", "fish.mp4"), new byte[64]);
+            File.WriteAllText(Path.Combine(root, "video", "theme.json"), """
+                { "base": "dark", "colors": { "surface": "#B3161B22" },
+                  "background": { "image": "fish.mp4", "dim": 0.7, "blur": 12 } }
+                """);
+
+            Sta.Run(() =>
+            {
+                var theme = ThemeLoader.Load("video", root).Theme!;
+                var problems = new List<string>();
+                var built = Zephyron.Gui.Themes.Build(theme, problems, new Appearance(true, true, 0));
+
+                try
+                {
+                    Assert.Empty(problems);
+                    Assert.Null(built["GlassImage"]);
+                    Assert.Equal(BackgroundFit.Cover, Assert.IsType<VideoBackdrop>(built[BackdropVideo.Key]).Fit);
+                    Assert.True(((SolidColorBrush)built["RailFill"]).Color.A >= 217, "меню без плотной подложки");
+                    Assert.Equal(0.7, built["BackdropDim"]);
+
+                    // Кисть с проигрывателем в словаре — падение: WPF замораживает
+                    // его содержимое, а проигрыватель не замораживается (сборка 1,
+                    // 07.10: «MediaPlayer… IsFrozen должно иметь значение false»).
+                    foreach (var key in built.Keys)
+                    {
+                        if (built[key] is Freezable freezable)
+                            Assert.True(freezable.CanFreeze, $"«{key}» в словаре темы не замораживается");
+                    }
+                }
+                finally
+                {
+                    BackdropVideo.Discard(built);
+                }
+            });
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Край яркости картинки считается под затемнением: чёрная картинка
+    /// с белым пятном в два процента не должна объявляться белой.
+    /// </summary>
+    [Fact]
+    public void TheBackgroundRangeIgnoresASpeck()
+    {
+        Sta.Run(() =>
+        {
+            const int size = 100;
+            var pixels = new byte[size * size * 4];
+
+            // Пятно в один процент площади — белое; остальное чёрное.
+            for (int i = 0; i < size * size; i++)
+            {
+                byte v = i < size ? (byte)255 : (byte)0;
+                pixels[i * 4] = pixels[i * 4 + 1] = pixels[i * 4 + 2] = v;
+                pixels[i * 4 + 3] = 255;
+            }
+
+            var image = BitmapSource.Create(size, size, 96, 96, PixelFormats.Bgra32, null, pixels, size * 4);
+            var (darkest, lightest) = Zephyron.Gui.Themes.LuminanceRange(image, ThemeColor.Parse("#000000"), 0.5);
+
+            Assert.Equal(0, darkest, 3);
+            Assert.Equal(0, lightest, 3);
+        });
+    }
+}

@@ -1,0 +1,37 @@
+# Discord: переписка, вход, приглашения.
+#
+# Первым — основной домен: на него смотрят и правило, и проверка, и первая
+# строка списка попадает в отчёт при быстрой проверке.
+#
+# Из списка Zapret не перенесены двадцать с лишним чужих сайтов о Discord —
+# disboard.org, top.gg, mee6.xyz, discordbotlist.com и им подобные. Они
+# принадлежат не Discord, ломаются по своим причинам и лечатся по своим,
+# а в отчёте выглядели поломкой Discord. Один из них, disboard.org, три
+# прогона подряд числился закрытым при исправном Discord.
+#
+# cloudflare-ech.com тоже убран: это домен Cloudflare, и его место в
+# cloudflare.txt, а не здесь.
+discord.com
+discordapp.com
+discordapp.net
+discord.gg
+discord.gift
+discord.gifts
+discord.co
+dis.gd
+discord.dev
+discord.new
+discordcdn.com
+discordstatus.com
+discordsays.com
+discordactivities.com
+discord-activities.com
+discord-attachments-uploads-prd.storage.googleapis.com
+
+# Капча Discord — hCaptcha, и она обязана идти тем же путём, что Discord.
+# Жалоба 30.09: Discord целиком через VPN, а при получении Orbs за видео
+# в конце — ошибка капчи. hcaptcha.com шёл напрямую, то есть с другого
+# адреса, чем сам Discord; добавленный человеком к Discord — заработало.
+# Чем именно капча отказывала, не выяснено: догадка — сверка адреса.
+# Цена: капча других сайтов на hCaptcha идёт тем же маршрутом, что Discord.
+hcaptcha.com

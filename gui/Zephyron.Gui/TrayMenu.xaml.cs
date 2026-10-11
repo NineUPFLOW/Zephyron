@@ -1,0 +1,369 @@
+using System.Runtime.InteropServices;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Effects;
+using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
+using Zephyron.Core;
+using Zephyron.Core.Rules;
+using Zephyron.Supervisor;
+
+namespace Zephyron.Gui;
+
+/// <summary>Что показать в меню трея — снимок состояния движков.</summary>
+/// <param name="Starting">
+/// Надзор поднят, а движки ещё не готовы. До 04.10 трей этого не знал:
+/// файл состояния появляется, лишь когда движки подняты (до 20 с), и всё
+/// это время меню писало «Остановлено» и снова предлагало «Запустить» —
+/// владелец нажимал по нескольку раз.
+/// </param>
+/// <param name="Stopping">Трей сам сейчас гасит движки.</param>
+internal sealed record TrayStatus(
+    bool Running,
+    bool AllHealthy,
+    ServiceHealth? Tunnel,
+    ServiceHealth? Desync,
+    bool Busy,
+    bool Starting = false,
+    bool Stopping = false)
+{
+    /// <summary>Сколько после подъёма ждать здоровья движков — как «Главная» (StatusView.StartupPatience).</summary>
+    private static readonly TimeSpan StartupPatience = TimeSpan.FromSeconds(90);
+
+    public string Headline =>
+        Stopping ? "Останавливается…"
+        : Busy && Running ? "Перезапускается…"
+        : Starting ? "Запускается…"
+        : !Running ? "Остановлено"
+        : AllHealthy ? "Работает"
+        : Tunnel == ServiceHealth.Degraded ? "Выходы VPN не отвечают" : "Работает с оговорками";
+
+    /// <summary>Из файла состояния надзора — того же, что читает «Главная», — и из живого надзора.</summary>
+    public static TrayStatus Read(bool busy, bool stopping = false)
+    {
+        var state = SupervisorState.Load(SupervisorState.DefaultPath);
+        bool running = state is not null && state.IsSupervisorAlive();
+
+        ServiceHealth? Of(string name) => running
+            ? state!.Services.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase))?.Health
+            : null;
+
+        bool healthy = running && EngineHealth.Bypass(state!).All(s => s.Health == ServiceHealth.Healthy);
+
+        // Запуск идёт, пока надзор жив, а состояния нет, — и после, пока
+        // движки не прошли проверку, но не дольше, чем ждёт «Главная»:
+        // сдавшийся движок — уже не запуск.
+        bool starting = !stopping && (running
+            ? !healthy
+              && EngineHealth.Bypass(state!).All(s => s.Health != ServiceHealth.Faulted)
+              && DateTimeOffset.Now - state!.StartedAt < StartupPatience
+            : busy || EngineControl.IsRunning);
+
+        return new TrayStatus(running, healthy, Of("sing-box"), Of("winws2"), busy, starting, stopping);
+    }
+
+    /// <param name="tunnel">
+    /// Это sing-box: у него «не отвечает» почти всегда значит мёртвые выходы
+    /// подписки, и так и говорится (26.09), — «с оговорками» не говорило ничего.
+    /// </param>
+    public static string Describe(ServiceHealth? health, bool tunnel = false) => health switch
+    {
+        ServiceHealth.Healthy => "работает",
+        ServiceHealth.Degraded => tunnel ? "выходы VPN не отвечают" : "не отвечает",
+        ServiceHealth.Dead => "упал",
+        ServiceHealth.Faulted => "не поднимается",
+        ServiceHealth.Stopped => "остановлен",
+
+        // Службы нет в состоянии — её и не поднимали: выключена выключателем
+        // на «Главной». «Остановлен» здесь соврал бы, что она была.
+        _ => "выключен",
+    };
+}
+
+/// <summary>
+/// Меню значка в трее — карточка в стиле окна.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Окно создаётся один раз и прячется, а не закрывается: открывают его часто,
+/// а тема, шрифт и масштаб у него и так живые — всё на DynamicResource.
+/// </para>
+/// <para>
+/// Прячется, когда теряет фокус, — как любое меню: щелчок мимо закрывает его.
+/// </para>
+/// </remarks>
+public partial class TrayMenu : Window
+{
+    private readonly Action _toggle;
+    private readonly Action<WorkMode> _chooseMode;
+    private readonly Action _showWindow;
+    private readonly Action<bool> _quit;
+
+    internal TrayMenu(Action toggle, Action<WorkMode> chooseMode, Action showWindow, Action<bool> quit)
+    {
+        _toggle = toggle;
+        _chooseMode = chooseMode;
+        _showWindow = showWindow;
+        _quit = quit;
+
+        InitializeComponent();
+
+        Version.Text = MainWindow.Version();
+
+        ModeDesyncName.Text = WorkModes.Name(WorkMode.Desync);
+        ModeTunnelName.Text = WorkModes.Name(WorkMode.Tunnel);
+        ModeRouteName.Text = WorkModes.Name(WorkMode.Route);
+    }
+
+    internal void Render(TrayStatus status)
+    {
+        State.Text = status.Headline;
+        Dot.SetResourceReference(
+            Shape.FillProperty,
+            status.Starting || status.Stopping || status.Busy ? "Warn"
+            : !status.Running ? "Faint"
+            : status.AllHealthy ? "Accent" : "Warn");
+
+        // До файла состояния движков в нём нет — пока надзор их поднимает,
+        // так и говорится, а не «—», как у остановленных.
+        Tunnel.Text = status.Running ? TrayStatus.Describe(status.Tunnel, tunnel: true) : status.Starting ? "запускается" : "—";
+        Desync.Text = status.Running ? TrayStatus.Describe(status.Desync) : status.Starting ? "запускается" : "—";
+
+        // Пока идёт запуск, кнопка — «Остановить», как на «Главной»: второй
+        // «Запустить» тут не нужен, а остановить запуск можно.
+        Toggle.Content = status.Busy
+            ? (status.Stopping ? "Останавливаю…" : status.Running ? "Перезапускаю…" : "Запускаю…")
+            : status.Running || status.Starting ? "Остановить" : "Запустить";
+        Toggle.IsEnabled = !status.Busy;
+
+        ShowModes(status);
+    }
+
+    /// <summary>Выбранный режим — по настройкам, как бы он ни был выбран: здесь, на «Главной» или руками в файле.</summary>
+    private void ShowModes(TrayStatus status)
+    {
+        AppSettings settings;
+
+        try
+        {
+            settings = AppSettings.Load(AppSettings.DefaultPath);
+        }
+        catch (Exception)
+        {
+            Modes.IsEnabled = false;
+            ModeNote.Text = "Настройки не прочитались — режим выбирается в окне";
+            return;
+        }
+
+        var current = WorkModes.Of(settings.Engines);
+
+        foreach (var (button, mode) in new[] { (ModeDesync, WorkMode.Desync), (ModeTunnel, WorkMode.Tunnel), (ModeRoute, WorkMode.Route) })
+        {
+            button.IsChecked = current == mode;
+            button.IsEnabled = current == mode || WorkModes.CanChoose(settings, mode);
+        }
+
+        Modes.IsEnabled = !status.Busy;
+
+        ModeNote.Text = !settings.HasTunnelExit
+            ? "«Туннелю» нужна подписка или WARP на вкладке VPN"
+            : status.Running
+                ? "Выбор сразу перезапускает движки"
+                : "Выбор сразу запускает движки";
+    }
+
+    private void OnMode(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string tag } && Enum.TryParse<WorkMode>(tag, out var mode))
+            _chooseMode(mode);
+    }
+
+    /// <summary>Показывает меню у указателя, в пределах рабочей области его экрана.</summary>
+    internal void PopUp()
+    {
+        // Размер — до показа: снимок под меню снимается раньше, чем меню
+        // его закроет, а для снимка надо знать, где оно встанет.
+        var content = (FrameworkElement)Content;
+        content.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var size = content.DesiredSize;
+
+        var cursor = System.Windows.Forms.Cursor.Position;
+        var area = System.Windows.Forms.Screen.FromPoint(cursor).WorkingArea;
+        var dpi = VisualTreeHelper.GetDpi(this);
+
+        // Точки экрана — в единицы WPF: на 150 % масштаба Windows это разное.
+        double x = cursor.X / dpi.DpiScaleX;
+        double y = cursor.Y / dpi.DpiScaleY;
+        double left = area.Left / dpi.DpiScaleX;
+        double top = area.Top / dpi.DpiScaleY;
+        double right = area.Right / dpi.DpiScaleX;
+        double bottom = area.Bottom / dpi.DpiScaleY;
+
+        // Правым нижним углом к указателю — трей обычно внизу справа, — но
+        // не за пределы рабочей области: панель задач бывает и слева, и сверху.
+        Left = Math.Clamp(x - size.Width, left, Math.Max(left, right - size.Width));
+        Top = Math.Clamp(y - size.Height, top, Math.Max(top, bottom - size.Height));
+
+        // Вид — по настройкам «Меню в трее» в оформлении, читаются при каждом
+        // открытии: сохранить там и есть применить здесь.
+        var settings = AppSettings.Load(AppSettings.DefaultPath);
+        var margin = Card.Margin;
+
+        var backdrop = settings.TrayBlur
+            ? Blurred(
+                (int)Math.Round((Left + margin.Left) * dpi.DpiScaleX),
+                (int)Math.Round((Top + margin.Top) * dpi.DpiScaleY),
+                (int)Math.Round((size.Width - margin.Left - margin.Right) * dpi.DpiScaleX),
+                (int)Math.Round((size.Height - margin.Top - margin.Bottom) * dpi.DpiScaleY))
+            : null;
+
+        // Размытие просили, а снимок не вышел — сплошная карточка, а не
+        // прозрачная: прозрачности человек не выбирал.
+        double density = settings.TrayBlur && backdrop is null
+            ? 1
+            : Math.Clamp(settings.TrayDensity, 0, 100) / 100.0;
+
+        Card.Background = backdrop ?? (Brush)Brushes.Transparent;
+        Plate.Background = Tint(density);
+
+        Show();
+        Activate();
+    }
+
+    /// <summary>
+    /// Оттенок темы под текстом меню заданной плотности.
+    /// </summary>
+    /// <remarks>
+    /// Цвет карточки берётся без его собственной прозрачности: у тем со стеклом
+    /// она своя, и плотность тогда значила бы разное в разных темах.
+    /// </remarks>
+    private Brush Tint(double density)
+    {
+        var surface = TryFindResource("SurfaceColor") is Color c ? c : Colors.Black;
+
+        return new SolidColorBrush(Color.FromRgb(surface.R, surface.G, surface.B)) { Opacity = density };
+    }
+
+    /// <summary>Радиус размытия в точках экрана — как у стекла под карточками окна.</summary>
+    private const double BlurRadius = 28;
+
+    /// <summary>
+    /// Размытый снимок участка экрана — подложка карточки.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Снимок, а не живое размытие. Системное размытие Windows — подложка DWM
+    /// и политика акцента — под этим окном рисовало сплошной тёмный слой:
+    /// снято 24.09 поверх ярких полос, в трёх вариантах окна. Меню живёт
+    /// секунды и прячется при щелчке мимо, так что снимка на это время
+    /// хватает, и на Windows 10 он работает так же.
+    /// </para>
+    /// <para>
+    /// Снимается шире карточки на радиус и обрезается после размытия: края
+    /// размытия иначе тянут к прозрачному и дают тёмную рамку — ровно так
+    /// сделано и у стекла в окне (Themes.RenderLayer). У края экрана запас
+    /// берётся, сколько есть: за краем снимать нечего.
+    /// </para>
+    /// </remarks>
+    private static ImageBrush? Blurred(int x, int y, int width, int height)
+    {
+        if (width <= 0 || height <= 0)
+            return null;
+
+        try
+        {
+            var screen = System.Windows.Forms.SystemInformation.VirtualScreen;
+            int pad = (int)Math.Ceiling(BlurRadius * 1.5);
+
+            int left = Math.Max(screen.Left, x - pad);
+            int top = Math.Max(screen.Top, y - pad);
+            int right = Math.Min(screen.Right, x + width + pad);
+            int bottom = Math.Min(screen.Bottom, y + height + pad);
+
+            if (right - left < width || bottom - top < height)
+                return null;
+
+            using var shot = new System.Drawing.Bitmap(right - left, bottom - top);
+
+            using (var graphics = System.Drawing.Graphics.FromImage(shot))
+                graphics.CopyFromScreen(left, top, 0, 0, shot.Size);
+
+            var handle = shot.GetHbitmap();
+            BitmapSource source;
+
+            try
+            {
+                source = Imaging.CreateBitmapSourceFromHBitmap(
+                    handle, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+            }
+            finally
+            {
+                DeleteObject(handle);
+            }
+
+            var image = new Image
+            {
+                Source = source,
+                Width = shot.Width,
+                Height = shot.Height,
+                Effect = new BlurEffect
+                {
+                    Radius = BlurRadius,
+                    KernelType = KernelType.Gaussian,
+                    RenderingBias = RenderingBias.Quality,
+                },
+            };
+
+            var whole = new Size(shot.Width, shot.Height);
+            image.Measure(whole);
+            image.Arrange(new Rect(whole));
+
+            var rendered = new RenderTargetBitmap(shot.Width, shot.Height, 96, 96, PixelFormats.Pbgra32);
+            rendered.Render(image);
+
+            var cropped = new CroppedBitmap(rendered, new Int32Rect(x - left, y - top, width, height));
+            cropped.Freeze();
+
+            return new ImageBrush(cropped) { Stretch = Stretch.Fill };
+        }
+        catch (Exception)
+        {
+            // Снимок — украшение. Не вышел — карточка будет сплошной.
+            return null;
+        }
+    }
+
+    [DllImport("gdi32.dll")]
+    private static extern bool DeleteObject(IntPtr handle);
+
+    private void OnDeactivated(object? sender, EventArgs e) => Hide();
+
+    private void OnKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+            Hide();
+    }
+
+    private void OnToggle(object sender, RoutedEventArgs e) => _toggle();
+
+    private void OnShowWindow(object sender, RoutedEventArgs e)
+    {
+        Hide();
+        _showWindow();
+    }
+
+    private void OnQuitKeep(object sender, RoutedEventArgs e)
+    {
+        Hide();
+        _quit(false);
+    }
+
+    private void OnQuitStop(object sender, RoutedEventArgs e)
+    {
+        // Не прячется: пока гаснут движки, человек видит «Останавливаю…».
+        _quit(true);
+    }
+}

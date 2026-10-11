@@ -1,0 +1,138 @@
+using System.Net;
+using System.Net.Sockets;
+
+namespace Zephyron.Core.Connections;
+
+/// <summary>
+/// Одно наблюдённое соединение — то, что видит классификатор в момент решения.
+/// </summary>
+/// <remarks>
+/// Тип намеренно описывает соединение независимо от источника: сегодня его
+/// наполняет WFP-подписка на net-events, завтра — собственный драйвер или
+/// Clash-API sing-box. Правила не должны знать, откуда пришли данные.
+/// </remarks>
+public sealed record ConnectionEvent
+{
+    public required DateTimeOffset Timestamp { get; init; }
+
+    public required ProtocolKind Protocol { get; init; }
+
+    public IPAddress? LocalAddress { get; init; }
+
+    public ushort LocalPort { get; init; }
+
+    public IPAddress? RemoteAddress { get; init; }
+
+    public ushort RemotePort { get; init; }
+
+    /// <summary>
+    /// Полный путь к исполняемому файлу в DOS-нотации (C:\...), если удалось
+    /// преобразовать NT-путь из WFP appId.
+    /// </summary>
+    public string? ExecutablePath { get; init; }
+
+    /// <summary>Имя файла без каталога, в нижнем регистре.</summary>
+    public string? ExecutableName =>
+        ExecutablePath is null ? null : Path.GetFileName(ExecutablePath).ToLowerInvariant();
+
+    /// <summary>
+    /// PID процесса-владельца. WFP в CLASSIFY_ALLOW его не отдаёт, поэтому
+    /// значение восстанавливается сопоставлением с таблицей соединений и
+    /// может отсутствовать, если сокет уже закрылся.
+    /// </summary>
+    public int? ProcessId { get; init; }
+
+    /// <summary>
+    /// Доменное имя назначения, если известно: у наблюдения — из кэша ответов
+    /// DNS (DnsNameCache), у проверок и «куда пойдёт» — то имя, о котором спросили.
+    /// </summary>
+    public string? Hostname { get; init; }
+
+    /// <summary>Направление относительно локальной машины.</summary>
+    public ConnectionDirection Direction { get; init; } = ConnectionDirection.Unknown;
+
+    /// <summary>Соединение на loopback — такие всегда остаются direct.</summary>
+    public bool IsLoopback { get; init; }
+
+    /// <summary>Идентификатор слоя WFP, на котором произошла классификация (диагностика).</summary>
+    public ushort LayerId { get; init; }
+
+    /// <summary>
+    /// Что система на самом деле сделала с соединением.
+    /// </summary>
+    /// <remarks>
+    /// Диспетчер интересует прежде всего разрешённый трафик — только его есть
+    /// смысл куда-то направлять. Но отброшенные соединения тоже стоит показывать:
+    /// это единственный способ отличить «правило не сработало» от «трафика не было».
+    /// </remarks>
+    public ObservedVerdict Verdict { get; init; } = ObservedVerdict.Unknown;
+
+    public string DescribeEndpoint()
+    {
+        var remote = RemoteAddress is null
+            ? "?"
+            : RemoteAddress.AddressFamily == AddressFamily.InterNetworkV6
+                ? $"[{RemoteAddress}]"
+                : RemoteAddress.ToString();
+
+        return $"{remote}:{RemotePort}";
+    }
+
+    /// <summary>
+    /// Соединение из одной строки: имя программы, домен или адрес.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Для вопроса «куда пойдёт это» — человек пишет что угодно, и помнить,
+    /// каким ключом описывается его случай, он не обязан. Перенесено
+    /// из консольной where вместе с отказом от консоли: разбор нужен nz.
+    /// </para>
+    /// <para>
+    /// Порядок проверок важен: <c>discord.com</c> и <c>discord.exe</c>
+    /// различаются только расширением, а <c>1.2.3.4</c> разбирается как адрес
+    /// раньше, чем как домен.
+    /// </para>
+    /// </remarks>
+    public static ConnectionEvent Describe(string target)
+    {
+        var connection = new ConnectionEvent
+        {
+            Timestamp = DateTimeOffset.Now,
+            Protocol = ProtocolKind.Tcp,
+            RemotePort = 443,
+            Direction = ConnectionDirection.Outbound,
+        };
+
+        if (IPAddress.TryParse(target, out var address))
+            return connection with { RemoteAddress = address };
+
+        if (target.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || target.Contains('\\'))
+            return connection with { ExecutablePath = target };
+
+        return connection with { Hostname = target.TrimStart('.').TrimEnd('.') };
+    }
+}
+
+public enum ProtocolKind
+{
+    Unknown = 0,
+    Tcp = 6,
+    Udp = 17,
+    Icmp = 1,
+    IcmpV6 = 58,
+}
+
+public enum ConnectionDirection
+{
+    Unknown = 0,
+    Outbound = 1,
+    Inbound = 2,
+}
+
+/// <summary>Вердикт, который система вынесла соединению.</summary>
+public enum ObservedVerdict
+{
+    Unknown = 0,
+    Allowed = 1,
+    Dropped = 2,
+}

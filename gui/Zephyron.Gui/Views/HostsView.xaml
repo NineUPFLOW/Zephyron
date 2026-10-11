@@ -1,0 +1,264 @@
+<UserControl x:Class="Zephyron.Gui.Views.HostsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:gui="clr-namespace:Zephyron.Gui"
+             Background="{DynamicResource Chrome}">
+
+    <!--
+        Строка одна на оба списка — наш и чужой. Вид у неё один, и держать
+        две копии разметки значило бы чинить каждую правку дважды.
+        Отличается только правая кнопка: у своей записи «снять», у чужой
+        «удалить» — разные действия и разная цена, поэтому и слова разные.
+    -->
+    <UserControl.Resources>
+        <DataTemplate x:Key="PinItem">
+            <Border Style="{StaticResource Card}" Margin="0,0,0,6" Padding="14,11">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Ellipse Grid.Column="0" Width="8" Height="8" Margin="2,0,12,0"
+                             VerticalAlignment="Center" Fill="{Binding Color}" />
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Caption}"
+                                   Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="2" Text="{Binding Note}" Style="{StaticResource Caption}"
+                               VerticalAlignment="Center" Margin="12,0,14,0"
+                               Foreground="{Binding Color}" />
+
+                    <Button Grid.Column="3" Style="{StaticResource Ghost}"
+                            Content="снять" Padding="14,7"
+                            Visibility="{Binding UnpinShown}"
+                            Tag="{Binding Name}" Click="OnUnpin" />
+
+                    <!--
+                        Чужая строка удаляется совсем — решение владельца.
+                        Отменить нажатием нельзя, поэтому спрашиваем перед
+                        правкой и всегда кладём копию файла рядом.
+                    -->
+                    <Button Grid.Column="3" Style="{StaticResource Ghost}"
+                            Content="удалить" Padding="14,7"
+                            Foreground="{DynamicResource Danger}"
+                            Visibility="{Binding ForeignShown}"
+                            Tag="{Binding Line}" Click="OnRemoveForeign" />
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <ScrollViewer Style="{StaticResource PageScroll}" Padding="32,28,32,28">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="470" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0">
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Файл hosts" Style="{StaticResource Title}" />
+                        <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0"
+                                   TextTrimming="CharacterEllipsis"
+                                   Text="Прибитые имена. Запись здесь отменяет любой наш маршрут." />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="OpenButton" Style="{StaticResource Ghost}"
+                                Content="Открыть файл" Click="OnOpen" Margin="0,0,8,0" />
+                        <Button x:Name="CheckButton" Style="{StaticResource Primary}"
+                                Content="Проверить адреса" Click="OnCheck" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- Стёртый защитником файл: сказать до того, как человек решит, что ничего не прибивал. -->
+                <Border x:Name="ReplacedCard" Style="{StaticResource Card}" Margin="0,20,0,0"
+                        BorderBrush="{DynamicResource Danger}" Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock x:Name="ReplacedTitle" FontWeight="SemiBold" Foreground="{DynamicResource Danger}" />
+                        <TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                   Text="Изменённый hosts он считает признаком заражения и вернул файл к своему умолчанию — вместе со всеми пинами. Пин на этой машине не живёт, пока файл не внесён в доверенные в настройках защитника." />
+                    </StackPanel>
+                </Border>
+
+                <!--
+                    Повторы: имя прибито не в первый раз. Windows берёт первую
+                    запись, так что повтор ничего не делает, но в списке ниже
+                    выглядит рабочим. Замер 23.09: 68 повторов, из них 29 —
+                    тот же адрес в блоке ZapretGUI, 39 — ChatGPT на старом
+                    адресе под нашим пином.
+                -->
+                <Border x:Name="RepeatsCard" Style="{StaticResource Card}" Margin="0,20,0,0"
+                        Visibility="Collapsed">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel>
+                            <TextBlock x:Name="RepeatsTitle" FontWeight="SemiBold" />
+                            <TextBlock x:Name="RepeatsText" Style="{StaticResource Caption}"
+                                       TextWrapping="Wrap" Margin="0,6,0,0" />
+                        </StackPanel>
+
+                        <Button Grid.Column="1" x:Name="RepeatsButton" Style="{StaticResource Ghost}"
+                                Content="Убрать повторы" Click="OnRemoveRepeats"
+                                Margin="12,0,0,0" VerticalAlignment="Top" />
+                    </Grid>
+                </Border>
+
+                <!--
+                    Своё имя руками. Отдельно от окна пина, которое подбирает
+                    живой адрес пробами: здесь адрес уже известен — его дали,
+                    подсмотрели или взяли из чужой записи, — и подбирать нечего.
+                -->
+                <Border Style="{StaticResource Card}" Margin="0,20,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Прибить вручную" FontWeight="SemiBold" />
+
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox Grid.Column="0" x:Name="NewName" Margin="0,0,8,0"
+                                     KeyDown="OnNewKey" gui:Hint.Text="Имя, например example.com" />
+
+                            <TextBox Grid.Column="1" x:Name="NewAddress" Width="190" Margin="0,0,8,0"
+                                     KeyDown="OnNewKey" gui:Hint.Text="Адрес, 93.184.216.34" />
+
+                            <Button Grid.Column="2" Style="{StaticResource Primary}"
+                                    Content="Прибить" Click="OnAddPin" />
+                        </Grid>
+
+                        <TextBlock Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap"
+                                   Text="Слева имя, справа адрес: example.com и 93.184.216.34. Запись ложится в наш блок в начале файла — при двух записях на одно имя Windows берёт первую, и дописанная в конец проиграла бы чужой молча." />
+
+                        <TextBlock Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap"
+                                   Text="Пин бьёт любой резолв, включая наш: имя не получит fakeip, и правило «через VPN» на него молча не сработает. Десинк такое имя тоже не тронет." />
+                    </StackPanel>
+                </Border>
+
+                <!--
+                    Поиск: у владельца в файле сто три наши записи и семьсот
+                    восемьдесят две чужие, и глазами такое не перебрать.
+                    Ищет по обоим спискам разом — разделение на своё и чужое
+                    полезно при осмотре, но мешает, когда ищешь одно имя
+                    и не знаешь, чьё оно.
+
+                    С подсказкой внутри поля, как в маршрутах: пустое поле
+                    без неё читается как карточка, поставленная по ошибке.
+                -->
+                <!--
+                    «Удалить найденные» — только при поиске и только отобранное
+                    им. Заведено 26.09: пин на мёртвый прокси стоял на сто двадцать
+                    две записи jetbrains, и снимать их по одной было нельзя.
+                -->
+                <Grid Margin="0,18,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBox x:Name="Search" TextChanged="OnSearch"
+                             gui:Hint.Text="Поиск по имени или адресу" />
+
+                    <Button Grid.Column="1" x:Name="RemoveFoundButton" Style="{StaticResource Ghost}"
+                            Foreground="{DynamicResource Danger}" Margin="8,0,0,0"
+                            Visibility="Collapsed" Click="OnRemoveFound" />
+                </Grid>
+
+                <TextBlock x:Name="Status" Style="{StaticResource Caption}" Margin="4,12,0,0" TextWrapping="Wrap" />
+
+                <!--
+                    Наши и чужие врозь, тем же приёмом, что у пресетов.
+                    За свои мы отвечаем и снимаем их кнопкой; чужие ведёт
+                    кто-то ещё — редактор Zapret GUI, антивирус, рука, — и
+                    удаляются они по одной, с вопросом. Видеть их обязательно:
+                    именно чужой пин на Canva и RuTracker выглядел как неисправный
+                    VPN, и разбор стоил дня.
+                -->
+                <TextBlock x:Name="OursHeader" Text="Прибито нами"
+                           FontWeight="SemiBold" FontSize="15" Margin="4,20,0,4" />
+                <TextBlock x:Name="OursNote" Style="{StaticResource Caption}" Margin="4,0,0,10"
+                           TextWrapping="Wrap"
+                           Text="Эти записи поставила программа, и она же их снимает." />
+
+                <ItemsControl x:Name="Pins" ItemTemplate="{StaticResource PinItem}" />
+
+                <!--
+                    Чужих у людей бывают сотни — на этой машине семьсот
+                    восемьдесят два. Плоским списком их класть нельзя: раздел
+                    целиком лежит в свитке, и на бесконечной высоте
+                    виртуализация выключается сама. Отсюда своя высота
+                    и свой свиток, как у «Порядка вычисления» в маршрутах.
+                -->
+                <Button x:Name="ForeignToggle" Style="{StaticResource Choice}"
+                        Margin="0,22,0,0" Click="OnForeignToggle">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Path x:Name="ForeignChevron" Grid.Column="0"
+                              Style="{StaticResource Chevron}" Margin="0,0,12,0" />
+
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Чужие записи" FontWeight="SemiBold" />
+                            <TextBlock x:Name="ForeignSummary" Style="{StaticResource Caption}"
+                                       Margin="0,5,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                </Button>
+
+                <StackPanel x:Name="ForeignPanel" Visibility="Collapsed" Margin="0,10,0,0">
+                    <ItemsControl x:Name="Foreign" MaxHeight="360"
+                                  ItemTemplate="{StaticResource PinItem}"
+                                  VirtualizingPanel.IsVirtualizing="True"
+                                  VirtualizingPanel.VirtualizationMode="Recycling"
+                                  VirtualizingPanel.ScrollUnit="Pixel">
+                        <ItemsControl.Template>
+                            <ControlTemplate TargetType="ItemsControl">
+                                <ScrollViewer CanContentScroll="True" Focusable="False"
+                                              VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled">
+                                    <ItemsPresenter />
+                                </ScrollViewer>
+                            </ControlTemplate>
+                        </ItemsControl.Template>
+
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+
+                    <TextBlock Style="{StaticResource Caption}" Margin="4,10,0,0" TextWrapping="Wrap"
+                               Text="Удаляются по одной либо разом — всё, что нашёл поиск, кнопкой рядом с ним. Перед удалением вопрос, копия файла ложится рядом. Кнопки «почистить всё» нет намеренно: файл общий, записи ведёт кто-то ещё, и она однажды сотрёт то, на чём всё держалось. Правку вручную никто не отменял — кнопка «Открыть файл» выше." />
+                </StackPanel>
+
+                <TextBlock Style="{StaticResource Caption}" Margin="4,14,0,0" TextWrapping="Wrap"
+                           Text="Имя разрешается до нашего резолвера, fakeip не выдаётся, и адрес берётся из файла. Но маршрут этим не отменяется: имя вынюхивается из рукопожатия, и правило по домену срабатывает всё равно. Чужие записи мы не трогаем — их ведёт кто-то ещё." />
+
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

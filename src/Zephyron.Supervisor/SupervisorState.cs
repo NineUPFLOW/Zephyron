@@ -1,0 +1,151 @@
+using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace Zephyron.Supervisor;
+
+/// <summary>
+/// Снимок состояния для команды <c>status</c>.
+/// </summary>
+/// <remarks>
+/// Пишется на диск, потому что <c>start</c>, <c>status</c> и <c>stop</c> —
+/// три отдельных запуска программы. Другого способа рассказать одному
+/// процессу о состоянии другого без службы Windows или именованного канала нет,
+/// а файл проще и переживает перезагрузку.
+/// </remarks>
+public sealed record SupervisorState
+{
+    public required int SupervisorProcessId { get; init; }
+
+    public required DateTimeOffset StartedAt { get; init; }
+
+    public DateTimeOffset UpdatedAt { get; init; }
+
+    public required IReadOnlyList<ServiceState> Services { get; init; }
+
+    private static readonly JsonSerializerOptions Options = new()
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
+
+    public static string DefaultPath => Path.Combine("runtime", "supervisor.state.json");
+
+    public void Save(string path)
+    {
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory))
+            Directory.CreateDirectory(directory);
+
+        var json = JsonSerializer.Serialize(this with { UpdatedAt = DateTimeOffset.Now }, Options);
+
+        // Запись через временный файл: status может читать состояние ровно
+        // в момент обновления и получить обрезанный JSON.
+        var temporary = path + ".tmp";
+        File.WriteAllText(temporary, json, new UTF8Encoding(false));
+
+        // Замена занятого файла — не редкость, а обычное дело: окно читает
+        // состояние каждые пару секунд, и чтение держит файл без права
+        // на удаление. Windows отвечает на это «Access denied» — не IOException,
+        // а UnauthorizedAccessException. 19.09 он и уронил супервизор, а с ним
+        // движки. Чтение длится миллисекунды, так что короткий повтор
+        // закрывает почти всё; не вышло — решает вызывающий.
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                File.Move(temporary, path, overwrite: true);
+                return;
+            }
+            catch (Exception ex) when (IsBusy(ex) && attempt < 5)
+            {
+                Thread.Sleep(20 * attempt);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Занят ли файл кем-то другим: так Windows отвечает и тем, и другим.
+    /// </summary>
+    public static bool IsBusy(Exception ex) => ex is IOException or UnauthorizedAccessException;
+
+    public static SupervisorState? Load(string path)
+    {
+        if (!File.Exists(path))
+            return null;
+
+        try
+        {
+            // Читающий держит файл, и замена в этот миг получает «Access denied».
+            // Разрешение FileShare.Delete тут не спасает — замерено 23.09:
+            // File.Move с перезаписью открытого файла отказывает и с ним.
+            // Поэтому столкновение переживает пишущий, см. Save.
+            return JsonSerializer.Deserialize<SupervisorState>(File.ReadAllText(path), Options);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    public static void Clear(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch (Exception ex) when (IsBusy(ex))
+        {
+            // Файл состояния — вспомогательный; невозможность удалить не критична.
+        }
+    }
+
+    /// <summary>
+    /// Отвечает ли на DNS Windows наш движок — туннель либо движок только ради DNS.
+    /// </summary>
+    /// <remarks>
+    /// Вопрос «поднят ли туннель» на это не отвечает с 03.10: при одном десинке
+    /// sing-box может работать без выхода, ради DNS (<see cref="Proxy.DnsEngine"/>).
+    /// </remarks>
+    public bool EngineAnswersDns() =>
+        IsSupervisorAlive()
+        && Services.Any(s => s.Name is "sing-box" or Proxy.DnsEngine.ServiceName);
+
+    /// <summary>Жив ли процесс супервизора, записавший это состояние.</summary>
+    public bool IsSupervisorAlive()
+    {
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(SupervisorProcessId);
+            return !process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+}
+
+public sealed record ServiceState
+{
+    public required string Name { get; init; }
+
+    public required ServiceHealth Health { get; init; }
+
+    public int? ProcessId { get; init; }
+
+    public DateTimeOffset? StartedAt { get; init; }
+
+    public int RestartCount { get; init; }
+
+    public string? LastError { get; init; }
+
+    /// <summary>Что стоит знать о работающей службе (SupervisedService.Remark); <c>null</c> — нечего.</summary>
+    public string? Remark { get; init; }
+
+    /// <summary>С какого момента держится нынешнее <see cref="Health"/>; <c>null</c> — неизвестно.</summary>
+    public DateTimeOffset? HealthSince { get; init; }
+}

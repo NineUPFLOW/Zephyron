@@ -1,0 +1,28 @@
+{
+  // «Зефирная» — основная тёмная тема Zephyron и основа для чужих: "base": "dark".
+  // Значения — те же, что в gui/Zephyron.Gui/Theme/Palette.xaml;
+  // расхождение ловит тест ThemeFilesMatchXamlPalettes.
+  "name": "Зефирная",
+  "author": "Zephyron",
+  "colors": {
+    "backdrop": "#17131F",
+    "surface": "#221C2E",
+    "raised": "#2C2439",
+    "border": "#3E3350",
+    "text": "#F4EEFB",
+    "muted": "#BCB0CE",
+    "faint": "#8F85A3",
+    "accent": "#FF8FC0",
+    "accent-dim": "#7A3F63",
+    "danger": "#FF7A8A",
+    "warn": "#FFC978",
+    "accent-fill": "#FF8FC0",
+    "on-accent": "#2A0F1E",
+    "warn-fill": "#FFC978"
+  },
+  "fonts": {
+    "ui": "Comfortaa, Segoe UI",
+    "mono": "Cascadia Mono, Consolas",
+    "display": "Comfortaa, Segoe UI"
+  }
+}

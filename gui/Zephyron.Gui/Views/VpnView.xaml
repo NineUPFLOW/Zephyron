@@ -1,0 +1,588 @@
+<UserControl x:Class="Zephyron.Gui.Views.VpnView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:gui="clr-namespace:Zephyron.Gui"
+             Background="{DynamicResource Chrome}"
+             Focusable="True" FocusVisualStyle="{x:Null}"
+             PreviewKeyDown="OnPreviewKeyDown">
+
+    <ScrollViewer Style="{StaticResource PageScroll}" Padding="32,28,32,28">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="470" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0">
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="VPN" Style="{StaticResource Title}" TextWrapping="Wrap" />
+                        <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0"
+                                   TextWrapping="Wrap"
+                                   Text="Подписки, их серверы и то, через что идёт трафик." />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="RefreshButton" Style="{StaticResource Ghost}"
+                                Content="Обновить" Click="OnRefresh" Margin="0,0,8,0" />
+                        <!--
+                            Настройки — отдельным окном. То, что задают
+                            однажды, не должно занимать полосу над списком,
+                            который смотрят каждый раз.
+                        -->
+                        <Button x:Name="SettingsButton" Style="{StaticResource Ghost}"
+                                Content="Настройки" Click="OnSettings" Margin="0,0,8,0"
+                                ToolTip="Режим, автоподбор по зарубежным, обход туннеля при мёртвых выходах, проверка серверов." />
+
+                        <Button x:Name="MeasureButton" Style="{StaticResource Primary}"
+                                Content="Замерить все" Click="OnMeasure" />
+                    </StackPanel>
+                </Grid>
+
+                <!--
+                    Первый ряд — по макету владельца 01.10: слева выход, через
+                    который идёт трафик, с главными цифрами, справа — недавние
+                    серверы. Прежде выход был одной строкой подписи, а цифры
+                    приходилось собирать по списку.
+                -->
+                <Grid Margin="0,22,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MinWidth="360" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="290" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Style="{StaticResource Card}" Padding="22,20">
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0" x:Name="CurrentFlag" Width="76" Height="54" CornerRadius="10"
+                                        Margin="0,0,20,0" VerticalAlignment="Center"
+                                        Background="{DynamicResource Raised}">
+                                    <Grid>
+                                        <TextBlock x:Name="CurrentCountry" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   FontWeight="SemiBold" FontSize="17" Foreground="{DynamicResource Muted}" />
+                                        <!-- У WARP флага нет — облачко (владелец, 01.10). -->
+                                        <TextBlock x:Name="CurrentCloud" Style="{StaticResource TileGlyph}" Text="&#xE753;"
+                                                   FontSize="28" Foreground="#F38020" Visibility="Collapsed" />
+                                    </Grid>
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock x:Name="CurrentCaption" Style="{StaticResource Caption}" />
+
+                                    <!-- Сетка, а не стопка: в стопке обрезание длинного имени не срабатывает. -->
+                                    <Grid Margin="0,3,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0" x:Name="CurrentName" FontSize="22" FontWeight="SemiBold"
+                                                   MaxWidth="440" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+
+                                        <Border Grid.Column="1" x:Name="CurrentSourcePill" CornerRadius="7" Padding="8,2"
+                                                Margin="12,0,0,0" BorderThickness="1" VerticalAlignment="Center"
+                                                BorderBrush="{DynamicResource Accent}" Visibility="Collapsed">
+                                            <TextBlock x:Name="CurrentSource" FontSize="12" Foreground="{DynamicResource Accent}" />
+                                        </Border>
+                                    </Grid>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
+                                        <Ellipse x:Name="CurrentDot" Width="8" Height="8" VerticalAlignment="Center" />
+                                        <TextBlock x:Name="CurrentState" Margin="7,0,0,0" VerticalAlignment="Center"
+                                                   FontWeight="SemiBold" FontSize="13" />
+                                    </StackPanel>
+
+                                    <TextBlock x:Name="CurrentDetail" Style="{StaticResource Caption}" Margin="0,4,0,0"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Border Height="1" Background="{DynamicResource Border}" Margin="0,16,0,14" />
+
+                            <!-- Цифры выхода: задержка, протокол, реализация, откуда он. -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE916;" Margin="0,0,10,0" />
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource Caption}" Text="Задержка" />
+                                        <TextBlock x:Name="StatLatency" Style="{StaticResource Mono}" Margin="0,3,0,0"
+                                                   Foreground="{DynamicResource Accent}" Text="—" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE71B;" Margin="0,0,10,0" />
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource Caption}" Text="Протокол" />
+                                        <TextBlock x:Name="StatProtocol" Margin="0,3,0,0" Text="—"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE943;" Margin="0,0,10,0" />
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource Caption}" Text="Реализация" />
+                                        <TextBlock x:Name="StatKind" Margin="0,3,0,0" Text="—" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="3" Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE8B7;" Margin="0,0,10,0" />
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource Caption}" Text="Источник" />
+                                        <TextBlock x:Name="StatSource" Margin="0,3,0,0" Text="—"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!--
+                        Недавние серверы — через которые шёл трафик, свежие первыми
+                        (ExitHistory: пишется, когда программа спрашивает движок о выходе).
+                    -->
+                    <Border Grid.Column="2" Style="{StaticResource Card}" Padding="18,16">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Недавние серверы" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
+                                                Content="Выходы, через которые недавно шёл трафик, — свежие первыми. Замечаются, пока программа открыта: смену при закрытом окне журнал увидит, когда окно спросит движок снова.&#x0a;&#x0a;Задержка и цвет — по последнему замеру сервера." />
+                            </StackPanel>
+
+                            <ItemsControl x:Name="RecentList" Margin="0,10,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,0,0,9">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <Grid Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
+                                                <Border CornerRadius="3" ClipToBounds="True" Visibility="{Binding FlagShown}"
+                                                        BorderBrush="{DynamicResource Border}" BorderThickness="1">
+                                                    <Image Source="{Binding Flag}" Width="24" Height="16" Stretch="UniformToFill"
+                                                           RenderOptions.BitmapScalingMode="HighQuality" />
+                                                </Border>
+                                                <TextBlock Text="{Binding Mark}" FontFamily="{Binding MarkFont}" FontSize="{Binding MarkSize}"
+                                                           FontWeight="SemiBold" Foreground="{Binding MarkBrush}" Width="24"
+                                                           TextAlignment="Center" VerticalAlignment="Center"
+                                                           Visibility="{Binding MarkShown}" />
+                                            </Grid>
+
+                                            <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center" FontWeight="{Binding Weight}" />
+
+                                            <TextBlock Grid.Column="2" Text="{Binding Latency}" Style="{StaticResource Mono}"
+                                                       Margin="8,0,10,0" VerticalAlignment="Center" />
+
+                                            <Ellipse Grid.Column="3" Width="7" Height="7" Fill="{Binding Color}"
+                                                     VerticalAlignment="Center" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock x:Name="RecentEmpty" Style="{StaticResource Caption}" TextWrapping="Wrap"
+                                       Margin="0,10,0,0" Visibility="Collapsed"
+                                       Text="Пока пусто: журнал заполняется, пока движки работают и окно открыто." />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!--
+                    Быстрая смена сервера (макет владельца 01.10) — заменила карточку
+                    «Автоподбор»: автоподбор теперь первая плитка ленты, а его
+                    пояснение — строкой под заголовком. Выбрать плитку — то же,
+                    что «выбрать» у сервера в списке.
+                -->
+                <Border x:Name="QuickCard" Style="{StaticResource Card}" Margin="0,12,0,0" Padding="18,16">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Быстрая смена сервера" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
+                                                    Content="«Авто» — автоподбор: движок сам опрашивает серверы и берёт быстрейший из живых. Мёртвый выход не выбирается.&#x0a;&#x0a;Плитка сервера закрепляет его — автоподбор выключится. Закреплённый держится, даже если перестанет отвечать, — пока в «Настройках» не включена «Замена выбранному серверу».&#x0a;&#x0a;Здесь серверы подписок в работе, быстрые первыми. Все — в списке подписок ниже." />
+                                </StackPanel>
+                                <TextBlock x:Name="PickLine" Style="{StaticResource Caption}" Margin="0,5,0,0" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+
+                            <Button Grid.Column="1" x:Name="ShowAllButton" Style="{StaticResource Ghost}"
+                                    Content="Показать все" Click="OnShowAll" VerticalAlignment="Top" />
+                        </Grid>
+
+                        <Grid Margin="0,14,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Button Grid.Column="0" Style="{StaticResource IconGhost}" Content="&#xE76B;"
+                                    VerticalAlignment="Center" ToolTip="Назад" Click="OnQuickLeft" />
+
+                            <ScrollViewer Grid.Column="1" x:Name="QuickScroll" Margin="8,0"
+                                          HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                                          PreviewMouseWheel="OnQuickWheel">
+                                <ItemsControl x:Name="QuickServers">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Style="{StaticResource Choice}" Width="116" Margin="0,0,8,0" Padding="8,12"
+                                                    BorderBrush="{Binding Edge}" Background="{Binding Fill}"
+                                                    ToolTip="{Binding Tip}" Tag="{Binding Tag}" Click="OnQuick">
+                                                <StackPanel HorizontalAlignment="Center">
+                                                    <Grid Height="22" HorizontalAlignment="Center">
+                                                        <Border CornerRadius="3" ClipToBounds="True" Visibility="{Binding FlagShown}"
+                                                                BorderBrush="{DynamicResource Border}" BorderThickness="1">
+                                                            <Image Source="{Binding Flag}" Width="32" Height="22" Stretch="UniformToFill"
+                                                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                                                        </Border>
+                                                        <TextBlock Text="{Binding Mark}" FontFamily="{Binding MarkFont}" FontSize="16"
+                                                                   FontWeight="SemiBold" Foreground="{DynamicResource Muted}"
+                                                                   VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                                   Visibility="{Binding MarkShown}" />
+                                                    </Grid>
+
+                                                    <TextBlock Text="{Binding Title}" Margin="0,8,0,0" FontWeight="SemiBold"
+                                                               TextAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Latency}" Style="{StaticResource Mono}" Margin="0,3,0,0"
+                                                               TextAlignment="Center" Foreground="{Binding Color}" />
+                                                </StackPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+
+                            <Button Grid.Column="2" Style="{StaticResource IconGhost}" Content="&#xE76C;"
+                                    VerticalAlignment="Center" ToolTip="Дальше" Click="OnQuickRight" />
+                        </Grid>
+
+                        <Border Height="1" Background="{DynamicResource Border}" Margin="0,14,0,12" />
+
+                        <!--
+                            Отбор для автоподбора — здесь, а не в окне настроек
+                            (владелец, 01.10): он про те же серверы, что в ленте.
+                        -->
+                        <WrapPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,32,4">
+                                <ToggleButton x:Name="ForeignSwitch" Style="{StaticResource Switch}"
+                                              VerticalAlignment="Center" Click="OnForeign" />
+                                <TextBlock Text="Только зарубежные" Margin="10,0,0,0" VerticalAlignment="Center" />
+                                <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
+                                                Content="Автоподбор не берёт отечественные выходы. Подбор идёт по задержке и потому сползает на ближайший сервер — свой же, а через него не работает ровно то, ради чего туннель обычно и нужен: адрес остаётся отечественным, и отказ по стране приходит тот же, что без туннеля.&#x0a;&#x0a;Выбрать отечественный плиткой или в списке это не мешает. Применяется при следующем запуске движков." />
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <ToggleButton x:Name="StableSwitch" Style="{StaticResource Switch}"
+                                              VerticalAlignment="Center" Click="OnStable" />
+                                <TextBlock Text="Сначала стабильные" Margin="10,0,0,0" VerticalAlignment="Center" />
+                                <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
+                                                Content="Нестабильные — серверы, что работают через раз: из последних пяти и больше замеров удачных меньше четырёх из пяти. Они жёлтые в списке.&#x0a;&#x0a;Включено — автоподбор их не берёт, а в ленте и при сортировке по задержке они идут после стабильных. Выключено — только по задержке, как все.&#x0a;&#x0a;Выбрать нестабильный руками можно всегда. Автоподбор меняется при следующем запуске движков." />
+                            </StackPanel>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+
+                <!--
+                    WARP — выбор пути, а не запасной (владелец, 01.10: «разводка
+                    впн и варп… лучше сделать взаимоисключающими»). Включён — туннель
+                    идёт только через WARP, подписки на паузе; выключен — только
+                    подписки. Выключатель вернулся сюда из окна настроек.
+                -->
+                <Border x:Name="WarpCard" Style="{StaticResource Card}" Margin="0,12,0,0" Padding="18,16">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Style="{StaticResource IconTile}" VerticalAlignment="Center" Margin="0,0,14,0">
+                            <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE753;" Foreground="#F38020" />
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Cloudflare WARP" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
+                                                Content="Бесплатный выход Cloudflare: без счёта, без срока, без почты и ключей — учётную запись движок заводит себе сам.&#x0a;&#x0a;Это выбор пути: включённый WARP ставит подписки на паузу, и весь туннель идёт через него. Выключили — туннель вернётся к подпискам и к выбранному там серверу. Применяется при следующем запуске движков.&#x0a;&#x0a;Выпускает трафик в ближайшем городе Cloudflare, из России — в Москве. От блокировок оператора спасает, от отказов по стране — нет: адрес остаётся отечественным.&#x0a;&#x0a;Идёт по MASQUE поверх HTTP/2 на 443 порту. После запуска ему нужно около полуминуты, прежде чем пойдёт трафик." />
+                            </StackPanel>
+                            <TextBlock x:Name="WarpLine" Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <!--
+                                Замер пинга — значком, как у подписок (владелец, 01.10).
+                                Меряет движок, а он знает WARP, только когда тот в конфиге.
+                            -->
+                            <Button x:Name="WarpCheckButton" Style="{StaticResource IconGhost}" Content="&#xEC4A;"
+                                    Margin="0,0,14,0" Click="OnCheckWarp" ToolTipService.ShowOnDisabled="True" />
+
+                            <Ellipse x:Name="WarpDot" Width="8" Height="8" Margin="0,0,7,0" VerticalAlignment="Center" />
+                            <TextBlock x:Name="WarpWord" Style="{StaticResource Caption}" Margin="0,0,12,0" VerticalAlignment="Center" />
+                            <ToggleButton x:Name="WarpSwitch" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="OnWarp" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Подписки: заголовок со сводкой, добавление — по кнопке (макет 01.10). -->
+                <Grid Margin="4,24,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="Подписки" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+
+                    <Border Grid.Column="1" CornerRadius="10" Padding="10,3" Margin="12,0,0,0" VerticalAlignment="Center"
+                            Background="{DynamicResource Raised}" BorderBrush="{DynamicResource Border}" BorderThickness="1">
+                        <TextBlock x:Name="SubsSummary" FontSize="12" Foreground="{DynamicResource Muted}" Text="…" />
+                    </Border>
+
+                    <StackPanel Grid.Column="3" Orientation="Horizontal">
+                        <Button x:Name="SortButton" Style="{StaticResource Ghost}"
+                                Content="По задержке" Click="OnSort" Margin="0,0,8,0" />
+                        <Button x:Name="AddToggle" Style="{StaticResource Ghost}"
+                                Content="Добавить подписку" Click="OnAddToggle" />
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock x:Name="PausedLine" Style="{StaticResource Caption}" Margin="4,8,0,0" TextWrapping="Wrap"
+                           Foreground="{DynamicResource Warn}" Visibility="Collapsed"
+                           Text="На паузе: туннель идёт через WARP. Выключите WARP выше — и он вернётся к подпискам." />
+
+                <!--
+                    Новая подписка — отдельным окном (SubscriptionAddWindow,
+                    владелец 01.10: «как в Happ»). До того здесь стояла
+                    карточка с одним полем на всё.
+                -->
+
+                <TextBlock x:Name="Status" Margin="4,10,0,0" TextWrapping="Wrap" Text="Читаю подписки…">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource Caption}">
+                            <Style.Triggers>
+                                <Trigger Property="Text" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <!--
+                    Полоса замера. Замер идёт десятками секунд и до неё
+                    выглядел зависанием: строки оживали по одной, а понять,
+                    идёт ли ещё что-то, было не по чему.
+                -->
+                <ProgressBar x:Name="Progress" Height="6" Margin="4,10,0,0"
+                             Visibility="Collapsed" Minimum="0"
+                             Background="{DynamicResource Border}"
+                             Foreground="{DynamicResource Accent}"
+                             BorderThickness="0" />
+
+                <ItemsControl x:Name="Subscriptions" Margin="0,10,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,0,0,10">
+
+                                <!-- Папка подписки. Свёрнутая, но со всеми цифрами в заголовке. -->
+                                <Button Style="{StaticResource Choice}" BorderBrush="{Binding Edge}"
+                                        Margin="0" Click="OnFolder">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Path Grid.Column="0" Style="{StaticResource Chevron}"
+                                              Margin="5,0,6,0">
+                                            <Path.RenderTransform>
+                                                <RotateTransform Angle="{Binding ChevronAngle}" />
+                                            </Path.RenderTransform>
+                                        </Path>
+
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <!--
+                                                Сетка, а не стопка: в горизонтальной
+                                                стопке ширина считается бесконечной,
+                                                и обрезание длинного имени
+                                                не срабатывает — оно лезет
+                                                на соседнюю подпись.
+                                            -->
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <TextBlock Grid.Column="0" Text="{Binding Name}"
+                                                           FontWeight="SemiBold" FontSize="14"
+                                                           TextTrimming="CharacterEllipsis" />
+
+                                                <TextBlock Grid.Column="1" Text="в работе" Style="{StaticResource Mono}"
+                                                           Foreground="{DynamicResource Accent}"
+                                                           Margin="10,0,0,0" VerticalAlignment="Center"
+                                                           Visibility="{Binding ActiveShown}" />
+                                            </Grid>
+
+                                            <TextBlock Text="{Binding Detail}" Style="{StaticResource Caption}"
+                                                       Margin="0,5,0,0" TextWrapping="Wrap" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                            <!--
+                                                Выключатель «в работе» вместо «сделать действующей»
+                                                (0.9.0, пул): подписок в работе может быть сколько
+                                                угодно, их серверы идут в один автоподбор.
+                                            -->
+                                            <ToggleButton Style="{StaticResource Switch}" Margin="0,0,14,0"
+                                                          VerticalAlignment="Center"
+                                                          IsChecked="{Binding Active, Mode=OneWay}"
+                                                          ToolTip="В работе: серверы этой подписки идут в пул движка"
+                                                          Tag="{Binding Name}" Click="OnActivate" />
+
+                                            <!--
+                                                Значками, как в Happ (владелец, 28.09): обновить,
+                                                тест пинга и меню со всем остальным. Подписи —
+                                                во всплывающих подсказках.
+                                            -->
+                                            <Button Style="{StaticResource IconGhost}" Content="&#xE72C;"
+                                                    Margin="0,0,6,0" ToolTip="Обновить: перечитать подписку"
+                                                    Tag="{Binding Name}" Click="OnRefreshOne" />
+
+                                            <Button Style="{StaticResource IconGhost}" Content="&#xEC4A;"
+                                                    Margin="0,0,6,0" ToolTip="{Binding CheckLabel}"
+                                                    IsEnabled="{Binding CanCheck}"
+                                                    Tag="{Binding Name}" Click="OnCheckOne" />
+                                        </StackPanel>
+
+                                        <Button Grid.Column="3" Style="{StaticResource IconGhost}" Content="&#xE712;"
+                                                ToolTip="Ещё: закрепить, скопировать ссылку, изменить, удалить"
+                                                Tag="{Binding Name}" Click="OnMore" />
+                                    </Grid>
+                                </Button>
+
+                                <ItemsControl ItemsSource="{Binding Servers}"
+                                              Visibility="{Binding ServersShown}"
+                                              Margin="20,8,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource Card}" Margin="0,0,0,6" Padding="14,11"
+                                                    ToolTip="Правый щелчок — убрать из автоподбора или вернуть">
+                                                <!--
+                                                    Убрать сервер из автоподбора (владелец 29.09: ОБС у SecureWay
+                                                    отвечают через раз на домашней сети). Выбрать руками — можно.
+                                                -->
+                                                <Border.ContextMenu>
+                                                    <ContextMenu>
+                                                        <MenuItem Header="{Binding AutoPickLabel}" Tag="{Binding Tag}" Click="OnAutoPickToggle" />
+                                                    </ContextMenu>
+                                                </Border.ContextMenu>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <Ellipse Grid.Column="0" Width="8" Height="8" Margin="2,0,12,0"
+                                                             VerticalAlignment="Center" Fill="{Binding Color}" />
+
+                                                    <!--
+                                                        Флаг картинкой, а если такой нет — буквы кода.
+                                                        Windows флаги стран не рисует вовсе: в Segoe UI
+                                                        Emoji их нет, и пара региональных букв выходит
+                                                        как «de», влипшее в название.
+                                                    -->
+                                                    <Grid Grid.Column="1" Margin="0,0,12,0" VerticalAlignment="Center">
+                                                        <Border CornerRadius="3" ClipToBounds="True"
+                                                                BorderBrush="{DynamicResource Border}" BorderThickness="1"
+                                                                Visibility="{Binding FlagShown}">
+                                                            <Image Source="{Binding Flag}" Width="26" Height="18"
+                                                                   Stretch="UniformToFill"
+                                                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                                                        </Border>
+
+                                                        <Border Background="{DynamicResource Raised}"
+                                                                BorderBrush="{DynamicResource Border}" BorderThickness="1"
+                                                                CornerRadius="5" Padding="7,3"
+                                                                Visibility="{Binding CountryShown}">
+                                                            <TextBlock Text="{Binding Country}" FontSize="11" FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource Muted}" />
+                                                        </Border>
+                                                    </Grid>
+
+                                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Caption}"
+                                                                   Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+
+                                                    <TextBlock Grid.Column="3" Text="{Binding Latency}" Style="{StaticResource Mono}"
+                                                               VerticalAlignment="Center" Margin="12,0,14,0"
+                                                               TextAlignment="Right" MinWidth="86"
+                                                               Foreground="{Binding Color}" />
+
+                                                    <Button Grid.Column="4" Style="{StaticResource Ghost}"
+                                                            Content="{Binding ChooseLabel}" Padding="14,7"
+                                                            IsEnabled="{Binding CanChoose}"
+                                                            Tag="{Binding Tag}" Click="OnChoose" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Style="{StaticResource Caption}" Margin="4,10,0,0" TextWrapping="Wrap"
+                           Text="Движок берёт серверы всех подписок «в работе» и отдельных ключей, а автоподбор — быстрейший из живых. Замер поднимает движок с локальным входом и ходит через каждый сервер по очереди — TUN не трогается, работающий обход не прерывается." />
+
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

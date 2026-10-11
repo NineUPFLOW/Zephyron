@@ -1,0 +1,10 @@
+# Claude — сайт.
+#
+# Вторым anthropic.com, а не claude.com: второй перенаправляет на claude.ai
+# и в отчёте дублировал первую строку, тогда как anthropic.com — это API
+# и документация, и ломается он отдельно.
+#
+# Содержимое (claudeusercontent.com) — своей частью, в claude-content.txt.
+claude.ai
+anthropic.com
+claude.com

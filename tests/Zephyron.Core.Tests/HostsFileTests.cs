@@ -1,0 +1,246 @@
+using System.Net;
+using Zephyron.Core.Rules;
+using Zephyron.Proxy;
+using Xunit;
+
+namespace Zephyron.Core.Tests;
+
+/// <summary>
+/// hosts бьёт любой резолв, включая наш, и молча отменяет правила
+/// <c>mode: proxy</c>. Так пропали Canva, RuTracker и LinkedIn.
+/// </summary>
+public sealed class HostsFileTests : IDisposable
+{
+    private readonly string _path = Path.Combine(
+        Path.GetTempPath(),
+        $"zephyron-hosts-{Guid.NewGuid():N}.txt");
+
+    public void Dispose()
+    {
+        if (File.Exists(_path))
+            File.Delete(_path);
+    }
+
+    private void Write(string content) => File.WriteAllText(_path, content);
+
+    [Fact]
+    public void ReadsAddressesAndSkipsComments()
+    {
+        Write("""
+            # комментарий
+            104.21.32.39    rutracker.org www.rutracker.org
+            72.56.93.144 canva.com   # хвостовой комментарий
+            """);
+
+        var hosts = HostsFile.Read(_path);
+
+        Assert.Equal(IPAddress.Parse("104.21.32.39"), hosts["rutracker.org"][0]);
+        Assert.Equal(IPAddress.Parse("104.21.32.39"), hosts["www.rutracker.org"][0]);
+        Assert.Equal(IPAddress.Parse("72.56.93.144"), hosts["canva.com"][0]);
+    }
+
+    [Fact]
+    public void MissingFileIsNotAnError()
+    {
+        // Ради чтения hosts запуск останавливать незачем.
+        Assert.Empty(HostsFile.Read(Path.Combine(Path.GetTempPath(), "нет-такого-файла")));
+    }
+
+    [Fact]
+    public void BlockingEntriesAreNotCaptured()
+    {
+        // 127.0.0.1 и 0.0.0.0 ставят, чтобы имя не открывалось вовсе.
+        // Заводить такое в туннель бессмысленно, а 127.0.0.1 в маршрутах
+        // TUN и вредно: петлю машины понесло бы к sing-box.
+        //
+        // Прежде это проверялось на FindPinned, которую звала только
+        // консоль; окно собирает адреса CollectPinnedProxyAddresses, и её
+        // эта проверка не касалась вовсе.
+        Write("""
+            127.0.0.1 canva.com
+            0.0.0.0 rutracker.org
+            """);
+
+        var engine = RuleSetLoader.Load("""
+            mode: selective
+            rules:
+              - match: domain
+                value: "*.canva.com"
+                mode: proxy
+              - match: domain
+                value: "*.rutracker.org"
+                mode: proxy
+            """);
+
+        Assert.Empty(HostsFile.CollectPinnedProxyAddresses(engine.RuleSet, out _, _path));
+    }
+
+    [Fact]
+    public void PinnedProxyDomainsAreCollectedWithAnExplanation()
+    {
+        Write("72.56.93.144 canva.com");
+
+        var engine = RuleSetLoader.Load("""
+            mode: selective
+            rules:
+              - match: domain
+                value: "*.canva.com"
+                mode: proxy
+              - match: domain
+                value: "*.youtube.com"
+                mode: desync
+            """);
+
+        var found = HostsFile.CollectPinnedProxyAddresses(engine.RuleSet, out var notes, _path);
+
+        Assert.Equal("72.56.93.144/32", Assert.Single(found));
+        Assert.Contains("canva.com", Assert.Single(notes));
+    }
+
+    /// <summary>
+    /// Общий адрес пина: имена отдаются только те, что стоят на VPN.
+    /// </summary>
+    /// <remarks>
+    /// 23.09: все имена Claude прибиты к посреднику 87.228.47.204, на VPN
+    /// из них одно downloads.claude.ai. Туннелю нужно знать именно его —
+    /// иначе он увозит по адресу весь Claude, стоящий «напрямую».
+    /// </remarks>
+    [Fact]
+    public void ASharedPinnedAddressNamesOnlyTheProxyName()
+    {
+        Write("""
+            87.228.47.204 claude.ai
+            87.228.47.204 api.anthropic.com
+            87.228.47.204 downloads.claude.ai
+            """);
+
+        var engine = RuleSetLoader.Load("""
+            mode: selective
+            rules:
+              - match: domain
+                value: "*.downloads.claude.ai"
+                mode: proxy
+              - match: domain
+                value: "*.claude.ai"
+                mode: direct
+              - match: domain
+                value: "*.anthropic.com"
+                mode: direct
+            """);
+
+        var pinned = HostsFile.CollectPinnedProxy(engine.RuleSet, out _, _path);
+
+        Assert.Equal("87.228.47.204/32", Assert.Single(pinned.Addresses));
+        Assert.Equal("downloads.claude.ai", Assert.Single(pinned.Names));
+    }
+
+    /// <summary>Списочное правило учитывается наравне с доменным.</summary>
+    /// <remarks>
+    /// Пока учитывались только доменные, это молча не работало для всего,
+    /// что назначено через раздел сервисов, — а он пишет именно hostlist.
+    /// Так и вышло с ChatGPT: правило говорило «через VPN», в hosts все его
+    /// имена были прибиты к давно умолкшему адресу, и трафик уходил туда
+    /// мимо туннеля. Со стороны — блокировка, которую ничем не пробить.
+    /// </remarks>
+    [Fact]
+    public void PinnedDomainsOfAHostListRuleAreCollectedToo()
+    {
+        Write("72.56.93.144 chatgpt.com");
+
+        var engine = RuleSetLoader.Load("""
+            mode: selective
+            rules:
+              - match: hostlist
+                value: "lists/chatgpt.txt"
+                mode: proxy
+            """);
+
+        // Список обычно загружает разворачиватель правил; здесь он подан
+        // напрямую, чтобы проверка не зависела от установленного Zapret.
+        engine.RuleSet.Rules[0].LoadHostList(["chatgpt.com", "openai.com"]);
+
+        var found = HostsFile.CollectPinnedProxyAddresses(engine.RuleSet, out var notes, _path);
+
+        Assert.Equal("72.56.93.144/32", Assert.Single(found));
+        Assert.Contains("chatgpt.com", Assert.Single(notes));
+    }
+
+    /// <summary>Перекрытое правило в туннель никого не заводит.</summary>
+    /// <remarks>
+    /// <para>
+    /// Правила разбираются по порядку, и решает первое совпавшее. Прежде
+    /// здесь перебирались все правила с <c>mode: proxy</c> подряд, без вопроса,
+    /// какое из них выигрывает, — и перекрытое, недействующее правило всё
+    /// равно уводило прибитый адрес в туннель.
+    /// </para>
+    /// <para>
+    /// Стоило это работающего сервиса. У ChatGPT пин на живой прокси был снизу
+    /// перекрыт пользовательским «напрямую», а сверху оставалось поставляемое
+    /// «через VPN». С остановленной программой сайт открывался, с запущенной
+    /// умирал сразу: адрес заводился в туннель по правилу, которого движок
+    /// даже не смотрит.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void AShadowedProxyRuleDoesNotCapture()
+    {
+        Write("87.228.47.204 chatgpt.com");
+
+        var engine = RuleSetLoader.Load("""
+            mode: selective
+            rules:
+              - match: domain
+                value: "chatgpt.com"
+                mode: direct
+              - match: domain
+                value: "*.chatgpt.com"
+                mode: proxy
+            """);
+
+        var found = HostsFile.CollectPinnedProxyAddresses(engine.RuleSet, out var notes, _path);
+
+        Assert.Empty(found);
+        Assert.Empty(notes);
+    }
+
+    /// <summary>А действующее — заводит.</summary>
+    /// <remarks>Тот же файл и те же правила, переставленные местами.</remarks>
+    [Fact]
+    public void TheWinningProxyRuleStillCaptures()
+    {
+        Write("87.228.47.204 chatgpt.com");
+
+        var engine = RuleSetLoader.Load("""
+            mode: selective
+            rules:
+              - match: domain
+                value: "*.chatgpt.com"
+                mode: proxy
+              - match: domain
+                value: "chatgpt.com"
+                mode: direct
+            """);
+
+        var found = HostsFile.CollectPinnedProxyAddresses(engine.RuleSet, out _, _path);
+
+        Assert.Equal("87.228.47.204/32", Assert.Single(found));
+    }
+
+    [Fact]
+    public void DesyncDomainsAreLeftAlone()
+    {
+        // Записи для десинка ставит редактор hosts из Zapret GUI, и уводить
+        // их в туннель значило бы сломать то, что работает.
+        Write("142.250.1.1 youtube.com");
+
+        var engine = RuleSetLoader.Load("""
+            mode: selective
+            rules:
+              - match: domain
+                value: "*.youtube.com"
+                mode: desync
+            """);
+
+        Assert.Empty(HostsFile.CollectPinnedProxyAddresses(engine.RuleSet, out _, _path));
+    }
+}

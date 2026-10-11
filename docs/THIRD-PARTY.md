@@ -1,0 +1,288 @@
+# Что входит в состав
+
+Zephyron не работает сам по себе: он управляет двумя чужими движками. В готовый
+архив они входят целиком, чтобы после распаковки ничего не приходилось доставлять.
+Ниже — что именно, откуда и на каких условиях.
+
+Ниже не юридическая консультация. Это сведения, собранные из файлов лицензий
+и метаданных самих бинарников, чтобы было с чего начинать разбор.
+
+| Что | Лицензия | Текст в комплекте |
+| --- | --- | --- |
+| sing-box | GPL v3 или новее | `engines/sing-box/LICENSE` |
+| wintun.dll | проприетарная, © WireGuard LLC | см. wintun.net |
+| Zapret 2 (winws2 и его библиотека lua; winws2 — родная сборка loop-uh, с 07.10) | MIT, © 2016–2024 bol-van | `engines/zapret/LICENSE.txt` |
+| Zapret GUI (сценарии lua, списки, пресеты, каталог адресов) | MIT, © 2025–2026 censorliber; автор — loop-uh | `engines/zapret/LICENSE-ZapretGUI.txt` |
+| zapret-discord-youtube (game filter, список ipset-all) | MIT, © 2024–2026 Flowseal, © 2016–2026 bol-van | `engines/zapret/LICENSE-Flowseal.txt` |
+| tg-ws-proxy-rs (прокси вкладки «TG Proxy», с 07.10) — порт tg-ws-proxy Flowseal | MIT, © 2026 valnesfjord; MIT, © 2026 Flowseal | `engines/tg-ws-proxy/LICENSE`, `engines/tg-ws-proxy/LICENSE-Flowseal-tg-ws-proxy.txt` |
+| WinDivert | LGPL v3 либо GPL v3 | см. reqrypt.org |
+| ZXing.Net (чтение QR-кодов с ключами, с 01.10) | Apache-2.0, Michael Jahn | `LICENSE-ZXing.Net.txt` |
+
+## Как это соотносится с лицензией самого Zephyron
+
+Zephyron **запускает движки отдельными процессами** и общается с ними через
+командную строку и HTTP-интерфейс Clash API. Он не линкуется с их кодом и не
+включает его в себя.
+
+GPLv3 прямо оговаривает такой случай: объединение независимых программ на одном
+носителе — «простая агрегация», и она не распространяет условия GPL на остальное
+содержимое носителя. Поэтому присутствие GPL-движков в архиве само по себе
+не обязывает лицензировать Zephyron под GPL.
+
+Из этого следуют три обязанности на каждый GPL/LGPL-файл в составе:
+
+1. приложить текст лицензии;
+2. обеспечить доступ к исходному коду — для неизменённых бинарников, взятых
+   с публичного сервера, GPLv3 §6 разрешает сослаться на тот же сервер;
+3. не убирать уведомления об авторстве и не изменять бинарники молча.
+
+Ничего из этого мы не нарушаем: движки берутся как есть и не правятся.
+
+## sing-box
+
+`engines/sing-box/sing-box.exe` — **изменённая сборка**, называющая себя
+`1.14.1-extended-2.7.2`. Берётся готовым двоичным файлом из выпусков
+[github.com/shtorm-7/sing-box-extended](https://github.com/shtorm-7/sing-box-extended).
+Она, в свою очередь, основана на
+[github.com/SagerNet/sing-box](https://github.com/SagerNet/sing-box)
+© 2022 nekohasekai.
+
+Отличается от исходной поддержкой транспорта `xhttp` и рядом протоколов,
+которых нет в основной ветке: WireGuard, MASQUE, MTProto, Tailscale. Мы её
+не собираем и не правим.
+
+**GNU GPL v3 или новее.** Текст — в `engines/sing-box/LICENSE`, он едет вместе
+с движком. Лицензия требует назвать источник именно изменённой сборки, а не
+только исходный проект: исходный код этой сборки лежит в репозитории форка,
+ссылка на который приведена выше.
+
+## wintun.dll
+
+`engines/sing-box/wintun.dll`, версия 0.14.1, © 2018–2021 WireGuard LLC —
+драйвер туннельного адаптера, [wintun.net](https://www.wintun.net/).
+Поставляется в составе релиза sing-box. Без него туннель не поднимается.
+
+**Лицензия проприетарная, не GPL** — «Prebuilt Binaries License». Существенны
+два пункта:
+
+* распространять его отдельно нельзя, но разрешено «в составе другого
+  программного обеспечения, использующего Software только через Permitted API».
+  sing-box обращается к нему именно так, поэтому наш архив под это исключение
+  подпадает;
+* нельзя использовать названия WireGuard, WireGuard LLC и Wintun для
+  продвижения продукта.
+
+Запрета на коммерческое использование в лицензии нет. Изменять библиотеку
+и извлекать из неё что-либо запрещено — мы этого и не делаем.
+
+## WinDivert
+
+`engines/zapret/exe/WinDivert.dll` и драйвер `engines/zapret/exe/Monkey64.sys` —
+[reqrypt.org/windivert.html](https://reqrypt.org/windivert.html), исходники —
+[github.com/basil00/WinDivert](https://github.com/basil00/WinDivert).
+
+**LGPL v3 или GPL v3 на выбор**, есть и коммерческая лицензия. Метаданных
+в файлах нет; версию следует уточнять по установке Zapret.
+
+**О подписи драйвера.** `Monkey64.sys` — переименованный драйвер WinDivert,
+подписанный **成都密思听科技有限公司**, сторонней организацией, не имеющей
+отношения к проекту WinDivert. Переименование и чужая подпись — обычная
+практика в этой области: Windows не загружает неподписанные драйверы ядра,
+а подпись Microsoft получить трудно. Подпись действительна, система драйвер
+принимает.
+
+Знать об этом стоит потому, что распространяя сборку, вы ручаетесь за этот
+файл. Если такое положение не устраивает — не включайте Zapret в архив
+и оставьте его отдельной установкой.
+
+Именно этот драйвер вызывает срабатывания антивирусов: на VirusTotal архив
+даёт 3 из 66, и все три указывают на WinDivert. Kaspersky помечает его
+`Not-a-virus:HEUR:RiskTool`, то есть прямо говорит, что это не вредонос.
+
+## Zapret
+
+`engines/zapret/exe/winws2.exe` — с 07.10 родная сборка под Windows от loop-uh
+(автора Zapret GUI): [zapret2-fork](https://git.zapret.moe/zapretdiscordyoutube/zapret2-fork),
+выпуск `v1.0.5.2-41-g204fd66-native`. Это исходники bol-van без изменений,
+на 41 коммит новее выпуска 1.0.5.2, а вместо Cygwin — своя прослойка
+(`nfq2/winnative/` форка): файлы, пути, разбор командной строки, сигналы,
+пакетная отправка пакетов. Внутри статически собраны LuaJIT и zlib.
+Единственный файл лицензии форка — MIT bol-van (`docs/LICENSE.txt`, годы
+2016–2026); своего уведомления у прослойки нет. С 03.10 до 07.10 стоял выпуск
+bol-van 1.0.5.2 (коммит `6b6c63e3`), до того — копия из Zapret GUI, версия 1.0.3;
+сборка кладёт наш winws2 поверх неё.
+
+И шесть модулей его библиотеки в `engines/zapret/lua/`:
+`zapret-lib.lua`, `zapret-antidpi.lua`, `zapret-auto.lua`, `zapret-obfs.lua`,
+`zapret-pcap.lua`, `zapret-tests.lua` — эти по-прежнему из Zapret GUI, то есть
+от версии 1.0.3; номер совместимости Lua у обеих версий один (6). Оттуда же
+часть образцов пакетов в `bin/` и частей фильтра в `windivert.filter/`.
+
+**Cygwin больше не входит.** До 07.10 архив вёз `engines/zapret/exe/cygwin1.dll`
+(версия 3.4.10, © Cygwin Authors 1996–2023, Red Hat, GNU LGPL v3): winws2
+bol-van собран под Cygwin и без него не запускается. Упаковка кладёт его,
+только если выбранный `winws2.exe` на него ссылается; родная сборка — нет.
+У обновившихся старый файл может остаться в папке — его ничто не загружает.
+
+Всё остальное в `engines/zapret/` — не его, а Zapret GUI, о нём следующий
+раздел. До 30.09 этот документ приписывал bol-van папку целиком, и это было
+неверно.
+
+**MIT License, Copyright (c) 2016–2024 bol-van.** «Zapret 2»
+([github.com/bol-van/zapret2](https://github.com/bol-van/zapret2)) — форк проекта
+[bol-van/zapret](https://github.com/bol-van/zapret), и условия наследуются
+от него. Текст лежит в `engines/zapret/LICENSE.txt`.
+
+MIT разрешает распространение в любом виде, включая состав архива, и требует
+единственного: чтобы уведомление об авторстве и текст лицензии сопровождали
+копии. Именно это мы и делаем.
+
+Оговорка о происхождении текста: в установке Zapret файла лицензии нет ни
+одного, у `winws2.exe` пусты поля версии, автора и копирайта. Текст взят
+из первоисточника — [docs/LICENSE.txt](https://github.com/bol-van/zapret/blob/master/docs/LICENSE.txt)
+в репозитории bol-van. Там он лежит не в корне, поэтому GitHub его
+не распознаёт и показывает репозиторий как «без лицензии»; это особенность
+размещения файла, а не отсутствие условий.
+
+## Zapret GUI
+
+Программа **Zapret GUI**, автор — **loop-uh**:
+[wiki.zapret.moe](https://wiki.zapret.moe/), исходники —
+[git.zapret.moe/zapretdiscordyoutube/zapretgui](https://git.zapret.moe/zapretdiscordyoutube/zapretgui).
+Папка `engines/zapret/` в архиве — это копия её установки, и на ней Zephyron
+стоит не меньше, чем на самом winws2. Из Zapret GUI взято:
+
+* **сценарии десинка на lua** — пятнадцать модулей в `engines/zapret/lua/`:
+  `combined-detector.lua`, `custom_diag.lua`, `custom_funcs.lua`,
+  `domain-grouping.lua`, `fakemultidisorder.lua`, `fakemultisplit.lua`,
+  `init_vars.lua`, `silent-drop-detector.lua`, `strategies.lua`,
+  `strategy-lock-manager.lua`, `strategy-stats.lua`, `zapret-16kb.lua`,
+  `zapret-multishake.lua`, `zapret-rst-flood.lua`, `zapret-wgobfs.lua` —
+  и шесть файлов со стратегиями рядом с ними (`circular-config.txt`,
+  `strategies-*-source.txt`). Наши пресеты Universal V10 и V11 Lite грузят пять из этих
+  модулей: на одном winws2 от bol-van они бы не поднялись;
+* **списки доменов и адресов** в `engines/zapret/lists/` — мы их не изменяем
+  и не дополняем, только читаем. Один из них, `ipset-all.txt`, в установку
+  пришёл от Flowseal — о нём следующий раздел;
+* **образцы пакетов** в `engines/zapret/bin/` — те, которых нет у bol-van;
+* **пресеты** в `presets/` — формат и сами наборы секций. Сверка с установкой
+  30.09: четыре пресета совпадают с её пресетами дословно, семь отличаются
+  на одну — двенадцать строк, а Universal V7–V10 в установке нет — они
+  собраны уже здесь, но из тех же секций и в том же формате. 08.10 убраны
+  Universal V5, V5 (game filter), V5 my, V6, V6 voicefix, V7 и V8 diag;
+* **каталог адресов**. `config/catalog.zapret.yaml` — выборка из каталога
+  установки (`system/hosts_catalog.sqlite3`): те записи «имя — адрес», что
+  ответили при проверке в день сборки. Сам каталог `pack.cmd` тоже кладёт
+  в архив, если он есть на машине сборщика. Это адреса чужих публичных
+  DNS-сервисов (XBOX DNS, Comss DNS и других), то есть ответы, которые
+  те раздают всем желающим; собрал их в каталог автор Zapret GUI;
+* **пины напрямую**. `config/pin-solutions.yaml` — раздел «Напрямую» того же
+  каталога (версия 2026.10.01.1, снят 06.10): двенадцать сервисов, у которых
+  имя прибивается к адресу как есть, — Instagram, X, YouTube, Discord и другие.
+  Взяты имена и адреса; какой пин чей (адрес самого сервиса или посредника)
+  и как с ним обходится щит, решено здесь, по замеру. Одно из решений,
+  голосовые узлы Discord на одном адресе Cloudflare, в самом каталоге названо
+  «Решение от Flowseal»;
+* **сборка драйвера** — `Monkey64.sys`, о котором сказано в разделе WinDivert,
+  едет в том виде, в каком лежит в установке Zapret GUI.
+
+**MIT License, Copyright (c) 2025–2026 censorliber.** Так правообладатель назван
+в самом файле лицензии —
+[docs/LICENSE](https://git.zapret.moe/zapretdiscordyoutube/zapretgui/src/branch/main/docs/LICENSE)
+в репозитории проекта; коммиты в репозитории подписаны loop-uh. Строка
+приведена дословно, как того требует MIT, а текст целиком лежит
+в `engines/zapret/LICENSE-ZapretGUI.txt` (в репозитории —
+[docs/licenses/zapretgui-MIT.txt](licenses/zapretgui-MIT.txt)). В нём же сам
+Zapret GUI называет, что взял у bol-van.
+
+Оговорка о точности. Какие именно образцы пакетов и части фильтра WinDivert
+в установке принадлежат bol-van, а какие добавлены Zapret GUI, пофайлово
+не разобрано: сверены только модули lua (30.09, по каталогу `lua/`
+репозитория zapret2). Лицензия у обоих одна — MIT, и оба уведомления едут
+рядом с файлами.
+
+### v2fly/domain-list-community
+
+Открытый каталог доменов по сервисам —
+[github.com/v2fly/domain-list-community](https://github.com/v2fly/domain-list-community),
+MIT. Кода из него нет; 01.10 по сверке с ним в наши списки `config/lists/`
+добавлены около сорока имён (Gemini, ChatGPT, Notion, Perplexity, JetBrains AI,
+Telegram, Docker, Minecraft, Spotify) — каждое подписано в своём файле.
+
+### Zapret KVN
+
+VPN-клиент той же команды —
+[git.zapret.moe/zapretkvn/zapret-kvn](https://git.zapret.moe/zapretkvn/zapret-kvn),
+GPL v3. Кода из него в Zephyron нет. Взят только **список из двенадцати
+имён** для выключателя «Прятать VPN от российских приложений»
+(`src/Zephyron.Core/Rules/VpnHiding.cs`): сервисы «узнать свой адрес»
+и адреса, к которым ходят приложения Яндекса, VK, MAX и 2ГИС, — из правила
+блокировки в шаблоне его конфига sing-box (`default.json`, сверка 01.10
+по версии 0.8.4). Это перечень доменных имён, а не код; назван здесь,
+чтобы не выдавать чужую находку за свою. Распоряжаемся мы им иначе:
+KVN эти имена блокирует, мы пускаем напрямую.
+
+## zapret-discord-youtube
+
+Сборка **zapret-discord-youtube**, автор — **Flowseal**:
+[github.com/Flowseal/zapret-discord-youtube](https://github.com/Flowseal/zapret-discord-youtube).
+Отсюда взято три вещи:
+
+* **game filter** — выключатель на вкладке «Десинк». У Flowseal это
+  выключатель в `service.bat`: он открывает двум последним секциям каждого
+  `.bat` порты 1024–65535. У нас те же две секции дописываются к любому
+  пресету (`GameFilter` в коде). Отбор по `ipset-all` и `ipset-exclude`,
+  обрезка на четвёртом пакете, рецепты — перевод секций его `general (ALT11).bat`
+  на язык Zapret 2;
+* **список адресов** `engines/zapret/lists/ipset-all.txt` — облака, хостинги
+  и Cloudflare, по которым game filter отбирает трафик. Сверка 30.09: все
+  33 048 записей нашего файла совпадают с `lists/ipset-all.txt.backup`
+  в репозитории Flowseal. К нам он попадает из установки Zapret GUI;
+* **три образца пакетов**, которыми эти секции пользуются:
+  `bin/tls_clienthello_max_ru.bin`, `bin/stun2.bin` и `bin/ACTIVE_GAME_UDP.bin`.
+  Сверка 30.09: побайтно те же файлы, что в `bin/` его репозитория. Тоже
+  едут из установки Zapret GUI.
+
+**MIT License, Copyright (c) 2016–2026 bol-van, Copyright (c) 2024–2026
+Flowseal** — обе строки стоят в его
+[LICENSE.txt](https://github.com/Flowseal/zapret-discord-youtube/blob/main/LICENSE.txt),
+и приводятся как есть. Текст целиком — в `engines/zapret/LICENSE-Flowseal.txt`
+(в репозитории — [docs/licenses/flowseal-MIT.txt](licenses/flowseal-MIT.txt)).
+
+Исполняемых файлов из этой сборки в архиве нет: winws2 и WinDivert у нас свои,
+описанные выше. Остальные образцы пакетов в `bin/` с его репозиторием
+не сверялись.
+
+## tg-ws-proxy-rs и tg-ws-proxy
+
+Прокси вкладки «TG Proxy» (с 07.10) — **tg-ws-proxy-rs**, автор — **valnesfjord**:
+[github.com/valnesfjord/tg-ws-proxy-rs](https://github.com/valnesfjord/tg-ws-proxy-rs),
+порт на Rust программы **tg-ws-proxy** того же **Flowseal**:
+[github.com/Flowseal/tg-ws-proxy](https://github.com/Flowseal/tg-ws-proxy).
+Едет как есть, исполняемым файлом выпуска 2.5.2 (`engines/tg-ws-proxy/tg-ws-proxy.exe`,
+архив сверен с их `SHA256SUMS`); запускает его наш надзор. Список доменов
+за Cloudflare, через которые прокси ведёт Telegram, ведёт проект Flowseal:
+прокси берёт его из `.github/cfproxy-domains.txt` репозитория tg-ws-proxy,
+а не ответил GitHub — из копии, зашитой в сам прокси.
+
+**MIT License, Copyright (c) 2026 valnesfjord** и **MIT License, Copyright (c)
+2026 Flowseal** — строки из их файлов LICENSE, приводятся как есть. Тексты
+целиком — `engines/tg-ws-proxy/LICENSE` и `engines/tg-ws-proxy/LICENSE-Flowseal-tg-ws-proxy.txt`.
+
+## Сам Zephyron
+
+Всё, что вне `engines/`, написано в рамках этого проекта и распространяется
+под **MIT License** — текст в [LICENSE](../LICENSE) в корне репозитория.
+
+### Производная работа: NetZapret
+
+Zephyron собран из исходного кода [NetZapret](https://github.com/RixyPow/netzapret),
+**Copyright (c) 2026 RixyPow**, **MIT License**. Взята рабочая основа — правила
+и маршрутизация, десинк, туннель, подписки, супервизор движков; окно
+и оформление переделаны. Условие MIT соблюдено: уведомление об авторстве
+NetZapret и текст его лицензии сохранены в [LICENSE](../LICENSE) в корне
+репозитория. Сам NetZapret в поставку Zephyron не входит и отдельным
+компонентом не является — это основа исходников, а не файл в архиве.
+
+Совместимость с составом сомнений не вызывает: MIT ничему не противоречит,
+а движки остаются на своих условиях и запускаются отдельными процессами.

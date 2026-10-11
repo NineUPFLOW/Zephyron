@@ -1,0 +1,199 @@
+<Window x:Class="Zephyron.Gui.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:Zephyron.Gui.Views"
+        xmlns:local="clr-namespace:Zephyron.Gui"
+        Title="Zephyron"
+        Height="720" Width="1080"
+        MinHeight="560" MinWidth="880"
+        Background="{DynamicResource Backdrop}"
+        WindowStartupLocation="CenterScreen"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Ideal">
+
+    <!--
+        Масштаб окна из «Ещё» → «Шрифт и размер»: всё окно целиком, как
+        «масштаб» в Telegram. Стекло считается в координатах этой же сетки,
+        поэтому от масштаба не съезжает.
+    -->
+    <Grid x:Name="Root" LayoutTransform="{DynamicResource UiScaleTransform}">
+        <Grid.ColumnDefinitions>
+            <!-- Шире на значок с отступом (30.09): под них ушло 30 точек, а самой длинной подписи, «Проверке блокировок», нужна прежняя ширина. -->
+            <ColumnDefinition Width="236" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!--
+            Фон темы: картинка и затемнение цветом подложки, под меню и под
+            содержимым. У встроенных тем картинки нет, и оба слоя сливаются
+            с подложкой окна. Не ловят мышь: под ними ничего нет, а над ними
+            всё окно.
+        -->
+        <Rectangle x:Name="BackdropLayer" Grid.ColumnSpan="2" IsHitTestVisible="False" Fill="{DynamicResource BackdropImage}" />
+        <Rectangle Grid.ColumnSpan="2" IsHitTestVisible="False" Fill="{DynamicResource Backdrop}"
+                   Opacity="{DynamicResource BackdropDim}" />
+
+        <!--
+            Боковое меню. Полоса, а не вкладки: разделов девять, и все они
+            равноправны — проверку блокировок нельзя прятать глубже
+            остальных, она и отличает нас от любого клиента VPN.
+        -->
+        <Border Grid.Column="0" Style="{StaticResource RailPanel}">
+            <DockPanel LastChildFill="True">
+
+                <StackPanel DockPanel.Dock="Top" Margin="22,26,22,22">
+                    <TextBlock Text="Zephyron" FontSize="19" FontWeight="SemiBold" />
+                    <TextBlock x:Name="VersionLabel" Style="{StaticResource Caption}" Margin="0,3,0,0" />
+                </StackPanel>
+
+                <!--
+                    Полоса прокручивается: разделов девять, и на невысоком
+                    окне последний иначе уезжает за нижний край — а уехавшего
+                    пункта не существует, его не найти.
+                -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,4,0,0">
+                    <!--
+                        Две группы (владелец, 23.09). Пунктов одиннадцать,
+                        и подряд они читались стеной. Каждый день открывают
+                        первые четыре; остальное — инструменты разбора,
+                        к которым идут, когда что-то не так. «Ещё» отдельно:
+                        это настройки программы, а не часть работы с сетью.
+                    -->
+                    <StackPanel x:Name="Rail">
+                        <RadioButton x:Name="RailStatus" Style="{StaticResource RailItem}" Content="Главная" Tag="status" local:MenuIcon.Glyph="&#xE80F;" IsChecked="True" Checked="OnSection" />
+                        <RadioButton Style="{StaticResource RailItem}" Content="VPN" Tag="vpn" local:MenuIcon.Glyph="&#xE774;" Checked="OnSection" />
+                        <RadioButton Style="{StaticResource RailItem}" Content="Десинк" Tag="desync" local:MenuIcon.Glyph="&#xE9E9;" Checked="OnSection" />
+                        <RadioButton Style="{StaticResource RailItem}" Content="Маршруты" Tag="routes" local:MenuIcon.Glyph="&#xE816;" Checked="OnSection" />
+                        <RadioButton Style="{StaticResource RailItem}" Content="TG Proxy" Tag="tgproxy" local:MenuIcon.Glyph="&#xE724;" Checked="OnSection" />
+
+                        <!--
+                            Заголовок группы, а не пункт: прописными, мельче
+                            и с чертой до края. Строчной «Разбор» того же
+                            цвета, что пункты, выглядел ещё одной вкладкой
+                            (владелец, 23.09).
+                        -->
+                        <Grid Margin="22,20,22,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource RailGroup}" Text="РАЗБОР" />
+                            <Border Grid.Column="1" Height="1" Background="{DynamicResource Border}"
+                                    VerticalAlignment="Center" Margin="10,1,0,0" />
+                        </Grid>
+                        <RadioButton Style="{StaticResource RailItem}" Content="Проверка блокировок" Tag="check" local:MenuIcon.Glyph="&#xE721;" Checked="OnSection" />
+                        <RadioButton Style="{StaticResource RailItem}" Content="Замер скорости" Tag="speed" local:MenuIcon.Glyph="&#xEC4A;" Checked="OnSection" />
+                        <RadioButton Style="{StaticResource RailItem}" Content="DNS" Tag="dns" local:MenuIcon.Glyph="&#xE968;" Checked="OnSection" />
+                        <RadioButton Style="{StaticResource RailItem}" Content="Файл hosts" Tag="hosts" local:MenuIcon.Glyph="&#xE8A5;" Checked="OnSection" />
+                        <RadioButton Style="{StaticResource RailItem}" Content="Наблюдение" Tag="watch" local:MenuIcon.Glyph="&#xE9D2;" Checked="OnSection" />
+                        <!-- «Журнал» — с 07.10 окном из «Диагностики» (LogWindow): место в меню отдано «TG Proxy». -->
+                        <RadioButton Style="{StaticResource RailItem}" Content="Диагностика" Tag="doctor" local:MenuIcon.Glyph="&#xE9D9;" Checked="OnSection" />
+
+                        <Border Height="1" Background="{DynamicResource Border}" Margin="22,12,22,10" />
+                        <RadioButton Style="{StaticResource RailItem}" Content="Оформление" Tag="look" local:MenuIcon.Glyph="&#xE790;" Checked="OnSection" />
+                        <RadioButton x:Name="RailMore" Style="{StaticResource RailItem}" Content="Ещё" Tag="more" local:MenuIcon.Glyph="&#xE713;" Checked="OnSection" />
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Column="1">
+            <ContentControl x:Name="Section">
+                <views:StatusView />
+            </ContentControl>
+
+            <!--
+                Всплывающие карточки — стопкой внизу справа, чтобы две разом
+                не легли одна на другую.
+            -->
+            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24">
+
+            <!--
+                После обновления (владелец, 03.10): звезда на GitHub и канал.
+                Один раз на каждую новую версию и только тем, кто скрыл
+                карточку на «Главной» (UpdateGreeting). Сама не уходит —
+                закрывается кнопкой: кнопки в ней и есть смысл.
+            -->
+            <Border x:Name="GreetingToast" Visibility="Collapsed" MaxWidth="500" Margin="0,0,0,12"
+                    Background="{DynamicResource Surface}"
+                    BorderBrush="{DynamicResource Warn}" BorderThickness="1.5"
+                    CornerRadius="14" Padding="18,15">
+                <StackPanel>
+                    <!--
+                        «Закрыть» — крестиком в углу (05.10): с кнопкой «Поддержать»
+                        четыре кнопки в ряд в карточку не влезали.
+                    -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE735;" FontSize="16"
+                                   Foreground="{DynamicResource Warn}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                        <TextBlock Grid.Column="1" x:Name="GreetingTitle" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        <Button Grid.Column="2" Style="{StaticResource IconGhost}" Content="&#xE711;" Margin="10,-4,-6,0"
+                                Padding="6,4" MinWidth="0" VerticalAlignment="Top" Click="OnGreetingClose"
+                                ToolTip="Закрыть" />
+                    </Grid>
+                    <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
+                               Text="Если программа помогает — поставьте звезду на GitHub и подпишитесь на канал: так о ней узнают другие, а вы — о новых версиях. Поддержать разработку можно и донатом." />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+                        <Button Style="{StaticResource Ghost}" Padding="14,7" Margin="0,0,8,0" Click="OnGreetingTelegram"
+                                ToolTip="Новости в телеграм-канале">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE724;" Margin="0,0,8,0"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                <TextBlock Text="Канал" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource Ghost}" Padding="14,7" Margin="0,0,8,0" Click="OnGreetingDonate"
+                                ToolTip="Страница Zephyron на GitHub">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource LineGlyph}" Text="&#xEB51;" Margin="0,0,8,0"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                <TextBlock Text="Поддержать" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{StaticResource Primary}" Padding="16,8" Click="OnGreetingStar"
+                                ToolTip="Страница Zephyron на GitHub — звезда справа вверху">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE734;" Margin="0,0,8,0"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                <TextBlock Text="Звезда на GitHub" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!--
+                Предложение перезапустить движки. Внизу справа и само уходит:
+                почти всё, что меняется в окне, применяется перезапуском,
+                и говорить об этом строкой в глубине раздела значит не сказать
+                вовсе. Но и держать перед глазами нельзя — правок за один
+                заход бывает десяток.
+            -->
+            <Border x:Name="Toast" Visibility="Collapsed" MaxWidth="460"
+                    Background="{DynamicResource Surface}"
+                    BorderBrush="{DynamicResource Accent}" BorderThickness="1.5"
+                    CornerRadius="14" Padding="18,15">
+                <StackPanel>
+                    <TextBlock x:Name="ToastTitle" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock x:Name="ToastBody" Style="{StaticResource Caption}"
+                               Margin="0,6,0,0" TextWrapping="Wrap" />
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+                        <Button x:Name="ToastLater" Style="{StaticResource Ghost}" Content="Позже"
+                                Padding="16,7" Margin="0,0,8,0" Click="OnToastLater" />
+                        <Button x:Name="ToastAct" Style="{StaticResource Primary}"
+                                Content="Перезапустить" Padding="18,8" Click="OnToastRestart" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,1178 @@
+using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
+using Zephyron.Core.Rules;
+using Zephyron.Proxy;
+using Zephyron.Subscriptions;
+using Xunit;
+
+namespace Zephyron.Core.Tests;
+
+public class SingBoxConfigCompilerTests
+{
+    private static ProxyServer Server(
+        string tag = "NL",
+        ProxyProtocol protocol = ProxyProtocol.Hysteria2,
+        string transport = "udp") => new()
+        {
+            Protocol = protocol,
+            Tag = tag,
+            Host = "nl.example.com",
+            Port = 4443,
+            Credential = "PLACEHOLDER",
+            Transport = transport,
+            Security = protocol == ProxyProtocol.Hysteria2 ? "tls" : "reality",
+            Sni = "nl.example.com",
+            RealityPublicKey = "jNXHt1yRo0vDuchQlIP6Z0ZvjT3KtzVI-T4E7RoLJS0",
+            RealityShortId = "abcd",
+        };
+
+    private static JsonElement CompileToJson(
+        string yaml,
+        params ProxyServer[] servers)
+    {
+        var engine = RuleSetLoader.Load(yaml);
+        var result = new SingBoxConfigCompiler().Compile(engine.RuleSet, servers, new SingBoxOptions());
+
+        return JsonDocument.Parse(result.Json).RootElement.Clone();
+    }
+
+    private static IEnumerable<JsonElement> Rules(JsonElement root) =>
+        root.GetProperty("route").GetProperty("rules").EnumerateArray();
+
+    private static JsonElement CompileProxyOnly(string yaml, params string[] resolvers)
+    {
+        var engine = RuleSetLoader.Load(yaml);
+        var result = new SingBoxConfigCompiler().Compile(
+            engine.RuleSet,
+            [Server()],
+            new SingBoxOptions
+            {
+                Scope = TunnelScope.ProxyOnly,
+                DnsServerAddresses = resolvers,
+            });
+
+        return JsonDocument.Parse(result.Json).RootElement.Clone();
+    }
+
+    /// <summary>
+    /// У адаптера TUN — только DNS по IPv4 (03.10): Java с TLauncher'овским
+    /// preferIPv4Stack падала на нашем IPv6-адресе DNS, первом в её списке.
+    /// </summary>
+    [Fact]
+    public void TunAnnouncesOnlyAnIpv4Resolver()
+    {
+        var root = CompileProxyOnly(ProxyOnlyRules, "192.168.1.1");
+        var tun = root.GetProperty("inbounds").EnumerateArray()
+            .Single(inbound => inbound.GetProperty("type").GetString() == "tun");
+
+        Assert.Equal(["172.19.0.2"], tun.GetProperty("dns_address").EnumerateArray().Select(a => a.GetString()));
+
+        // Сам TUN остаётся двухстековым: без IPv6-адреса auto_route не ставит маршрутов IPv6.
+        Assert.Contains("fdfe:dcba:9876::1/126", tun.GetProperty("address").EnumerateArray().Select(a => a.GetString()));
+    }
+
+    [Theory]
+    [InlineData("172.19.0.1/30", "172.19.0.2")]
+    [InlineData("10.0.0.255/24", "10.0.1.0")]
+    public void TunDnsIsTheAddressAfterTheTun(string tun, string dns)
+    {
+        Assert.Equal(dns, SingBoxConfigCompiler.TunDnsAddress(tun));
+    }
+
+    private const string ProxyOnlyRules = """
+        mode: selective
+        rules:
+          - match: domain
+            value: "*.rutracker.org"
+            mode: proxy
+        """;
+
+    private const string ProxyAllWithRuExclusion = """
+        mode: proxy
+        rules:
+          - match: ip
+            value: "5.255.255.0/24"
+            mode: direct
+          - match: domain
+            value: "*.rutracker.org"
+            mode: proxy
+        """;
+
+    [Fact]
+    public void ProxyAllStillSendsRussianAddressesDirect()
+    {
+        // «Всё через VPN» не должно означать «в том числе туда, где VPN ломает
+        // работу»: российские сервисы через зарубежный адрес требуют
+        // подтверждений или отказывают вовсе.
+        var root = CompileToJson(ProxyAllWithRuExclusion, Server());
+
+        var direct = Rules(root).Single(r =>
+            r.TryGetProperty("ip_cidr", out _) &&
+            r.TryGetProperty("outbound", out var o) && o.GetString() == "direct");
+
+        Assert.Equal("5.255.255.0/24", direct.GetProperty("ip_cidr")[0].GetString());
+    }
+
+    [Fact]
+    public void ProxyAllDropsRulesThatOnlyRepeatTheDefault()
+    {
+        // Правила на прокси в этом режиме избыточны: всё, что не выведено
+        // явно, и так уходит в туннель по final. Лишние строки в конфиге
+        // потом читаются как «здесь что-то особенное».
+        var root = CompileToJson(ProxyAllWithRuExclusion, Server());
+
+        Assert.DoesNotContain(Rules(root), r => r.TryGetProperty("domain_suffix", out _));
+    }
+
+    [Fact]
+    public void StrictProxyKeepsNoExceptionsAtAll()
+    {
+        // «Без исключений» буквально: даже прямые правила отбрасываются,
+        // и российские сервисы уходят в туннель вместе со всем остальным.
+        // Это осознанный выбор режима, а не недосмотр.
+        var root = CompileToJson("""
+            mode: proxy_strict
+            rules:
+              - match: ip
+                value: "5.255.255.0/24"
+                mode: direct
+              - match: domain
+                value: "*.rutracker.org"
+                mode: proxy
+            """, Server());
+
+        Assert.Equal("auto", root.GetProperty("route").GetProperty("final").GetString());
+        Assert.DoesNotContain(Rules(root), r => r.TryGetProperty("ip_cidr", out _));
+        Assert.DoesNotContain(Rules(root), r => r.TryGetProperty("domain_suffix", out _));
+    }
+
+    [Fact]
+    public void DesyncOnlyLeavesTheTunnelEmpty()
+    {
+        // Для sing-box этот режим неотличим от выключенного: десинк
+        // туннеля не касается вовсе.
+        var root = CompileToJson("""
+            mode: desync
+            rules:
+              - match: domain
+                value: "*.rutracker.org"
+                mode: proxy
+            """, Server());
+
+        Assert.Equal("direct", root.GetProperty("route").GetProperty("final").GetString());
+        Assert.DoesNotContain(Rules(root), r => r.TryGetProperty("domain_suffix", out _));
+    }
+
+    [Fact]
+    public void OffModeRoutesNothingThroughTheTunnel()
+    {
+        var root = CompileToJson("""
+            mode: off
+            rules:
+              - match: domain
+                value: "*.rutracker.org"
+                mode: proxy
+            """, Server());
+
+        Assert.Equal("direct", root.GetProperty("route").GetProperty("final").GetString());
+        Assert.DoesNotContain(Rules(root), r => r.TryGetProperty("domain_suffix", out _));
+    }
+
+    private static JsonElement CompileWith(string yaml, SingBoxOptions options)
+    {
+        var engine = RuleSetLoader.Load(yaml);
+        var result = new SingBoxConfigCompiler().Compile(engine.RuleSet, [Server()], options);
+
+        return JsonDocument.Parse(result.Json).RootElement.Clone();
+    }
+
+    private static JsonElement DnsServer(JsonElement root, string tag) =>
+        root.GetProperty("dns").GetProperty("servers").EnumerateArray()
+            .Single(s => s.GetProperty("tag").GetString() == tag);
+
+    [Fact]
+    public void APinnedAddressGetsBothCaptureAndARule()
+    {
+        // Порознь получается хуже, чем ничего: адрес заводится в туннель,
+        // правила ему не достаётся, и он уходит в direct переоткрытым сокетом.
+        // До VPN не доезжает, а десинк ломается — WinDivert видит уже не поток
+        // приложения. Canva давала на этом сотни оборванных соединений.
+        var root = CompileWith(ProxyOnlyRules, new SingBoxOptions
+        {
+            Scope = TunnelScope.ProxyOnly,
+            DnsServerAddresses = ["8.8.8.8/32"],
+            PinnedProxyAddresses = ["72.56.93.144/32"],
+        });
+
+        Assert.Contains("72.56.93.144/32",
+            root.GetProperty("inbounds")[0].GetProperty("route_address")
+                .EnumerateArray().Select(e => e.GetString()));
+
+        var rule = Rules(root).Single(r =>
+            r.TryGetProperty("ip_cidr", out var c) &&
+            c.EnumerateArray().Any(e => e.GetString() == "72.56.93.144/32"));
+
+        Assert.Equal("auto", rule.GetProperty("outbound").GetString());
+    }
+
+    [Fact]
+    public void APinnedAddressIsRoutedBeforeBroaderRules()
+    {
+        // Адрес прибит в hosts именно потому, что домен иначе не разрешается.
+        // Общее правило по подсети не должно перехватить его первым.
+        var root = CompileWith("""
+            mode: selective
+            rules:
+              - match: ip
+                value: "72.0.0.0/8"
+                mode: direct
+              - match: domain
+                value: "*.canva.com"
+                mode: proxy
+            """, new SingBoxOptions
+        {
+            Scope = TunnelScope.ProxyOnly,
+            DnsServerAddresses = ["8.8.8.8/32"],
+            PinnedProxyAddresses = ["72.56.93.144/32"],
+        });
+
+        var all = Rules(root).ToArray();
+
+        int pinnedAt = Array.FindIndex(all, r =>
+            r.TryGetProperty("ip_cidr", out var c) &&
+            c.EnumerateArray().Any(e => e.GetString() == "72.56.93.144/32"));
+
+        int broadAt = Array.FindIndex(all, r =>
+            r.TryGetProperty("ip_cidr", out var c) &&
+            c.EnumerateArray().Any(e => e.GetString() == "72.0.0.0/8"));
+
+        Assert.True(pinnedAt >= 0 && broadAt >= 0);
+        Assert.True(pinnedAt < broadAt, "прибитый адрес должен проверяться раньше общего правила");
+    }
+
+    /// <summary>
+    /// Общий адрес пина уводит в туннель только имя на VPN, а не весь адрес.
+    /// </summary>
+    /// <remarks>
+    /// 23.09: все имена Claude прибиты к посреднику 87.228.47.204, на VPN
+    /// стояло одно downloads.claude.ai. Правило по одному адресу увело
+    /// в туннель весь Claude, и с поднятыми движками он не работал.
+    /// </remarks>
+    [Fact]
+    public void ASharedPinnedAddressTakesOnlyTheProxyName()
+    {
+        var root = CompileWith("""
+            mode: selective
+            rules:
+              - match: domain
+                value: "*.downloads.claude.ai"
+                mode: proxy
+              - match: domain
+                value: "*.claude.ai"
+                mode: direct
+            """, new SingBoxOptions
+        {
+            Scope = TunnelScope.ProxyOnly,
+            DnsServerAddresses = ["8.8.8.8/32"],
+            PinnedProxyAddresses = ["87.228.47.204/32"],
+            PinnedProxyNames = ["downloads.claude.ai"],
+        });
+
+        // В перехват адрес по-прежнему заводится: иначе до туннеля не дойдёт
+        // и само имя на VPN.
+        Assert.Contains("87.228.47.204/32",
+            root.GetProperty("inbounds")[0].GetProperty("route_address")
+                .EnumerateArray().Select(e => e.GetString()));
+
+        // Правила «по одному адресу» нет — оно и увозило весь Claude.
+        Assert.DoesNotContain(Rules(root), r =>
+            r.TryGetProperty("ip_cidr", out var c) &&
+            c.EnumerateArray().Any(e => e.GetString() == "87.228.47.204/32"));
+
+        var rule = Rules(root).Single(r =>
+            r.TryGetProperty("type", out var t) && t.GetString() == "logical");
+
+        Assert.Equal("and", rule.GetProperty("mode").GetString());
+        Assert.Equal("auto", rule.GetProperty("outbound").GetString());
+
+        var parts = rule.GetProperty("rules").EnumerateArray().ToList();
+
+        Assert.Contains(parts, p => p.TryGetProperty("ip_cidr", out var c)
+            && c.EnumerateArray().Single().GetString() == "87.228.47.204/32");
+        Assert.Contains(parts, p => p.TryGetProperty("domain", out var d)
+            && d.EnumerateArray().Single().GetString() == "downloads.claude.ai");
+    }
+
+    [Fact]
+    public void ByDefaultNamesAreResolvedDirectly()
+    {
+        // Разрешение имён не должно зависеть от туннеля: пока тот не поднялся,
+        // иначе не открывается ничего, включая работающее на десинке.
+        var root = CompileProxyOnly(ProxyOnlyRules, "8.8.8.8/32");
+
+        Assert.False(DnsServer(root, "remote").TryGetProperty("detour", out _));
+        Assert.Equal("remote",
+            root.GetProperty("route").GetProperty("default_domain_resolver").GetProperty("server").GetString());
+    }
+
+    /// <summary>
+    /// DNS «авто» (05.10): резолвер ходит через свой переключатель пути, при
+    /// запуске стоящий «напрямую», а имена серверов — через bootstrap.
+    /// </summary>
+    [Fact]
+    public void AutoDnsGoesThroughItsOwnSwitchStartingDirect()
+    {
+        var root = CompileWith(ProxyOnlyRules, new SingBoxOptions
+        {
+            Scope = TunnelScope.ProxyOnly,
+            DnsServerAddresses = ["8.8.8.8/32"],
+            DnsViaAuto = true,
+        });
+
+        Assert.Equal(SingBoxOptions.DnsPathTag, DnsServer(root, "remote").GetProperty("detour").GetString());
+
+        var path = root.GetProperty("outbounds").EnumerateArray()
+            .Single(o => o.GetProperty("tag").GetString() == SingBoxOptions.DnsPathTag);
+
+        Assert.Equal("selector", path.GetProperty("type").GetString());
+        Assert.Equal("direct", path.GetProperty("default").GetString());
+        Assert.Equal(["auto", "direct"], path.GetProperty("outbounds").EnumerateArray().Select(o => o.GetString()));
+        Assert.True(path.GetProperty("interrupt_exist_connections").GetBoolean());
+
+        Assert.Equal("bootstrap",
+            root.GetProperty("route").GetProperty("default_domain_resolver").GetProperty("server").GetString());
+    }
+
+    /// <summary>«Напрямую» — без переключателя: резолвер мимо туннеля, как прежде.</summary>
+    [Fact]
+    public void DirectDnsHasNoSwitch()
+    {
+        var root = CompileWith(ProxyOnlyRules, new SingBoxOptions
+        {
+            Scope = TunnelScope.ProxyOnly,
+            DnsServerAddresses = ["8.8.8.8/32"],
+        });
+
+        Assert.False(DnsServer(root, "remote").TryGetProperty("detour", out _));
+        Assert.DoesNotContain(root.GetProperty("outbounds").EnumerateArray(),
+            o => o.GetProperty("tag").GetString() == SingBoxOptions.DnsPathTag);
+    }
+
+    [Fact]
+    public void ThroughTunnelTheResolverIsHiddenFromTheOperator()
+    {
+        // Ответ на блокировку DoH у операторов: запрос внутри туннеля
+        // неотличим от прочего трафика.
+        var root = CompileWith(ProxyOnlyRules, new SingBoxOptions
+        {
+            Scope = TunnelScope.ProxyOnly,
+            DnsServerAddresses = ["8.8.8.8/32"],
+            DnsThroughTunnel = true,
+        });
+
+        Assert.Equal("auto", DnsServer(root, "remote").GetProperty("detour").GetString());
+    }
+
+    [Fact]
+    public void ThroughTunnelSubscriptionHostnamesStillResolveOutsideIt()
+    {
+        // Иначе замкнутый круг: чтобы поднять туннель, нужно разрешить имя
+        // сервера, а чтобы разрешить — уже иметь туннель.
+        var root = CompileWith(ProxyOnlyRules, new SingBoxOptions
+        {
+            Scope = TunnelScope.ProxyOnly,
+            DnsServerAddresses = ["8.8.8.8/32"],
+            DnsThroughTunnel = true,
+        });
+
+        Assert.Equal("bootstrap",
+            root.GetProperty("route").GetProperty("default_domain_resolver").GetProperty("server").GetString());
+        Assert.Equal("local", DnsServer(root, "bootstrap").GetProperty("type").GetString());
+    }
+
+    [Fact]
+    public void ThroughTunnelPanelHostnamesResolveOutsideIt()
+    {
+        // Жалоба 24.09: выход лёг, и подписка не читалась с «Этот хост
+        // неизвестен» — адрес панели спрашивался через тот же мёртвый выход.
+        var root = CompileWith(ProxyOnlyRules, new SingBoxOptions
+        {
+            Scope = TunnelScope.ProxyOnly,
+            DnsServerAddresses = ["8.8.8.8/32"],
+            DnsThroughTunnel = true,
+            PanelHosts = ["panel.example.net"],
+        });
+
+        var rules = root.GetProperty("dns").GetProperty("rules").EnumerateArray().ToList();
+        int panel = rules.FindIndex(r =>
+            r.TryGetProperty("domain", out var d)
+            && d.EnumerateArray().Any(x => x.GetString() == "panel.example.net"));
+        int fake = rules.FindIndex(r => r.GetProperty("server").GetString() == "fake");
+
+        Assert.True(panel >= 0, "правила для панели нет");
+        Assert.Equal("bootstrap", rules[panel].GetProperty("server").GetString());
+
+        // После fakeip: панель, которую человек сам отправил в VPN, остаётся в VPN.
+        Assert.True(fake >= 0 && fake < panel, "правило панели стоит раньше fakeip");
+    }
+
+    [Fact]
+    public void WithoutTunnelDnsPanelHostnamesNeedNoRule()
+    {
+        // Напрямую remote и так мимо туннеля, а bootstrap-резолвера
+        // в таком конфиге нет вовсе — ссылаться было бы не на что.
+        var root = CompileWith(ProxyOnlyRules, new SingBoxOptions
+        {
+            Scope = TunnelScope.ProxyOnly,
+            DnsServerAddresses = ["8.8.8.8/32"],
+            PanelHosts = ["panel.example.net"],
+        });
+
+        Assert.DoesNotContain(
+            root.GetProperty("dns").GetProperty("rules").EnumerateArray(),
+            r => r.GetProperty("server").GetString() == "bootstrap");
+    }
+
+    [Fact]
+    public void WithoutServersTheTunnelDetourIsNotUsed()
+    {
+        // Detour на селектор без единого сервера убил бы разрешение имён
+        // целиком — а это состояние наступает при пустой подписке.
+        var engine = RuleSetLoader.Load(ProxyOnlyRules);
+        var result = new SingBoxConfigCompiler().Compile(engine.RuleSet, [], new SingBoxOptions
+        {
+            Scope = TunnelScope.ProxyOnly,
+            DnsServerAddresses = ["8.8.8.8/32"],
+            DnsThroughTunnel = true,
+        });
+
+        var root = JsonDocument.Parse(result.Json).RootElement;
+
+        Assert.False(DnsServer(root, "remote").TryGetProperty("detour", out _));
+    }
+
+    [Fact]
+    public void TunMtuIsSetAndFitsAnOrdinaryPath()
+    {
+        // Без явного значения адаптер поднимался с MTU 65535 при физическом
+        // интерфейсе в 1500: мелкие запросы проходили, крупные загрузки
+        // рассыпались. В Telegram это выглядело как «переписка работает,
+        // фотографии не грузятся» — на неисправность маршрутов непохоже вовсе.
+        var root = CompileProxyOnly(ProxyOnlyRules, "8.8.8.8/32");
+        var mtu = root.GetProperty("inbounds")[0].GetProperty("mtu").GetInt32();
+
+        Assert.InRange(mtu, 1280, 1452);
+    }
+
+    [Fact]
+    public void TunGetsAnIpV6AddressSoIpV6RoutesAreInstalled()
+    {
+        // Без адреса IPv6 auto_route не ставит ни одного маршрута IPv6,
+        // и резолвер провайдера по адресу fd7d:…::1 остаётся вне туннеля:
+        // отвечает настоящими адресами в обход fakeip. Перехват при этом
+        // выглядит исправным — обход идёт по второму протоколу.
+        var root = CompileProxyOnly(ProxyOnlyRules, "8.8.8.8/32");
+
+        var addresses = root.GetProperty("inbounds")[0].GetProperty("address")
+            .EnumerateArray()
+            .Select(e => e.GetString()!)
+            .ToArray();
+
+        Assert.Contains(addresses, a => a.Contains(':'));
+    }
+
+    [Fact]
+    public void DohToSystemResolversIsRejected()
+    {
+        // Windows 11 сама поднимает запрос до DNS over HTTPS, и тогда он уходит
+        // по TCP/443 мимо hijack-dns: домен резолвится по-настоящему, fakeip
+        // не выдаётся, и трафик, которому положен туннель, идёт напрямую.
+        // Отказ возвращает резолвер на UDP/53, где мы его перехватываем.
+        var root = CompileProxyOnly(ProxyOnlyRules, "8.8.8.8/32", "1.1.1.1/32");
+
+        var reject = Rules(root).Single(r =>
+            r.TryGetProperty("action", out var a) && a.GetString() == "reject");
+
+        var addresses = reject.GetProperty("ip_cidr").EnumerateArray()
+            .Select(e => e.GetString()!)
+            .ToArray();
+
+        Assert.Equal(["8.8.8.8/32", "1.1.1.1/32"], addresses);
+        Assert.Equal(443, reject.GetProperty("port")[0].GetInt32());
+    }
+
+    [Fact]
+    public void DohRejectAppliesOnlyToTunnelTraffic()
+    {
+        // Наш собственный резолвер — тоже DoH и живёт по тем же адресам.
+        // Без привязки к входящему отказ накрыл бы его самого.
+        var root = CompileProxyOnly(ProxyOnlyRules, "8.8.8.8/32");
+
+        var reject = Rules(root).Single(r =>
+            r.TryGetProperty("action", out var a) && a.GetString() == "reject");
+
+        Assert.Equal("tun-in", reject.GetProperty("inbound")[0].GetString());
+    }
+
+    [Fact]
+    public void DohRejectStandsBeforeAnyRoutingDecision()
+    {
+        // Порядок существенный: правило, отправившее запрос в исходящий,
+        // сделало бы отказ недостижимым.
+        var root = CompileProxyOnly(ProxyOnlyRules, "8.8.8.8/32");
+        var rules = Rules(root).ToArray();
+
+        int reject = Array.FindIndex(rules, r =>
+            r.TryGetProperty("action", out var a) && a.GetString() == "reject");
+        int firstOutbound = Array.FindIndex(rules, r => r.TryGetProperty("outbound", out _));
+
+        Assert.True(reject >= 0, "правило отказа отсутствует");
+        Assert.True(reject < firstOutbound, "отказ должен стоять раньше маршрутизации");
+    }
+
+    [Fact]
+    public void WithoutSelectiveCaptureThereIsNothingToReject()
+    {
+        // При сплошном перехвате резолверы в туннель не заводятся отдельно,
+        // и ломать DoH незачем.
+        var root = CompileToJson(ProxyOnlyRules, Server());
+
+        Assert.DoesNotContain(Rules(root), r =>
+            r.TryGetProperty("action", out var a) && a.GetString() == "reject");
+    }
+
+    [Fact]
+    public void ProxyRuleWithAutoServerPointsAtTheSelector()
+    {
+        var root = CompileToJson("""
+            mode: selective
+            rules:
+              - match: domain
+                value: "*.rutracker.org"
+                mode: proxy
+                server: "auto"
+            """, Server());
+
+        var rule = Rules(root).Single(r => r.TryGetProperty("domain_suffix", out _));
+
+        Assert.Equal("rutracker.org", rule.GetProperty("domain_suffix")[0].GetString());
+        Assert.Equal("auto", rule.GetProperty("outbound").GetString());
+    }
+
+    [Fact]
+    public void DesyncRuleCompilesToDirect()
+    {
+        // Десинк исполняет WinDivert на реальном интерфейсе, поэтому для
+        // sing-box такой трафик — обычный direct.
+        var root = CompileToJson("""
+            mode: selective
+            rules:
+              - match: domain
+                value: "*.youtube.com"
+                mode: desync
+            """, Server());
+
+        var rule = Rules(root).Single(r => r.TryGetProperty("domain_suffix", out _));
+        Assert.Equal("direct", rule.GetProperty("outbound").GetString());
+    }
+
+    [Fact]
+    public void ProcessRuleUsesPathOrNameDependingOnTheValue()
+    {
+        var root = CompileToJson("""
+            mode: selective
+            rules:
+              - match: process
+                value: "somegame.exe"
+                mode: direct
+              - match: process
+                value: "C:\\Program Files\\App\\app.exe"
+                mode: direct
+            """, Server());
+
+        Assert.Contains(Rules(root), r => r.TryGetProperty("process_name", out _));
+        Assert.Contains(Rules(root), r => r.TryGetProperty("process_path", out _));
+    }
+
+    [Fact]
+    public void XhttpServersAreUsedNotSkipped()
+    {
+        // Прежде такой сервер выбрасывался: xhttp придуман в Xray, и обычный
+        // sing-box его не знает. Подписка из семнадцати серверов показывала
+        // четырнадцать, а целиком построенная на xhttp — ноль. Со сборкой
+        // extended он идёт в конфиг наравне с остальными.
+        var engine = RuleSetLoader.Load("mode: selective\nrules: []");
+        var servers = new[]
+        {
+            Server("ok"),
+            Server("xhttp-node", ProxyProtocol.Vless, transport: "xhttp"),
+        };
+
+        var result = new SingBoxConfigCompiler().Compile(engine.RuleSet, servers, new SingBoxOptions());
+
+        Assert.Equal(2, result.UsedServers.Count);
+        Assert.Empty(result.SkippedServers);
+        Assert.Contains("xhttp", result.Json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AutoPickTakesAtMostTwoFastestFromOneEntry()
+    {
+        // Trust 28.09: 16 серверов на одном входе, общий замер движка бил
+        // по нему пачкой в 16 соединений. С одного входа — два быстрейших,
+        // остальные остаются в селекторе, выбрать их руками можно.
+        var engine = RuleSetLoader.Load("mode: selective\nrules: []");
+        var servers = new[]
+        {
+            Server("a"), Server("b"), Server("c"), Server("d"),
+            Server("other") with { Host = "other.example.com" },
+        };
+
+        var result = new SingBoxConfigCompiler().Compile(engine.RuleSet, servers, new SingBoxOptions
+        {
+            KnownLatency = new Dictionary<string, double> { ["c"] = 10, ["a"] = 20, ["b"] = 300 },
+        });
+
+        var root = JsonDocument.Parse(result.Json).RootElement;
+        var outbounds = root.GetProperty("outbounds").EnumerateArray().ToList();
+
+        var auto = outbounds.Single(o => o.GetProperty("tag").GetString() == "auto-latency");
+        var selector = outbounds.Single(o => o.GetProperty("tag").GetString() == "auto");
+
+        Assert.Equal(["a", "c", "other"], auto.GetProperty("outbounds").EnumerateArray().Select(e => e.GetString()));
+        Assert.Contains("d", selector.GetProperty("outbounds").EnumerateArray().Select(e => e.GetString()));
+    }
+
+    [Fact]
+    public void XhttpTransportCarriesPadding()
+    {
+        // Без набивки движок отказывается разбирать конфиг со словами
+        // «x_padding_bytes cannot be disabled», и отказ приходит уже
+        // при запуске, а не при сборке.
+        var engine = RuleSetLoader.Load("mode: selective\nrules: []");
+
+        var result = new SingBoxConfigCompiler().Compile(
+            engine.RuleSet,
+            [Server("xhttp-node", ProxyProtocol.Vless, transport: "xhttp")],
+            new SingBoxOptions());
+
+        Assert.Contains("x_padding_bytes", result.Json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DnsCarriesNoDeprecatedIndependentCache()
+    {
+        // Объявлен устаревшим в 1.14.0 и будет убран в 1.16.0. Держать его
+        // до последнего значило бы чинить конфиг в тот день, когда движок
+        // обновится и перестанет его собирать.
+        var engine = RuleSetLoader.Load("mode: selective\nrules: []");
+        var result = new SingBoxConfigCompiler().Compile(engine.RuleSet, [Server("ok")], new SingBoxOptions());
+
+        Assert.DoesNotContain("independent_cache", result.Json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AutoRoutesThroughLatencyTestNotAFixedFirstServer()
+    {
+        // Раньше по умолчанию брался первый сервер подписки. У пользователя
+        // это оказалась мёртвая нода, и прокси не работал вовсе.
+        var engine = RuleSetLoader.Load("mode: selective\nrules: []");
+        var result = new SingBoxConfigCompiler()
+            .Compile(engine.RuleSet, [Server("first"), Server("second")], new SingBoxOptions());
+
+        var outbounds = JsonDocument.Parse(result.Json).RootElement
+            .GetProperty("outbounds").EnumerateArray().ToList();
+
+        var urltest = outbounds.Single(o => o.GetProperty("type").GetString() == "urltest");
+        var selector = outbounds.Single(o => o.GetProperty("type").GetString() == "selector");
+
+        // Автоподбор перебирает все серверы.
+        Assert.Equal(2, urltest.GetProperty("outbounds").GetArrayLength());
+        Assert.True(urltest.TryGetProperty("interval", out _));
+
+        // Селектор по умолчанию указывает на автоподбор, а не на конкретный сервер.
+        Assert.Equal("auto-latency", selector.GetProperty("default").GetString());
+
+        // При этом в селекторе есть и все серверы: только так их можно
+        // закрепить вручную через Clash API. Четвёртым — прямой выход:
+        // переключением на него трафик уводится мимо туннеля, когда все
+        // выходы легли. См. SelectorDirectTests.
+        Assert.Equal(4, selector.GetProperty("outbounds").GetArrayLength());
+    }
+
+    [Fact]
+    public void LatencyToleranceIsSetToAvoidFlapping()
+    {
+        var engine = RuleSetLoader.Load("mode: selective\nrules: []");
+        var result = new SingBoxConfigCompiler()
+            .Compile(engine.RuleSet, [Server()], new SingBoxOptions { LatencyTolerance = 120 });
+
+        var urltest = JsonDocument.Parse(result.Json).RootElement
+            .GetProperty("outbounds").EnumerateArray()
+            .Single(o => o.GetProperty("type").GetString() == "urltest");
+
+        Assert.Equal(120, urltest.GetProperty("tolerance").GetInt32());
+    }
+
+    [Fact]
+    public void NoSelectorIsEmittedWithoutServers()
+    {
+        var engine = RuleSetLoader.Load("mode: selective\nrules: []");
+        var result = new SingBoxConfigCompiler()
+            .Compile(engine.RuleSet, Array.Empty<ProxyServer>(), new SingBoxOptions());
+
+        var types = JsonDocument.Parse(result.Json).RootElement
+            .GetProperty("outbounds").EnumerateArray()
+            .Select(o => o.GetProperty("type").GetString())
+            .ToList();
+
+        Assert.DoesNotContain("urltest", types);
+        Assert.DoesNotContain("selector", types);
+    }
+
+    [Fact]
+    public void DuplicateServerNamesGetUniqueTags()
+    {
+        // sing-box адресует outbound'ы по тегу, а подписки повторяют названия.
+        var engine = RuleSetLoader.Load("mode: selective\nrules: []");
+        var result = new SingBoxConfigCompiler()
+            .Compile(engine.RuleSet, [Server("Node"), Server("Node")], new SingBoxOptions());
+
+        var tags = result.ServerTags.Values.ToList();
+        Assert.Equal(2, tags.Distinct().Count());
+    }
+
+    [Fact]
+    public void WithoutServersProxyRulesFallBackToDirect()
+    {
+        // Ссылка на несуществующий outbound не дала бы конфигу даже запуститься.
+        var root = CompileToJson("""
+            mode: selective
+            rules:
+              - match: domain
+                value: "example.com"
+                mode: proxy
+            """);
+
+        var rule = Rules(root).Single(r => r.TryGetProperty("domain", out _));
+        Assert.Equal("direct", rule.GetProperty("outbound").GetString());
+        Assert.Equal("direct", root.GetProperty("route").GetProperty("final").GetString());
+    }
+
+    [Fact]
+    public void ProxyAllModeSendsEverythingToTheSelectorButKeepsDirectRules()
+    {
+        // Прежде этот режим отбрасывал правила целиком, и вместе с ними
+        // исключения на прямой проход. Оставлять их обязательно: см.
+        // ProxyAllStillSendsRussianAddressesDirect.
+        var root = CompileToJson("""
+            mode: proxy
+            rules:
+              - match: domain
+                value: "example.com"
+                mode: direct
+            """, Server());
+
+        Assert.Equal("auto", root.GetProperty("route").GetProperty("final").GetString());
+
+        var kept = Rules(root).Single(r => r.TryGetProperty("domain", out _));
+
+        Assert.Equal("direct", kept.GetProperty("outbound").GetString());
+    }
+
+    [Fact]
+    public void OffModeProducesDirectOnlyRouting()
+    {
+        var root = CompileToJson("""
+            mode: off
+            rules:
+              - match: domain
+                value: "example.com"
+                mode: proxy
+            """, Server());
+
+        Assert.Equal("direct", root.GetProperty("route").GetProperty("final").GetString());
+        Assert.DoesNotContain(Rules(root), r => r.TryGetProperty("domain", out _));
+    }
+
+    [Fact]
+    public void RealityOutboundCarriesUtlsAndKeys()
+    {
+        var engine = RuleSetLoader.Load("mode: selective\nrules: []");
+        var result = new SingBoxConfigCompiler()
+            .Compile(engine.RuleSet, [Server("US", ProxyProtocol.Trojan, "tcp")], new SingBoxOptions());
+
+        var root = JsonDocument.Parse(result.Json).RootElement;
+        var outbound = root.GetProperty("outbounds").EnumerateArray()
+            .Single(o => o.GetProperty("type").GetString() == "trojan");
+
+        var tls = outbound.GetProperty("tls");
+        Assert.True(tls.GetProperty("reality").GetProperty("enabled").GetBoolean());
+        Assert.Equal("abcd", tls.GetProperty("reality").GetProperty("short_id").GetString());
+
+        // Без подделки отпечатка сервер REALITY не отвечает.
+        Assert.True(tls.GetProperty("utls").GetProperty("enabled").GetBoolean());
+    }
+
+    [Fact]
+    public void MandatoryFieldsForSingBox112ArePresent()
+    {
+        var root = CompileToJson("mode: selective\nrules: []", Server());
+
+        // Без default_domain_resolver sing-box 1.12+ отказывается стартовать.
+        Assert.True(root.GetProperty("route").TryGetProperty("default_domain_resolver", out _));
+
+        var dnsServers = root.GetProperty("dns").GetProperty("servers").EnumerateArray().ToList();
+        Assert.Contains(dnsServers, s => s.GetProperty("type").GetString() == "fakeip");
+    }
+
+    [Fact]
+    public void ConfigIsWrittenWithoutByteOrderMark()
+    {
+        // Разборщик JSON в Go спотыкается о BOM.
+        var path = Path.Combine(Path.GetTempPath(), $"zephyron-bom-{Guid.NewGuid():N}.json");
+
+        try
+        {
+            SingBoxConfigCompiler.WriteToFile(path, """{ "a": 1 }""");
+
+            var bytes = File.ReadAllBytes(path);
+            Assert.False(bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void NonAsciiServerTagsSurviveSerialization()
+    {
+        var engine = RuleSetLoader.Load("mode: selective\nrules: []");
+        var result = new SingBoxConfigCompiler()
+            .Compile(engine.RuleSet, [Server("🇸🇪 Trojan | Швеция")], new SingBoxOptions());
+
+        Assert.Contains("Швеция", result.Json, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Сквозная проверка настоящим sing-box. Пропускается, если движка нет:
+    /// он не хранится в репозитории.
+    /// </summary>
+    [Fact]
+    public void GeneratedConfigPassesSingBoxCheck()
+    {
+        var singBox = FindSingBox();
+        if (singBox is null)
+            return;
+
+        var engine = RuleSetLoader.Load("""
+            mode: selective
+            rules:
+              - match: process
+                value: "steam.exe"
+                mode: direct
+              - match: domain
+                value: "*.rutracker.org"
+                mode: proxy
+                server: "auto"
+              - match: domain
+                value: "*.youtube.com"
+                mode: desync
+              - match: ip
+                value: "203.0.113.0/24"
+                mode: proxy
+            """);
+
+        var servers = new[]
+        {
+            Server("hy2", ProxyProtocol.Hysteria2),
+            Server("tj", ProxyProtocol.Trojan, "tcp"),
+            Server("vl", ProxyProtocol.Vless, "tcp"),
+        };
+
+        // С пином на общем адресе: логическое правило «адрес и имя»
+        // появилось 23.09, и формат его проверяет только сам движок.
+        var result = new SingBoxConfigCompiler().Compile(engine.RuleSet, servers, new SingBoxOptions
+        {
+            PinnedProxyAddresses = ["203.0.114.7/32"],
+            PinnedProxyNames = ["files.rutracker.org"],
+
+            // С паролями входов (27.09): поля users и secret движок разбирает
+            // сам, и незнакомое поле уронило бы весь конфиг.
+            HealthInbound = true,
+            Keys = EngineKeys.Generate(),
+        });
+        var path = Path.Combine(Path.GetTempPath(), $"zephyron-check-{Guid.NewGuid():N}.json");
+
+        try
+        {
+            SingBoxConfigCompiler.WriteToFile(path, result.Json);
+
+            var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = singBox,
+                ArgumentList = { "check", "-c", path },
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+            })!;
+
+            var stderr = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+
+            Assert.True(process.ExitCode == 0, $"sing-box check не пройден: {stderr}");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// DNS через туннель с панелями в обход — тем же настоящим sing-box:
+    /// правило DNS ссылается на bootstrap, и формат его проверяет только движок.
+    /// </summary>
+    [Fact]
+    public void TunnelDnsWithPanelBypassPassesSingBoxCheck()
+    {
+        var singBox = FindSingBox();
+        if (singBox is null)
+            return;
+
+        var engine = RuleSetLoader.Load(ProxyOnlyRules);
+        var result = new SingBoxConfigCompiler().Compile(
+            engine.RuleSet,
+            [Server("vl", ProxyProtocol.Vless, "tcp")],
+            new SingBoxOptions
+            {
+                Scope = TunnelScope.ProxyOnly,
+                DnsServerAddresses = [
+                    "8.8.8.8/32",
+
+                    // Резолвер роутера link-local: с номером адаптера sing-box
+                    // отвергал весь конфиг (обсуждение #5, 25.09).
+                    SystemResolvers.ToPrefix(System.Net.IPAddress.Parse("fe80::f2b4:d2ff:fec8:b5e6%6")),
+                ],
+                DnsThroughTunnel = true,
+                PanelHosts = ["panel.example.net", "sub.example.org"],
+            });
+
+        var path = Path.Combine(Path.GetTempPath(), $"zephyron-check-{Guid.NewGuid():N}.json");
+
+        try
+        {
+            SingBoxConfigCompiler.WriteToFile(path, result.Json);
+
+            var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = singBox,
+                ArgumentList = { "check", "-c", path },
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+            })!;
+
+            var stderr = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+
+            Assert.True(process.ExitCode == 0, $"sing-box check не пройден: {stderr}");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>DNS «авто» — тем же настоящим sing-box: переключатель пути и detour на него.</summary>
+    [Fact]
+    public void AutoDnsPassesSingBoxCheck()
+    {
+        var singBox = FindSingBox();
+        if (singBox is null)
+            return;
+
+        var engine = RuleSetLoader.Load(ProxyOnlyRules);
+        var result = new SingBoxConfigCompiler().Compile(
+            engine.RuleSet,
+            [Server("vl", ProxyProtocol.Vless, "tcp")],
+            new SingBoxOptions
+            {
+                Scope = TunnelScope.ProxyOnly,
+                DnsServerAddresses = ["8.8.8.8/32"],
+                DnsViaAuto = true,
+                PanelHosts = ["panel.example.net"],
+            });
+
+        var path = Path.Combine(Path.GetTempPath(), $"zephyron-check-{Guid.NewGuid():N}.json");
+
+        try
+        {
+            SingBoxConfigCompiler.WriteToFile(path, result.Json);
+
+            var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = singBox,
+                ArgumentList = { "check", "-c", path },
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+            })!;
+
+            var stderr = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+
+            Assert.True(process.ExitCode == 0, $"sing-box check не пройден: {stderr}");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// Конфиг пробника обязан оставаться валидным: на нём держится вся проверка
+    /// «прокси жив», и его ломала уже одна регрессия — detour DNS-сервера
+    /// в пустой direct-исходящий, который sing-box 1.13 отвергает.
+    /// </summary>
+    [Fact]
+    public void ProbeConfigPassesSingBoxCheck()
+    {
+        var singBox = FindSingBox();
+        if (singBox is null)
+            return;
+
+        var json = new SingBoxConfigCompiler()
+            .CompileProbeConfig(Server("probe", ProxyProtocol.Vless, "tcp"), 21099, logPath: null,
+                keys: EngineKeys.Generate());
+
+        var path = Path.Combine(Path.GetTempPath(), $"zephyron-probe-{Guid.NewGuid():N}.json");
+
+        try
+        {
+            SingBoxConfigCompiler.WriteToFile(path, json);
+
+            var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = singBox,
+                ArgumentList = { "check", "-c", path },
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+            })!;
+
+            var stderr = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+
+            Assert.True(process.ExitCode == 0, $"конфиг пробника не проходит проверку: {stderr}");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void ProbeConfigHasNoTunAndListensOnLoopbackOnly()
+    {
+        // Пробник обязан работать без прав администратора: никакого TUN,
+        // инбаунд только на петле.
+        var json = new SingBoxConfigCompiler()
+            .CompileProbeConfig(Server(), 21099, logPath: null);
+
+        var root = JsonDocument.Parse(json).RootElement;
+        var inbounds = root.GetProperty("inbounds").EnumerateArray().ToList();
+
+        Assert.Single(inbounds);
+        Assert.Equal("mixed", inbounds[0].GetProperty("type").GetString());
+        Assert.Equal("127.0.0.1", inbounds[0].GetProperty("listen").GetString());
+        Assert.DoesNotContain("\"tun\"", json);
+    }
+
+    /// <summary>Обфускация доходит до конфига движка.</summary>
+    /// <remarks>
+    /// Разобрать её из ссылки мало: пока блок не попадал в исходящий, сервер
+    /// молчал ровно так же. Проверка замкнута на конец цепочки — на то, что
+    /// увидит sing-box.
+    /// </remarks>
+    [Fact]
+    public void ProbeConfigCarriesHysteria2Obfuscation()
+    {
+        var server = Server("lv", ProxyProtocol.Hysteria2, "udp") with
+        {
+            ObfsType = "salamander",
+            ObfsPassword = "hidden",
+        };
+
+        var json = new SingBoxConfigCompiler().CompileProbeConfig(server, 21099, logPath: null);
+
+        var outbound = JsonDocument.Parse(json).RootElement
+            .GetProperty("outbounds").EnumerateArray()
+            .First(o => o.GetProperty("tag").GetString() == "probe-out");
+
+        var obfs = outbound.GetProperty("obfs");
+
+        Assert.Equal("salamander", obfs.GetProperty("type").GetString());
+        Assert.Equal("hidden", obfs.GetProperty("password").GetString());
+    }
+
+    [Fact]
+    public void ProbeConfigWithoutObfuscationHasNoBlock()
+    {
+        var json = new SingBoxConfigCompiler()
+            .CompileProbeConfig(Server("lv", ProxyProtocol.Hysteria2, "udp"), 21099, logPath: null);
+
+        var outbound = JsonDocument.Parse(json).RootElement
+            .GetProperty("outbounds").EnumerateArray()
+            .First(o => o.GetProperty("tag").GetString() == "probe-out");
+
+        Assert.False(outbound.TryGetProperty("obfs", out _));
+    }
+
+    /// <summary>Подставленный адрес не должен уносить с собой SNI.</summary>
+    /// <remarks>
+    /// Адрес ставится вместо имени, чтобы обойти перехват DNS работающим
+    /// движком. Но по имени сервер выбирает сертификат: потеряв его,
+    /// мы сменили бы одну поломку на другую.
+    /// </remarks>
+    [Fact]
+    public void PinnedAddressKeepsTheNameForSni()
+    {
+        var server = Server("lv", ProxyProtocol.Hysteria2, "udp");
+
+        var json = new SingBoxConfigCompiler()
+            .CompileProbeConfig(server, 21099, logPath: null, resolvedAddress: "31.76.62.95");
+
+        var outbound = JsonDocument.Parse(json).RootElement
+            .GetProperty("outbounds").EnumerateArray()
+            .First(o => o.GetProperty("tag").GetString() == "probe-out");
+
+        Assert.Equal("31.76.62.95", outbound.GetProperty("server").GetString());
+        Assert.Equal(server.Host, outbound.GetProperty("tls").GetProperty("server_name").GetString());
+    }
+
+    private static string? FindSingBox()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (directory is not null)
+        {
+            var tools = Path.Combine(directory.FullName, "tools");
+
+            if (Directory.Exists(tools))
+            {
+                var found = Directory
+                    .EnumerateFiles(tools, "sing-box.exe", SearchOption.AllDirectories)
+                    .FirstOrDefault();
+
+                if (found is not null)
+                    return found;
+            }
+
+            directory = directory.Parent;
+        }
+
+        return null;
+    }
+}

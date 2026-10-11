@@ -1,0 +1,376 @@
+using System.Net;
+using Zephyron.Core.Connections;
+using Zephyron.Core.Rules;
+using Zephyron.Core.Services;
+using Zephyron.Zapret;
+using Xunit;
+
+namespace Zephyron.Core.Tests;
+
+/// <summary>
+/// Вид по сервисам: Discord, YouTube и прочее так, как о них думает человек.
+/// </summary>
+/// <remarks>
+/// Ценность появляется там, где части сервиса расходятся: у Discord голос
+/// ломается иначе, чем переписка, и лечится иначе.
+/// </remarks>
+public sealed class ServiceRoutingTests : IDisposable
+{
+    private readonly string _root = Path.Combine(Path.GetTempPath(), $"zephyron-svc-{Guid.NewGuid():N}");
+
+    public ServiceRoutingTests()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "config", "lists"));
+
+        Write("discord-media.txt", "discord.media");
+        Write("discord.txt", "discord.com", "discord.gg", "discordapp.com");
+    }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_root))
+            Directory.Delete(_root, recursive: true);
+    }
+
+    private void Write(string name, params string[] lines) =>
+        File.WriteAllLines(Path.Combine(_root, "config", "lists", name), lines);
+
+    private static ServiceDefinition Discord => new()
+    {
+        Name = "Discord",
+        Parts =
+        [
+            new ServicePart { Name = "Голос", List = "config/lists/discord-media.txt" },
+            new ServicePart { Name = "Текст", List = "config/lists/discord.txt" },
+        ],
+    };
+
+    private RuleEngine Load(string yaml)
+    {
+        var engine = RuleSetLoader.Load(yaml);
+        RuleSetExpander.Expand(engine.RuleSet, _root);
+        return engine;
+    }
+
+    private static ConnectionEvent Connection(string host) => new()
+    {
+        Timestamp = DateTimeOffset.UnixEpoch,
+        Protocol = ProtocolKind.Tcp,
+        RemoteAddress = IPAddress.Parse("203.0.113.7"),
+        RemotePort = 443,
+        Hostname = host,
+    };
+
+    [Fact]
+    public void AHostListRuleCoversEveryDomainInTheFile()
+    {
+        var engine = Load("""
+            mode: selective
+            rules:
+              - match: hostlist
+                value: "config/lists/discord.txt"
+                mode: proxy
+            default:
+              mode: desync
+            """);
+
+        Assert.Equal(RoutingMode.Proxy, engine.Evaluate(Connection("discord.com")).Mode);
+        Assert.Equal(RoutingMode.Proxy, engine.Evaluate(Connection("discord.gg")).Mode);
+        Assert.Equal(RoutingMode.Proxy, engine.Evaluate(Connection("discordapp.com")).Mode);
+    }
+
+    [Fact]
+    public void EntriesInAListAreZonesNotExactNames()
+    {
+        // В списках Zapret пишут discord.media, подразумевая и поддомены:
+        // голосовые серверы называются russia1234.discord.media. Толковать
+        // записи буквально значило бы не поймать ровно то, ради чего список нужен.
+        var engine = Load("""
+            mode: selective
+            rules:
+              - match: hostlist
+                value: "config/lists/discord-media.txt"
+                mode: proxy
+            default:
+              mode: desync
+            """);
+
+        Assert.Equal(RoutingMode.Proxy, engine.Evaluate(Connection("russia1234.discord.media")).Mode);
+        Assert.Equal(RoutingMode.Proxy, engine.Evaluate(Connection("discord.media")).Mode);
+    }
+
+    [Fact]
+    public void PartsOfOneServiceCanGoDifferentWays()
+    {
+        // Ровно то, ради чего затевалось разделение.
+        var engine = Load("""
+            mode: selective
+            rules:
+              - match: hostlist
+                value: "config/lists/discord-media.txt"
+                mode: proxy
+            default:
+              mode: desync
+            """);
+
+        var parts = ServiceRouting.Describe(Discord, engine, _root, EmptyUserRules());
+
+        Assert.Equal(RoutingMode.Proxy, parts[0].Mode);
+        Assert.Equal(RoutingMode.Desync, parts[1].Mode);
+    }
+
+    [Fact]
+    public void AddressRulesDoNotDecideTheModeOfADomain()
+    {
+        // Регрессия. Показ подставлял выдуманный адрес, а IPAddress.None —
+        // это 255.255.255.255, и он попадал в список российских подсетей.
+        // Из-за этого все сервисы показывались идущими напрямую, хотя шли
+        // через десинк; верным оставался лишь RuTracker, у которого доменное
+        // правило проверяется раньше адресных.
+        File.WriteAllLines(Path.Combine(_root, "config", "lists", "все-адреса.txt"), ["0.0.0.0/0"]);
+
+        var engine = Load("""
+            mode: selective
+            rules:
+              - match: ipset
+                value: "config/lists/все-адреса.txt"
+                mode: direct
+            default:
+              mode: desync
+            """);
+
+        var parts = ServiceRouting.Describe(Discord, engine, _root, EmptyUserRules());
+
+        Assert.All(parts, p => Assert.Equal(RoutingMode.Desync, p.Mode));
+    }
+
+    [Fact]
+    public void AnAddressBasedPartIsAskedAboutByAddress()
+    {
+        // Так устроен Telegram: доменной секции у него нет вовсе, клиент ходит
+        // по адресам мимо DNS. Спросив про домен, мы получали ответ про другой
+        // трафик — и приложение показывалось идущим через десинк, хотя шло
+        // через VPN.
+        File.WriteAllLines(Path.Combine(_root, "config", "lists", "ipset-telegram.txt"), ["91.108.56.0/22"]);
+        Write("telegram.txt", "telegram.org");
+
+        var engine = Load("""
+            mode: selective
+            rules:
+              - match: ipset
+                value: "config/lists/ipset-telegram.txt"
+                mode: proxy
+            default:
+              mode: desync
+            """);
+
+        var telegram = new ServiceDefinition
+        {
+            Name = "Telegram",
+            Parts =
+            [
+                new ServicePart { Name = "Приложение", List = "config/lists/ipset-telegram.txt", ByAddress = true },
+                new ServicePart { Name = "Сайт", List = "config/lists/telegram.txt" },
+            ],
+        };
+
+        var parts = ServiceRouting.Describe(telegram, engine, _root, EmptyUserRules());
+
+        Assert.Equal(RoutingMode.Proxy, parts[0].Mode);
+        Assert.Equal(RoutingMode.Desync, parts[1].Mode);
+    }
+
+    [Fact]
+    public void AnAddressPartRemembersItsOwnChoice()
+    {
+        // Правило пишется того же вида, каким часть задана; пометка «ваш выбор»
+        // должна узнавать именно его, а не искать доменное.
+        File.WriteAllLines(Path.Combine(_root, "config", "lists", "ipset-telegram.txt"), ["91.108.56.0/22"]);
+
+        var users = Path.Combine(_root, "rules.user.yaml");
+        var file = UserRulesFile.Load(users);
+        file.Set(MatchKind.IpSet, "config/lists/ipset-telegram.txt", RoutingMode.Proxy);
+        file.Save();
+
+        var service = new ServiceDefinition
+        {
+            Name = "Telegram",
+            Parts = [new ServicePart { Name = "Приложение", List = "config/lists/ipset-telegram.txt", ByAddress = true }],
+        };
+
+        var parts = ServiceRouting.Describe(service, Load("mode: selective"), _root, UserRulesFile.Load(users));
+
+        Assert.True(parts[0].Explicit);
+    }
+
+    /// <summary>
+    /// Часть, выключенная по умолчанию, показана «выключено», пока человек не выбрал режим.
+    /// </summary>
+    /// <remarks>
+    /// Владелец 06.10 о запасном пути Discord: 3,4 млн адресов, из них ~791 тыс.
+    /// Cloudflare и ~664 тыс. Google — «вот это выключи». Прежде показывался режим,
+    /// которым движок решает первый адрес списка, хотя части не действовало ничего.
+    /// </remarks>
+    [Fact]
+    public void ADefaultOffPartIsOffUntilChosen()
+    {
+        File.WriteAllLines(Path.Combine(_root, "config", "lists", "ipset-discord.txt"), ["34.0.48.0/24"]);
+
+        var service = new ServiceDefinition
+        {
+            Name = "Discord",
+            Parts = [new ServicePart { Name = "Запасной путь", List = "config/lists/ipset-discord.txt", ByAddress = true, DefaultOff = true }],
+        };
+
+        var off = ServiceRouting.Describe(service, Load("mode: selective"), _root, EmptyUserRules());
+
+        Assert.True(off[0].Off);
+        Assert.False(off[0].Explicit);
+        Assert.Equal("выключено", off[0].DescribeMode());
+
+        var users = Path.Combine(_root, "rules.user.yaml");
+        var file = UserRulesFile.Load(users);
+        file.Set(MatchKind.IpSet, "config/lists/ipset-discord.txt", RoutingMode.Proxy);
+        file.Save();
+
+        var chosen = ServiceRouting.Describe(service, Load("mode: selective"), _root, UserRulesFile.Load(users));
+
+        Assert.False(chosen[0].Off);
+        Assert.True(chosen[0].Explicit);
+    }
+
+    /// <summary>
+    /// У частей, выключенных по умолчанию, нет заводского правила.
+    /// </summary>
+    /// <remarks>
+    /// Иначе «Маршруты» показывали бы «выключено», а правило действовало:
+    /// заводское гасит только «выключено», выбранное человеком (mode: off).
+    /// </remarks>
+    [Fact]
+    public void DefaultOffPartsHaveNoFactoryRule()
+    {
+        for (var d = new DirectoryInfo(AppContext.BaseDirectory); d is not null; d = d.Parent)
+        {
+            var rules = Path.Combine(d.FullName, "config", "rules.yaml");
+
+            if (!File.Exists(rules))
+                continue;
+
+            var factory = RuleSetLoader.LoadRawRules(rules).Select(r => r.Value.Replace('\\', '/')).ToList();
+            var off = ServiceCatalog.All.SelectMany(s => s.Parts).Where(p => p.DefaultOff).ToList();
+
+            Assert.NotEmpty(off);
+            Assert.All(off, p => Assert.DoesNotContain(p.List, factory, StringComparer.OrdinalIgnoreCase));
+            return;
+        }
+
+        Assert.Fail("config/rules.yaml не найден");
+    }
+
+    [Fact]
+    public void ARuleWrittenByHandIsRecognisedInTheService()
+    {
+        // Иначе список начнёт врать: человек направил домен вручную,
+        // а сервис показывает прежнее.
+        var engine = Load("""
+            mode: selective
+            rules:
+              - match: domain
+                value: "*.discord.media"
+                mode: direct
+            default:
+              mode: desync
+            """);
+
+        var parts = ServiceRouting.Describe(Discord, engine, _root, EmptyUserRules());
+
+        Assert.Equal(RoutingMode.Direct, parts[0].Mode);
+    }
+
+    [Fact]
+    public void AMissingListIsReportedRatherThanMatchingEverything()
+    {
+        var service = new ServiceDefinition
+        {
+            Name = "Нет такого",
+            Parts = [new ServicePart { Name = "Всё", List = "config/lists/нет-файла.txt" }],
+        };
+
+        var parts = ServiceRouting.Describe(service, Load("mode: selective"), _root, EmptyUserRules());
+
+        Assert.Equal(0, parts[0].DomainCount);
+    }
+
+    [Fact]
+    public void AnUnloadedListMatchesNothingAtAll()
+    {
+        // Правило, чей файл не нашёлся, не должно совпасть со всем подряд:
+        // это увело бы в туннель весь трафик вместо одного сервиса.
+        var engine = RuleSetLoader.Load("""
+            mode: selective
+            rules:
+              - match: hostlist
+                value: "config/lists/нет-файла.txt"
+                mode: proxy
+            default:
+              mode: desync
+            """);
+
+        Assert.Equal(RoutingMode.Desync, engine.Evaluate(Connection("example.com")).Mode);
+    }
+
+    [Fact]
+    public void EveryServiceInTheCatalogHasParts()
+    {
+        Assert.NotEmpty(ServiceCatalog.All);
+
+        Assert.All(ServiceCatalog.All, s =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(s.Name));
+            Assert.NotEmpty(s.Parts);
+
+            Assert.All(s.Parts, p =>
+            {
+                Assert.False(string.IsNullOrWhiteSpace(p.Name));
+
+                // Только наши файлы, без исключений. Раньше здесь допускался
+                // и путь lists/... — список установки Zapret, — и это выходило
+                // боком: без установки правило молча не совпадало ни с чем,
+                // а состав задавал не тот, кто отвечает за последствия.
+                Assert.StartsWith("config/lists/", p.List, StringComparison.Ordinal);
+            });
+        });
+    }
+
+    [Fact]
+    public void ServiceNamesAreUnique()
+    {
+        // Иначе Find вернёт первый попавшийся, а человек выберет другой.
+        var names = ServiceCatalog.All.Select(s => s.Name).ToList();
+
+        Assert.Equal(names.Count, names.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+    }
+
+    [Fact]
+    public void NoListBelongsToTwoServicesUnlessSaidSo()
+    {
+        // Один список в двух местах означает, что человек направит его
+        // в одном разделе, а другой покажет изменение как своё — и оба
+        // будут выглядеть так, будто настройка живёт где-то ещё.
+        //
+        // Исключение одно и намеренное (02.10): видео Amazon IVS у Twitch
+        // и Kick — одно имя, и два разных пути для него рвали оба сервиса.
+        // Тогда общая часть обязана сказать об этом сама, в обоих местах.
+        var shared = ServiceCatalog.All
+            .SelectMany(s => s.Parts)
+            .GroupBy(p => p.List, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .ToList();
+
+        Assert.Equal(["config/lists/kick-video.txt"], shared.Select(g => g.Key));
+        Assert.All(shared.SelectMany(g => g), p => Assert.StartsWith("общая с ", p.Note));
+    }
+
+    private static UserRulesFile EmptyUserRules() =>
+        UserRulesFile.Load(Path.Combine(Path.GetTempPath(), $"zephyron-none-{Guid.NewGuid():N}.yaml"));
+}

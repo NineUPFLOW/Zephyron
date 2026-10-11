@@ -1,0 +1,23 @@
+{
+  // «Небесная», встроенная. Прохладная синева с голубым акцентом —
+  // спокойная и ясная.
+  "name": "Небесная",
+  "author": "Zephyron",
+  "base": "dark",
+  "colors": {
+    "backdrop": "#121821",
+    "surface": "#1B2331",
+    "raised": "#232E40",
+    "border": "#33425A",
+    "text": "#EEF3FA",
+    "muted": "#A9B8CE",
+    "faint": "#7E8EA6",
+    "accent": "#7CC7FF",
+    "accent-dim": "#2E4E72",
+    "danger": "#FF8A8A",
+    "warn": "#FFD07A",
+    "accent-fill": "#4FA3E3",
+    "on-accent": "#08161F",
+    "warn-fill": "#FFD07A"
+  }
+}

@@ -1,0 +1,49 @@
+# Сборка и тесты при каждом изменении.
+#
+# Раннер именно windows: проекты нацелены на net8.0-windows, на linux они
+# не соберутся. Это не придирка к платформе — программа обращается к WFP,
+# WinDivert и планировщику задач, которых на другой системе нет.
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+
+      # Отдельным шагом от сборки: так в логе видно, что именно упало —
+      # восстановление зависимостей или компиляция.
+      - name: Восстановить зависимости
+        run: dotnet restore
+
+      - name: Собрать
+        run: dotnet build --no-restore --configuration Release -warnaserror
+
+      - name: Прогнать тесты
+        run: dotnet test --no-build --configuration Release --verbosity normal
+
+      # Окно собирается отдельно: оно живёт в своём решении и в Zephyron.sln
+      # не входит. Прежде его не собирал никто, и оно ломалось незаметно —
+      # а теперь именно оно и есть выпускаемая программа.
+      - name: Собрать окно
+        run: dotnet build gui/Zephyron.Gui/Zephyron.Gui.csproj --configuration Release -warnaserror
+
+      # Тесты окна — отдельно от тестов библиотек: их проект живёт в решении
+      # окна. До 23.09 CI их не гонял вовсе, и сто пятьдесят проверок
+      # запускались только на машине владельца.
+      - name: Прогнать тесты окна
+        run: dotnet test gui/Zephyron.Gui.sln --configuration Release --verbosity normal
+
+      # Поставляемые правила проверяет тест ShippedRulesTests: прежде это делал
+      # отдельный шаг через консольную команду rules, ушедшую 23.09.

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Zephyron.Core\Zephyron.Core.csproj" />
+    <ProjectReference Include="..\Zephyron.Subscriptions\Zephyron.Subscriptions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Zephyron.Core.Tests" />
+  </ItemGroup>
+
+</Project>
