@@ -1,0 +1,201 @@
+# Сборка выпуска и публикация архива.
+#
+# Один клик: Actions → release → Run workflow. Версия берётся из
+# Directory.Build.props, тег получается v<версия>, а к выпуску прикладывается
+# Zephyron-<версия>.zip с программой внутри.
+#
+# Раннер ubuntu, а не windows, хотя программа для Windows. Сам exe собирается
+# кроссплатформенно: `dotnet publish -r win-x64 --self-contained` кладёт в
+# архив и .NET, и WPF-части, и результат не зависит от того, где шла сборка.
+# Движки (sing-box, tg-ws-proxy, winws2, набор Zapret) скачиваются из своих
+# выпусков — раньше это делал pack.cmd из локальной установки Zapret, и оттого
+# выпуск можно было собрать только на машине владельца.
+#
+# pack.cmd остаётся: он собирает то же самое на Windows из локальных движков.
+# Этот файл — тот же путь, но без установки Zapret и без Windows.
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Версия выпуска, например 0.15.2. Пусто — взять из Directory.Build.props"
+        required: false
+        type: string
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  # Версии движков закреплены, а не «последние»: выпуск должен собираться
+  # одинаково и через год, а «последний» выпуск sing-box однажды отвергнет
+  # наши конфиги (1.14 строже прежних к незнакомым полям). Обновлять
+  # осознанно, вместе с проверкой вживую.
+  SINGBOX_URL: https://github.com/shtorm-7/sing-box-extended/releases/download/v1.14.1-extended-2.7.2/sing-box-1.14.1-extended-2.7.2-windows-amd64.zip
+  SINGBOX_DIR: sing-box-1.14.1-extended-2.7.2-windows-amd64
+  TGWS_URL: https://github.com/valnesfjord/tg-ws-proxy-rs/releases/download/v2.5.4/tg-ws-proxy-x86_64-pc-windows-gnu.zip
+  WINWS2_URL: https://git.zapret.moe/zapretdiscordyoutube/zapret2-fork/releases/download/v1.0.5.2-41-g204fd66-native-3-g9528c5b-native/winws2.exe
+  # Набор Zapret (exe, lua, bin, lists, windivert.filter) одним зеркалом.
+  ZAPRET_REPO: https://github.com/krambovic/Lumen.git
+  ZAPRET_PATH: windows/zapret
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Определить версию
+        id: v
+        env:
+          INPUT: ${{ inputs.version }}
+        run: |
+          FROM_PROPS="$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props | head -1)"
+          VERSION="${INPUT:-$FROM_PROPS}"
+          if [ "$VERSION" != "$FROM_PROPS" ]; then
+            echo "Входная версия $VERSION, а Directory.Build.props объявляет $FROM_PROPS." >&2
+            echo "Подними <Version> в Directory.Build.props и повтори: иначе программа внутри отчитается чужой версией." >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Собираем Zephyron $VERSION"
+
+      - name: Собрать программу
+        run: |
+          dotnet publish gui/Zephyron.Gui/Zephyron.Gui.csproj \
+            -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -p:DebugSymbols=false \
+            -o stage/Zephyron --nologo -v quiet
+
+      - name: Скачать движки
+        run: |
+          set -e
+          mkdir -p dl
+          curl -fsSL -o dl/singbox.zip "$SINGBOX_URL"
+          curl -fsSL -o dl/tgws.zip "$TGWS_URL"
+          curl -fsSL -o dl/winws2.exe "$WINWS2_URL"
+          unzip -q dl/singbox.zip -d dl/singbox
+          unzip -q dl/tgws.zip -d dl/tgws
+          git clone --depth 1 --filter=blob:none --sparse -q "$ZAPRET_REPO" dl/lumen
+          git -C dl/lumen sparse-checkout set "$ZAPRET_PATH"
+          echo "sing-box, tg-ws-proxy, winws2 и набор Zapret на месте."
+
+      - name: Собрать архив
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -e
+          ROOT="$PWD"
+          STAGE="$ROOT/stage/Zephyron"
+          Z="$STAGE/engines/zapret"
+          K="$ROOT/dl/lumen/$ZAPRET_PATH"
+
+          # Настройки: шаблоны, а не рабочий файл — в нём лежит ссылка подписки.
+          mkdir -p "$STAGE/config/lists"
+          for f in rules.yaml zephyron.example.json addresses.yaml catalog.yaml \
+                   catalog.zapret.yaml pin-solutions.yaml; do
+            cp "$ROOT/config/$f" "$STAGE/config/$f"
+          done
+          cp "$ROOT"/config/lists/*.txt "$STAGE/config/lists/"
+          cp "$ROOT/config/lists/README.md" "$STAGE/config/lists/"
+
+          cp "$ROOT/docs/README.dist.md" "$STAGE/README.md"
+          cp "$ROOT/dist-template/uninstall.cmd" "$STAGE/uninstall.cmd"
+          cp "$ROOT/LICENSE" "$STAGE/LICENSE"
+          cp "$ROOT/docs/THIRD-PARTY.md" "$STAGE/THIRD-PARTY.md"
+          cp "$ROOT/docs/licenses/zxing-net-Apache-2.0.txt" "$STAGE/LICENSE-ZXing.Net.txt"
+
+          mkdir -p "$STAGE/presets"
+          cp "$ROOT"/presets/*.txt "$STAGE/presets/"
+
+          for t in dark light grey tinted violet ocean coffee rose cream; do
+            mkdir -p "$STAGE/themes/$t"
+            cp "$ROOT/themes/$t/theme.json" "$STAGE/themes/$t/theme.json"
+          done
+          for t in sloyka1 blissfield fish; do
+            mkdir -p "$STAGE/themes/$t"
+            cp "$ROOT"/themes/$t/* "$STAGE/themes/$t/"
+          done
+          cp "$ROOT/themes/README.md" "$STAGE/themes/README.md"
+
+          # Движки. Раскладка повторяет pack.cmd, чтобы Engines.FindIn нашёл их.
+          mkdir -p "$STAGE/engines/sing-box" "$STAGE/engines/tg-ws-proxy"
+          cp -r "$ROOT/dl/singbox/$SINGBOX_DIR/." "$STAGE/engines/sing-box/"
+          cp "$ROOT/dl/tgws/tg-ws-proxy.exe" "$STAGE/engines/tg-ws-proxy/tg-ws-proxy.exe"
+
+          # Из exe\ Zapret не берём то, что не читается: прежний winws.exe,
+          # дубль Monkey64.sys, stop.bat чужой оболочки, её dnscrypt-proxy.
+          mkdir -p "$Z/exe"
+          cp -r "$K/exe/." "$Z/exe/"
+          rm -f "$Z/exe/winws.exe" "$Z/exe/aaaaaaaaa1" "$Z/exe/stop.bat" \
+                "$Z/exe/dnscrypt-proxy.exe" "$Z/exe/dnscrypt-proxy.LICENSE.txt"
+          cp -r "$K/lua" "$Z/lua"
+          cp -r "$K/bin" "$Z/bin"
+          cp -r "$K/lists" "$Z/lists"
+          cp -r "$K/windivert.filter" "$Z/windivert.filter"
+
+          # Родной winws2 вместо cygwin-сборки: тот же движок, но cygwin1.dll
+          # не нужен, и в архив не едет 3 МБ LGPL-рантайма без потребителя.
+          cp "$ROOT/dl/winws2.exe" "$Z/exe/winws2.exe"
+          rm -f "$Z/exe/cygwin1.dll"
+
+          # Наши списки с приставкой nz-, чтобы не подменять чужие одноимённые.
+          for f in "$ROOT"/config/lists/*.txt; do
+            cp "$f" "$Z/lists/nz-$(basename "$f")"
+          done
+
+          cp "$ROOT/docs/licenses/zapret-MIT.txt" "$Z/LICENSE.txt"
+          cp "$ROOT/docs/licenses/zapretgui-MIT.txt" "$Z/LICENSE-ZapretGUI.txt"
+          cp "$ROOT/docs/licenses/flowseal-MIT.txt" "$Z/LICENSE-Flowseal.txt"
+
+          # Личное не должно попасть в архив: подписка — это пароль,
+          # отчёты и runtime описывают сеть этой машины.
+          for bad in config/zephyron.json config/subscriptions.json \
+                     config/rules.user.yaml runtime reports; do
+            if [ -e "$STAGE/$bad" ]; then
+              echo "Отказ: $bad личное и не должно уехать в архив." >&2
+              exit 1
+            fi
+          done
+
+          ( cd "$ROOT/stage" && zip -qr9 "$ROOT/Zephyron-$VERSION.zip" Zephyron )
+          echo "Zephyron-$VERSION.zip: $(du -h "$ROOT/Zephyron-$VERSION.zip" | cut -f1)"
+
+      - name: Заметки выпуска
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -e
+          ZIP_SHA="$(sha256sum "Zephyron-$VERSION.zip" | cut -d' ' -f1)"
+          EXE_SHA="$(sha256sum stage/Zephyron/Zephyron.exe | cut -d' ' -f1)"
+          SDK="$(dotnet --version)"
+          cp docs/release-notes.md notes.md
+          sed -e "s/{ZIP}/$ZIP_SHA/" -e "s/{EXE}/$EXE_SHA/" \
+              -e "s/{SDK}/$SDK/" -e "s/{VERSION}/$VERSION/" \
+              docs/release-notes.footer.md >> notes.md
+          echo "ZIP SHA256: $ZIP_SHA"
+
+      - name: Опубликовать выпуск
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -e
+          gh release view "v$VERSION" >/dev/null 2>&1 && {
+            echo "Выпуск v$VERSION уже есть. Опубликованный выпуск не пересобирают"
+            echo "на месте: файл у людей уже на руках. Подними <Version>."
+            exit 1
+          } || true
+          gh release create "v$VERSION" "Zephyron-$VERSION.zip" \
+            --title "Zephyron $VERSION" \
+            --notes-file notes.md \
+            --target "$GITHUB_SHA"
