@@ -159,7 +159,7 @@ MIT разрешает распространение в любом виде, в
   `strategy-lock-manager.lua`, `strategy-stats.lua`, `zapret-16kb.lua`,
   `zapret-multishake.lua`, `zapret-rst-flood.lua`, `zapret-wgobfs.lua` —
   и шесть файлов со стратегиями рядом с ними (`circular-config.txt`,
-  `strategies-*-source.txt`). Наши пресеты Universal V10 и V11 Lite грузят пять из этих
+  `strategies-*-source.txt`). Наши пресеты Universal V10, V11 и V11 Lite грузят пять из этих
   модулей: на одном winws2 от bol-van они бы не поднялись;
 * **списки доменов и адресов** в `engines/zapret/lists/` — мы их не изменяем
   и не дополняем, только читаем. Один из них, `ipset-all.txt`, в установку
@@ -261,7 +261,7 @@ Flowseal** — обе строки стоят в его
 [github.com/valnesfjord/tg-ws-proxy-rs](https://github.com/valnesfjord/tg-ws-proxy-rs),
 порт на Rust программы **tg-ws-proxy** того же **Flowseal**:
 [github.com/Flowseal/tg-ws-proxy](https://github.com/Flowseal/tg-ws-proxy).
-Едет как есть, исполняемым файлом выпуска 2.5.2 (`engines/tg-ws-proxy/tg-ws-proxy.exe`,
+Едет как есть, исполняемым файлом выпуска 2.5.4 (`engines/tg-ws-proxy/tg-ws-proxy.exe`,
 архив сверен с их `SHA256SUMS`); запускает его наш надзор. Список доменов
 за Cloudflare, через которые прокси ведёт Telegram, ведёт проект Flowseal:
 прокси берёт его из `.github/cfproxy-domains.txt` репозитория tg-ws-proxy,

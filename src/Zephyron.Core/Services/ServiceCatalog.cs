@@ -675,6 +675,35 @@ public static class ServiceCatalog
             ],
         },
 
+        // Photon — своей папкой, как Riot (владелец 12.10): облако мультиплеера
+        // Unity-игр, R.E.P.O. в их числе. «Ошибка подключения» в R.E.P.O.
+        // у владельца 11.10 — не десинк: UDP игры V11 Lite не перехватывает
+        // (порты не те, game filter выключен), а игровые серверы Photon
+        // в его сети недоступны напрямую ни по TCP, ни, видимо, по UDP —
+        // через туннель отвечают (замер 12.10). Матч — UDP к голым адресам,
+        // поэтому вторая часть по сетям: по имени его не узнать.
+        new ServiceDefinition
+        {
+            Name = "Photon: R.E.P.O. и другие",
+            Parts =
+            [
+                new ServicePart
+                {
+                    Name = "Сервер и лобби",
+                    List = "config/lists/photon.txt",
+                    Probe = "ns.photonengine.io",
+                    Note = "по именам: сервер имён и игровые серверы по TCP; в сети владельца игровые серверы закрыты напрямую",
+                },
+                new ServicePart
+                {
+                    Name = "Игровые серверы (адреса)",
+                    List = "config/lists/photon-network.txt",
+                    ByAddress = true,
+                    Note = "сам матч: UDP на голые адреса серверов Photon — сюда тот же путь, что у «Сервера и лобби»",
+                },
+            ],
+        },
+
         new ServiceDefinition
         {
             Name = "Игры",
@@ -697,6 +726,17 @@ public static class ServiceCatalog
                     DefaultOff = true,
                 },
                 new ServicePart { Name = "Ubisoft", List = "config/lists/ubisoft.txt" },
+
+                // Wardogs — имена от владельца 12.10. У пользователя на V10
+                // с game filter заходит на серверы, на V11 Lite — нет (11.10);
+                // какие соединения ломаются, не выяснено.
+                new ServicePart
+                {
+                    Name = "Wardogs",
+                    List = "config/lists/wardogs.txt",
+                    Probe = "live.wardogs.bulkhead.pragmaengine.com",
+                    Note = "на V11 Lite, по сообщению, не заходит в игру, на V10 — заходит",
+                },
                 new ServicePart { Name = "itch.io", List = "config/lists/itch.txt" },
                 new ServicePart
                 {

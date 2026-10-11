@@ -240,7 +240,7 @@ public sealed class TunnelStatusTests
 
     /// <summary>Слова zy status и отчёта — одни: замену называет надзор.</summary>
     [Fact]
-    public void The_standing_is_worded_once_for_nz_and_the_report()
+    public void The_standing_is_worded_once_for_zy_and_the_report()
     {
         Assert.Equal("закреплён", TunnelStatus.StandingWord("🇪🇪 Эстония", false, "🇪🇪 Эстония", null));
         Assert.Equal("автоподбор", TunnelStatus.StandingWord("🇪🇪 Эстония", true, null, null));

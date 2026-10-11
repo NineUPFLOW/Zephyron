@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Zephyron.Core;
+using Zephyron.Core.Diagnostics;
 using Zephyron.Core.Rules;
 using Zephyron.Core.Updates;
 using Zephyron.Proxy;
@@ -417,7 +418,8 @@ public partial class StatusView : UserControl
         SupervisorState? State,
         bool Running,
         bool SingBoxUp,
-        DateTime? ConfigBuilt);
+        DateTime? ConfigBuilt,
+        bool Coming = false);
 
     private static Seen Read(bool starting)
     {
@@ -464,7 +466,8 @@ public partial class StatusView : UserControl
         {
         }
 
-        return new Seen(settings, null, subscriptions, state, running, starting && !running && IsRunning("sing-box"), built);
+        return new Seen(settings, null, subscriptions, state, running, starting && !running && IsRunning("sing-box"), built,
+            !running && EngineControl.Coming);
     }
 
     private bool _updating;
@@ -534,7 +537,16 @@ public partial class StatusView : UserControl
         var state = seen.State;
         bool running = seen.Running;
 
-        ShowState(settings, state, running, seen.SingBoxUp);
+        // Движки поднимает не эта кнопка — перезапуск из всплывающего
+        // сообщения, трей, автозапуск: запуск показывается и тогда.
+        if (_startingSince is null && seen.Coming)
+        {
+            _startingSince = DateTimeOffset.Now;
+            _refresh.Interval = StartingInterval;
+            StartAnimations();
+        }
+
+        ShowState(settings, state, running, seen.SingBoxUp, seen.Coming);
         ShowFooter(state, running, seen.ConfigBuilt);
         ShowWarnings(settings);
 
@@ -588,11 +600,11 @@ public partial class StatusView : UserControl
         }
     }
 
-    private void ShowState(AppSettings settings, SupervisorState? state, bool running, bool singBoxUp)
+    private void ShowState(AppSettings settings, SupervisorState? state, bool running, bool singBoxUp, bool coming)
     {
         // Запуск показывается своим чередом: пока он идёт, «остановлено»
         // означает не отказ, а то, что супервизор ещё не дописал состояние.
-        if (_startingSince is not null && ShowStarting(settings, state, running, singBoxUp))
+        if (_startingSince is not null && ShowStarting(settings, state, running, singBoxUp, coming))
             return;
 
         StartButton.Visibility = running ? Visibility.Collapsed : Visibility.Visible;
@@ -657,7 +669,7 @@ public partial class StatusView : UserControl
     /// либо исчерпанное терпение — иначе окно объявляло бы отказ, пока
     /// внизу ещё идут попытки.
     /// </remarks>
-    private bool ShowStarting(AppSettings settings, SupervisorState? state, bool running, bool singBoxUp)
+    private bool ShowStarting(AppSettings settings, SupervisorState? state, bool running, bool singBoxUp, bool coming)
     {
         var since = _startingSince!.Value;
         var services = running ? state!.Services : [];
@@ -665,7 +677,11 @@ public partial class StatusView : UserControl
         bool ready = services.Count > 0 && services.All(s => s.Health == ServiceHealth.Healthy);
         bool gaveUp = services.Any(s => s.Health == ServiceHealth.Faulted);
 
-        if (ready || gaveUp || DateTimeOffset.Now - since > StartupPatience)
+        // Ни состояния, ни живого супервизора, ни запуска в очереди — значит,
+        // он ушёл, не подняв движков. Ждать тут все 90 с незачем.
+        bool gone = !running && !coming && DateTimeOffset.Now - since > TimeSpan.FromSeconds(3);
+
+        if (ready || gaveUp || gone || DateTimeOffset.Now - since > StartupPatience)
         {
             EndStarting();
             return false;
@@ -1144,8 +1160,9 @@ public partial class StatusView : UserControl
 
         _warningsBusy = true;
         bool needsDesync = settings.NeedsDesync;
+        bool hybrid = WorkModes.Of(settings.Engines) == WorkMode.Route;
 
-        _ = Task.Run(() => CollectWarnings(needsDesync)).ContinueWith(task =>
+        _ = Task.Run(() => CollectWarnings(needsDesync, hybrid)).ContinueWith(task =>
         {
             _warningsBusy = false;
             _warningsAt = DateTimeOffset.Now;
@@ -1164,9 +1181,27 @@ public partial class StatusView : UserControl
         Warnings.ItemsSource = rows;
     }
 
-    private static IReadOnlyList<WarningRow> CollectWarnings(bool needsDesync)
+    private static IReadOnlyList<WarningRow> CollectWarnings(bool needsDesync, bool hybrid)
     {
         var rows = new List<WarningRow>();
+
+        // «Гибрид» решает, что через VPN, по именам. Браузер со своим
+        // шифрованным DNS спрашивает имена мимо системы — наш резолвер их
+        // не видит, правило не срабатывает, и сайт, которому нужен туннель,
+        // идёт напрямую и не открывается. Со стороны это неотличимо от
+        // «маршрут не работает», а лечится одной галочкой в браузере.
+        if (hybrid)
+        {
+            foreach (var browser in BrowserDns.Scan())
+            {
+                rows.Add(new WarningRow(
+                    $"{browser.Browser} спрашивает имена сам, мимо системы",
+                    "В «Гибриде» путь имени (через VPN или напрямую) решает наш резолвер, "
+                    + "а такой браузер его не спрашивает: сайт, которому нужен туннель, "
+                    + "пойдёт напрямую и не откроется. Выключите свой DNS в браузере: "
+                    + browser.Setting + "."));
+            }
+        }
 
         if (HostsEditor.WhoReplaced() is { } who)
         {

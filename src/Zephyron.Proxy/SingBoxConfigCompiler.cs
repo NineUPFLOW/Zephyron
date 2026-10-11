@@ -757,6 +757,9 @@ public sealed class SingBoxConfigCompiler
             .Concat(proxied
                 .Where(r => r.Match == MatchKind.IpSet)
                 .SelectMany(r => r.IpSetCidrs))
+            .Concat(proxied
+                .Where(r => r.Match == MatchKind.HostList)
+                .SelectMany(r => r.HostListCidrs))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
@@ -1564,7 +1567,7 @@ public sealed class SingBoxConfigCompiler
 
         // uTLS подделывает отпечаток клиента. Для REALITY он обязателен:
         // без него сервер не отвечает.
-        var fingerprint = KnownFingerprint(server.Fingerprint);
+        string? fingerprint = Fingerprint(server.Fingerprint);
         if (fingerprint is not null || reality)
         {
             block["utls"] = new JsonObject
@@ -1590,43 +1593,31 @@ public sealed class SingBoxConfigCompiler
         return block;
     }
 
-    /// <summary>
-    /// Приводит отпечаток uTLS к значению, которое понимает sing-box.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Из ссылок приходит словарь Xray, и он не совпадает со словарём sing-box.
-    /// <c>fp=unsafe</c> у Xray значит «подделку выключить, отпечаток родной» —
-    /// в sing-box такого имени нет, и он на нём падает целиком: движок не
-    /// поднимается ни с одним сервером. Оттого чужое имя подставляет chrome,
-    /// а не едет в конфиг как есть.
-    /// </para>
-    /// <para>
-    /// <c>random</c> и <c>randomized</c> у обоих значат разное, но оба
-    /// допустимы, и переводить их не нужно. Имена сверены с
-    /// <c>uTLSClientHelloID</c> sing-box 1.14.1-extended-2.7.2.
-    /// </para>
-    /// </remarks>
-    private static string? KnownFingerprint(string? fingerprint)
+    // Имена отпечатков, которые знает sing-box 1.14 (проверено `sing-box check`
+    // 11.10), — с учётом регистра. Чужое имя он не пропускает, а валит весь
+    // конфиг: «unknown uTLS fingerprint» — и ни одного сервера подписки.
+    private static readonly HashSet<string> KnownFingerprints = new(StringComparer.Ordinal)
     {
-        if (string.IsNullOrEmpty(fingerprint))
+        "chrome", "chrome_psk", "chrome_psk_shuffle", "chrome_padding_psk_shuffle",
+        "chrome_pq", "chrome_pq_psk", "firefox", "edge", "safari", "360", "qq",
+        "ios", "android", "random", "randomized",
+    };
+
+    /// <summary>
+    /// Отпечаток из ссылки в имя sing-box; null — родной отпечаток, без uTLS.
+    /// «unsafe» у Xray и значит «подделку выключить»; прочие чужие имена
+    /// (опечатки, «randomizednoalpn» Xray) — так же, лучше родной, чем ни одного.
+    /// </summary>
+    internal static string? Fingerprint(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
             return null;
 
-        return fingerprint.ToLowerInvariant() switch
-        {
-            "chrome" or "chrome_psk" or "chrome_psk_shuffle" or "chrome_padding_psk_shuffle"
-                or "chrome_pq" or "chrome_pq_psk" => "chrome",
-            "firefox" => "firefox",
-            "edge" => "edge",
-            "safari" => "safari",
-            "360" => "360",
-            "qq" => "qq",
-            "ios" => "ios",
-            "android" => "android",
-            "random" => "random",
-            "randomized" => "randomized",
-            _ => null,
-        };
+        string name = value.Trim().ToLowerInvariant();
+        if (name == "randomizednoalpn")
+            return "randomized";
+
+        return KnownFingerprints.Contains(name) ? name : null;
     }
 
     private static JsonObject? BuildTransport(ProxyServer server)
@@ -1975,19 +1966,35 @@ public sealed class SingBoxConfigCompiler
                 // Непрогруженный список означает, что файл не нашёлся.
                 // Правило без доменов совпало бы со всем подряд, поэтому
                 // выбрасываем его целиком — о пропаже уже сказал разворот.
-                if (rule.HostListDomains.Count == 0)
+                if (rule.HostListDomains.Count == 0 && rule.HostListCidrs.Count == 0)
                     return null;
 
-                var suffixes = new JsonArray();
-
-                foreach (var domain in rule.HostListDomains)
+                if (rule.HostListDomains.Count > 0)
                 {
-                    // Записи в списках Zapret — это зоны: там пишут
-                    // discord.media, подразумевая и russia1234.discord.media.
-                    suffixes.Add(domain.StartsWith("*.", StringComparison.Ordinal) ? domain[2..] : domain);
+                    var suffixes = new JsonArray();
+
+                    foreach (var domain in rule.HostListDomains)
+                    {
+                        // Записи в списках Zapret — это зоны: там пишут
+                        // discord.media, подразумевая и russia1234.discord.media.
+                        suffixes.Add(domain.StartsWith("*.", StringComparison.Ordinal) ? domain[2..] : domain);
+                    }
+
+                    node["domain_suffix"] = suffixes;
                 }
 
-                node["domain_suffix"] = suffixes;
+                // Адреса своего списка — в том же правиле: у sing-box имена
+                // и ip_cidr одного правила складываются через «или».
+                if (rule.HostListCidrs.Count > 0)
+                {
+                    var cidrs = new JsonArray();
+
+                    foreach (var cidr in rule.HostListCidrs)
+                        cidrs.Add(cidr);
+
+                    node["ip_cidr"] = cidrs;
+                }
+
                 break;
             }
 

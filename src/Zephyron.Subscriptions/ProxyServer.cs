@@ -89,8 +89,9 @@ public sealed record ProxyServer
     /// <remarks>
     /// В ссылках приходит словарь Xray, и там бывает <c>unsafe</c> — «подделку
     /// выключить». sing-box такого имени не знает, оттого при сборке конфига
-    /// значение сверяется со словарём sing-box и чужое заменяется на chrome.
-    /// См. <c>SingBoxConfigCompiler.KnownFingerprint</c>.
+    /// значение сверяется со словарём sing-box, и чужое отбрасывается (родной
+    /// отпечаток; для REALITY — chrome, иначе сервер не отвечает).
+    /// См. <c>SingBoxConfigCompiler.Fingerprint</c>.
     /// </remarks>
     public string? Fingerprint { get; init; }
 

@@ -53,7 +53,7 @@ public sealed class DnsRouteTests : IDisposable
     [InlineData("туннель", DnsRoute.Tunnel)]
     [InlineData("через туннель", DnsRoute.Tunnel)]
     [InlineData("tunnel", DnsRoute.Tunnel)]
-    public void Words_from_nz_are_understood(string word, DnsRoute route) =>
+    public void Words_from_zy_are_understood(string word, DnsRoute route) =>
         Assert.Equal(route, DnsRoutes.Parse(word));
 
     /// <summary>
