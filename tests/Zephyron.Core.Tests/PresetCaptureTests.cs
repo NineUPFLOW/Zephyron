@@ -30,7 +30,7 @@ public sealed class PresetCaptureTests
 
     private static ZapretPreset Preset(params string[] lines)
     {
-        var path = Path.Combine(Path.GetTempPath(), $"nz-capture-{Guid.NewGuid():N}.txt");
+        var path = Path.Combine(Path.GetTempPath(), $"zy-capture-{Guid.NewGuid():N}.txt");
 
         try
         {
@@ -157,7 +157,7 @@ public sealed class PresetCaptureTests
     [Fact]
     public void The_level_survives_the_settings_file()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"nz-settings-{Guid.NewGuid():N}.json");
+        var path = Path.Combine(Path.GetTempPath(), $"zy-settings-{Guid.NewGuid():N}.json");
 
         try
         {

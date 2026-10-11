@@ -43,7 +43,7 @@ public sealed class PingAndFragmentTests
     [Fact]
     public void SettingsWithTheRemovedBestOfTwoStillRead()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"nz-settings-{Guid.NewGuid():N}.json");
+        var path = Path.Combine(Path.GetTempPath(), $"zy-settings-{Guid.NewGuid():N}.json");
 
         try
         {

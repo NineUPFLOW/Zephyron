@@ -47,9 +47,9 @@ public static class GameFilter
     // Свои имена образцов, с приставкой: пресет мог объявить stun2 или
     // tls_max под теми же именами, а два объявления одного имени движок
     // не обязан переносить молча.
-    private const string BlobStun = "nz_game_stun";
-    private const string BlobTls = "nz_game_tls";
-    private const string BlobUdp = "nz_game_udp";
+    private const string BlobStun = "zy_game_stun";
+    private const string BlobTls = "zy_game_tls";
+    private const string BlobUdp = "zy_game_udp";
 
     private static readonly string[] Globals =
     [

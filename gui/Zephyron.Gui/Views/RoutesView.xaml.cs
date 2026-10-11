@@ -1351,7 +1351,7 @@ public partial class RoutesView : UserControl
     /// в блокчеке кликабельными, ведущими на их маршрут»).
     /// </summary>
     /// <remarks>
-    /// Тем же движком правил, что <c>nz where</c>: первое совпавшее правило —
+    /// Тем же движком правил, что <c>zy where</c>: первое совпавшее правило —
     /// и та часть, что стоит на его списке, домене или сети. Не попало ни в
     /// одно — имя ставится в поиск: «Маршруты» сами предложат добавить его
     /// своим доменом.
@@ -1488,24 +1488,25 @@ public partial class RoutesView : UserControl
         }
 
         // Добавить предлагается, только когда искать больше нечего: вписанное
-        // похоже на имя сайта, а в списке оно не нашлось ни частью, ни доменом.
-        // Нашлось — значит, такое уже есть, и второе правило на него было бы
-        // двойником, спорящим с первым.
+        // похоже на имя сайта или на программу, а в списке оно не нашлось
+        // ни частью, ни доменом. Нашлось — значит, такое уже есть, и второе
+        // правило на него было бы двойником, спорящим с первым.
         var program = found.Count == 0 ? ProgramInput(needle) : null;
         var domain = found.Count == 0 && program is null ? DomainInput.Normalize(needle) : null;
 
-        // Программу добавить не предлагаем: обход по программе на переработке
-        // (Rules.ProgramRulesOff, владелец 04.10) — правило обещало бы то, чего
-        // в «Гибриде» не делает. Вписанное «.exe» не ищется и сайтом.
-        AddOffer.Visibility = domain is null ? Visibility.Collapsed : Visibility.Visible;
+        // Программа — как кнопкой «Добавить программу»: встаёт «напрямую»,
+        // режим правится в её строке. Обход по программе возвращён (11.10).
+        AddOffer.Visibility = program is null && domain is null ? Visibility.Collapsed : Visibility.Visible;
 
-        if (domain is not null)
+        if (program is not null)
+            AddOfferText.Text = $"«{program}» — программа. Добавить — сперва «напрямую», дальше режим правится в её строке.";
+        else if (domain is not null)
             AddOfferText.Text = $"«{domain}» в списке нет. Добавить своим доменом — сперва «напрямую», дальше правится в его строке.";
 
         Status.Text = found.Count > 0
             ? $"Найдено частей: {found.Sum(s => s.Parts.Count)}."
             : program is not null
-                ? $"«{program}» — программа. Правила по программе на переработке: добавить её сейчас нельзя."
+                ? $"«{program}» — программа. Добавить можно здесь или кнопкой «Добавить программу»."
                 : domain is null
                     ? $"По «{needle}» ничего нет. Чтобы добавить свой домен, впишите имя сайта, например example.com."
                     : string.Empty;
@@ -1739,13 +1740,45 @@ public partial class RoutesView : UserControl
               + (own.Count > 3 ? $" и ещё {own.Count - 3}" : string.Empty)
               + ". Они стоят в списке ниже вместе с сервисами.";
 
-        // Снятые правила по программе (Rules.ProgramRulesOff, 04.10) — словами,
-        // а не молча: человек ставил игру «через VPN», и правило пропало.
+        // Снятые правила по программе (Rules.ProgramRulesOff, 04.10) —
+        // карточкой с кнопкой, а не молча: человек ставил игру «через VPN»,
+        // и правило пропало. Возврат — его решение, а не наше.
         if (AppSettings.Load(AppSettings.DefaultPath).RemovedProgramRules is { Count: > 0 } removed)
-            OwnSummary.Text += $" Правила по программе сняты — обход по программе на переработке: {string.Join(", ", removed)}.";
+        {
+            RestoreProgramsText.Text = $"Правила по программе сняты при переводе «на переработку»: {string.Join(", ", removed)}. "
+                + "Обход по программе вернулся — «через VPN» снова заводит программу в туннель. Вернуть их?";
+            RestorePrograms.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            RestorePrograms.Visibility = Visibility.Collapsed;
+        }
     }
 
     private void OnAddOwn(object sender, RoutedEventArgs e) => AddOwn();
+
+    /// <summary>Возвращает снятые правила по программе — «через VPN» (Rules.ProgramRulesOff).</summary>
+    private void OnRestorePrograms(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var restored = Core.Rules.ProgramRulesOff.Restore(
+                AppSettings.DefaultPath, Core.Rules.UserRulesFile.DefaultPath);
+
+            Reload();
+
+            Status.Text = restored > 0
+                ? $"Вернули правил по программе: {restored}. Они стоят «через VPN». Применится при следующем запуске движков."
+                : "Возвращать было нечего: такие правила уже стоят.";
+
+            if (restored > 0)
+                this.Offer($"Вернули правила по программе: {restored}");
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Не удалось вернуть: " + ex.GetBaseException().Message;
+        }
+    }
 
     /// <summary>«Добавить программу»: меню «из запущенных» и «файлом», как в Happ.</summary>
     private void OnAddProgram(object sender, RoutedEventArgs e)
@@ -1848,11 +1881,11 @@ public partial class RoutesView : UserControl
     /// </remarks>
     private void AddOwn()
     {
-        // Программы — на переработке (Rules.ProgramRulesOff, 04.10): «Добавить»
-        // под полем для них и не появляется, но Enter не должен обойти это.
+        // Программа из поля — как кнопкой «Добавить программу»: имя файла
+        // переживает обновление, а режим правится в её строке (AddProgram).
         if (ProgramInput(Search.Text) is { } program)
         {
-            Status.Text = $"«{program}» — программа. Правила по программе на переработке: добавить её сейчас нельзя.";
+            AddProgram(program);
             return;
         }
 

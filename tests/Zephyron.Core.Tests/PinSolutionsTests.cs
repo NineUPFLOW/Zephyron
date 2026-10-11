@@ -73,7 +73,7 @@ public sealed class PinSolutionsTests : IDisposable
 
         HostsEditor.Pin(new Dictionary<string, string> { ["chatgpt.com"] = "87.228.47.203" }, _hosts);
 
-        Assert.Contains("163.70.151.174 www.instagram.com # nz:desync", File.ReadAllLines(_hosts));
+        Assert.Contains("163.70.151.174 www.instagram.com # zy:desync", File.ReadAllLines(_hosts));
         Assert.Equal(["www.instagram.com"], HostsEditor.DesyncPins(_hosts));
 
         var engine = RuleSetLoader.Load("""
@@ -108,7 +108,7 @@ public sealed class PinSolutionsTests : IDisposable
     public void ForeignMarkIsNotTrusted()
     {
         // Пометка вне нашего блока ничего не значит: чужую строку мы не ставили.
-        File.AppendAllText(_hosts, "163.70.151.174 instagram.com # nz:desync\r\n");
+        File.AppendAllText(_hosts, "163.70.151.174 instagram.com # zy:desync\r\n");
 
         Assert.Empty(HostsEditor.DesyncPins(_hosts));
     }

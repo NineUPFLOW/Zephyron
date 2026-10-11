@@ -8,7 +8,7 @@ namespace Zephyron.Core.Tests;
 /// </summary>
 public sealed class ListCarryTests : IDisposable
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), $"nz-carry-{Guid.NewGuid():N}");
+    private readonly string _root = Path.Combine(Path.GetTempPath(), $"zy-carry-{Guid.NewGuid():N}");
 
     private string Installed => Path.Combine(_root, "installed");
     private string Staged => Path.Combine(_root, "staged");

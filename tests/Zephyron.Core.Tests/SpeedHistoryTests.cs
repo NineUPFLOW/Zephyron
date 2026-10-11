@@ -17,7 +17,7 @@ public sealed class SpeedHistoryTests
         new() { At = at, Tunnel = true, Exit = "Эстония — TLS XHTTP", DownMbps = down, UpMbps = up, PingMs = ping, Country = "EE" };
 
     private static string TempFile() =>
-        Path.Combine(Path.GetTempPath(), $"nz-speed-{Guid.NewGuid():N}", "speed-history.json");
+        Path.Combine(Path.GetTempPath(), $"zy-speed-{Guid.NewGuid():N}", "speed-history.json");
 
     [Fact]
     public void EntriesComeBackNewestFirst()

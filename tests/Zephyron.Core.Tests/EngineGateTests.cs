@@ -118,7 +118,7 @@ public sealed class EngineGateTests
 /// <summary>Замок супервизора: второй не берёт, номер держателя виден, умерший отпускает.</summary>
 public sealed class SupervisorLockTests : IDisposable
 {
-    private readonly string _path = Path.Combine(Path.GetTempPath(), $"nz-lock-{Guid.NewGuid():N}", "supervisor.lock");
+    private readonly string _path = Path.Combine(Path.GetTempPath(), $"zy-lock-{Guid.NewGuid():N}", "supervisor.lock");
 
     public void Dispose()
     {

@@ -32,7 +32,7 @@ using Zephyron.Supervisor;
 Console.OutputEncoding = new UTF8Encoding(false);
 
 // Корень установки — тем же поиском, что у окна: пути в настройках
-// считаются от него, и nz из build\ иначе читала бы пустые настройки.
+// считаются от него, и zy из build\ иначе читала бы пустые настройки.
 InstallRoot.MoveTo();
 
 var command = args.FirstOrDefault()?.ToLowerInvariant();
@@ -120,14 +120,14 @@ int Status()
 // «десинк» при прибитом в hosts имени не трогается вовсе. Поэтому три
 // факта врозь: что сказано в правилах, что из этого делают выключатели,
 // и выведено ли имя из-под десинка. Сводить их здесь в один ответ
-// значило бы завести своё решение — а решения у nz нет.
+// значило бы завести своё решение — а решения у zy нет.
 int Where(string target)
 {
     target = target.Trim();
 
     if (target.Length == 0)
     {
-        Console.Error.WriteLine("что проверить? nz where twitch.tv");
+        Console.Error.WriteLine("что проверить? zy where twitch.tv");
         return 2;
     }
 
@@ -160,7 +160,7 @@ async Task<int> Fix(string target)
 
 // Как движок спрашивает имена, и переключение — то же, что список на
 // вкладке DNS: пишется DnsVia (авто, напрямую, туннель), применяется при следующем запуске
-// движков. Перезапустить их nz не может — прав администратора он не просит.
+// движков. Перезапустить их zy не может — прав администратора он не просит.
 int DnsMode(string? choice)
 {
     var settings = AppSettings.Load(AppSettings.DefaultPath);
@@ -171,7 +171,7 @@ int DnsMode(string? choice)
 
         if (route is null)
         {
-            Console.Error.WriteLine("nz dns-mode авто | напрямую | туннель");
+            Console.Error.WriteLine("zy dns-mode авто | напрямую | туннель");
             return 2;
         }
 
@@ -265,10 +265,10 @@ int Voice()
 }
 
 // Наблюдение — тот же сеанс, что раздел «Наблюдение» окна (ConnectionWatch),
-// и тот же журнал runtime\watch.log. Владелец 10.10: «добавь в nz наблюдение».
+// и тот же журнал runtime\watch.log. Владелец 10.10: «добавь в zy наблюдение».
 //
-// Единственная команда nz, которой нужны права администратора: сессия ETW
-// ядра без них не создаётся. Просить их nz не станет (см. начало файла) —
+// Единственная команда zy, которой нужны права администратора: сессия ETW
+// ядра без них не создаётся. Просить их zy не станет (см. начало файла) —
 // запускать из терминала администратора.
 async Task<int> Watch(List<string> options)
 {
@@ -297,17 +297,17 @@ async Task<int> Watch(List<string> options)
                 journal = false;
                 break;
             default:
-                Console.Error.WriteLine($"не знаю «{options[i]}». nz watch [--seconds N] [--process имя.exe] [--routed] [--no-log] [--force]");
+                Console.Error.WriteLine($"не знаю «{options[i]}». zy watch [--seconds N] [--process имя.exe] [--routed] [--no-log] [--force]");
                 return 2;
         }
     }
 
     // Имя сессии одно на машину, и новая останавливает прежнюю: без вопроса
-    // nz молча оборвала бы наблюдение в окне.
+    // zy молча оборвала бы наблюдение в окне.
     if (!force && Zephyron.Etw.EtwConnectionSource.SessionExists())
     {
         Console.Error.WriteLine("сессия наблюдения уже есть: наблюдает окно или осталась от прерванного запуска.");
-        Console.Error.WriteLine("nz watch --force заберёт её себе (наблюдение в окне остановится).");
+        Console.Error.WriteLine("zy watch --force заберёт её себе (наблюдение в окне остановится).");
         return 1;
     }
 
@@ -320,7 +320,7 @@ async Task<int> Watch(List<string> options)
     catch (Exception ex)
     {
         Console.Error.WriteLine("наблюдение не началось: " + ex.GetBaseException().Message);
-        Console.Error.WriteLine("сессии ETW нужны права администратора — запустите nz из терминала администратора.");
+        Console.Error.WriteLine("сессии ETW нужны права администратора — запустите zy из терминала администратора.");
         return 1;
     }
 
@@ -371,7 +371,7 @@ async Task<int> Watch(List<string> options)
 }
 
 // Те же проверки, что раздел «Диагностика» окна и doctor.txt в отчёте.
-// Права не проверяются: nz идёт без администратора намеренно.
+// Права не проверяются: zy идёт без администратора намеренно.
 int DoctorCommand()
 {
     var sections = Doctor.Run(AppSettings.Load(AppSettings.DefaultPath), elevation: false);
@@ -455,7 +455,7 @@ int Report()
         .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
         .FirstOrDefault()?.InformationalVersion.Split('+')[0] ?? "—";
 
-    var result = SupportReport.Create(version + " (nz)", machine: true);
+    var result = SupportReport.Create(version + " (zy)", machine: true);
 
     Console.WriteLine($"записано: {result.Path}");
     Console.WriteLine($"внутри: {string.Join(", ", result.Files)}");
@@ -465,27 +465,27 @@ int Report()
 
 int Help()
 {
-    Console.WriteLine("nz — разбор неисправностей Zephyron.");
+    Console.WriteLine("zy — разбор неисправностей Zephyron.");
     Console.WriteLine();
-    Console.WriteLine("  nz status    что сейчас поднято");
-    Console.WriteLine("  nz doctor    те же проверки, что раздел «Диагностика» окна");
-    Console.WriteLine("  nz where <имя|программа.exe|адрес>");
+    Console.WriteLine("  zy status    что сейчас поднято");
+    Console.WriteLine("  zy doctor    те же проверки, что раздел «Диагностика» окна");
+    Console.WriteLine("  zy where <имя|программа.exe|адрес>");
     Console.WriteLine("               куда пойдёт и через что разрешится имя: по правилам,");
     Console.WriteLine("               выключателям, hosts и конфигу работающего движка");
-    Console.WriteLine("  nz routes    противоречия в своих маршрутах и пинах");
-    Console.WriteLine("  nz fix <сайт>  не открывается: пробует как есть, напрямую, через VPN");
+    Console.WriteLine("  zy routes    противоречия в своих маршрутах и пинах");
+    Console.WriteLine("  zy fix <сайт>  не открывается: пробует как есть, напрямую, через VPN");
     Console.WriteLine("               и записывает сработавший маршрут");
-    Console.WriteLine("  nz dns       обзор DNS-провайдеров: что отвечает и что подменяется");
-    Console.WriteLine("  nz voice     голос Discord: адреса звука из его журнала против списка голоса —");
+    Console.WriteLine("  zy dns       обзор DNS-провайдеров: что отвечает и что подменяется");
+    Console.WriteLine("  zy voice     голос Discord: адреса звука из его журнала против списка голоса —");
     Console.WriteLine("               что сторож окна дописал бы; ничего не пишет");
-    Console.WriteLine("  nz watch [--seconds N] [--process имя.exe] [--routed] [--no-log] [--force]");
+    Console.WriteLine("  zy watch [--seconds N] [--process имя.exe] [--routed] [--no-log] [--force]");
     Console.WriteLine("               наблюдение: соединения и правило к каждому, как раздел окна;");
     Console.WriteLine("               пишет runtime\\watch.log; нужен терминал администратора");
-    Console.WriteLine("  nz dns-mode [авто|напрямую|туннель]");
+    Console.WriteLine("  zy dns-mode [авто|напрямую|туннель]");
     Console.WriteLine("               как движок спрашивает имена; с аргументом — переключить");
-    Console.WriteLine("  nz catalog   снимок рабочих записей каталога Zapret");
+    Console.WriteLine("  zy catalog   снимок рабочих записей каталога Zapret");
     Console.WriteLine("               в config\\catalog.zapret.yaml; идёт несколько минут");
-    Console.WriteLine("  nz report    отчёт для разбора архивом в reports\\: журналы, настройки, сеть,");
+    Console.WriteLine("  zy report    отчёт для разбора архивом в reports\\: журналы, настройки, сеть,");
     Console.WriteLine("               диагностика, голос Discord, hosts, сторож серверов, наблюдение —");
     Console.WriteLine("               без ссылок подписок и ключей");
     Console.WriteLine();
@@ -499,7 +499,7 @@ int Help()
 
 int Unknown(string? said)
 {
-    Console.Error.WriteLine($"не знаю команды «{said}». Список: nz help");
+    Console.Error.WriteLine($"не знаю команды «{said}». Список: zy help");
 
     return 2;
 }

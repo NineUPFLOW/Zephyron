@@ -22,7 +22,7 @@ namespace Zephyron.Proxy;
 /// вживую не проверялся.
 /// </para>
 /// <para>
-/// Пароли новые при каждой сборке конфига и живут только в нём. Окно, <c>nz</c>
+/// Пароли новые при каждой сборке конфига и живут только в нём. Окно, <c>zy</c>
 /// и сторож читают их оттуда же, а не держат своей копии: иначе копии
 /// разошлись бы с движком после первой пересборки.
 /// </para>
@@ -38,7 +38,7 @@ public sealed record EngineKeys(string ClashSecret, string User, string Password
     public static string DefaultConfigPath => Path.Combine("runtime", "singbox.json");
 
     /// <summary>Новые случайные пароли — для очередной сборки конфига.</summary>
-    public static EngineKeys Generate() => new(Random(32), "nz-" + Random(8), Random(24));
+    public static EngineKeys Generate() => new(Random(32), "zy-" + Random(8), Random(24));
 
     /// <summary>Заголовок для Clash API; <c>null</c> — секрета нет.</summary>
     public AuthenticationHeaderValue? Bearer =>

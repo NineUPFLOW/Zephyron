@@ -152,9 +152,9 @@ jobs:
           cp "$ROOT/dl/winws2.exe" "$Z/exe/winws2.exe"
           rm -f "$Z/exe/cygwin1.dll"
 
-          # Наши списки с приставкой nz-, чтобы не подменять чужие одноимённые.
+          # Наши списки с приставкой zy-, чтобы не подменять чужие одноимённые.
           for f in "$ROOT"/config/lists/*.txt; do
-            cp "$f" "$Z/lists/nz-$(basename "$f")"
+            cp "$f" "$Z/lists/zy-$(basename "$f")"
           done
 
           cp "$ROOT/docs/licenses/zapret-MIT.txt" "$Z/LICENSE.txt"

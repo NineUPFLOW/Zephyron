@@ -43,14 +43,14 @@ public sealed record DoctorSection(string Title, IReadOnlyList<DoctorCheck> Line
 /// До 06.10 проверки жили в окне (раздел «Диагностика»), и в отчёт для разбора
 /// не попадали: человек видел жёлтые строки у себя, а в присланном архиве их
 /// не было (№18 — безопасный DNS Chrome и служба Flowseal пересказаны словами).
-/// Теперь один источник для окна, отчёта и <c>nz doctor</c>.
+/// Теперь один источник для окна, отчёта и <c>zy doctor</c>.
 /// </para>
 /// </remarks>
 public static class Doctor
 {
     /// <param name="elevation">
     /// Проверять ли права. Они описывают процесс, который спрашивает, а не систему:
-    /// nz и отчёт из него идут без администратора, и строка «обычные права» в отчёте
+    /// zy и отчёт из него идут без администратора, и строка «обычные права» в отчёте
     /// звала бы чинить исправную установку.
     /// </param>
     public static IReadOnlyList<DoctorSection> Run(AppSettings settings, bool elevation = true)
@@ -89,7 +89,7 @@ public static class Doctor
               + "Красное чинить первым — остальное часто следствие.";
     }
 
-    /// <summary>Текстом — для отчёта и nz.</summary>
+    /// <summary>Текстом — для отчёта и zy.</summary>
     public static string Describe(IReadOnlyList<DoctorSection> sections)
     {
         var text = new StringBuilder();
@@ -147,7 +147,7 @@ public static class Doctor
     /// Оговорка, а не поломка: движки в такой папке поднимаются, но обновление
     /// может не заменить занятый файл, а журналы и списки, переписываемые каждую
     /// минуту, гоняются в облако. Папка — текущая: окно при запуске переходит
-    /// в корень установки (InstallRoot.MoveTo), nz — тоже.
+    /// в корень установки (InstallRoot.MoveTo), zy — тоже.
     /// </remarks>
     public static IReadOnlyList<DoctorCheck> Place(string root, Func<string, string?>? variable = null)
     {
@@ -397,7 +397,7 @@ public static class Doctor
             lines.Add(Bad("Правила не читаются: " + ex.GetBaseException().Message));
         }
 
-        // Свои маршруты против пинов — то же, что карточка «Маршрутов» и nz routes.
+        // Свои маршруты против пинов — то же, что карточка «Маршрутов» и zy routes.
         // 21.09 час разбора «почему инста не грузится» кончился тем, что имя
         // прибито в hosts и потому выведено из-под десинка.
         try

@@ -35,7 +35,7 @@ public sealed class SupervisorArgumentsTests
     /// </remarks>
     private static string[] SplitLikeWindows(string commandLine)
     {
-        var handle = CommandLineToArgvW("nz.exe " + commandLine, out int count);
+        var handle = CommandLineToArgvW("zy.exe " + commandLine, out int count);
 
         Assert.NotEqual(IntPtr.Zero, handle);
 

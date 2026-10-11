@@ -30,7 +30,7 @@ public sealed record DoctorGroup(string Title, IReadOnlyList<DoctorLine> Lines);
 /// <remarks>
 /// <para>
 /// Сами проверки — в <see cref="Doctor"/>: те же уходят в отчёт для разбора
-/// и в <c>nz doctor</c>. Здесь только цвета и кнопка у строки.
+/// и в <c>zy doctor</c>. Здесь только цвета и кнопка у строки.
 /// </para>
 /// <para>
 /// Здесь же вопрос «куда пойдёт это имя». Он задаётся ровно тогда, когда

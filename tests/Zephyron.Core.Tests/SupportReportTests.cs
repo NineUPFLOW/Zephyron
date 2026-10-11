@@ -319,9 +319,9 @@ public sealed class SupportReportTests : IDisposable
         var forward = profile.Replace('\\', '/');
         var cygwin = "/cygdrive/" + char.ToLowerInvariant(profile[0]) + profile[2..].Replace('\\', '/');
         var log = string.Join('\n',
-            $"Loading hostlist {profile}\\nz\\runtime\\desync-keep.txt",
-            $"Loading hostlist {forward}/nz/runtime/desync-keep.txt",
-            $"Loading hostlist {cygwin}/nz/runtime/desync-keep.txt");
+            $"Loading hostlist {profile}\\zy\\runtime\\desync-keep.txt",
+            $"Loading hostlist {forward}/zy/runtime/desync-keep.txt",
+            $"Loading hostlist {cygwin}/zy/runtime/desync-keep.txt");
 
         var redacted = SupportReport.Redact(log, []);
         var user = Path.GetFileName(profile);

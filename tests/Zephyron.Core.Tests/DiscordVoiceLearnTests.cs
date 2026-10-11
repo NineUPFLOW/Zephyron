@@ -10,7 +10,7 @@ namespace Zephyron.Core.Tests;
 /// </summary>
 public sealed class DiscordVoiceLearnTests : IDisposable
 {
-    private readonly string _dir = Directory.CreateTempSubdirectory("nz-voice-").FullName;
+    private readonly string _dir = Directory.CreateTempSubdirectory("zy-voice-").FullName;
 
     public void Dispose() => Directory.Delete(_dir, recursive: true);
 
@@ -127,7 +127,7 @@ public sealed class DiscordVoiceLearnTests : IDisposable
         Assert.False(AppSettings.Load(path).LearnDiscordVoice);
     }
 
-    /// <summary>Обзор для nz voice: по адресу — сколько раз, последний раз и чем покрыт.</summary>
+    /// <summary>Обзор для zy voice: по адресу — сколько раз, последний раз и чем покрыт.</summary>
     [Fact]
     public void The_survey_counts_dates_and_coverage()
     {
@@ -147,7 +147,7 @@ public sealed class DiscordVoiceLearnTests : IDisposable
     }
 
     /// <summary>
-    /// Текст для nz voice и отчёта: журнал из выдуманного %APPDATA%, список и правила
+    /// Текст для zy voice и отчёта: журнал из выдуманного %APPDATA%, список и правила
     /// из выдуманного корня — ничего не дописывается.
     /// </summary>
     [Fact]

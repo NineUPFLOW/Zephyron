@@ -15,7 +15,7 @@ namespace Zephyron.Core.Tests;
 public sealed class SupervisorStateBusyTests : IDisposable
 {
     private readonly string _path = Path.Combine(
-        Path.GetTempPath(), $"nz-state-{Guid.NewGuid():N}.json");
+        Path.GetTempPath(), $"zy-state-{Guid.NewGuid():N}.json");
 
     public void Dispose()
     {

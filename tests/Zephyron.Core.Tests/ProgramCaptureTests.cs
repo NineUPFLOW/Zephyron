@@ -31,17 +31,25 @@ public sealed class ProgramCaptureTests
         """;
 
     /// <summary>
-    /// Полный перехват ради программы — только без десинка (владелец, 01.10).
+    /// Полный перехват ради программы — и при десинке (возврат 11.10).
     /// </summary>
+    /// <remarks>
+    /// Прежде он был только без десинка (владелец, 01.10): при десинке весь
+    /// трафик через движок туннеля ломал голос Discord, а двойной проход
+    /// winws2 видел каждое соединение дважды. Теперь двойной проход закрыт
+    /// адресами TUN (<c>TunnelCapture</c>), и правило программы работает
+    /// при десинке — иначе оно не работало вовсе, и его снимали (04.10).
+    /// </remarks>
     [Fact]
-    public void AProgramTakesTheWholeTunnelOnlyWithoutDesync()
+    public void AProgramTakesTheWholeTunnelWithOrWithoutDesync()
     {
         var withProgram = Rules("mode: selective\nrules:\n" + Program);
         var without = Rules("mode: selective\nrules:\n" + Riot("desync"));
 
-        Assert.False(ProgramCapture.ForcesFullCapture(withProgram, desyncRuns: true));
+        Assert.True(ProgramCapture.ForcesFullCapture(withProgram, desyncRuns: true));
         Assert.True(ProgramCapture.ForcesFullCapture(withProgram, desyncRuns: false));
         Assert.False(ProgramCapture.ForcesFullCapture(without, desyncRuns: false));
+        Assert.False(ProgramCapture.ForcesFullCapture(without, desyncRuns: true));
     }
 
     [Fact]

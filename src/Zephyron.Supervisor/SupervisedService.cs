@@ -1102,7 +1102,7 @@ public sealed class SingBoxService : SupervisedService
 
         bool replaced = _pinnedPlaced && _watch.Replaced(exit);
 
-        // Окну и nz: туннель здоров, но идёт не через то, что выбрано.
+        // Окну и zy: туннель здоров, но идёт не через то, что выбрано.
         Remark = replaced ? StandInRemark : null;
 
         // Стоит замена — заодно спрашиваем закреплённый сервер. Только

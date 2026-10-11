@@ -146,7 +146,7 @@
                     на прежний. Выбор сам перезапускает движки (TrayIcon.ChooseMode):
                     ради этого переключатель в трее и просили — не открывать окно.
                 -->
-                <TextBlock Text="Режим работы NZ" Margin="0,11,0,6" FontSize="11.5"
+                <TextBlock Text="Режим работы ZY" Margin="0,11,0,6" FontSize="11.5"
                            Foreground="{DynamicResource Muted}" />
 
                 <Grid x:Name="Modes">

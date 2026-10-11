@@ -4,7 +4,7 @@
              Background="{DynamicResource Chrome}">
 
     <UserControl.Resources>
-        <!-- Карточка режима на шаге «Режим работы NZ»: выбранная обведена цветом темы. -->
+        <!-- Карточка режима на шаге «Режим работы ZY»: выбранная обведена цветом темы. -->
         <Style x:Key="ModeCard" TargetType="RadioButton">
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Foreground" Value="{DynamicResource Text}" />
@@ -211,7 +211,7 @@
                     Выбор пишется при «Дальше» (WorkModes.Choose).
                 -->
                 <StackPanel x:Name="StepMode" Visibility="Collapsed">
-                    <TextBlock Text="Режим работы NZ" FontSize="17" FontWeight="SemiBold" />
+                    <TextBlock Text="Режим работы ZY" FontSize="17" FontWeight="SemiBold" />
                     <TextBlock Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap"
                                Text="Как программа обходит блокировки. Режим меняется в любой момент — на «Главной» и в меню значка в трее." />
 

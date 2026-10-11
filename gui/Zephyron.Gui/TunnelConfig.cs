@@ -159,8 +159,13 @@ internal static class TunnelConfig
             // (RuleSet.RoutesProgramIntoTunnel, обсуждение №10): её трафик
             // идёт на адреса, которых в выборочном перехвате нет.
             //
-            // С 01.10 — только без десинка (ProgramCapture.ForcesFullCapture,
-            // владелец): при десинке весь трафик через движок ломал голос Discord.
+            // С 01.10 по 11.10 полный перехват ради программы не включался
+            // при десинке (владелец: весь трафик через движок ломал голос
+            // Discord). Но из-за этого правило программы при десинке не работало
+            // вовсе, и его сняли (ProgramRulesOff, 04.10). Двойной проход
+            // с тех пор закрыт адресами TUN (TunnelCapture), поэтому с 11.10
+            // ForcesFullCapture снова верен и при десинке: правило программы
+            // заводит её в туннель, как и обещано.
             bool byProgram = ProgramCapture.ForcesFullCapture(ruleSet, settings.NeedsDesync);
             bool narrow = !settings.Engines.TunnelTakesAll && settings.ProxyOnly && !byProgram;
 
@@ -209,7 +214,7 @@ internal static class TunnelConfig
                 // (SupervisorHost), — лишний вход ему не мешает.
                 HealthInbound = true,
 
-                // Новые пароли служебных входов на каждую сборку: окно, nz
+                // Новые пароли служебных входов на каждую сборку: окно, zy
                 // и сторож читают их из этого же конфига (EngineKeys.Current).
                 Keys = EngineKeys.Generate(),
 
@@ -307,7 +312,7 @@ internal static class TunnelConfig
         }
     }
 
-    /// <summary>Правила так, как их увидят движки, — общим кодом с nz.</summary>
+    /// <summary>Правила так, как их увидят движки, — общим кодом с zy.</summary>
     private static (RuleSet RuleSet, string? ZapretRoot) LoadRules(AppSettings settings)
     {
         var (engine, zapretRoot) = RuleSetExpander.LoadFor(settings);

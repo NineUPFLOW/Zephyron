@@ -47,7 +47,7 @@ public sealed class GameFilterTests
             var off = WinwsCommandLine.Build(preset, gameFilter: false).ToList();
 
             Assert.Equal(plain, off);
-            Assert.DoesNotContain(off, a => a.Contains("nz_game", StringComparison.Ordinal));
+            Assert.DoesNotContain(off, a => a.Contains("zy_game", StringComparison.Ordinal));
             Assert.DoesNotContain($"--name={GameFilter.TcpName}", off);
             Assert.DoesNotContain($"--name={GameFilter.UdpName}", off);
         }
@@ -92,7 +92,7 @@ public sealed class GameFilterTests
             }
 
             // Образцы игр объявлены, модули приёмов подключены — и ровно по разу.
-            foreach (var blob in new[] { "nz_game_stun", "nz_game_tls", "nz_game_udp" })
+            foreach (var blob in new[] { "zy_game_stun", "zy_game_tls", "zy_game_udp" })
                 Assert.Single(on, a => a.StartsWith($"--blob={blob}:", StringComparison.Ordinal));
 
             foreach (var module in new[] { "zapret-lib.lua", "zapret-antidpi.lua" })

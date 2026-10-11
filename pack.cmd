@@ -96,7 +96,7 @@ rem readable text beside the rules.
 copy /y "%ROOT%config\catalog.yaml" "%STAGE%\config\" >nul
 
 rem Snapshot of the Zapret catalogue entries that answered when it was taken
-rem (nz catalog). Separate from catalog.yaml because that one is preserved
+rem (zy catalog). Separate from catalog.yaml because that one is preserved
 rem on update and this one must be replaced, or its addresses go stale.
 copy /y "%ROOT%config\catalog.zapret.yaml" "%STAGE%\config\" >nul
 
@@ -214,11 +214,11 @@ rem name hostlists as "lists/<name>" relative to the Zapret root, and winws2
 rem resolves them there - not next to our config, so a section pointing at
 rem config\lists\proton.txt would load nothing and match nothing.
 rem
-rem Prefixed with nz- so they cannot collide with Zapret's own files: without
+rem Prefixed with zy- so they cannot collide with Zapret's own files: without
 rem it our discord.txt would quietly replace theirs, and the preset would match
 rem a different set of names than its author wrote.
 for %%F in ("%ROOT%config\lists\*.txt") do (
-    copy /y "%%F" "%ENGINES%\zapret\lists\nz-%%~nxF" >nul
+    copy /y "%%F" "%ENGINES%\zapret\lists\zy-%%~nxF" >nul
 )
 
 rem Presets are ours and come from presets\ in the repository. Nothing is taken

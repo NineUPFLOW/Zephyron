@@ -8,7 +8,7 @@ namespace Zephyron.Core.Tests;
 /// </summary>
 public sealed class DnsRouteTests : IDisposable
 {
-    private readonly string _dir = Directory.CreateTempSubdirectory("nz-dns-route-").FullName;
+    private readonly string _dir = Directory.CreateTempSubdirectory("zy-dns-route-").FullName;
 
     public void Dispose() => Directory.Delete(_dir, recursive: true);
 

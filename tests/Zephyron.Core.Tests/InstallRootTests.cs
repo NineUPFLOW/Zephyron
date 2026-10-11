@@ -12,7 +12,7 @@ namespace Zephyron.Core.Tests;
 /// </remarks>
 public sealed class InstallRootTests : IDisposable
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), "nz-root-" + Guid.NewGuid().ToString("N")[..8]);
+    private readonly string _root = Path.Combine(Path.GetTempPath(), "zy-root-" + Guid.NewGuid().ToString("N")[..8]);
 
     public InstallRootTests() => Directory.CreateDirectory(_root);
 

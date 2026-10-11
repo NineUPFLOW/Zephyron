@@ -238,7 +238,7 @@ public sealed class TunnelStatusTests
         Assert.Equal(ExitStanding.Other, TunnelStatus.Standing(null, "🇪🇪 Эстония"));
     }
 
-    /// <summary>Слова nz status и отчёта — одни: замену называет надзор.</summary>
+    /// <summary>Слова zy status и отчёта — одни: замену называет надзор.</summary>
     [Fact]
     public void The_standing_is_worded_once_for_nz_and_the_report()
     {

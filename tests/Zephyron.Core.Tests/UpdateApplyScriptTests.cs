@@ -29,8 +29,8 @@ public sealed class UpdateApplyScriptTests : IDisposable
         Directory.CreateDirectory(UpdateInstaller.StagingDirectory);
 
         var path = UpdateInstaller.WriteApplyScript(
-            new UpdatePlan { StagedAt = @"C:\nz\runtime\update\Zephyron-9.9.9", Files = 1, Kept = [] },
-            @"C:\nz\",
+            new UpdatePlan { StagedAt = @"C:\zy\runtime\update\Zephyron-9.9.9", Files = 1, Kept = [] },
+            @"C:\zy\",
             relaunch: "Zephyron.exe");
 
         return File.ReadAllLines(path);
@@ -90,9 +90,9 @@ public sealed class UpdateApplyScriptTests : IDisposable
         File.WriteAllLines(Path.Combine(_root, UpdateInstaller.LogFile),
         [
             "   ROBOCOPY     ::     Robust File Copy for Windows",
-            "2026/10/07 12:00:01 ERROR 32 (0x00000020) Copying File C:\\nz\\runtime\\update\\x\\engines\\zapret\\exe\\winws2.exe",
+            "2026/10/07 12:00:01 ERROR 32 (0x00000020) Copying File C:\\zy\\runtime\\update\\x\\engines\\zapret\\exe\\winws2.exe",
             "The process cannot access the file because it is being used by another process.",
-            "2026/10/07 12:00:03 ERROR 32 (0x00000020) Copying File C:\\nz\\runtime\\update\\x\\engines\\zapret\\exe\\winws2.exe",
+            "2026/10/07 12:00:03 ERROR 32 (0x00000020) Copying File C:\\zy\\runtime\\update\\x\\engines\\zapret\\exe\\winws2.exe",
         ]);
 
         var failed = UpdateInstaller.FailedFiles(_root);

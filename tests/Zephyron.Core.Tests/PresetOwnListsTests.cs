@@ -6,11 +6,11 @@ using Xunit;
 namespace Zephyron.Core.Tests;
 
 /// <summary>
-/// Наши списки в пресетах: на каждый <c>lists/nz-*.txt</c> есть файл в config\lists.
+/// Наши списки в пресетах: на каждый <c>lists/zy-*.txt</c> есть файл в config\lists.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Файлы <c>nz-*</c> рядом с движком кладут build.cmd и pack.cmd, копируя
+/// Файлы <c>zy-*</c> рядом с движком кладут build.cmd и pack.cmd, копируя
 /// config\lists. Ссылку на список, которого там нет, winws2 переживает молча:
 /// секция остаётся в пресете и не совпадает ни с чем. V10 завёл два новых
 /// списка — virustotal и bsky-app — и забытый файл выглядел бы ровно так.
@@ -22,7 +22,7 @@ namespace Zephyron.Core.Tests;
 /// </remarks>
 public sealed class PresetOwnListsTests
 {
-    private static readonly Regex OwnList = new(@"lists/nz-(?<name>[^\s""]+\.txt)", RegexOptions.Compiled);
+    private static readonly Regex OwnList = new(@"lists/zy-(?<name>[^\s""]+\.txt)", RegexOptions.Compiled);
 
     [Fact]
     public void EveryOwnListAPresetNamesHasASource()
@@ -81,7 +81,7 @@ public sealed class PresetOwnListsTests
         foreach (var section in picked)
         {
             Assert.DoesNotContain(section.RawArguments, a => a.StartsWith("--hostlist-domains=", StringComparison.Ordinal));
-            Assert.Contains(section.RawArguments, a => a.StartsWith("--hostlist=lists/nz-", StringComparison.Ordinal));
+            Assert.Contains(section.RawArguments, a => a.StartsWith("--hostlist=lists/zy-", StringComparison.Ordinal));
         }
     }
 

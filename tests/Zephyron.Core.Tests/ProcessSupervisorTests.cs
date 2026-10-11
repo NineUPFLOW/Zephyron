@@ -367,7 +367,7 @@ public sealed class ProcessSupervisorTests : IDisposable
     }
 }
 
-/// <summary>Состояние службы словами — одно для окна, трея и nz status.</summary>
+/// <summary>Состояние службы словами — одно для окна, трея и zy status.</summary>
 public sealed class EngineStatusTests
 {
     private static ServiceState State(ServiceHealth health, string? error = null, int? pid = null) => new()

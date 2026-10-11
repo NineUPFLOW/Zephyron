@@ -10,7 +10,7 @@ public sealed class FlakyServerTests
 {
     private static ServerHealthCache With(params bool[] outcomes)
     {
-        var path = Path.Combine(Path.GetTempPath(), $"nz-health-{Guid.NewGuid():N}.json");
+        var path = Path.Combine(Path.GetTempPath(), $"zy-health-{Guid.NewGuid():N}.json");
         var cache = ServerHealthCache.Load(path);
 
         foreach (var ok in outcomes)

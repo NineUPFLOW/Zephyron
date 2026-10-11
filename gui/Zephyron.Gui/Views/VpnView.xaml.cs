@@ -240,7 +240,7 @@ public partial class VpnView : UserControl
     /// <remarks>
     /// <para>
     /// Просьба владельца 26.09. Строка говорила «через быстрейший из живых», но
-    /// какой это сервер, было видно только в <c>nz status</c>: тот же вечер
+    /// какой это сервер, было видно только в <c>zy status</c>: тот же вечер
     /// через «Польшу» висело каждое третье соединение, и понять, с каким
     /// выходом беда, из окна было нельзя.
     /// </para>
@@ -1935,7 +1935,7 @@ public partial class VpnView : UserControl
     /// Оставляет запасы только нынешних подписок и ссылки консоли.
     /// </summary>
     /// <remarks>
-    /// Ссылка консоли (<c>SubscriptionUrl</c>) — отдельно: nz читает её
+    /// Ссылка консоли (<c>SubscriptionUrl</c>) — отдельно: zy читает её
     /// и сам, и её запас нужен ему, даже когда в книге её почему-то нет.
     /// </remarks>
     private static void KeepReserves(SubscriptionBook book, AppSettings settings)

@@ -660,7 +660,7 @@
 # "subdomains auto apply", а мессенджеры и почта живут на поддоменах:
 # chat.signal.org, mail.proton.me, web.archive.org.
 #
-# Файлы кладут сюда build.cmd и pack.cmd из config\lists с приставкой nz-,
+# Файлы кладут сюда build.cmd и pack.cmd из config\lists с приставкой zy-,
 # чтобы не столкнуться с одноимёнными файлами самого Zapret.#
 # Пять имён, у которых своей секции не было вовсе. Их ловил только
 # подвальный russia-blacklist ниже — то есть рецепт доставался им
@@ -688,7 +688,7 @@
 # не проверенный пока вариант, а не повтор того же.
 --name=Proton
 --filter-tcp=80,443
---hostlist=lists/nz-proton.txt
+--hostlist=lists/zy-proton.txt
 --out-range=-d8
 --lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-1000:tcp_md5:repeats=4
 
@@ -696,7 +696,7 @@
 
 --name=Signal
 --filter-tcp=80,443
---hostlist=lists/nz-signal.txt
+--hostlist=lists/zy-signal.txt
 --out-range=-d8
 --lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-1000:tcp_md5:repeats=4
 
@@ -704,7 +704,7 @@
 
 --name=Viber
 --filter-tcp=80,443
---hostlist=lists/nz-viber.txt
+--hostlist=lists/zy-viber.txt
 --out-range=-d8
 --lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-1000:tcp_md5:repeats=4
 
@@ -712,7 +712,7 @@
 
 --name=archive.org
 --filter-tcp=80,443
---hostlist=lists/nz-archive.txt
+--hostlist=lists/zy-archive.txt
 --out-range=-d8
 --lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-1000:tcp_md5:repeats=4
 
@@ -723,7 +723,7 @@
 # рецепт, который эту сигнатуру уже брал у них.
 --name=Bluesky
 --filter-tcp=80,443
---hostlist=lists/nz-bluesky.txt
+--hostlist=lists/zy-bluesky.txt
 --out-range=-d8
 --lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-1000:tcp_md5:repeats=4
 

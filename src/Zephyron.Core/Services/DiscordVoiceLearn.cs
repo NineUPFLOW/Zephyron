@@ -98,7 +98,7 @@ public static class DiscordVoiceLearn
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
     /// <summary>
-    /// Обзор адресов звука в журнале против списка — для <c>nz voice</c>, ничего не пишет.
+    /// Обзор адресов звука в журнале против списка — для <c>zy voice</c>, ничего не пишет.
     /// </summary>
     /// <remarks>
     /// По порядку первого появления. Время — из начала строки; строки без него
@@ -195,9 +195,9 @@ public static class DiscordVoiceLearn
     /// (DiscordVoiceWatch) дописал бы. Ничего не пишет.
     /// </summary>
     /// <remarks>
-    /// Один текст для <c>nz voice</c> и отчёта для разбора: чтобы проверить
+    /// Один текст для <c>zy voice</c> и отчёта для разбора: чтобы проверить
     /// без звонков у того, у кого голос не идёт, и не просить его отдельно
-    /// запускать nz (владелец 06.10).
+    /// запускать zy (владелец 06.10).
     /// </remarks>
     /// <param name="appData">Папка, где лежат журналы Discord; <c>null</c> — %APPDATA%.</param>
     /// <param name="root">Корень установки; <c>null</c> — рабочий каталог.</param>

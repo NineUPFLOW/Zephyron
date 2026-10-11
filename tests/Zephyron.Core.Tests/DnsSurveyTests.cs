@@ -9,7 +9,7 @@ namespace Zephyron.Core.Tests;
 /// </summary>
 /// <remarks>
 /// Сетевую часть здесь не проверить — она проверена живым прогоном 23.09
-/// (nz dns): Google, Cloudflare и OpenDNS по UDP отвечали из
+/// (zy dns): Google, Cloudflare и OpenDNS по UDP отвечали из
 /// RIPN-NS5-RU-MSK и подменяли четыре имени из пяти, по DoH и DoT — сами.
 /// </remarks>
 public sealed class DnsSurveyTests

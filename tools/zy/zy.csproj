@@ -14,7 +14,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>nz</AssemblyName>
+    <AssemblyName>zy</AssemblyName>
     <RootNamespace>Zephyron.Tools</RootNamespace>
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>

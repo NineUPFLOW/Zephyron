@@ -37,7 +37,7 @@ public static class TunnelStatus
     /// Прежде «закреплён» говорилось про всякий сервер, на который селектор
     /// указывает прямо. До 28.09 это и значило «выбран руками». Но с 28.09
     /// сторож сам ставит серверы прямо в селектор — при прогреве и при замене
-    /// умершего, — и при автоподборе <c>nz status</c> и вкладка VPN стали
+    /// умершего, — и при автоподборе <c>zy status</c> и вкладка VPN стали
     /// писать «закреплён» про сервер, которого никто не выбирал.
     /// </para>
     /// <para>
@@ -55,7 +55,7 @@ public static class TunnelStatus
             : server == preferred ? ExitStanding.Pinned : ExitStanding.Other;
 
     /// <summary>
-    /// Как назвать выход в <c>nz status</c> и в отчёте: закреплён, автоподбор
+    /// Как назвать выход в <c>zy status</c> и в отчёте: закреплён, автоподбор
     /// или временная замена — теми словами, что выведены из <see cref="Standing"/>.
     /// </summary>
     /// <param name="automatic">Селектор движка стоит на группе автоподбора, а не прямо на сервере.</param>
@@ -119,7 +119,7 @@ public static class TunnelStatus
     /// <remarks>
     /// Второе важно не меньше первого. 23.09 в настройках стояло «авто»,
     /// а движок держался WARP из своего кэша, и Telegram висел; заметить это
-    /// можно было, только спросив движок, — теперь это видно в <c>nz status</c>.
+    /// можно было, только спросив движок, — теперь это видно в <c>zy status</c>.
     /// </remarks>
     public static async Task<(string? Server, bool Automatic)> CurrentExitAsync(
         CancellationToken cancellationToken,

@@ -51,7 +51,7 @@ public sealed class TunnelCaptureTests
 
     private static ZapretPreset WithHead(params string[] head)
     {
-        var path = Path.Combine(Path.GetTempPath(), $"nz-preset-{Guid.NewGuid():N}.txt");
+        var path = Path.Combine(Path.GetTempPath(), $"zy-preset-{Guid.NewGuid():N}.txt");
 
         try
         {
@@ -152,7 +152,7 @@ public sealed class TunnelCaptureTests
     [Fact]
     public void TheTunAddressesAreLeftOutOfTheCapture()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"nz-tun-{Guid.NewGuid():N}.json");
+        var path = Path.Combine(Path.GetTempPath(), $"zy-tun-{Guid.NewGuid():N}.json");
 
         try
         {
@@ -183,7 +183,7 @@ public sealed class TunnelCaptureTests
     [Fact]
     public void TheFakeRangeIsReadFromTheCompiledConfig()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"nz-fake-{Guid.NewGuid():N}.json");
+        var path = Path.Combine(Path.GetTempPath(), $"zy-fake-{Guid.NewGuid():N}.json");
 
         try
         {
@@ -439,7 +439,7 @@ public sealed class TunnelCaptureTests
     [Fact]
     public void AddressesAreReadWithoutRepeatsAndLoopback()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"nz-endpoints-{Guid.NewGuid():N}.json");
+        var path = Path.Combine(Path.GetTempPath(), $"zy-endpoints-{Guid.NewGuid():N}.json");
 
         try
         {
@@ -468,6 +468,6 @@ public sealed class TunnelCaptureTests
     [Fact]
     public void AMissingConfigGivesNoAddresses()
     {
-        Assert.Empty(TunnelEndpoints.Read(Path.Combine(Path.GetTempPath(), $"nz-none-{Guid.NewGuid():N}.json")));
+        Assert.Empty(TunnelEndpoints.Read(Path.Combine(Path.GetTempPath(), $"zy-none-{Guid.NewGuid():N}.json")));
     }
 }

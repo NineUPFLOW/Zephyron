@@ -10,7 +10,7 @@ namespace Zephyron.Core.Tests;
 /// </summary>
 public sealed class ServerMemoryTests : IDisposable
 {
-    private readonly string _root = Path.Combine(Path.GetTempPath(), $"nz-memory-{Guid.NewGuid():N}");
+    private readonly string _root = Path.Combine(Path.GetTempPath(), $"zy-memory-{Guid.NewGuid():N}");
 
     private string SettingsPath => Path.Combine(_root, "zephyron.json");
 

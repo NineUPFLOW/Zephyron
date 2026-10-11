@@ -17,7 +17,7 @@ namespace Zephyron.Core.Updates;
 /// <para>
 /// Список прошлой версии у установки есть: <c>build.cmd</c> и <c>pack.cmd</c>
 /// кладут нетронутую копию каждого нашего списка движку как
-/// <c>engines\zapret\lists\nz-&lt;имя&gt;</c>, а правит человек
+/// <c>engines\zapret\lists\zy-&lt;имя&gt;</c>, а правит человек
 /// <c>config\lists\&lt;имя&gt;</c>. Строки второго, которых нет в первом, — его.
 /// </para>
 /// <para>
@@ -33,7 +33,7 @@ public static class ListCarry
     public const string Marker = "# Дописано вами до обновления — перенесено Zephyron";
 
     /// <summary>Приставка нетронутой копии в папке списков движка.</summary>
-    public const string PristinePrefix = "nz-";
+    public const string PristinePrefix = "zy-";
 
     /// <summary>
     /// Что человек дописал в каждый список: имя файла → строки в прежнем порядке.

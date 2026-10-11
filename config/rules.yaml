@@ -15,8 +15,8 @@
 # Старые ссылки на переехавшие списки понимаются по-прежнему.
 #
 # Посмотреть, куда пойдёт что-то конкретное:
-#   nz where telegram.exe
-#   nz where rutracker.org
+#   zy where telegram.exe
+#   zy where rutracker.org
 
 mode: selective
 

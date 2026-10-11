@@ -1,7 +1,7 @@
 @echo off
-rem Builds the window and nz, and deploys both to build\.
+rem Builds the window and zy, and deploys both to build\.
 rem
-rem The window is the program; nz is the troubleshooting tool beside it. The
+rem The window is the program; zy is the troubleshooting tool beside it. The
 rem console that used to be built here was removed on 23.09.
 rem
 rem Why the extra copy: running straight out of a project's bin\ folder makes
@@ -14,16 +14,16 @@ rem and UTF-8 Cyrillic here breaks apart into bogus commands.
 setlocal
 
 set "ROOT=%~dp0"
-rem nz, not the old console: the console was removed on 23.09. nz is the
+rem zy, not the old console: the console was removed on 23.09. zy is the
 rem troubleshooting tool that needs no administrator rights and holds no
-rem logic of its own - see tools\nz\Program.cs.
-set "NZ=%ROOT%tools\nz\bin\Debug\net8.0-windows"
+rem logic of its own - see tools\zy\Program.cs.
+set "ZY=%ROOT%tools\zy\bin\Debug\net8.0-windows"
 set "WINDOW=%ROOT%gui\Zephyron.Gui\bin\Debug\net8.0-windows"
 set "TARGET=%ROOT%build"
 
 set "DOTNET=C:\Program Files\dotnet\dotnet.exe"
 
-echo Building the libraries and nz...
+echo Building the libraries and zy...
 "%DOTNET%" build "%ROOT%Zephyron.sln" -v quiet --nologo
 if %errorlevel% neq 0 (
     echo Build failed.
@@ -180,7 +180,7 @@ rem /R and /W are not optional here. Robocopy defaults to one million retries
 rem with a thirty second wait, so a single locked file hangs the script for
 rem what is effectively forever. Observed exactly that when a stray instance
 rem held the deployed assemblies. Two quick retries, then fail loudly.
-robocopy "%NZ%" "%TARGET%" /E /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
+robocopy "%ZY%" "%TARGET%" /E /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
 if %errorlevel% geq 8 goto :held
 
 rem The window second, and never renamed on the way. The apphost looks for its
@@ -342,7 +342,7 @@ rem Preset sections reference hostlists as "lists/<name>" relative to the Zapret
 rem root, and winws2 resolves them there - not next to our config. So a section
 rem pointing at config\lists\proton.txt would load nothing and match nothing.
 rem
-rem Prefixed with nz- so they cannot collide with Zapret's own files. Without
+rem Prefixed with zy- so they cannot collide with Zapret's own files. Without
 rem the prefix our discord.txt would quietly replace theirs, and the preset
 rem would start matching a different set of names than its author wrote.
 rem
@@ -353,7 +353,7 @@ rem ---------------------------------------------------------------------------
 
 echo Bundling our lists
 for %%F in ("%ROOT%config\lists\*.txt") do (
-    copy /y "%%F" "%ENGINES%\zapret\lists\nz-%%~nxF" >nul
+    copy /y "%%F" "%ENGINES%\zapret\lists\zy-%%~nxF" >nul
 )
 
 

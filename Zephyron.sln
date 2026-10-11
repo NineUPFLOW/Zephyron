@@ -22,7 +22,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Zephyron.Core.Tests", "test
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{0FF13F61-7DDA-4D77-BEDB-952F18C43E51}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "nz", "tools\nz\nz.csproj", "{770F8BF9-7F73-4671-832E-91B9667753CD}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "zy", "tools\zy\zy.csproj", "{770F8BF9-7F73-4671-832E-91B9667753CD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

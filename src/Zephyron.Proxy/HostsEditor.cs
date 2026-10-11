@@ -467,7 +467,7 @@ public static class HostsEditor
     /// Windows комментарий в строке hosts пропускает.
     /// </para>
     /// </remarks>
-    public const string DesyncMark = "nz:desync";
+    public const string DesyncMark = "zy:desync";
 
     /// <summary>
     /// Прибивает имена к адресам самого сервиса — с пометкой <see cref="DesyncMark"/>.

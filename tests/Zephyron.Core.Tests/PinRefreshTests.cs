@@ -43,7 +43,7 @@ public sealed class PinRefreshTests
     [Fact]
     public void Repin_keeps_the_block_note_and_other_names()
     {
-        var file = Path.Combine(Path.GetTempPath(), "nz-hosts-" + Guid.NewGuid().ToString("N"));
+        var file = Path.Combine(Path.GetTempPath(), "zy-hosts-" + Guid.NewGuid().ToString("N"));
 
         try
         {

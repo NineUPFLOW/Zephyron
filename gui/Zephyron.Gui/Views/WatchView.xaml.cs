@@ -48,7 +48,7 @@ public sealed record WatchTopLine(string Name, int Count, double Bar, double Tra
 /// </para>
 /// <para>
 /// Источник — события ядра (ETW), сеанс — <see cref="ConnectionWatch"/>, общий
-/// с <c>nz watch</c>; каждое соединение пишется в <c>runtime\watch.log</c>,
+/// с <c>zy watch</c>; каждое соединение пишется в <c>runtime\watch.log</c>,
 /// и журнал со сводкой по программам едет в отчёт.
 /// </para>
 /// <para>
@@ -266,7 +266,7 @@ public partial class WatchView : UserControl
 
         try
         {
-            // Тот же сеанс, что у nz watch (ConnectionWatch): те же правила,
+            // Тот же сеанс, что у zy watch (ConnectionWatch): те же правила,
             // что у сборки конфига, и тот же журнал runtime\watch.log.
             _watch = ConnectionWatch.Start(AppSettings.Load(AppSettings.DefaultPath), ConnectionWatch.DefaultJournal);
             _startedAt = DateTimeOffset.Now;
@@ -334,9 +334,9 @@ public partial class WatchView : UserControl
             }
 
             // Поток кончился без нашей остановки — сессию погасили снаружи:
-            // имя сессии одно на машину, и nz watch --force её забирает.
+            // имя сессии одно на машину, и zy watch --force её забирает.
             if (!cancellationToken.IsCancellationRequested)
-                Interrupted("сессию забрал nz watch --force или остановила система");
+                Interrupted("сессию забрал zy watch --force или остановила система");
         }
         catch (OperationCanceledException)
         {
@@ -901,7 +901,7 @@ public partial class WatchView : UserControl
         Details.Visibility = Visibility.Collapsed;
     }
 
-    /// <summary>«Почему так» — то же объяснение, что nz where (RouteWhy).</summary>
+    /// <summary>«Почему так» — то же объяснение, что zy where (RouteWhy).</summary>
     private async Task WhyAsync(string target)
     {
         ShowDetails($"Почему так: {target}", "Смотрю правила, hosts и DNS…");

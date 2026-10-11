@@ -11,7 +11,7 @@ namespace Zephyron.Core.Tests;
 /// </remarks>
 public sealed class RulesShareTests : IDisposable
 {
-    private readonly string _dir = Path.Combine(Path.GetTempPath(), $"nz-share-{Guid.NewGuid():N}");
+    private readonly string _dir = Path.Combine(Path.GetTempPath(), $"zy-share-{Guid.NewGuid():N}");
 
     public RulesShareTests() => Directory.CreateDirectory(_dir);
 

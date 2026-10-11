@@ -9,7 +9,7 @@ namespace Zephyron.Core.Tests;
 public sealed class PresetModulesTests : IDisposable
 {
     private readonly string _root = Path.Combine(
-        Path.GetTempPath(), "nz-modules-" + Guid.NewGuid().ToString("N")[..8]);
+        Path.GetTempPath(), "zy-modules-" + Guid.NewGuid().ToString("N")[..8]);
 
     public PresetModulesTests() => Directory.CreateDirectory(_root);
 

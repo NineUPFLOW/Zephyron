@@ -13,7 +13,7 @@ public enum DnsRoute
     Tunnel,
 }
 
-/// <summary>Слова для выбора пути DNS — одни в окне, отчёте и nz.</summary>
+/// <summary>Слова для выбора пути DNS — одни в окне, отчёте и zy.</summary>
 public static class DnsRoutes
 {
     public static string Word(DnsRoute route) => route switch
@@ -76,7 +76,7 @@ public static class DnsRoutes
         };
     }
 
-    /// <summary>Разбор слова из nz: «авто», «напрямую», «туннель» и английские.</summary>
+    /// <summary>Разбор слова из zy: «авто», «напрямую», «туннель» и английские.</summary>
     public static DnsRoute? Parse(string? word) => word?.Trim().ToLowerInvariant() switch
     {
         "авто" or "auto" => DnsRoute.Auto,

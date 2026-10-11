@@ -8,7 +8,7 @@ namespace Zephyron.Core.Tests;
 /// <summary>Журнал выходов для «Недавних серверов» (01.10).</summary>
 public sealed class ExitHistoryTests : IDisposable
 {
-    private readonly string _path = Path.Combine(Path.GetTempPath(), $"nz-exits-{Guid.NewGuid():N}.json");
+    private readonly string _path = Path.Combine(Path.GetTempPath(), $"zy-exits-{Guid.NewGuid():N}.json");
 
     public void Dispose()
     {

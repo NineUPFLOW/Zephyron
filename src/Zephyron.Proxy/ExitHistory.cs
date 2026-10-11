@@ -12,7 +12,7 @@ public sealed record ExitSeen(string Tag, DateTimeOffset At);
 /// <remarks>
 /// <para>
 /// Пишется там, где выход и так спрашивают у движка (<see cref="TunnelStatus.CurrentExitAsync"/>):
-/// «Главная» спрашивает раз в несколько секунд, вкладка VPN — раз в 15, <c>nz status</c> —
+/// «Главная» спрашивает раз в несколько секунд, вкладка VPN — раз в 15, <c>zy status</c> —
 /// по просьбе. Отдельный опрос ради журнала был бы лишним вопросом движку.
 /// Значит, журнал знает только выходы, замеченные при открытой программе, —
 /// смену при закрытом окне он увидит со следующего вопроса.
@@ -92,7 +92,7 @@ public static class ExitHistory
             if (!string.IsNullOrEmpty(directory))
                 Directory.CreateDirectory(directory);
 
-            // Через временный файл: окно и nz могут писать почти разом.
+            // Через временный файл: окно и zy могут писать почти разом.
             var temporary = target + ".tmp";
             File.WriteAllText(temporary, JsonSerializer.Serialize(seen), new UTF8Encoding(false));
             File.Move(temporary, target, overwrite: true);

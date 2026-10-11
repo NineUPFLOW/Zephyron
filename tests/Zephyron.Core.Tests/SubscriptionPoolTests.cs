@@ -124,7 +124,7 @@ public sealed class SubscriptionPoolTests
     [Fact]
     public async Task A_dead_panel_falls_back_to_its_reserve_and_duplicates_are_merged()
     {
-        var folder = Path.Combine(Path.GetTempPath(), "nz-pool-" + Guid.NewGuid().ToString("N"));
+        var folder = Path.Combine(Path.GetTempPath(), "zy-pool-" + Guid.NewGuid().ToString("N"));
 
         try
         {
@@ -157,7 +157,7 @@ public sealed class SubscriptionPoolTests
     [Fact]
     public async Task Only_reserves_of_remaining_subscriptions_are_kept()
     {
-        var folder = Path.Combine(Path.GetTempPath(), "nz-pool-" + Guid.NewGuid().ToString("N"));
+        var folder = Path.Combine(Path.GetTempPath(), "zy-pool-" + Guid.NewGuid().ToString("N"));
 
         try
         {
@@ -189,7 +189,7 @@ public sealed class SubscriptionPoolTests
     {
         // Владелец 28.09: «почему так часто проводится чтение подписок».
         // Свежий запас — ответ; к панели идут только силой (⟳, «Обновить»).
-        var folder = Path.Combine(Path.GetTempPath(), "nz-pool-" + Guid.NewGuid().ToString("N"));
+        var folder = Path.Combine(Path.GetTempPath(), "zy-pool-" + Guid.NewGuid().ToString("N"));
 
         try
         {
@@ -228,7 +228,7 @@ public sealed class SubscriptionPoolTests
     [Fact]
     public void The_kept_answer_gives_the_quota_without_the_panel()
     {
-        var folder = Path.Combine(Path.GetTempPath(), "nz-pool-" + Guid.NewGuid().ToString("N"));
+        var folder = Path.Combine(Path.GetTempPath(), "zy-pool-" + Guid.NewGuid().ToString("N"));
 
         try
         {
@@ -266,7 +266,7 @@ public sealed class SubscriptionPoolTests
     [Fact]
     public async Task A_dead_panel_without_reserve_does_not_break_the_pool()
     {
-        var folder = Path.Combine(Path.GetTempPath(), "nz-pool-" + Guid.NewGuid().ToString("N"));
+        var folder = Path.Combine(Path.GetTempPath(), "zy-pool-" + Guid.NewGuid().ToString("N"));
 
         var result = await SubscriptionPool.BuildAsync(
             [new PoolSource("Лежит", "http://127.0.0.1:1/sub")], CancellationToken.None, folder);

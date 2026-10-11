@@ -627,7 +627,7 @@ public sealed record AppSettings
     /// причина не писалась.
     /// </para>
     /// <para>
-    /// Занятый файл — не испорченный: окно, надзор и nz читают и пишут его
+    /// Занятый файл — не испорченный: окно, надзор и zy читают и пишут его
     /// из разных процессов. Такое чтение повторяется несколько раз с короткой
     /// паузой, прежде чем сдаться.
     /// </para>
@@ -731,7 +731,8 @@ public sealed record AppSettings
     public bool? ProgramRulesRemoved { get; init; }
 
     /// <summary>
-    /// Какие правила по программе сняты — словами, «Diablo IV.exe → VPN»: вернуть их, когда обход по программе переделают.
+    /// Какие правила по программе сняты — словами, «Diablo IV.exe → VPN»:
+    /// чтобы предложить вернуть их (11.10, <see cref="Rules.ProgramRulesOff.Restore"/>).
     /// </summary>
     public IReadOnlyList<string>? RemovedProgramRules { get; init; }
 
