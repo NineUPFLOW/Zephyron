@@ -31,6 +31,9 @@ on:
 
 permissions:
   contents: write
+  # Диспетчер поста в Telegram: выпуск, созданный этим workflow, события
+  # release не поднимает (см. шаг «Опубликовать выпуск»).
+  actions: write
 
 env:
   # Версии движков закреплены, а не «последние»: выпуск должен собираться
@@ -211,3 +214,20 @@ jobs:
             --title "Zephyron $VERSION" \
             --notes-file notes.md \
             --target "$GITHUB_SHA"
+
+      - name: Пост в Telegram
+        # Пост — диспетчером, а не событием release: выпуск, созданный с токеном
+        # Actions, событий не поднимает вовсе (защита от рекурсии), и
+        # telegram-release на него не сработает. Отдельным шагом, чтобы отказ
+        # поста был виден в списке проверок и не прятался за успехом выпуска.
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          # Пост не должен держать выпуск в неизвестности: телеграм-секреты
+          # бывают не заведены, и падение здесь сообщит об этом, не отменяя
+          # сам выпуск.
+          gh workflow run telegram-release.yml --repo "$GITHUB_REPOSITORY" \
+            --ref "$GITHUB_REF_NAME" -f tag="v$VERSION" \
+            || echo "Не вышло запустить пост — отправьте его кнопкой: Actions → telegram-release, тег v$VERSION."
