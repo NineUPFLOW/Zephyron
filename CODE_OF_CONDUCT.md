@@ -33,7 +33,7 @@ Zephyron делают и чинят люди, у которых что-то не
 ## Куда писать
 
 Если кто-то нарушает эти правила — напишите автору в
-[телеграм-канале](https://github.com/NineUPFLOW/Zephyron) или через
+[телеграм-канале](https://t.me/zephyron0) или через
 [обсуждения](https://github.com/NineUPFLOW/Zephyron/discussions).
 Об уязвимостях — только приватно, см. [SECURITY.md](SECURITY.md).
 

@@ -4,6 +4,7 @@
 [![Скачиваний последней версии](https://img.shields.io/github/downloads/NineUPFLOW/Zephyron/latest/total?label=%D0%BF%D0%BE%D1%81%D0%BB%D0%B5%D0%B4%D0%BD%D0%B5%D0%B9%20%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D0%B8)](https://github.com/NineUPFLOW/Zephyron/releases/latest)
 [![Последний выпуск](https://img.shields.io/github/v/release/NineUPFLOW/Zephyron?label=%D0%B2%D1%8B%D0%BF%D1%83%D1%81%D0%BA)](https://github.com/NineUPFLOW/Zephyron/releases/latest)
 [![Звёзды](https://img.shields.io/github/stars/NineUPFLOW/Zephyron?label=%D0%B7%D0%B2%D1%91%D0%B7%D0%B4&style=flat)](https://github.com/NineUPFLOW/Zephyron/stargazers)
+[![Телеграм-канал](https://img.shields.io/badge/%D1%82%D0%B5%D0%BB%D0%B5%D0%B3%D1%80%D0%B0%D0%BC-%D0%BA%D0%B0%D0%BD%D0%B0%D0%BB-26A5E4?logo=telegram&logoColor=white)](https://t.me/zephyron0)
 
 **Милый диспетчер трафика для Windows.** Десинк чинит то, что тормозит
 провайдер, VPN берёт то, что закрыто по стране, — а Zephyron решает, что куда,
@@ -32,7 +33,8 @@ Zephyron — самостоятельный проект: свой интерф�
 и его автору [RixyPow](https://github.com/RixyPow): оттуда взята основа —
 маршрутизация трафика, десинк, туннель, подписки и супервизор движков.
 Лицензия MIT это позволяет, а условия её соблюдены: см. раздел
-«Благодарности и лицензии» ниже. Вопросы и отчёты об ошибках — в
+«Благодарности и лицензии» ниже. Новости — в
+[телеграм-канале](https://t.me/zephyron0). Вопросы и отчёты об ошибках — в
 [issues](https://github.com/NineUPFLOW/Zephyron/issues) этого репозитория.
 
 Что едет в архиве, кроме самой программы:

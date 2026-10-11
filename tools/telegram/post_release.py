@@ -13,7 +13,13 @@ Markdown GitHub (## заголовки, **жирный**).
     RELEASE_BODY="$(cat notes.md)" RELEASE_TAG=v0.8.7 python post_release.py --dry-run
 
 Переменные: RELEASE_BODY, RELEASE_TAG, RELEASE_URL, TELEGRAM_BOT_TOKEN,
-TELEGRAM_CHAT_ID. Токен никуда не печатается — ни в вывод, ни в ошибку.
+TELEGRAM_CHAT_ID, TELEGRAM_THREAD_ID. Токен никуда не печатается — ни
+в вывод, ни в ошибку.
+
+Канал — форум, и обновления идут в отдельную тему, а не в «General»:
+без TELEGRAM_THREAD_ID пост уходит в общую ленту. Номер темы — тот, что
+в ссылке на неё: https://t.me/zephyron0/20774 → TELEGRAM_THREAD_ID=20774.
+Пусто — пост в общую ленту, как было.
 """
 
 import html
@@ -121,13 +127,21 @@ def compose(body: str, tag: str, url: str) -> str:
 def send(text: str) -> None:
     token = os.environ["TELEGRAM_BOT_TOKEN"]
     chat = os.environ["TELEGRAM_CHAT_ID"]
+    thread = os.environ.get("TELEGRAM_THREAD_ID", "").strip()
 
-    data = urllib.parse.urlencode({
+    fields = {
         "chat_id": chat,
         "text": text,
         "parse_mode": "HTML",
         "disable_web_page_preview": "true",
-    }).encode()
+    }
+
+    # Канал — форум: без номера темы пост уходит в общую ленту, а не
+    # в тему обновлений.
+    if thread:
+        fields["message_thread_id"] = thread
+
+    data = urllib.parse.urlencode(fields).encode()
 
     request = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage", data=data)
 
@@ -144,7 +158,10 @@ def send(text: str) -> None:
     if not answer.get("ok"):
         sys.exit(f"Telegram отказал: {answer.get('description', 'без объяснения')}")
 
-    print("Отправлено в", chat)
+    if thread:
+        print("Отправлено в", chat, "тему", thread)
+    else:
+        print("Отправлено в", chat)
 
 
 def main() -> None:

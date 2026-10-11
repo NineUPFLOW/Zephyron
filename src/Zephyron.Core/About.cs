@@ -30,9 +30,9 @@ public static class About
 
     public const string Discussions = Repository + "/discussions";
 
-    public const string Telegram = "https://github.com/NineUPFLOW/Zephyron";
+    public const string Telegram = "https://t.me/zephyron0";
 
-    public const string Support = "https://https://github.com/NineUPFLOW/Zephyron";
+    public const string Support = "https://github.com/NineUPFLOW/Zephyron";
 
     /// <summary>
     /// Состав поставки, в порядке важности для работы.

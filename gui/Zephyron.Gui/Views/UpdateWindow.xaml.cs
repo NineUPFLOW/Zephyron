@@ -39,7 +39,7 @@ public enum UpdateChoice
 public partial class UpdateWindow : Window
 {
     /// <summary>Канал проекта — тот же, что в README.</summary>
-    public const string Telegram = "https://github.com/NineUPFLOW/Zephyron";
+    public const string Telegram = "https://t.me/zephyron0";
 
     private static readonly CultureInfo Russian = CultureInfo.GetCultureInfo("ru-RU");
 

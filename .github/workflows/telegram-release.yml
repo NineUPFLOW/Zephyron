@@ -7,7 +7,10 @@
 # tools/telegram/post_release.py: Markdown GitHub Telegram не понимает.
 #
 # Нужны секреты репозитория TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID; бот —
-# администратор канала с правом публиковать. Нет секретов — шаг падает
+# администратор канала с правом публиковать. Канал — форум, и обновления
+# идут в отдельную тему: её номер (20774 из ссылки t.me/zephyron0/20774)
+# лежит в секрете TELEGRAM_THREAD_ID. Нет этого секрета — пост уйдёт
+# в общую ленту канала, а не в тему. Нет секретов вовсе — шаг падает
 # с объяснением, а не отправляет в никуда.
 #
 # Кнопкой в Actions можно отправить уже вышедший выпуск — по тегу.
@@ -44,6 +47,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_THREAD_ID: ${{ secrets.TELEGRAM_THREAD_ID }}
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
             echo "Нет секретов TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID — заведите их в Settings → Secrets and variables → Actions."
