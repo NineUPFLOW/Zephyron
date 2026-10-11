@@ -108,3 +108,7 @@ themes/*
 !themes/blissfield/
 !themes/fish/
 config/*.tmp
+
+# Python bytecode
+__pycache__/
+*.pyc

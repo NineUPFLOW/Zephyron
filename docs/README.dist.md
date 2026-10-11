@@ -111,7 +111,7 @@ Windows вдобавок покажет SmartScreen: программа не п�
 
 ## Поддержать
 
-Если программа пригодилась — [https://github.com/NineUPFLOW/Zephyron](https://https://github.com/NineUPFLOW/Zephyron).
+Если программа пригодилась — [github.com/NineUPFLOW/Zephyron](https://github.com/NineUPFLOW/Zephyron).
 
 Она бесплатная и останется такой.
 
