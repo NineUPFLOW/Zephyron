@@ -225,9 +225,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.v.outputs.version }}
         run: |
-          # Пост не должен держать выпуск в неизвестности: телеграм-секреты
-          # бывают не заведены, и падение здесь сообщит об этом, не отменяя
-          # сам выпуск.
           gh workflow run telegram-release.yml --repo "$GITHUB_REPOSITORY" \
-            --ref "$GITHUB_REF_NAME" -f tag="v$VERSION" \
-            || echo "Не вышло запустить пост — отправьте его кнопкой: Actions → telegram-release, тег v$VERSION."
+            --ref "$GITHUB_REF_NAME" -f tag="v$VERSION" || {
+              echo "Не вышло запустить пост. Отправьте его кнопкой: Actions → telegram-release, тег v$VERSION." >&2
+              echo "Если дело в правах — у release.yml должно быть actions: write." >&2
+              exit 1
+            }
