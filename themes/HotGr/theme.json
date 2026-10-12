@@ -1,0 +1,26 @@
+{
+  "name": "HotGr",
+  "author": "@grandfathernahui",
+  "colors": {
+    "backdrop": "#06030F",
+    "surface": "#B3100820",
+    "raised": "#1A1030",
+    "border": "#5B2E9E",
+    "text": "#FFFFFF",
+    "muted": "#F5F0FF",
+    "faint": "#D4C8E8",
+    "accent": "#00FFD4",
+    "accent-dim": "#4A1F8C",
+    "danger": "#FF2E88",
+    "warn": "#FFE94D",
+    "accent-fill": "#7C3AED",
+    "on-accent": "#FFFFFF",
+    "warn-fill": "#FFE94D"
+  },
+  "background": {
+    "image": "background.jpg",
+    "fit": "cover",
+    "dim": 0.8,
+    "blur": 0
+  }
+}
