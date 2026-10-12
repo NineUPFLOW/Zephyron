@@ -182,6 +182,22 @@ jobs:
             fi
           done
 
+          # Единый файл обязан нести нативные библиотеки внутри себя: без
+          # IncludeNativeLibrariesForSelfExtract программа стартует и молча
+          # выходит — без окна и без ошибки (так вышли 0.15.7 и 0.15.8).
+          # Признаки, оба дешёвые: файл ~172 МБ, а не ~160, и нативных DLL
+          # рядом с ним нет. Пусть выпуск не состоится, но не сломается.
+          exe_size=$(stat -c%s "$STAGE/Zephyron.exe")
+          shopt -s nullglob
+          stray=("$STAGE"/*_cor3.dll)
+          shopt -u nullglob
+          if [ "$exe_size" -lt 168000000 ] || [ "${#stray[@]}" -ne 0 ]; then
+            echo "Отказ: Zephyron.exe без нативных библиотек внутри." >&2
+            echo "  размер: $exe_size байт, DLL рядом: ${#stray[@]}" >&2
+            echo "  соберите с -p:IncludeNativeLibrariesForSelfExtract=true" >&2
+            exit 1
+          fi
+
           ( cd "$ROOT/stage" && zip -qr9 "$ROOT/Zephyron-$VERSION.zip" Zephyron )
           echo "Zephyron-$VERSION.zip: $(du -h "$ROOT/Zephyron-$VERSION.zip" | cut -f1)"
 

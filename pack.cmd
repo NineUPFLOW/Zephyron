@@ -77,6 +77,26 @@ rem Debug symbols are of no use to anyone downloading this, and they clutter
 rem a folder whose whole point is being obvious.
 del /q "%STAGE%\*.pdb" >nul 2>&1
 
+rem The single file must carry the native libraries inside it. Without
+rem IncludeNativeLibrariesForSelfExtract they are dropped instead, and the
+rem program starts and silently exits - no window, no error (shipped this way
+rem in 0.15.7 and 0.15.8). Two signs, both cheap to check: the file comes out
+rem around 172 MB rather than 160, and no native .dll is left beside it.
+for %%F in ("%STAGE%\Zephyron.exe") do set ZSIZE=%%~zF
+set EXITCODE=0
+powershell -NoProfile -Command "if ((Get-Item '%STAGE%\Zephyron.exe').Length -lt 168000000) { exit 1 }"
+if %errorlevel% neq 0 set EXITCODE=1
+dir /b "%STAGE%\*_cor3.dll" >nul 2>&1
+if %errorlevel% equ 0 set EXITCODE=1
+if %EXITCODE% neq 0 (
+    echo.
+    echo Refusing to archive: Zephyron.exe has no native libraries inside it
+    echo (%ZSIZE% bytes, and stray DLLs beside it). The program would start and
+    echo silently exit. Build with -p:IncludeNativeLibrariesForSelfExtract=true,
+    echo as pack.cmd does.
+    exit /b 1
+)
+
 rem The distribution ships the base ruleset and the settings template, not a
 rem settings file: that one holds the subscription link, which is a password.
 echo Copying configuration
