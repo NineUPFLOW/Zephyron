@@ -1,0 +1,26 @@
+{
+  "name": "Peach Static",
+  "author": "@grandfathernahui",
+  "colors": {
+    "backdrop": "#16121A",
+    "surface": "#B3201A26",
+    "raised": "#2A2333",
+    "border": "#7A6E85",
+    "text": "#FFF8F4",
+    "muted": "#F5E9E2",
+    "faint": "#C9B8B0",
+    "accent": "#FFB39B",
+    "accent-dim": "#5C3A4A",
+    "danger": "#FF7A9C",
+    "warn": "#FFD9A0",
+    "accent-fill": "#B36F8A",
+    "on-accent": "#1F1219",
+    "warn-fill": "#E8B98A"
+  },
+  "background": {
+    "image": "background.jpg",
+    "fit": "cover",
+    "dim": 0.75,
+    "blur": 4
+  }
+}
