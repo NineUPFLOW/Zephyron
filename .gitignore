@@ -107,6 +107,7 @@ themes/*
 !themes/sloyka1/
 !themes/blissfield/
 !themes/fish/
+!themes/aurora/
 config/*.tmp
 
 # Python bytecode

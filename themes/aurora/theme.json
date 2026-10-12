@@ -1,0 +1,29 @@
+{
+  // «Аврора» — фирменный фон и сиренево-розовая палитра (12.10). Основа —
+  // тёмная: фон собран градиентом с мягким сиянием акцента, затемнение
+  // подобрано так, чтобы пояснения читались прямо на заголовках.
+  "name": "Аврора",
+  "author": "Zephyron",
+  "base": "dark",
+  "colors": {
+    "backdrop": "#140F22",
+    "surface": "#1E1733",
+    "raised": "#2A2044",
+    "border": "#3B2E5C",
+    "text": "#F5F0FF",
+    "muted": "#C3B6DE",
+    "faint": "#9284B0",
+    "accent": "#E58FFF",
+    "accent-dim": "#6E3F7A",
+    "danger": "#FF7A9C",
+    "warn": "#FFCB8A",
+    "accent-fill": "#E58FFF",
+    "on-accent": "#250F2E",
+    "warn-fill": "#FFCB8A"
+  },
+  "background": {
+    "image": "background.jpg",
+    "fit": "cover",
+    "dim": 0.7
+  }
+}
