@@ -128,7 +128,7 @@ jobs:
             mkdir -p "$STAGE/themes/$t"
             cp "$ROOT/themes/$t/theme.json" "$STAGE/themes/$t/theme.json"
           done
-          for t in sloyka1 blissfield fish; do
+          for t in sloyka1 blissfield fish aurora; do
             mkdir -p "$STAGE/themes/$t"
             cp "$ROOT"/themes/$t/* "$STAGE/themes/$t/"
           done

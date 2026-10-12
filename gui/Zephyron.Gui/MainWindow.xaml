@@ -36,6 +36,21 @@
                    Opacity="{DynamicResource BackdropDim}" />
 
         <!--
+            Мягкое свечение акцента в правом верхнем углу: цвет темы, а не
+            картинка, — потому идёт со всякой темой и не спорит с фоном.
+            Заметно на глаз, но не мешает: прозрачность мала, и под текстом
+            оно не читается как поверхность.
+        -->
+        <Rectangle Grid.ColumnSpan="2" IsHitTestVisible="False" Fill="{DynamicResource Accent}">
+            <Rectangle.OpacityMask>
+                <RadialGradientBrush Center="1,0" GradientOrigin="1,0" RadiusX="0.85" RadiusY="1.1">
+                    <GradientStop Color="#1C000000" Offset="0" />
+                    <GradientStop Color="#00000000" Offset="1" />
+                </RadialGradientBrush>
+            </Rectangle.OpacityMask>
+        </Rectangle>
+
+        <!--
             Боковое меню — отдельная карточка с полями от краёв окна.
             Полоса, а не вкладки: разделы равноправны, и проверку блокировок
             нельзя прятать глубже остальных, она и отличает нас от любого
