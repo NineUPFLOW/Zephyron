@@ -42,9 +42,9 @@
     <Style x:Key="Card" TargetType="Border">
         <Setter Property="Background" Value="{DynamicResource Surface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
-        <Setter Property="BorderThickness" Value="1.5" />
-        <Setter Property="CornerRadius" Value="14" />
-        <Setter Property="Padding" Value="18,16" />
+        <Setter Property="BorderThickness" Value="{StaticResource Stroke}" />
+        <Setter Property="CornerRadius" Value="{StaticResource RLg}" />
+        <Setter Property="Padding" Value="{StaticResource CardPad}" />
         <!-- Стекло под карточкой, если у темы фон и размытие включено (Glass.cs). -->
         <Setter Property="local:Glass.IsOn" Value="True" />
     </Style>
@@ -103,8 +103,8 @@
                     <Border x:Name="Shape"
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="1.5"
-                            CornerRadius="12"
+                            BorderThickness="{StaticResource Stroke}"
+                            CornerRadius="{StaticResource RMd}"
                             Padding="{TemplateBinding Padding}">
                         <!--
                             Подпись — цветом кнопки, а не общим цветом текста.
@@ -237,7 +237,7 @@
                                     <Border x:Name="Shape"
                                             Background="{DynamicResource Raised}"
                                             BorderBrush="{DynamicResource Border}"
-                                            BorderThickness="1.5" CornerRadius="12">
+                                            BorderThickness="{StaticResource Stroke}" CornerRadius="{StaticResource RMd}">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
@@ -282,8 +282,8 @@
                         <Popup IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom"
                                AllowsTransparency="True" PopupAnimation="Fade" Focusable="False">
                             <Border Background="{DynamicResource Surface}"
-                                    BorderBrush="{DynamicResource Border}" BorderThickness="1.5"
-                                    CornerRadius="12" Margin="0,4,0,0"
+                                    BorderBrush="{DynamicResource Border}" BorderThickness="{StaticResource Stroke}"
+                                    CornerRadius="{StaticResource RMd}" Margin="0,4,0,0"
                                     MinWidth="{TemplateBinding ActualWidth}"
                                     LayoutTransform="{DynamicResource UiScaleTransform}">
                                 <ScrollViewer MaxHeight="{TemplateBinding MaxDropDownHeight}"
@@ -312,7 +312,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ComboBoxItem">
-                    <Border x:Name="Shape" Background="Transparent" CornerRadius="6" Padding="10,7">
+                    <Border x:Name="Shape" Background="Transparent" CornerRadius="{StaticResource RSm}" Padding="10,7">
                         <ContentPresenter />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -343,8 +343,8 @@
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
                     <Border x:Name="Shape" Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1.5"
-                            CornerRadius="12" Padding="{TemplateBinding Padding}">
+                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{StaticResource Stroke}"
+                            CornerRadius="{StaticResource RMd}" Padding="{TemplateBinding Padding}">
                         <Grid>
                             <ScrollViewer x:Name="PART_ContentHost" />
 
@@ -397,8 +397,8 @@
             <Setter.Value>
                 <ControlTemplate TargetType="PasswordBox">
                     <Border x:Name="Shape" Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1.5"
-                            CornerRadius="12" Padding="{TemplateBinding Padding}">
+                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{StaticResource Stroke}"
+                            CornerRadius="{StaticResource RMd}" Padding="{TemplateBinding Padding}">
                         <Grid>
                             <ScrollViewer x:Name="PART_ContentHost" />
 
@@ -445,8 +445,8 @@
                     <Border x:Name="Shape"
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="1.5"
-                            CornerRadius="18"
+                            BorderThickness="{StaticResource Stroke}"
+                            CornerRadius="{StaticResource RXL}"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center" />
                     </Border>
@@ -478,8 +478,8 @@
                     <Border x:Name="Shape"
                             Background="{DynamicResource Surface}"
                             BorderBrush="{DynamicResource Border}"
-                            BorderThickness="1.5"
-                            CornerRadius="18"
+                            BorderThickness="{StaticResource Stroke}"
+                            CornerRadius="{StaticResource RXL}"
                             Padding="14,10"
                             MinHeight="64">
                         <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center" />
@@ -496,47 +496,49 @@
     </Style>
 
     <!--
-        Пункт бокового меню. Выбранный помечается полосой слева, а не заливкой:
-        заливка на тёмном спорит с карточками справа и читается как ещё одна
-        поверхность, а не как выбор.
+        Пункт бокового меню. Выбранный — таблетка, залитая акцентом целиком:
+        в меню всегда выбран ровно один раздел, и заливка читается сразу,
+        без левой черты у края.
     -->
     <Style x:Key="RailItem" TargetType="RadioButton">
         <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="Margin" Value="0,2" />
+        <Setter Property="Margin" Value="10,3" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <Grid>
-                        <Border x:Name="Mark"
-                                Width="3" HorizontalAlignment="Left"
-                                Margin="0,6" CornerRadius="2"
-                                Background="Transparent" />
-                        <Border x:Name="Shape" Background="Transparent" CornerRadius="12" Margin="8,0,10,0">
-                            <StackPanel Orientation="Horizontal" Margin="14,10">
-                                <!--
-                                    Значок (MenuIcon.cs). Колонка постоянной ширины:
-                                    знаки разной ширины иначе сдвигали бы подписи,
-                                    и столбец текста шёл бы лесенкой.
-                                -->
-                                <TextBlock x:Name="Glyph"
-                                           Text="{Binding (local:MenuIcon.Glyph), RelativeSource={RelativeSource TemplatedParent}}"
-                                           FontFamily="{DynamicResource IconFont}" FontSize="16"
-                                           Width="18" Margin="0,0,12,0" TextAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           Foreground="{DynamicResource Muted}" />
+                    <!--
+                        Пункт — таблетка. Выбранный залит акцентом целиком:
+                        в меню всегда выбран ровно один раздел, и залитая
+                        таблетка показывает это сразу, без левой черты у края.
+                    -->
+                    <Border x:Name="Shape" Background="Transparent"
+                            CornerRadius="{StaticResource RMd}"
+                            BorderThickness="{StaticResource Stroke}" BorderBrush="Transparent"
+                            Padding="12,9">
+                        <StackPanel Orientation="Horizontal">
+                            <!--
+                                Значок (MenuIcon.cs). Колонка постоянной ширины:
+                                знаки разной ширины иначе сдвигали бы подписи,
+                                и столбец текста шёл бы лесенкой.
+                            -->
+                            <TextBlock x:Name="Glyph"
+                                       Text="{Binding (local:MenuIcon.Glyph), RelativeSource={RelativeSource TemplatedParent}}"
+                                       FontFamily="{DynamicResource IconFont}" FontSize="16"
+                                       Width="18" Margin="0,0,12,0" TextAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Muted}" />
 
-                                <TextBlock x:Name="Label"
-                                           Text="{TemplateBinding Content}"
-                                           Foreground="{DynamicResource Muted}"
-                                           FontSize="13" VerticalAlignment="Center" />
+                            <TextBlock x:Name="Label"
+                                       Text="{TemplateBinding Content}"
+                                       Foreground="{DynamicResource Muted}"
+                                       FontSize="13" VerticalAlignment="Center" />
 
-                                <!-- Точка «есть новое» (RailBadge.cs). -->
-                                <Ellipse x:Name="Badge" Width="7" Height="7" Margin="8,1,0,0"
-                                         VerticalAlignment="Center" Fill="{DynamicResource Accent}"
-                                         Visibility="Collapsed" />
-                            </StackPanel>
-                        </Border>
-                    </Grid>
+                            <!-- Точка «есть новое» (RailBadge.cs). -->
+                            <Ellipse x:Name="Badge" Width="7" Height="7" Margin="8,1,0,0"
+                                     VerticalAlignment="Center" Fill="{DynamicResource Accent}"
+                                     Visibility="Collapsed" />
+                        </StackPanel>
+                    </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="local:RailBadge.Shown" Value="True">
                             <Setter TargetName="Badge" Property="Visibility" Value="Visible" />
@@ -547,11 +549,11 @@
                             <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Surface}" />
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Mark" Property="Background" Value="{DynamicResource Accent}" />
-                            <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Text}" />
-                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentFill}" />
+                            <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource OnAccent}" />
+                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource OnAccent}" />
                             <Setter TargetName="Label" Property="FontWeight" Value="SemiBold" />
-                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Surface}" />
+                            <Setter TargetName="Badge" Property="Fill" Value="{DynamicResource OnAccent}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -601,7 +603,7 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="12" Padding="{TemplateBinding Padding}">
+                            CornerRadius="{StaticResource RMd}" Padding="{TemplateBinding Padding}">
                         <!--
                             Перенос — здесь, для строки в ToolTip="…": её
                             ContentPresenter рисует своим TextBlock без
@@ -714,9 +716,12 @@
         слишком незаметен, стоит сделать подложку»).
     -->
     <Style x:Key="RailPanel" TargetType="Border">
+        <!-- Плавающая карточка, а не полоса от края до края: у меню свои
+             скруглённые углы со всех сторон и рамка на тон светлее фона. -->
         <Setter Property="Background" Value="{DynamicResource RailFill}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
-        <Setter Property="BorderThickness" Value="0,0,1.5,0" />
+        <Setter Property="BorderThickness" Value="{StaticResource Stroke}" />
+        <Setter Property="CornerRadius" Value="{StaticResource RLg}" />
         <Setter Property="local:Glass.IsOn" Value="True" />
     </Style>
 
@@ -747,10 +752,10 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
-                    <Border x:Name="Track" CornerRadius="14"
+                    <Border x:Name="Track" CornerRadius="{StaticResource RPill}"
                             Background="{DynamicResource Raised}"
                             BorderBrush="{DynamicResource Border}"
-                            BorderThickness="1.5">
+                            BorderThickness="{StaticResource Stroke}">
                         <Ellipse x:Name="Knob" Width="18" Height="18"
                                  HorizontalAlignment="Left" Margin="2,0,0,0"
                                  Fill="{DynamicResource Muted}" />
@@ -924,7 +929,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="ContextMenu">
                     <Border Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}"
-                            BorderThickness="1.5" CornerRadius="14" Padding="6" MinWidth="220">
+                            BorderThickness="{StaticResource Stroke}" CornerRadius="{StaticResource RLg}" Padding="6" MinWidth="220">
                         <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
                     </Border>
                 </ControlTemplate>
@@ -941,7 +946,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="MenuItem">
-                    <Border x:Name="Row" Background="Transparent" CornerRadius="10" Padding="10,8">
+                    <Border x:Name="Row" Background="Transparent" CornerRadius="{StaticResource RSm}" Padding="10,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="28" />

@@ -53,7 +53,7 @@ public sealed class ResourceKeyTests
 
         Sta.Run(() =>
         {
-            foreach (var theme in new[] { "Palette", "Controls", "Light" })
+            foreach (var theme in new[] { "Tokens", "Palette", "Controls", "Light" })
             {
                 var dictionary = new ResourceDictionary
                 {

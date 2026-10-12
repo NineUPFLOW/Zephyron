@@ -4,6 +4,13 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
+                <!--
+                    Токены — первыми: стили ниже берут из них скругления,
+                    отступы и размеры через StaticResource, а словарь виден
+                    только ниже своего места. Палитра — после токенов и до
+                    стилей: цветам токены не нужны, а стилям нужны оба.
+                -->
+                <ResourceDictionary Source="Theme/Tokens.xaml" />
                 <ResourceDictionary Source="Theme/Palette.xaml" />
                 <ResourceDictionary Source="Theme/Controls.xaml" />
             </ResourceDictionary.MergedDictionaries>

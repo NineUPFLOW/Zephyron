@@ -1,0 +1,59 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!--
+        Токены оформления Zephyron — нижний слой системы дизайна.
+
+        Здесь только то, что не зависит от темы: скругления, отступы, размеры
+        и толщины. Цвета и шрифты темой управляются, поэтому живут в
+        Palette.xaml и в theme.json, а не тут. Разделение намеренное: попади
+        скругления в тему, каждая правка разметки ломала бы чужие темы,
+        и чинить их пришлось бы нам (см. Theme.cs).
+
+        Имена — по роли, а не по значению: RLg, а не «16». Значение при
+        пересмотре меняется в одном месте, и вся программа едет за ним.
+
+        Стили берут токены через StaticResource: значение известно на разбор,
+        а не на бегу, — и это отличает токен оформления от цвета темы,
+        который обязан меняться вживую (DynamicResource).
+
+        Числа сходятся с docs/design-system.md; расхождение ловит
+        DesignTokensMatchTheDocument.
+    -->
+
+    <!-- Скругления. XL и Pill — для карточек-плиток и кнопок-таблеток. -->
+    <sys:Double x:Key="RSm">8</sys:Double>
+    <sys:Double x:Key="RMd">12</sys:Double>
+    <sys:Double x:Key="RLg">16</sys:Double>
+    <sys:Double x:Key="RXL">20</sys:Double>
+    <sys:Double x:Key="RPill">999</sys:Double>
+
+    <!-- Шаг отступов: 4 → 32. Рядом стоящие значения берутся из одной шкалы,
+         чтобы у соседних карточек и строк был один ритм. -->
+    <sys:Double x:Key="S1">4</sys:Double>
+    <sys:Double x:Key="S2">8</sys:Double>
+    <sys:Double x:Key="S3">12</sys:Double>
+    <sys:Double x:Key="S4">16</sys:Double>
+    <sys:Double x:Key="S5">24</sys:Double>
+    <sys:Double x:Key="S6">32</sys:Double>
+
+    <!-- Размеры оболочки окна. -->
+    <sys:Double x:Key="RailWidth">244</sys:Double>
+    <sys:Double x:Key="MarkSize">40</sys:Double>
+
+    <!-- Поля страницы раздела: шире горизонталь, чем вертикаль, — так
+         карточки стоят по центру взгляда, а не упираются в края. -->
+    <Thickness x:Key="PagePad">32,28,32,28</Thickness>
+    <Thickness x:Key="CardPad">20,18,20,18</Thickness>
+    <Thickness x:Key="RailPad">20,24,20,20</Thickness>
+
+    <!-- Поля карточки меню от краёв окна: слева и сверху/снизу воздух,
+         справа нет — правый край и так отбит от поля раздела. -->
+    <Thickness x:Key="RailInset">12,12,0,12</Thickness>
+
+    <!-- Толщина линий и рамок. Тонкая для разделителей, обычная для границ. -->
+    <sys:Double x:Key="Line">1</sys:Double>
+    <sys:Double x:Key="Stroke">1.5</sys:Double>
+
+</ResourceDictionary>

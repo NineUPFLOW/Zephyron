@@ -12,14 +12,16 @@
         TextOptions.TextFormattingMode="Ideal">
 
     <!--
-        Масштаб окна из «Ещё» → «Шрифт и размер»: всё окно целиком, как
-        «масштаб» в Telegram. Стекло считается в координатах этой же сетки,
-        поэтому от масштаба не съезжает.
+        Оболочка: плавающая колонка меню и просторное поле раздела. Так
+        программа выглядит иначе, чем плоская полоса вкладок: меню —
+        отдельная карточка со своим знаком, поле — с воздухом по краям.
+        Имена элементов и обработчики те же, что были: менялась форма,
+        а не поведение.
     -->
     <Grid x:Name="Root" LayoutTransform="{DynamicResource UiScaleTransform}">
         <Grid.ColumnDefinitions>
-            <!-- Шире на значок с отступом (30.09): под них ушло 30 точек, а самой длинной подписи, «Проверке блокировок», нужна прежняя ширина. -->
-            <ColumnDefinition Width="236" />
+            <!-- Меню фиксированной ширины (токен RailWidth), поле — остаток. -->
+            <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
@@ -34,30 +36,53 @@
                    Opacity="{DynamicResource BackdropDim}" />
 
         <!--
-            Боковое меню. Полоса, а не вкладки: разделов девять, и все они
-            равноправны — проверку блокировок нельзя прятать глубже
-            остальных, она и отличает нас от любого клиента VPN.
+            Боковое меню — отдельная карточка с полями от краёв окна.
+            Полоса, а не вкладки: разделы равноправны, и проверку блокировок
+            нельзя прятать глубже остальных, она и отличает нас от любого
+            клиента VPN.
         -->
-        <Border Grid.Column="0" Style="{StaticResource RailPanel}">
+        <Border Grid.Column="0" Style="{StaticResource RailPanel}"
+                Width="{StaticResource RailWidth}" Margin="{StaticResource RailInset}">
             <DockPanel LastChildFill="True">
 
-                <StackPanel DockPanel.Dock="Top" Margin="22,26,22,22">
-                    <TextBlock Text="Zephyron" FontSize="19" FontWeight="SemiBold" />
-                    <TextBlock x:Name="VersionLabel" Style="{StaticResource Caption}" Margin="0,3,0,0" />
+                <!--
+                    Знак программы и имя: мягкий градиент от акцента к его
+                    тёмной половине, буква — на акценте. Так у окна есть
+                    лицо, а не только подпись.
+                -->
+                <StackPanel DockPanel.Dock="Top" Margin="{StaticResource RailPad}">
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="{StaticResource MarkSize}" Height="{StaticResource MarkSize}"
+                                CornerRadius="{StaticResource RMd}">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="{DynamicResource AccentColor}" Offset="0" />
+                                    <GradientStop Color="{DynamicResource AccentDimColor}" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <TextBlock Text="&#xE734;" FontFamily="{DynamicResource IconFont}"
+                                       FontSize="18" Foreground="{DynamicResource OnAccent}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="Zephyron" Style="{StaticResource Title}" FontSize="19" />
+                            <TextBlock x:Name="VersionLabel" Style="{StaticResource Caption}" Margin="0,3,0,0" />
+                        </StackPanel>
+                    </StackPanel>
                 </StackPanel>
 
                 <!--
-                    Полоса прокручивается: разделов девять, и на невысоком
+                    Полоса прокручивается: разделов одиннадцать, и на невысоком
                     окне последний иначе уезжает за нижний край — а уехавшего
                     пункта не существует, его не найти.
                 -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,4,0,0">
                     <!--
-                        Две группы (владелец, 23.09). Пунктов одиннадцать,
-                        и подряд они читались стеной. Каждый день открывают
-                        первые четыре; остальное — инструменты разбора,
-                        к которым идут, когда что-то не так. «Ещё» отдельно:
-                        это настройки программы, а не часть работы с сетью.
+                        Две группы. Пунктов одиннадцать, и подряд они читались
+                        стеной. Каждый день открывают первые четыре; остальное —
+                        инструменты разбора, к которым идут, когда что-то не так.
+                        «Ещё» отдельно: это настройки программы, а не часть
+                        работы с сетью.
                     -->
                     <StackPanel x:Name="Rail">
                         <RadioButton x:Name="RailStatus" Style="{StaticResource RailItem}" Content="Главная" Tag="status" local:MenuIcon.Glyph="&#xE80F;" IsChecked="True" Checked="OnSection" />
@@ -68,11 +93,9 @@
 
                         <!--
                             Заголовок группы, а не пункт: прописными, мельче
-                            и с чертой до края. Строчной «Разбор» того же
-                            цвета, что пункты, выглядел ещё одной вкладкой
-                            (владелец, 23.09).
+                            и с чертой до края.
                         -->
-                        <Grid Margin="22,20,22,8">
+                        <Grid Margin="20,20,20,8">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
@@ -89,7 +112,7 @@
                         <!-- «Журнал» — с 07.10 окном из «Диагностики» (LogWindow): место в меню отдано «TG Proxy». -->
                         <RadioButton Style="{StaticResource RailItem}" Content="Диагностика" Tag="doctor" local:MenuIcon.Glyph="&#xE9D9;" Checked="OnSection" />
 
-                        <Border Height="1" Background="{DynamicResource Border}" Margin="22,12,22,10" />
+                        <Border Height="1" Background="{DynamicResource Border}" Margin="20,12,20,10" />
                         <RadioButton Style="{StaticResource RailItem}" Content="Оформление" Tag="look" local:MenuIcon.Glyph="&#xE790;" Checked="OnSection" />
                         <RadioButton x:Name="RailMore" Style="{StaticResource RailItem}" Content="Ещё" Tag="more" local:MenuIcon.Glyph="&#xE713;" Checked="OnSection" />
                     </StackPanel>
@@ -109,20 +132,16 @@
             <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24">
 
             <!--
-                После обновления (владелец, 03.10): звезда на GitHub и канал.
-                Один раз на каждую новую версию и только тем, кто скрыл
-                карточку на «Главной» (UpdateGreeting). Сама не уходит —
-                закрывается кнопкой: кнопки в ней и есть смысл.
+                После обновления: звезда на GitHub и канал. Один раз на каждую
+                новую версию и только тем, кто скрыл карточку на «Главной»
+                (UpdateGreeting). Сама не уходит — закрывается кнопкой:
+                кнопки в ней и есть смысл.
             -->
             <Border x:Name="GreetingToast" Visibility="Collapsed" MaxWidth="500" Margin="0,0,0,12"
                     Background="{DynamicResource Surface}"
                     BorderBrush="{DynamicResource Warn}" BorderThickness="1.5"
-                    CornerRadius="14" Padding="18,15">
+                    CornerRadius="{StaticResource RLg}" Padding="18,15">
                 <StackPanel>
-                    <!--
-                        «Закрыть» — крестиком в углу (05.10): с кнопкой «Поддержать»
-                        четыре кнопки в ряд в карточку не влезали.
-                    -->
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
@@ -178,7 +197,7 @@
             <Border x:Name="Toast" Visibility="Collapsed" MaxWidth="460"
                     Background="{DynamicResource Surface}"
                     BorderBrush="{DynamicResource Accent}" BorderThickness="1.5"
-                    CornerRadius="14" Padding="18,15">
+                    CornerRadius="{StaticResource RLg}" Padding="18,15">
                 <StackPanel>
                     <TextBlock x:Name="ToastTitle" FontWeight="SemiBold" TextWrapping="Wrap" />
                     <TextBlock x:Name="ToastBody" Style="{StaticResource Caption}"
