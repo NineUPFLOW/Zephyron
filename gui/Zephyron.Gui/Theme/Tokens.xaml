@@ -22,12 +22,16 @@
         DesignTokensMatchTheDocument.
     -->
 
-    <!-- Скругления. XL и Pill — для карточек-плиток и кнопок-таблеток. -->
-    <sys:Double x:Key="RSm">8</sys:Double>
-    <sys:Double x:Key="RMd">12</sys:Double>
-    <sys:Double x:Key="RLg">16</sys:Double>
-    <sys:Double x:Key="RXL">20</sys:Double>
-    <sys:Double x:Key="RPill">999</sys:Double>
+    <!-- Скругления. XL и Pill — для карточек-плиток и кнопок-таблеток.
+         Ровно CornerRadius, а не Double: свойство принимает только структуру,
+         а голое число для него неподходящего вида — «"12" не является
+         допустимым значением для свойства "CornerRadius"», — и это роняло
+         разбор шаблона, как раньше дробная толщина (см. Stroke). -->
+    <CornerRadius x:Key="RSm">8</CornerRadius>
+    <CornerRadius x:Key="RMd">12</CornerRadius>
+    <CornerRadius x:Key="RLg">16</CornerRadius>
+    <CornerRadius x:Key="RXL">20</CornerRadius>
+    <CornerRadius x:Key="RPill">999</CornerRadius>
 
     <!-- Шаг отступов: 4 → 32. Рядом стоящие значения берутся из одной шкалы,
          чтобы у соседних карточек и строк был один ритм. -->

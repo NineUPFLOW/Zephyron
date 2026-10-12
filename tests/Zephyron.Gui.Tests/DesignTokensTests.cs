@@ -77,12 +77,16 @@ public sealed class DesignTokensTests
                 var actual = tokens[name] switch
                 {
                     double number => number.ToString("0.###"),
-                    // Толщина с равными сторонами записана в документе одним
-                    // числом: «1.5» и Thickness(1.5) — одно и то же, а
-                    // «1.5,1.5,1.5,1.5» в таблице только мешало бы читать.
+                    // Толщина и скругление с равными сторонами записаны
+                    // в документе одним числом: «1.5» и Thickness(1.5), «12»
+                    // и CornerRadius(12) — одно и то же, а «1.5,1.5,1.5,1.5»
+                    // в таблице только мешало бы читать.
                     Thickness t when t.Left == t.Top && t.Top == t.Right && t.Right == t.Bottom
                         => t.Left.ToString("0.###"),
+                    CornerRadius r when r.TopLeft == r.TopRight && r.TopRight == r.BottomRight && r.BottomRight == r.BottomLeft
+                        => r.TopLeft.ToString("0.###"),
                     Thickness thickness => $"{thickness.Left},{thickness.Top},{thickness.Right},{thickness.Bottom}",
+                    CornerRadius radius => $"{radius.TopLeft},{radius.TopRight},{radius.BottomRight},{radius.BottomLeft}",
                     var other => other?.ToString() ?? "",
                 };
 
@@ -96,23 +100,30 @@ public sealed class DesignTokensTests
     /// <summary>Токен оформления, ждущий структуру, объявлен структурой, а не числом.</summary>
     /// <remarks>
     /// <para>
-    /// 11.10 окно падало на «"1,5" не является допустимым значением для
-    /// BorderThickness»: токен <c>Stroke</c> был <c>Double</c>, а WPF подставляет
-    /// число, переводя его в строку по текущей культуре. На русской Windows это
-    /// «1,5» с запятой, а разбор толщин принимает только точку, — шаблон не
-    /// собирался, и меню трея не открывалось. На английской локали всё работало,
-    /// поэтому и сборка, и проверка на глаз молчали.
+    /// Свойства <c>BorderThickness</c>, <c>Margin</c>, <c>Padding</c>
+    /// и <c>CornerRadius</c> принимают только свои структуры. Голое число для
+    /// них — не тот вид, и WPF роняет разбор шаблона при первом показе:
+    /// «"1,5" не является допустимым значением для свойства "BorderThickness"»
+    /// (11.10, токен <c>Stroke</c>) и «"12" не является допустимым значением
+    /// для свойства "CornerRadius"» (12.10, токен <c>RMd</c>).
     /// </para>
     /// <para>
-    /// Здесь сверяется вид: свойству, ждущему <c>Thickness</c> или
-    /// <c>CornerRadius</c>, достаётся токен либо той же структуры, либо
-    /// <c>Double</c> — и тогда целый. Дробное число среди них — та самая ошибка:
-    /// запятая вместо точки. Читается текст разметки, значит, ловится и на
-    /// машине без WPF, где окно не поднять.
+    /// У толщин и скруглений причина ещё и в культуре: WPF переводит число
+    /// в строку по текущей, и на русской Windows дробь выходит с запятой,
+    /// которую разбор толщин не принимает. На английской локали дробь потому
+    /// и не видна, что точка. Со структурой разбора нет вовсе — значит, ошибка
+    /// не зависит ни от языка системы, ни от целости числа: число не годится
+    /// ни дробное, ни целое.
+    /// </para>
+    /// <para>
+    /// Здесь сверяется именно вид токена, а не одно падение: свойству, ждущему
+    /// структуру, обязан достаться токен той же структуры. Иначе — ошибка, и
+    /// падает сборка, а не окно у человека. Читается текст разметки, значит,
+    /// ловится и на машине без WPF, где окно не поднять.
     /// </para>
     /// </remarks>
     [Fact]
-    public void A_geometrical_token_carries_no_fractional_number()
+    public void A_geometrical_token_carries_no_number()
     {
         if (Repository() is not { } repo)
             return;
@@ -120,8 +131,8 @@ public sealed class DesignTokensTests
         // Свойства, которые WPF принимает только как структуру. Встречаются
         // двумя видами: прямо в разметке («BorderThickness="{StaticResource K}"»)
         // и в шаблоне через Setter («Property="BorderThickness" Value="{…}"»).
-        // Падение 11.10 было именно вторым: шаблон собирался уже в окне,
-        // поэтому и упало у человека, а не на сборке.
+        // Оба падения были о шаблоне: он собирается уже в окне, поэтому и упало
+        // у человека, а не на сборке.
         var values = new Regex(
             @"(?<name>BorderThickness|Margin|Padding|CornerRadius)\s*=\s*""\{(?:Static|Dynamic)Resource\s+(?<key>[A-Za-z_][A-Za-z0-9_]*)\}""",
             RegexOptions.Compiled);
@@ -131,24 +142,23 @@ public sealed class DesignTokensTests
             + @"Value\s*=\s*""\{(?:Static|Dynamic)Resource\s+(?<key>[A-Za-z_][A-Za-z0-9_]*)\}""",
             RegexOptions.Compiled);
 
-        // Объявления в Tokens.xaml: структура, число или целое число.
-        var declared = new Regex(
-            @"<(?<type>Thickness|CornerRadius)\s+x:Key=""(?<key>[A-Za-z_][A-Za-z0-9_]*)""[^>]*>(?<value>[^<]*)</",
+        // Объявления в Tokens.xaml: структура или число. Первое типом (Thickness,
+        // CornerRadius), второе разметкой sys:Double.
+        var structures = new Regex(
+            @"<(?<type>Thickness|CornerRadius)\s+x:Key=""(?<key>[A-Za-z_][A-Za-z0-9_]*)""",
             RegexOptions.Compiled);
 
-        var number = new Regex(
-            @"<sys:Double\s+x:Key=""(?<key>[A-Za-z_][A-Za-z0-9_]*)""[^>]*>(?<value>[^<]*)</",
+        var numbers = new Regex(
+            @"<sys:Double\s+x:Key=""(?<key>[A-Za-z_][A-Za-z0-9_]*)""",
             RegexOptions.Compiled);
 
         var tokens = File.ReadAllText(Path.Combine(repo, "gui", "Zephyron.Gui", "Theme", "Tokens.xaml"));
 
-        // Дробные числа — те, чей разбор культурой даст запятую.
-        var fractional = number.Matches(tokens)
-            .Where(m => m.Groups["value"].Value.Replace('.', ',').Contains(','))
+        var structure = structures.Matches(tokens)
             .Select(m => m.Groups["key"].Value)
             .ToHashSet(StringComparer.Ordinal);
 
-        var structures = declared.Matches(tokens)
+        var number = numbers.Matches(tokens)
             .Select(m => m.Groups["key"].Value)
             .ToHashSet(StringComparer.Ordinal);
 
@@ -161,12 +171,12 @@ public sealed class DesignTokensTests
             {
                 var key = use.Groups["key"].Value;
 
-                if (structures.Contains(key))
+                if (structure.Contains(key))
                     continue;
 
-                Assert.False(fractional.Contains(key),
-                    $"{Path.GetFileName(file)}: токен {key} (дробное число) применён к "
-                    + $"{use.Groups["name"].Value} — на русской культуре это уронит шаблон.");
+                Assert.False(number.Contains(key),
+                    $"{Path.GetFileName(file)}: токен {key} (число) применён к "
+                    + $"{use.Groups["name"].Value}, а оно ждёт структуру — это уронит шаблон.");
             }
         }
     }
