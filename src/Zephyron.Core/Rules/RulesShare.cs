@@ -99,7 +99,7 @@ public static class RulesShare
     /// </summary>
     /// <remarks>
     /// Правило на несуществующий список не совпадает ни с чем — молча
-    /// (CLAUDE.md, «Код»). Так выходит со своими списками чужой машины
+    /// (AGENTS.md, «Код»). Так выходит со своими списками чужой машины
     /// (<c>config/lists/own/</c> в файл не входят) и со списком, который
     /// в другой версии программы назван иначе. Сказать об этом надо
     /// до замены, а не после вечера разбора.
@@ -146,7 +146,7 @@ public static class RulesShare
     /// </summary>
     /// <remarks>
     /// В <c>runtime\</c>, а не рядом в <c>config\</c>: тот не весь в .gitignore,
-    /// и копия личного файла уехала бы в коммит (CLAUDE.md, «Секреты»).
+    /// и копия личного файла уехала бы в коммит (AGENTS.md, «Секреты»).
     /// </remarks>
     public static string? Backup(string? rulesPath = null, string? folder = null)
     {

@@ -27,7 +27,7 @@ namespace Zephyron.Zapret;
 /// пакеты в начале каждого потока, а TCP Riot на портах от 1024 без имени
 /// из списка — fake и multisplit. Хорошо это или плохо, не замерено:
 /// в обсуждении №4 game filter как раз починил человеку Riot Client.
-/// Проверять Valorant — живым входом, см. CLAUDE.md.
+/// Проверять Valorant — живым входом, см. AGENTS.md.
 /// </para>
 /// <para>
 /// Рецепты — перевод ALT11 на Zapret 2, как в пресете «Flowseal ALT11».

@@ -11,7 +11,7 @@ namespace Zephyron.Core.Tests;
 /// </summary>
 public sealed class SupportReportTests : IDisposable
 {
-    // Выдуманные: настоящей ссылке в тестах не место (CLAUDE.md).
+    // Выдуманные: настоящей ссылке в тестах не место (AGENTS.md).
     private const string Subscription = "https://panel.example.net/sub/Zx9TOKENqQ7-abc?flag=1";
     private const string Vless = "vless://0b3e6d2c-1111-4a2b-9c3d-123456789abc@203.0.113.9:443?security=reality&pbk=KEY#Швеция";
     private const string BookOnly = "https://sub2.example.org/api/BOOKTOKEN";

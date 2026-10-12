@@ -192,7 +192,7 @@ public static class TunnelEndpoints
     /// движок не отвечал, проверка прохода трафика увела сеть в обход. Его
     /// рукопожатие через оператора проводит секция пресета «Cloudflare TCP»
     /// (имя узла в cloudflare.txt) — та же заморозка Cloudflare, что у списков
-    /// отзыва Let's Encrypt (CLAUDE.md). Нагрузка на winws2 — цена работающего WARP.
+    /// отзыва Let's Encrypt (AGENTS.md). Нагрузка на winws2 — цена работающего WARP.
     /// </para>
     /// </remarks>
     internal static IReadOnlyList<string> Hosts(JsonNode? config, string? first = null)

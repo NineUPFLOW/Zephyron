@@ -29,7 +29,7 @@ public sealed record SupportReportResult(string Path, IReadOnlyList<string> File
 /// </para>
 /// <para>
 /// Журналы — начало и конец, а не хвост: первая ошибка падает по своей
-/// причине, остальные — по её следам (CLAUDE.md), и в хвосте она не видна.
+/// причине, остальные — по её следам (AGENTS.md), и в хвосте она не видна.
 /// </para>
 /// </remarks>
 public static class SupportReport
