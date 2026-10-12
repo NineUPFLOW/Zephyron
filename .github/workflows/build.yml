@@ -7,7 +7,9 @@ name: build
 
 on:
   push:
-    branches: [main]
+    # zephyron — ветка по умолчанию, куда уходят рабочие коммиты и выпуски;
+    # main остаётся на случай, если её снова сделают основной.
+    branches: [main, zephyron]
   pull_request:
   workflow_dispatch:
 
