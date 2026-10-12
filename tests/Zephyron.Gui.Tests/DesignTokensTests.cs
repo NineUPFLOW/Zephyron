@@ -77,6 +77,11 @@ public sealed class DesignTokensTests
                 var actual = tokens[name] switch
                 {
                     double number => number.ToString("0.###"),
+                    // Толщина с равными сторонами записана в документе одним
+                    // числом: «1.5» и Thickness(1.5) — одно и то же, а
+                    // «1.5,1.5,1.5,1.5» в таблице только мешало бы читать.
+                    Thickness t when t.Left == t.Top && t.Top == t.Right && t.Right == t.Bottom
+                        => t.Left.ToString("0.###"),
                     Thickness thickness => $"{thickness.Left},{thickness.Top},{thickness.Right},{thickness.Bottom}",
                     var other => other?.ToString() ?? "",
                 };
@@ -86,5 +91,74 @@ public sealed class DesignTokensTests
                 Assert.Equal(wanted, actual.Replace(',', '.'));
             }
         });
+    }
+
+    /// <summary>Токен оформления, ждущий структуру, объявлен структурой, а не числом.</summary>
+    /// <remarks>
+    /// <para>
+    /// 11.10 окно падало на «"1,5" не является допустимым значением для
+    /// BorderThickness»: токен <c>Stroke</c> был <c>Double</c>, а WPF подставляет
+    /// число, переводя его в строку по текущей культуре. На русской Windows это
+    /// «1,5» с запятой, а разбор толщин принимает только точку, — шаблон не
+    /// собирался, и меню трея не открывалось. На английской локали всё работало,
+    /// поэтому и сборка, и проверка на глаз молчали.
+    /// </para>
+    /// <para>
+    /// Здесь сверяется вид: свойству, ждущему <c>Thickness</c> или
+    /// <c>CornerRadius</c>, достаётся токен либо той же структуры, либо
+    /// <c>Double</c> — и тогда целый. Дробное число среди них — та самая ошибка:
+    /// запятая вместо точки. Читается текст разметки, значит, ловится и на
+    /// машине без WPF, где окно не поднять.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void A_geometrical_token_carries_no_fractional_number()
+    {
+        if (Repository() is not { } repo)
+            return;
+
+        // Свойства, которые WPF принимает только как структуру. Оба вида
+        // ссылки на ресурс — StaticResource и DynamicResource — несут один
+        // и тот же объект, поэтому и падают одинаково.
+        var structure = new Regex(
+            @"(?<name>BorderThickness|Margin|Padding|CornerRadius)\s*=\s*""\{(?:Static|Dynamic)Resource\s+(?<key>[A-Za-z_][A-Za-z0-9_]*)\}""",
+            RegexOptions.Compiled);
+
+        // Объявления в Tokens.xaml: структура, число или целое число.
+        var declared = new Regex(
+            @"<(?<type>Thickness|CornerRadius)\s+x:Key=""(?<key>[A-Za-z_][A-Za-z0-9_]*)""[^>]*>(?<value>[^<]*)</",
+            RegexOptions.Compiled);
+
+        var number = new Regex(
+            @"<sys:Double\s+x:Key=""(?<key>[A-Za-z_][A-Za-z0-9_]*)""[^>]*>(?<value>[^<]*)</",
+            RegexOptions.Compiled);
+
+        var tokens = File.ReadAllText(Path.Combine(repo, "gui", "Zephyron.Gui", "Theme", "Tokens.xaml"));
+
+        // Дробные числа — те, чей разбор культурой даст запятую.
+        var fractional = number.Matches(tokens)
+            .Where(m => m.Groups["value"].Value.Replace('.', ',').Contains(','))
+            .Select(m => m.Groups["key"].Value)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var structures = declared.Matches(tokens)
+            .Select(m => m.Groups["key"].Value)
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var file in Directory.EnumerateFiles(
+                     Path.Combine(repo, "gui"), "*.xaml", SearchOption.AllDirectories))
+        {
+            foreach (Match use in structure.Matches(File.ReadAllText(file)))
+            {
+                var key = use.Groups["key"].Value;
+
+                if (structures.Contains(key))
+                    continue;
+
+                Assert.False(fractional.Contains(key),
+                    $"{Path.GetFileName(file)}: токен {key} (дробное число) применён к "
+                    + $"{use.Groups["name"].Value} — на русской культуре это уронит шаблон.");
+            }
+        }
     }
 }

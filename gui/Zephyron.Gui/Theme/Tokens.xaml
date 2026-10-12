@@ -52,8 +52,13 @@
          справа нет — правый край и так отбит от поля раздела. -->
     <Thickness x:Key="RailInset">12,12,0,12</Thickness>
 
-    <!-- Толщина линий и рамок. Тонкая для разделителей, обычная для границ. -->
-    <sys:Double x:Key="Line">1</sys:Double>
-    <sys:Double x:Key="Stroke">1.5</sys:Double>
+    <!-- Толщина линий и рамок. Тонкая для разделителей, обычная для границ.
+         Ровно Thickness, а не Double: WPF подставляет число в BorderThickness,
+         переводя его в строку по текущей культуре, — на русской Windows это
+         «1,5», а разбор толщин принимает только точку, и шаблон падал с
+         XamlParseException при открытии меню (11.10). Объект Thickness
+         разбору не подвергается вовсе. -->
+    <Thickness x:Key="Line">1</Thickness>
+    <Thickness x:Key="Stroke">1.5</Thickness>
 
 </ResourceDictionary>
