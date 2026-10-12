@@ -117,11 +117,18 @@ public sealed class DesignTokensTests
         if (Repository() is not { } repo)
             return;
 
-        // Свойства, которые WPF принимает только как структуру. Оба вида
-        // ссылки на ресурс — StaticResource и DynamicResource — несут один
-        // и тот же объект, поэтому и падают одинаково.
-        var structure = new Regex(
+        // Свойства, которые WPF принимает только как структуру. Встречаются
+        // двумя видами: прямо в разметке («BorderThickness="{StaticResource K}"»)
+        // и в шаблоне через Setter («Property="BorderThickness" Value="{…}"»).
+        // Падение 11.10 было именно вторым: шаблон собирался уже в окне,
+        // поэтому и упало у человека, а не на сборке.
+        var values = new Regex(
             @"(?<name>BorderThickness|Margin|Padding|CornerRadius)\s*=\s*""\{(?:Static|Dynamic)Resource\s+(?<key>[A-Za-z_][A-Za-z0-9_]*)\}""",
+            RegexOptions.Compiled);
+
+        var setters = new Regex(
+            @"<Setter\b[^>]*?Property\s*=\s*""(?<name>BorderThickness|Margin|Padding|CornerRadius)""[^>]*?"
+            + @"Value\s*=\s*""\{(?:Static|Dynamic)Resource\s+(?<key>[A-Za-z_][A-Za-z0-9_]*)\}""",
             RegexOptions.Compiled);
 
         // Объявления в Tokens.xaml: структура, число или целое число.
@@ -148,7 +155,9 @@ public sealed class DesignTokensTests
         foreach (var file in Directory.EnumerateFiles(
                      Path.Combine(repo, "gui"), "*.xaml", SearchOption.AllDirectories))
         {
-            foreach (Match use in structure.Matches(File.ReadAllText(file)))
+            var text = File.ReadAllText(file);
+
+            foreach (var use in values.Matches(text).Cast<Match>().Concat(setters.Matches(text).Cast<Match>()))
             {
                 var key = use.Groups["key"].Value;
 
