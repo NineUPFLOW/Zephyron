@@ -109,4 +109,81 @@ public sealed class ResourceKeyTests
 
         Assert.Empty(missing);
     }
+
+    /// <summary>Ссылка вида <c>{StaticResource Имя}</c> — только она требует порядка.</summary>
+    /// <remarks>
+    /// <c>DynamicResource</c> ищется на бегу по всему дереву и на объявление
+    /// ниже себя не жалуется, а <c>StaticResource</c> берёт значение на разбор
+    /// и видит лишь то, что объявлено выше. Ссылка вперёд разбирается молча
+    /// у нас на глазах и падает у человека: шапка разделов дала именно это —
+    /// <c>«Не удается найти ресурс с именем "Title"»</c> при показе окна.
+    /// </remarks>
+    private static readonly Regex StaticReference = new(
+        @"\{StaticResource\s+([A-Za-z_][A-Za-z0-9_]*)\s*\}",
+        RegexOptions.Compiled);
+
+    /// <summary>Порядок, в котором словари тем ложатся друг на друга.</summary>
+    /// <remarks>
+    /// Тот же, что в App.xaml и в Sta.Prepare: токены, палитра, стили. Ссылка
+    /// на имя из более раннего словаря законна; из более позднего — нет.
+    /// </remarks>
+    private static readonly string[] MergeOrder = ["Tokens.xaml", "Palette.xaml", "Controls.xaml"];
+
+    [Fact]
+    public void Every_static_reference_is_declared_before_its_use()
+    {
+        var declaredBefore = new HashSet<string>(StringComparer.Ordinal);
+        var forward = new List<string>();
+
+        foreach (var name in MergeOrder)
+        {
+            var file = Path.Combine(Folder, name);
+
+            if (!File.Exists(file))
+                continue;
+
+            var text = File.ReadAllText(file);
+            var own = Declaration.Matches(text)
+                .Select(m => m.Groups[1].Value)
+                .ToHashSet(StringComparer.Ordinal);
+
+            // Номера строк объявлений: имя видно лишь ниже первого из них.
+            var at = new Dictionary<string, int>(StringComparer.Ordinal);
+
+            foreach (Match match in Declaration.Matches(text))
+            {
+                var key = match.Groups[1].Value;
+
+                if (!at.ContainsKey(key))
+                    at[key] = LineOf(text, match.Index);
+            }
+
+            foreach (Match match in StaticReference.Matches(text))
+            {
+                var key = match.Groups[1].Value;
+
+                // Чужое имя — забота Every_referenced_style_and_brush_exists.
+                if (!own.Contains(key) && !declaredBefore.Contains(key))
+                    continue;
+
+                if (own.Contains(key) && LineOf(text, match.Index) < at[key])
+                    forward.Add($"{name}: {key} (объявлен на строке {at[key]}, а взят раньше)");
+            }
+
+            declaredBefore.UnionWith(own);
+        }
+
+        Assert.Empty(forward);
+    }
+
+    private static int LineOf(string text, int index)
+    {
+        var line = 1;
+
+        for (int i = 0; i < index; i++)
+            if (text[i] == '\n')
+                line++;
+
+        return line;
+    }
 }

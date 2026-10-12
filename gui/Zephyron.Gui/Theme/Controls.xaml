@@ -16,6 +16,24 @@
         <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
     </Style>
 
+    <!--
+        Title и Caption объявлены до PageHead: шаблон шапки берёт их через
+        StaticResource, а он ищет только выше себя. Ссылка вперёд роняла
+        показ окна — «Не удается найти ресурс с именем "Title"».
+    -->
+    <Style x:Key="Title" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
+        <Setter Property="Foreground" Value="{DynamicResource Text}" />
+        <Setter Property="FontSize" Value="22" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style x:Key="Caption" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+
     <Style x:Key="PageHead" TargetType="ContentControl">
         <!--
             Шапка раздела. Кнопки — содержимым, имя и подпись —
@@ -61,19 +79,6 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
-    </Style>
-
-    <Style x:Key="Title" TargetType="TextBlock">
-        <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
-        <Setter Property="Foreground" Value="{DynamicResource Text}" />
-        <Setter Property="FontSize" Value="22" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-    </Style>
-
-    <Style x:Key="Caption" TargetType="TextBlock">
-        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
-        <Setter Property="Foreground" Value="{DynamicResource Muted}" />
-        <Setter Property="FontSize" Value="12" />
     </Style>
 
     <Style x:Key="Mono" TargetType="TextBlock">
