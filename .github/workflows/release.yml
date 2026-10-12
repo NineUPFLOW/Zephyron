@@ -130,7 +130,7 @@ jobs:
           done
           for t in aurora NyaView HotGr "Peach Static"; do
             mkdir -p "$STAGE/themes/$t"
-            cp "$ROOT"/themes/$t/* "$STAGE/themes/$t/"
+            cp "$ROOT/themes/$t/"* "$STAGE/themes/$t/"
           done
           cp "$ROOT/themes/README.md" "$STAGE/themes/README.md"
 
