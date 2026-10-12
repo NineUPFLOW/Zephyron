@@ -104,10 +104,10 @@ themes/*
 !themes/coffee/
 !themes/rose/
 !themes/cream/
-!themes/sloyka1/
-!themes/blissfield/
-!themes/fish/
 !themes/aurora/
+!themes/HotGr/
+!themes/NyaView/
+!themes/Peach Static/
 config/*.tmp
 
 # Python bytecode

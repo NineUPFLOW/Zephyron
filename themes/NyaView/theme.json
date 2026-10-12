@@ -1,0 +1,18 @@
+{
+  // NyaView — живой фон: видео по кругу (прежнее имя «Рыбка», 12.10).
+  // Поле белое: muted светлее и карточки плотнее, иначе подписи на нём
+  // не читаются; «Главная» — на всю ширину.
+  "name": "NyaView",
+  "base": "dark",
+  "homeFullWidth": true,
+  "colors": {
+    "surface": "#CC161B22",
+    "muted": "#C9D1D9",
+    "faint": "#A3ACB6"
+  },
+  "background": {
+    "image": "background.mp4",
+    "fit": "cover",
+    "dim": 0.7
+  }
+}

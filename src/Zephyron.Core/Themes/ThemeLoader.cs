@@ -39,11 +39,12 @@ public static class ThemeLoader
     /// Серая и тёмно-синяя добавлены 24.09 по просьбе владельца, пять цветных —
     /// 30.09 («пару расцветок на любой вкус»). Основами
     /// они не служат: основа — только тёмная и светлая, чтобы чужая тема
-    /// не зависела от темы, которую мы однажды поправим. С картинкой едут четыре: «Слойка 1» (30.09),
-    /// Blissfield (01.10), «Рыбка» с живым фоном (08.10) и «Аврора»
-    /// с фирменным фоном (12.10).
+    /// не зависела от темы, которую мы однажды поправим. С картинкой едут
+    /// пять: «Аврора» с фирменным фоном (12.10), NyaView (прежняя «Рыбка»,
+    /// живой фон владельца), HotGr и Peach Static — арт владельца (12.10).
+    /// «Слойка 1» и Blissfield убраны 12.10 по его же слову.
     /// </remarks>
-    public static IReadOnlyList<string> Shipped { get; } = ["dark", "light", "grey", "tinted", "violet", "ocean", "coffee", "rose", "cream", "sloyka1", "blissfield", "fish", "aurora"];
+    public static IReadOnlyList<string> Shipped { get; } = ["dark", "light", "grey", "tinted", "violet", "ocean", "coffee", "rose", "cream", "aurora", "HotGr", "NyaView", "Peach Static"];
 
     public const long MaxImageBytes = 20 * 1024 * 1024;
     public const long MaxFontBytes = 8 * 1024 * 1024;
