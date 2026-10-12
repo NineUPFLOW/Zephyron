@@ -87,7 +87,11 @@ internal static class Sta
 
             var app = new Application();
 
-            foreach (var theme in new[] { "Palette", "Controls" })
+            // Токены — первыми, как в App.xaml: стили берут из них скругления
+            // и толщины через StaticResource, а словарь виден только ниже
+            // своего места. Без них разбор стилей падает на «Cannot find
+            // resource named 'RMd'» — окно в тесте не собиралось вовсе.
+            foreach (var theme in new[] { "Tokens", "Palette", "Controls" })
             {
                 app.Resources.MergedDictionaries.Add(new ResourceDictionary
                 {
