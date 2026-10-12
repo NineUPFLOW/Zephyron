@@ -123,7 +123,7 @@ public partial class OnboardingView : UserControl
                 Border.BackgroundProperty, i < step ? "Accent" : "Border");
         }
 
-        StepLabel.Text = $"Шаг {step} из {LastStep}";
+        PageHead.SetSubtitle(Head, $"Шаг {step} из {LastStep}");
 
         // Подпись меняется по шагу: на последнем «пропустить» пропускать
         // уже нечего, и кнопка честно называется «Готово».

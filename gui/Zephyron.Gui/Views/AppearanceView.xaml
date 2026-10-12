@@ -1,6 +1,7 @@
 <UserControl x:Class="Zephyron.Gui.Views.AppearanceView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Zephyron.Gui"
              Background="{DynamicResource Chrome}">
 
     <!--
@@ -18,9 +19,9 @@
 
             <StackPanel Grid.Column="0">
 
-                <TextBlock Text="Оформление" Style="{StaticResource Title}" />
-                <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
-                           Text="Тема, фон, шрифт, размер и меню в трее. Применяется сразу; настройки фона, шрифта и меню общие для всех тем." />
+                <ContentControl Style="{StaticResource PageHead}"
+                                local:PageHead.Title="Оформление"
+                                local:PageHead.Subtitle="Тема, фон, шрифт, размер и меню в трее. Применяется сразу; настройки фона, шрифта и меню общие для всех тем." />
 
                 <TextBlock x:Name="Status" Style="{StaticResource Caption}" Margin="4,16,0,0" TextWrapping="Wrap" />
 

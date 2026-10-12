@@ -1,6 +1,7 @@
 <UserControl x:Class="Zephyron.Gui.Views.VpnView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Zephyron.Gui"
              xmlns:gui="clr-namespace:Zephyron.Gui"
              xmlns:views="clr-namespace:Zephyron.Gui.Views"
              Background="{DynamicResource Chrome}"
@@ -269,20 +270,10 @@
             <StackPanel x:Name="TopBlock">
 
 
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <TextBlock Text="VPN" Style="{StaticResource Title}" TextWrapping="Wrap" />
-                        <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0"
-                                   TextWrapping="Wrap"
-                                   Text="Подписки, их серверы и то, через что идёт трафик." />
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <ContentControl Style="{StaticResource PageHead}"
+                                local:PageHead.Title="VPN"
+                                local:PageHead.Subtitle="Подписки, их серверы и то, через что идёт трафик.">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="RefreshButton" Style="{StaticResource Ghost}"
                                 Content="Обновить" Click="OnRefresh" Margin="0,0,8,0" />
                         <!--
@@ -297,7 +288,7 @@
                         <Button x:Name="MeasureButton" Style="{StaticResource Primary}"
                                 Content="Замерить все" Click="OnMeasure" />
                     </StackPanel>
-                </Grid>
+                </ContentControl>
 
                 <!--
                     Первый ряд — по макету владельца 01.10: слева выход, через

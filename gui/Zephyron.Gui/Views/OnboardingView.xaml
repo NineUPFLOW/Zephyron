@@ -1,6 +1,7 @@
 <UserControl x:Class="Zephyron.Gui.Views.OnboardingView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Zephyron.Gui"
              Background="{DynamicResource Chrome}">
 
     <UserControl.Resources>
@@ -57,25 +58,17 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Column="0">
-                    <TextBlock Text="Добро пожаловать" Style="{StaticResource Title}" />
-                    <TextBlock x:Name="StepLabel" Style="{StaticResource Caption}" Margin="0,6,0,0" />
-                </StackPanel>
-
+            <!-- Подпись — «Шаг N из M», её ставит код в PageHead.Subtitle. -->
+            <ContentControl Grid.Row="0" x:Name="Head" Style="{StaticResource PageHead}"
+                            local:PageHead.Title="Добро пожаловать">
                 <!--
                     Пропускает шаг, на котором сейчас стоите, а не весь
                     мастер — подпись меняется на «Готово» на последнем шаге,
                     где пропускать уже нечего.
                 -->
-                <Button Grid.Column="1" x:Name="HeaderSkip" Style="{StaticResource Ghost}"
-                        Content="Пропустить" Click="OnHeaderSkip" VerticalAlignment="Top" />
-            </Grid>
+                <Button x:Name="HeaderSkip" Style="{StaticResource Ghost}"
+                        Content="Пропустить" Click="OnHeaderSkip" VerticalAlignment="Center" />
+            </ContentControl>
 
             <!-- Полоса шагов: пройденные и текущий — цветом акцента. -->
             <UniformGrid Grid.Row="1" x:Name="Progress" Rows="1" Margin="0,16,0,0" Height="4" />

@@ -1,6 +1,7 @@
 <UserControl x:Class="Zephyron.Gui.Views.DnsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Zephyron.Gui"
              xmlns:gui="clr-namespace:Zephyron.Gui"
              Background="{DynamicResource Chrome}">
 
@@ -29,11 +30,9 @@
     <ScrollViewer Style="{StaticResource PageScroll}" Padding="32,28,32,28">
         <StackPanel>
 
-            <StackPanel>
-                <TextBlock Text="DNS" Style="{StaticResource Title}" />
-                <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
-                           Text="Через кого туннель узнаёт адреса имён. Настройки Windows мы не трогаем — этот выбор действует внутри sing-box." />
-            </StackPanel>
+            <ContentControl Style="{StaticResource PageHead}"
+                            local:PageHead.Title="DNS"
+                            local:PageHead.Subtitle="Через кого туннель узнаёт адреса имён. Настройки Windows мы не трогаем — этот выбор действует внутри sing-box." />
 
             <Grid Margin="0,20,0,0">
                 <Grid.ColumnDefinitions>

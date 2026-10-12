@@ -1,6 +1,7 @@
 <UserControl x:Class="Zephyron.Gui.Views.MoreView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Zephyron.Gui"
              xmlns:gui="clr-namespace:Zephyron.Gui"
              Background="{DynamicResource Chrome}">
 
@@ -12,10 +13,9 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0">
-
-                <TextBlock Text="Ещё" Style="{StaticResource Title}" />
-                <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
-                           Text="Антивирус, выключатели, папки программы и обслуживание. Оформление — своим разделом, обновление — на «Главной», подписки — в «VPN»." />
+                <ContentControl Style="{StaticResource PageHead}"
+                                local:PageHead.Title="Ещё"
+                                local:PageHead.Subtitle="Антивирус, выключатели, папки программы и обслуживание. Оформление — своим разделом, обновление — на «Главной», подписки — в «VPN»." />
 
                 <TextBlock x:Name="Status" Style="{StaticResource Caption}" Margin="4,16,0,0" TextWrapping="Wrap" />
 

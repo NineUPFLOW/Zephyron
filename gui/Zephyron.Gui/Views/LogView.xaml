@@ -1,6 +1,7 @@
 <UserControl x:Class="Zephyron.Gui.Views.LogView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Zephyron.Gui"
              Background="{DynamicResource Chrome}">
 
     <Grid Margin="32,28,32,28">
@@ -10,20 +11,10 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-
-            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                <TextBlock Text="Журнал" Style="{StaticResource Title}" />
-                <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0"
-                           TextTrimming="CharacterEllipsis"
-                           Text="Что говорят движки. Здесь видно, через какой выход шло имя и что ответила труба." />
-            </StackPanel>
-
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+        <ContentControl Grid.Row="0" Style="{StaticResource PageHead}"
+                        local:PageHead.Title="Журнал"
+                        local:PageHead.Subtitle="Что говорят движки. Здесь видно, через какой выход шло имя и что ответила труба.">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <!--
                     Переехало из «Ещё → Прочее» (владелец, 05.10): выключают
                     журнал, глядя на сам журнал. Движки читают настройку при
@@ -47,7 +38,7 @@
                         Content="Только ошибки" Click="OnErrors" Margin="0,0,8,0" />
                 <Button Style="{StaticResource Ghost}" Content="Обновить" Click="OnReload" />
             </StackPanel>
-        </Grid>
+        </ContentControl>
 
         <TextBlock Grid.Row="1" x:Name="Status" Style="{StaticResource Caption}"
                    Margin="4,18,0,10" TextWrapping="Wrap" />

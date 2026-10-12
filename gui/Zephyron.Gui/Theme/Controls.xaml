@@ -16,6 +16,53 @@
         <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
     </Style>
 
+    <Style x:Key="PageHead" TargetType="ContentControl">
+        <!--
+            Шапка раздела. Кнопки — содержимым, имя и подпись —
+            присоединёнными свойствами (PageHead.cs).
+        -->
+        <Setter Property="HorizontalContentAlignment" Value="Right" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContentControl">
+                    <Border CornerRadius="{StaticResource RXL}" Padding="22,20,22,20"
+                            BorderThickness="{StaticResource Stroke}"
+                            BorderBrush="{DynamicResource Border}">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0.4">
+                                <GradientStop Color="{DynamicResource SurfaceColor}" Offset="0" />
+                                <GradientStop Color="{DynamicResource RaisedColor}" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Акцентная черта: тонкая, от верха до низа — знак раздела. -->
+                            <Border Grid.Column="0" Width="5" CornerRadius="{StaticResource RPill}"
+                                    Background="{DynamicResource Accent}" Margin="0,2,18,2" />
+
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                                <TextBlock Style="{StaticResource Title}" FontSize="26"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=(local:PageHead.Title)}" />
+                                <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=(local:PageHead.Subtitle)}" />
+                            </StackPanel>
+
+                            <ContentPresenter Grid.Column="2" VerticalAlignment="Center"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="Title" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
         <Setter Property="Foreground" Value="{DynamicResource Text}" />

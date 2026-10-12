@@ -1,6 +1,7 @@
 <UserControl x:Class="Zephyron.Gui.Views.DesyncView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Zephyron.Gui"
              xmlns:gui="clr-namespace:Zephyron.Gui"
              Background="{DynamicResource Chrome}"
              AllowDrop="True" Drop="OnDrop" DragOver="OnDragOver" DragLeave="OnDragLeave">
@@ -149,19 +150,10 @@
 
             <StackPanel Grid.Column="0">
 
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <TextBlock Text="Десинк" Style="{StaticResource Title}" />
-                        <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
-                                   Text="Пресет решает, какой приём применяется к какому сервису. Трафик при этом никуда не уходит: пакеты правятся на лету, и сайт открывается напрямую." />
-                    </StackPanel>
-
-                    <Button Grid.Column="1" Style="{StaticResource Ghost}" Click="OnOpenFolder"
+                <ContentControl Style="{StaticResource PageHead}"
+                                local:PageHead.Title="Десинк"
+                                local:PageHead.Subtitle="Пресет решает, какой приём применяется к какому сервису. Трафик при этом никуда не уходит: пакеты правятся на лету, и сайт открывается напрямую.">
+                    <Button Style="{StaticResource Ghost}" Click="OnOpenFolder"
                             VerticalAlignment="Center" ToolTip="Папка presets рядом с программой">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE838;" Margin="0,0,9,0"
@@ -169,7 +161,7 @@
                             <TextBlock Text="Открыть папку" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
-                </Grid>
+                </ContentControl>
 
                 <!--
                     Движка нет — и это первое, что надо сказать. Пресет

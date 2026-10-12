@@ -1,6 +1,7 @@
 <UserControl x:Class="Zephyron.Gui.Views.RoutesView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Zephyron.Gui"
              xmlns:gui="clr-namespace:Zephyron.Gui"
              Background="{DynamicResource Chrome}">
 
@@ -66,27 +67,12 @@
 
             <StackPanel Grid.Row="0">
 
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <!--
-                        Пояснение под заголовком переехало в подсказку.
-                        Решение владельца 21.09: список маршрутов занимал
-                        треть полосы, а прочитывают эти строки один раз
-                        и больше к ним не возвращаются.
-                    -->
-                    <StackPanel Grid.Column="0" Orientation="Horizontal"
-                                VerticalAlignment="Center" Margin="0,0,16,0">
-                        <TextBlock Text="Маршруты" Style="{StaticResource Title}" />
-
-                        <ContentControl Style="{StaticResource Info}" Margin="6,0,0,0"
+                <ContentControl Style="{StaticResource PageHead}"
+                                local:PageHead.Title="Маршруты"
+                                local:PageHead.Subtitle="Куда идёт каждый сервис: напрямую, через десинк или через туннель.">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <ContentControl Style="{StaticResource Info}" Margin="0,0,8,0"
                                         Content="Куда идёт каждый сервис: напрямую, через десинк или через туннель. Выбор пишется в config\rules.user.yaml и применяется при следующем запуске движков." />
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <!--
                             Список, а не кнопка. Кнопка подписывалась
                             действием — «По алфавиту», — и какой порядок
@@ -113,7 +99,7 @@
                                 Content="Перечитать" Click="OnReload"
                                 ToolTip="Перечитывает правила, пресет и файл hosts с диска. Нужно, если правили их снаружи программы." />
                     </StackPanel>
-                </Grid>
+                </ContentControl>
 
                 <!--
                     Свой домен. Каталог покрывает то, что мы предусмотрели,

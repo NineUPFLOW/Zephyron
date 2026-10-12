@@ -1,6 +1,7 @@
 <UserControl x:Class="Zephyron.Gui.Views.StatusView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Zephyron.Gui"
              xmlns:views="clr-namespace:Zephyron.Gui.Views"
              Background="{DynamicResource Backdrop}">
 
@@ -113,24 +114,16 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <!-- Шапка: заголовок и ссылки. Ссылки справа, как в макете. -->
-                <Grid Grid.Row="0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <!-- Без подзаголовка: «Главная» помещается без прокрутки (владелец 04.10). -->
-                        <TextBlock Text="Главная" Style="{StaticResource Title}" FontSize="28" />
-                    </StackPanel>
-
+                <!-- Шапка раздела — общий элемент PageHead. -->
+                <ContentControl Grid.Row="0" Style="{StaticResource PageHead}"
+                                local:PageHead.Title="Главная"
+                                local:PageHead.Subtitle="Состояние защиты и быстрые действия">
                     <!--
                         Канал — кнопкой здесь, а не карточкой внизу страницы:
                         в макете карточки нет, а быть на «Главной» ему велено
                         (владелец, 28.09: в «Ещё» кнопку не находили).
                     -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                    <StackPanel Orientation="Horizontal">
                         <Button Style="{StaticResource Ghost}" Click="OnDocs" Margin="0,0,8,0"
                                 ToolTip="Описание программы на GitHub">
                             <StackPanel Orientation="Horizontal">
@@ -156,7 +149,7 @@
                             </StackPanel>
                         </Button>
                     </StackPanel>
-                </Grid>
+                </ContentControl>
 
                 <!--
                     Вышла новая версия (UpdateNotice). Над состоянием: её видно

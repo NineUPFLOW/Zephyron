@@ -1,6 +1,7 @@
 <UserControl x:Class="Zephyron.Gui.Views.SpeedView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Zephyron.Gui"
              xmlns:views="clr-namespace:Zephyron.Gui.Views"
              Background="{DynamicResource Chrome}">
 
@@ -54,20 +55,11 @@
         -->
         <Grid>
             <StackPanel x:Name="Page" SizeChanged="OnPageSize">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <TextBlock Text="Замер скорости" Style="{StaticResource Title}" />
-                        <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
-                                   Text="Задержка, скачивание и отдача — через туннель или напрямую." />
-                    </StackPanel>
-
+                <ContentControl Style="{StaticResource PageHead}"
+                                local:PageHead.Title="Замер скорости"
+                                local:PageHead.Subtitle="Задержка, скачивание и отдача — через туннель или напрямую.">
                     <!-- Путь: что мерить. Туннель — только при поднятом движке. -->
-                    <Border Grid.Column="1" VerticalAlignment="Center" CornerRadius="13" Padding="4"
+                    <Border VerticalAlignment="Center" CornerRadius="{StaticResource RMd}" Padding="4"
                             Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="1">
                         <StackPanel Orientation="Horizontal">
                             <Button x:Name="ViaTunnel" Style="{StaticResource SegmentOff}" Click="OnTunnel">
@@ -86,7 +78,7 @@
                             </Button>
                         </StackPanel>
                     </Border>
-                </Grid>
+                </ContentControl>
 
                 <!-- Три блока: цифра, кривая замера и слово о том, как он шёл. -->
                 <Border Style="{StaticResource Card}" Margin="0,16,0,0" Padding="0,16,0,14">

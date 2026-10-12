@@ -1,6 +1,7 @@
 <UserControl x:Class="Zephyron.Gui.Views.HostsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Zephyron.Gui"
              xmlns:gui="clr-namespace:Zephyron.Gui"
              Background="{DynamicResource Chrome}">
 
@@ -63,26 +64,16 @@
 
             <StackPanel Grid.Column="0">
 
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <TextBlock Text="Файл hosts" Style="{StaticResource Title}" />
-                        <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0"
-                                   TextTrimming="CharacterEllipsis"
-                                   Text="Прибитые имена. Запись здесь отменяет любой наш маршрут." />
-                    </StackPanel>
-
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <ContentControl Style="{StaticResource PageHead}"
+                                local:PageHead.Title="Файл hosts"
+                                local:PageHead.Subtitle="Прибитые имена. Запись здесь отменяет любой наш маршрут.">
+                    <StackPanel Orientation="Horizontal">
                         <Button x:Name="OpenButton" Style="{StaticResource Ghost}"
                                 Content="Открыть файл" Click="OnOpen" Margin="0,0,8,0" />
                         <Button x:Name="CheckButton" Style="{StaticResource Primary}"
                                 Content="Проверить адреса" Click="OnCheck" />
                     </StackPanel>
-                </Grid>
+                </ContentControl>
 
                 <!-- Стёртый защитником файл: сказать до того, как человек решит, что ничего не прибивал. -->
                 <Border x:Name="ReplacedCard" Style="{StaticResource Card}" Margin="0,20,0,0"

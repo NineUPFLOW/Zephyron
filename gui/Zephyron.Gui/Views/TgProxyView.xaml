@@ -1,6 +1,7 @@
 <UserControl x:Class="Zephyron.Gui.Views.TgProxyView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Zephyron.Gui"
              Background="{DynamicResource Chrome}">
 
     <!--
@@ -15,9 +16,9 @@
         -->
         <StackPanel>
 
-            <TextBlock Text="TG Proxy" Style="{StaticResource Title}" />
-            <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
-                       Text="Прокси для Telegram Desktop на этом компьютере: Telegram работает без VPN — его трафик идёт через WebSocket к Telegram и через домены за Cloudflare, в том же шифровании." />
+            <ContentControl Style="{StaticResource PageHead}"
+                            local:PageHead.Title="TG Proxy"
+                            local:PageHead.Subtitle="Прокси для Telegram Desktop на этом компьютере: Telegram работает без VPN — его трафик идёт через WebSocket к Telegram и через домены за Cloudflare, в том же шифровании." />
 
             <!-- Выключатель и состояние. -->
             <Border Style="{StaticResource Card}" Margin="0,20,0,0">
