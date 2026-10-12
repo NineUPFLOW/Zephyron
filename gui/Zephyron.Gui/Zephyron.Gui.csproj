@@ -93,6 +93,16 @@
   </ItemGroup>
 
   <!--
+    Знак программы в шапке меню — тот же рисунок, что у значка в трее
+    и у значка файла: Assets\logo.png вынут из Assets\app.ico. Ресурсом,
+    а не файлом рядом: он нужен окну всегда, а pack-адрес находит его
+    и из тестов, и из чужой сборки.
+  -->
+  <ItemGroup>
+    <Resource Include="Assets\logo.png" />
+  </ItemGroup>
+
+  <!--
     Неявные using от WinForms сняты. Иначе UserControl и Brush становятся
     двусмысленными между System.Windows.Forms/System.Drawing и WPF — сразу
     по всему коду, во всех разделах, а WinForms здесь нужен ровно ради

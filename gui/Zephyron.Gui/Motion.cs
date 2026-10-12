@@ -47,6 +47,32 @@ public static class Motion
 
     private static readonly IEasingFunction Ease = new CubicEase { EasingMode = EasingMode.EaseOut };
 
+    /// <summary>Знак программы проявляется и чуть наезжает — мягко, без рывка.</summary>
+    /// <remarks>
+    /// Отдельно от <see cref="Arrive"/>: там сдвиг вниз на десять точек,
+    /// а знаку в шапке меню он ни к чему — он и так стоит на месте.
+    /// Владелец 12.10: «нет плавных анимаций» — знак появлялся первым
+    /// и резко.
+    /// </remarks>
+    public static void Mark(FrameworkElement element)
+    {
+        if (!Enabled)
+            return;
+
+        var time = TimeSpan.FromMilliseconds(520);
+
+        element.BeginAnimation(UIElement.OpacityProperty,
+            new DoubleAnimation(0, 1, time) { EasingFunction = Ease, FillBehavior = FillBehavior.Stop });
+
+        element.RenderTransformOrigin = new Point(0.5, 0.5);
+        var grow = new ScaleTransform(0.86, 0.86);
+        element.RenderTransform = grow;
+
+        var scale = new DoubleAnimation(0.86, 1.0, time) { EasingFunction = Ease, FillBehavior = FillBehavior.Stop };
+        grow.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
+        grow.BeginAnimation(ScaleTransform.ScaleYProperty, scale);
+    }
+
     /// <summary>Элемент проявляется и доезжает на место.</summary>
     public static void Arrive(FrameworkElement element, double dx = 0, double dy = 10, int ms = 280, int delay = 0)
     {
@@ -136,6 +162,14 @@ public static class Motion
         page.BeginAnimation(UIElement.OpacityProperty,
             new DoubleAnimation(0, 0, TimeSpan.FromSeconds(5)) { FillBehavior = FillBehavior.Stop });
 
+        // Лёгкое «оседание»: раздел не только проявляется, но и чуть
+        // наезжает из чуть уменьшенного. Владелец 12.10: «нет плавных
+        // анимаций». Один процент — заметно по движению и незаметно как
+        // искажение; больше выглядело бы зумом.
+        var settle = new ScaleTransform(0.99, 0.99);
+        page.RenderTransform = settle;
+        page.RenderTransformOrigin = new Point(0.5, 0.5);
+
         // Начало — на первом кадре после Loaded: к нему синхронная работа
         // раздела сделана. Отсчёт свой, по часам, а не анимацией WPF: её
         // часы начинали с времени до паузы раздела, и уже второй кадр
@@ -161,10 +195,16 @@ public static class Motion
             {
                 CompositionTarget.Rendering -= Frame;
                 page.ClearValue(UIElement.OpacityProperty);
+                page.RenderTransform = Transform.Identity;
                 return;
             }
 
-            page.Opacity = 1 - (1 - x) * (1 - x);
+            double eased = 1 - (1 - x) * (1 - x);
+            page.Opacity = eased;
+
+            double grow = 0.99 + 0.01 * eased;
+            settle.ScaleX = grow;
+            settle.ScaleY = grow;
         }
 
         void Start(object sender, RoutedEventArgs e)

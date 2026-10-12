@@ -97,6 +97,15 @@ public static class BackdropVideo
                 player.Play();
         };
 
+        // Отказ проигрывателя прежде был молчаливым: файл не открылся или
+        // кодек не читается — слой оставался пустым, и «Рыбка» выглядела
+        // просто невключившейся темой, без причины (владелец 12.10: «тема
+        // Рыбка так и не работает»). Причину теперь видно в журнале —
+        // как у остальных отказов темы.
+        player.MediaFailed += (_, e) =>
+            Journal.Write("тема", $"живой фон «{System.IO.Path.GetFileName(path)}» не играет: "
+                + e.ErrorException.GetBaseException().Message);
+
         player.Open(new Uri(path));
 
         return new VideoBackdrop { Drawing = drawing, Fit = fit, Content = content };

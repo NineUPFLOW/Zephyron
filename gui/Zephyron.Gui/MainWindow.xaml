@@ -61,24 +61,18 @@
             <DockPanel LastChildFill="True">
 
                 <!--
-                    Знак программы и имя: мягкий градиент от акцента к его
-                    тёмной половине, буква — на акценте. Так у окна есть
-                    лицо, а не только подпись.
+                    Знак программы и имя. Прежде тут стоял глиф-звезда
+                    (E734): он читался как «оцените» и ничего не говорил
+                    о программе. Теперь — её же рисунок, что и у значка
+                    в трее и у значка файла (Assets\logo.png, вынут
+                    из app.ico). Владелец, 12.10: «наверное там лучше будет
+                    использовать лого программы».
                 -->
                 <StackPanel DockPanel.Dock="Top" Margin="{StaticResource RailPad}">
                     <StackPanel Orientation="Horizontal">
-                        <Border Width="{StaticResource MarkSize}" Height="{StaticResource MarkSize}"
-                                CornerRadius="{StaticResource RMd}">
-                            <Border.Background>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                    <GradientStop Color="{DynamicResource AccentColor}" Offset="0" />
-                                    <GradientStop Color="{DynamicResource AccentDimColor}" Offset="1" />
-                                </LinearGradientBrush>
-                            </Border.Background>
-                            <TextBlock Text="&#xE734;" FontFamily="{DynamicResource IconFont}"
-                                       FontSize="18" Foreground="{DynamicResource OnAccent}"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
+                        <Image x:Name="Mark" Width="{StaticResource MarkSize}" Height="{StaticResource MarkSize}"
+                               Source="pack://application:,,,/Zephyron;component/Assets/logo.png"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
                         <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
                             <TextBlock Text="Zephyron" Style="{StaticResource Title}" FontSize="19" />
                             <TextBlock x:Name="VersionLabel" Style="{StaticResource Caption}" Margin="0,3,0,0" />

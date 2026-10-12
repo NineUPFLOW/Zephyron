@@ -29,6 +29,7 @@ public partial class MainWindow : Window
         Closed += (_, _) => BackdropVideo.Detach(BackdropLayer);
 
         VersionLabel.Text = "версия " + Version();
+        Motion.Mark(Mark);
         ShowOnboardingIfNeeded();
         Loaded += (_, _) => ShowGreetingIfDue();
 
