@@ -6,7 +6,7 @@
 [![Звёзды](https://img.shields.io/github/stars/NineUPFLOW/Zephyron?label=%D0%B7%D0%B2%D1%91%D0%B7%D0%B4&style=flat)](https://github.com/NineUPFLOW/Zephyron/stargazers)
 [![Телеграм-канал](https://img.shields.io/badge/%D1%82%D0%B5%D0%BB%D0%B5%D0%B3%D1%80%D0%B0%D0%BC-%D0%BA%D0%B0%D0%BD%D0%B0%D0%BB-26A5E4?logo=telegram&logoColor=white)](https://t.me/zephyron0)
 
-**Милый диспетчер трафика для Windows.** Десинк чинит то, что тормозит
+**Диспетчер трафика для Windows.** Десинк чинит то, что тормозит
 провайдер, VPN берёт то, что закрыто по стране, — а Zephyron решает, что куда,
 для каждого сайта и сервиса. И делает это в уютном окне с мягкими цветами,
 скруглёнными карточками и заботливыми подсказками.
