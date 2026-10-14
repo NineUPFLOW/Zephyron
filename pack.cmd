@@ -258,7 +258,7 @@ for %%T in (dark light grey tinted violet ocean coffee rose cream) do (
     if errorlevel 8 exit /b 1
 )
 rem Shipped themes with a picture, by the owner's word: aurora - the project's
-rem own background (12.10); Nyaview (formerly "Fish" / "Рыбка") - a looping
+rem own background (12.10); NyaView - a looping
 rem video background, the owner's file; HotGr and Peach Static - the owner's
 rem art (12.10, uploaded by him). Every other picture theme in a working copy
 rem is somebody else's art and stays out.

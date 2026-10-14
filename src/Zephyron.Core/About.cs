@@ -32,7 +32,8 @@ public static class About
 
     public const string Telegram = "https://t.me/zephyron0";
 
-    public const string Support = "https://github.com/NineUPFLOW/Zephyron";
+    /// <summary>Поддержать разработку — страница донатов владельца.</summary>
+    public const string Support = "https://tips.tips/ru/000487908";
 
     /// <summary>
     /// Состав поставки, в порядке важности для работы.

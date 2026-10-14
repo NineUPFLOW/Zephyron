@@ -331,6 +331,9 @@ public partial class StatusView : UserControl
     /// <summary>Звезда ставится на странице репозитория — на неё и ведём.</summary>
     private void OnStar(object sender, RoutedEventArgs e) => OpenLink(About.Repository);
 
+    /// <summary>«Поддержать» ведёт на страницу донатов владельца.</summary>
+    private void OnSupport(object sender, RoutedEventArgs e) => OpenLink(About.Support);
+
     private void OnSupportHide(object sender, RoutedEventArgs e)
     {
         SupportCard.Visibility = Visibility.Collapsed;
@@ -1571,7 +1574,7 @@ public partial class StatusView : UserControl
     /// </remarks>
     private void ShowWidth(AppSettings settings)
     {
-        // Тема тоже может попросить всю ширину — «Рыбка» (08.10): её видео
+        // Тема тоже может попросить всю ширину — NyaView (08.10): её видео
         // в узкой колонке справа — размытое пятно (Theme.HomeFullWidth).
         if (settings.HomeFullWidth || Themes.WideHome)
         {

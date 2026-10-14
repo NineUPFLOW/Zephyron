@@ -231,6 +231,21 @@ public partial class WatchView : UserControl
         [WatchRoute.Engine] = EngineBrush,
     };
 
+    /// <summary>Та же палитра без раздела — для наблюдения, начатого при запуске окна.</summary>
+    private static Dictionary<WatchRoute, Brush> ThemePalette()
+    {
+        Brush Of(string key, Brush fallback) => Application.Current?.TryFindResource(key) as Brush ?? fallback;
+
+        return new()
+        {
+            [WatchRoute.Proxy] = Of("Accent", Brushes.SteelBlue),
+            [WatchRoute.Desync] = Of("Warn", Brushes.Goldenrod),
+            [WatchRoute.Direct] = Of("Muted", Brushes.Gray),
+            [WatchRoute.Local] = Of("Faint", Brushes.DimGray),
+            [WatchRoute.Engine] = EngineBrush,
+        };
+    }
+
     /// <summary>Кисть темы; у темы без неё — запасная, а не падение раздела.</summary>
     private Brush Brush(string key, Brush fallback) => TryFindResource(key) as Brush ?? fallback;
 
@@ -264,43 +279,130 @@ public partial class WatchView : UserControl
             return;
         }
 
+        // Кисти — здесь, в потоке окна: строки собираются в фоне.
+        _brushes = Palette();
+
+        if (!StartSession())
+        {
+            Say(_note);
+            return;
+        }
+
+        ShowPower(true);
+        // Строкой под кнопками это отъедало у таблицы высоту — в подсказку.
+        Say(null);
+        ClockText.ToolTip = $"Правил {_watch!.RuleCount}, режим «{_watch.Mode}». Журнал — {ConnectionWatch.DefaultJournal}.";
+    }
+
+    /// <summary>
+    /// Начинает наблюдение, если оно ещё не идёт, — и без открытого раздела.
+    /// </summary>
+    /// <remarks>
+    /// Нужно автопополнению маршрутов программ (13.10): оно видит соединения
+    /// только через наблюдение, и ждать, пока человек нажмёт «Начать»,
+    /// значило бы молча не пополнять. Зовётся при запуске окна, если у какой-то
+    /// программы пополнение включено, и при включении выключателя.
+    /// </remarks>
+    /// <returns><c>false</c> — не началось; причина в <see cref="_note"/>.</returns>
+    internal static bool StartSession()
+    {
+        // Начинается в фоне (StartSessionAsync) — второй сеанс ETW с тем же
+        // именем не создался бы, а этот вот-вот будет.
+        if (_watch is not null || _starting)
+            return true;
+
         try
         {
-            // Тот же сеанс, что у zy watch (ConnectionWatch): те же правила,
-            // что у сборки конфига, и тот же журнал runtime\watch.log.
-            _watch = ConnectionWatch.Start(AppSettings.Load(AppSettings.DefaultPath), ConnectionWatch.DefaultJournal);
-            _startedAt = DateTimeOffset.Now;
-            _totalBase = 0;
-            _matchedBase = 0;
-            _note = null;
-
-            // Кисти — здесь, в потоке окна: строки собираются в фоне.
-            _brushes = Palette();
-
-            // Сессия ETW переживает процесс: выход из программы обязан её
-            // остановить, раз раздел этого больше не делает.
-            if (!_exitHooked && Application.Current is { } app)
-            {
-                app.Exit += (_, _) => StopSession();
-                _exitHooked = true;
-            }
-
-            _work = new CancellationTokenSource();
-            _ = ReadAsync(_watch, _work.Token);
-
-            ShowPower(true);
-            // Строкой под кнопками это отъедало у таблицы высоту — в подсказку.
-            Say(null);
-            ClockText.ToolTip = $"Правил {_watch.RuleCount}, режим «{_watch.Mode}». Журнал — {ConnectionWatch.DefaultJournal}.";
+            Begin(Create());
+            return true;
         }
         catch (Exception ex)
         {
-            StopSession();
-
-            _note = "Не удалось начать: " + ex.GetBaseException().Message
-                + ". Сессия ETW требует прав администратора — окно их запрашивает при запуске.";
-            Say(_note);
+            Failed(ex);
+            return false;
         }
+    }
+
+    /// <summary>Наблюдение начинается в фоне.</summary>
+    private static bool _starting;
+
+    /// <summary>
+    /// То же, что <see cref="StartSession"/>, но правила и сессия ETW — в фоне.
+    /// </summary>
+    /// <remarks>
+    /// Для запуска окна (автопополнение маршрутов программ): ConnectionWatch.Start
+    /// читает правила со всеми списками, и в потоке окна это стоило 0,54–0,64 с
+    /// замирания «Главной» на каждом запуске (журнал сторожа владельца 13.10,
+    /// секунда в секунду с «наблюдение начато»).
+    /// </remarks>
+    internal static async Task<bool> StartSessionAsync()
+    {
+        if (_watch is not null || _starting)
+            return true;
+
+        _starting = true;
+
+        try
+        {
+            var watch = await Task.Run(Create);
+            Begin(watch);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Failed(ex);
+            return false;
+        }
+        finally
+        {
+            _starting = false;
+        }
+    }
+
+    /// <summary>
+    /// Тот же сеанс, что у zy watch (ConnectionWatch): те же правила, что у сборки
+    /// конфига, и тот же журнал наблюдения.
+    /// </summary>
+    private static ConnectionWatch Create() =>
+        ConnectionWatch.Start(
+            AppSettings.Load(AppSettings.DefaultPath),
+            ConnectionWatch.DefaultJournal,
+            new ProgramRouteLearner(AppSettings.DefaultPath));
+
+    private static void Failed(Exception ex)
+    {
+        StopSession();
+
+        _note = "Не удалось начать: " + ex.GetBaseException().Message
+            + ". Сессия ETW требует прав администратора — окно их запрашивает при запуске.";
+    }
+
+    /// <summary>Сеанс создан — дальше всё в потоке окна.</summary>
+    private static void Begin(ConnectionWatch watch)
+    {
+        if (_brushes.Count == 0)
+            _brushes = ThemePalette();
+
+        _watch = watch;
+        _watch.Learned += ProgramRouteNotice.Learned;
+        _startedAt = DateTimeOffset.Now;
+        _totalBase = 0;
+        _matchedBase = 0;
+        _note = null;
+
+        // Сессия ETW переживает процесс: выход из программы обязан её
+        // остановить, раз раздел этого больше не делает.
+        if (!_exitHooked && Application.Current is { } app)
+        {
+            app.Exit += (_, _) => StopSession();
+            _exitHooked = true;
+        }
+
+        _work = new CancellationTokenSource();
+        _ = ReadAsync(_watch, _work.Token);
+
+        if (_open is { } open)
+            open.Dispatcher.BeginInvoke(() => open.ShowPower(true));
     }
 
     /// <summary>

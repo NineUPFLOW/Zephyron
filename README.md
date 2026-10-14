@@ -915,9 +915,9 @@ Object с `KILL_ON_JOB_CLOSE`: осиротевший sing-box удержива�
 и в [docs/THIRD-PARTY.md](docs/THIRD-PARTY.md).
 
 Программа бесплатная и останется такой: лицензия MIT это и закрепляет.
-Отдельной страницы поддержки у проекта нет — лучшая помощь это звезда
-на [GitHub](https://github.com/NineUPFLOW/Zephyron) и отчёт об ошибке
-в [issues](https://github.com/NineUPFLOW/Zephyron/issues).
+Помочь проекту можно звездой на [GitHub](https://github.com/NineUPFLOW/Zephyron)
+и отчётом об ошибке в [issues](https://github.com/NineUPFLOW/Zephyron/issues),
+а если хочется поддержать разработку — [донатом](https://tips.tips/ru/000487908).
 
 ## Лицензия
 
