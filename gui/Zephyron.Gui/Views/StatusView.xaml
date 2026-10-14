@@ -203,9 +203,9 @@
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
                             <TextBlock FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap"
-                                       Text="Нравится Zephyron? Поставьте звезду и подпишитесь на канал" />
+                                       Text="Нравится Zephyron? Поставьте звезду, подпишитесь на канал или поддержите донатом" />
                             <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="Так о программе узнают другие, а вы — о новых версиях." />
+                                       Text="Так о программе узнают другие, а вы — о новых версиях. Донат — на развитие проекта." />
                         </StackPanel>
 
                         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
@@ -223,6 +223,14 @@
                                     <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE724;" Margin="0,0,8,0"
                                                Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                                     <TextBlock Text="Канал" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource Ghost}" Click="OnSupport" Margin="0,0,8,0"
+                                    ToolTip="Поддержать разработку донатом">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource LineGlyph}" Text="&#xEB51;" Margin="0,0,8,0"
+                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                    <TextBlock Text="Поддержать" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
                             <Button Style="{StaticResource Ghost}" Click="OnSupportHide" Content="Скрыть"
