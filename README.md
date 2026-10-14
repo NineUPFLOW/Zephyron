@@ -1,10 +1,12 @@
 # Zephyron
 
-[![Скачиваний](https://img.shields.io/github/downloads/NineUPFLOW/Zephyron/total?label=%D1%81%D0%BA%D0%B0%D1%87%D0%B8%D0%B2%D0%B0%D0%BD%D0%B8%D0%B9)](https://github.com/NineUPFLOW/Zephyron/releases)
-[![Скачиваний последней версии](https://img.shields.io/github/downloads/NineUPFLOW/Zephyron/latest/total?label=%D0%BF%D0%BE%D1%81%D0%BB%D0%B5%D0%B4%D0%BD%D0%B5%D0%B9%20%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D0%B8)](https://github.com/NineUPFLOW/Zephyron/releases/latest)
-[![Последний выпуск](https://img.shields.io/github/v/release/NineUPFLOW/Zephyron?label=%D0%B2%D1%8B%D0%BF%D1%83%D1%81%D0%BA)](https://github.com/NineUPFLOW/Zephyron/releases/latest)
-[![Звёзды](https://img.shields.io/github/stars/NineUPFLOW/Zephyron?label=%D0%B7%D0%B2%D1%91%D0%B7%D0%B4&style=flat)](https://github.com/NineUPFLOW/Zephyron/stargazers)
-[![Телеграм-канал](https://img.shields.io/badge/%D1%82%D0%B5%D0%BB%D0%B5%D0%B3%D1%80%D0%B0%D0%BC-%D0%BA%D0%B0%D0%BD%D0%B0%D0%BB-26A5E4?logo=telegram&logoColor=white)](https://t.me/zephyron0)
+[![Скачиваний](https://img.shields.io/github/downloads/NineUPFLOW/Zephyron/total?label=%D1%81%D0%BA%D0%B0%D1%87%D0%B8%D0%B2%D0%B0%D0%BD%D0%B8%D0%B9&style=for-the-badge)](https://github.com/NineUPFLOW/Zephyron/releases)
+[![Скачиваний последней версии](https://img.shields.io/github/downloads/NineUPFLOW/Zephyron/latest/total?label=%D0%BF%D0%BE%D1%81%D0%BB%D0%B5%D0%B4%D0%BD%D0%B5%D0%B9%20%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D0%B8&style=for-the-badge)](https://github.com/NineUPFLOW/Zephyron/releases/latest)
+[![Последний выпуск](https://img.shields.io/github/v/release/NineUPFLOW/Zephyron?label=%D0%B2%D1%8B%D0%BF%D1%83%D1%81%D0%BA&style=for-the-badge)](https://github.com/NineUPFLOW/Zephyron/releases/latest)
+[![Звёзды](https://img.shields.io/github/stars/NineUPFLOW/Zephyron?label=%D0%B7%D0%B2%D1%91%D0%B7%D0%B4&style=for-the-badge)](https://github.com/NineUPFLOW/Zephyron/stargazers)
+[![VirusTotal](https://img.shields.io/badge/VirusTotal-2%2F64-green?style=for-the-badge&logo=virustotal)](https://www.virustotal.com/gui/file/1e3e5e1f073c22164f39d52a27476a294eaad0ee180351c8cdb5d4408e955ace?nocache=1)
+[![Поддержать](https://img.shields.io/badge/%D0%BF%D0%BE%D0%B4%D0%B4%D0%B5%D1%80%D0%B6%D0%B0%D1%82%D1%8C-%E2%9D%A4-ff69b4?style=for-the-badge)](https://tips.tips/ru/000487908)
+[![Телеграм-канал](https://img.shields.io/badge/%D1%82%D0%B5%D0%BB%D0%B5%D0%B3%D1%80%D0%B0%D0%BC-%D0%BA%D0%B0%D0%BD%D0%B0%D0%BB-26A5E4?logo=telegram&logoColor=white&style=for-the-badge)](https://t.me/zephyron0)
 
 **Диспетчер трафика для Windows.** Десинк чинит то, что тормозит
 провайдер, VPN берёт то, что закрыто по стране, — а Zephyron решает, что куда,
@@ -694,12 +696,12 @@ HotGr и Peach Static. Основные — «Зефирная» и «Кремо
 
 ## Антивирусы
 
-Значок в шапке ведёт на отчёт VirusTotal по архиву 0.14.4
-(SHA-256 `2b883f12a96e492cd69ad92352541131cc2519bd0d3be00bb1011c831df1c0d3`).
+Значок в шапке ведёт на отчёт VirusTotal по архиву 0.15.13
+(SHA-256 `1e3e5e1f073c22164f39d52a27476a294eaad0ee180351c8cdb5d4408e955ace`).
 Хэш архива каждой версии стоит в примечаниях к выпуску: сверьте со скачанным
 файлом.
 
-Срабатывают на средства обхода, а не на вредоносный код. Архив 0.14.4 даёт
+Срабатывают на средства обхода, а не на вредоносный код. Архив 0.15.13 даёт
 2 срабатывания из 64:
 
 - **Elastic** — `Windows.Rootkit.WinDivert`: это **WinDivert**, драйвер
