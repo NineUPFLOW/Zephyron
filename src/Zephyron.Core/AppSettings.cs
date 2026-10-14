@@ -284,6 +284,32 @@ public sealed record AppSettings
     /// </remarks>
     public bool LearnDiscordVoice { get; init; } = true;
 
+    /// <summary>Программы в «Маршрутах» — папки из двух списков (<see cref="Rules.ProgramRoutes"/>, 13.10).</summary>
+    public IReadOnlyList<Rules.ProgramRoute> ProgramRoutes { get; init; } = [];
+
+    /// <summary>
+    /// Куда человек переложил маршрут: ключ строки «Маршрутов» → папка;
+    /// пустая строка — вне папки (<see cref="Services.RouteFolders"/>, 13.10).
+    /// </summary>
+    public IReadOnlyDictionary<string, string> RouteFolders { get; init; } = new Dictionary<string, string>();
+
+    /// <summary>
+    /// Порядок маршрутов «Маршрутов», оставленный перетаскиванием: ключи строк
+    /// (<see cref="Services.RouteFolders"/>, 13.10). Пусто — порядок каталога.
+    /// </summary>
+    public IReadOnlyList<string> RouteOrder { get; init; } = [];
+
+    /// <summary>Папки, заведённые человеком кнопкой «Добавить папку», — и пустыми не исчезают.</summary>
+    public IReadOnlyList<string> MadeFolders { get; init; } = [];
+
+    /// <summary>Переименованные папки: прежнее имя → имя на экране.</summary>
+    /// <remarks>
+    /// Имя папки — её ключ в перекладке (<see cref="RouteFolders"/>), и
+    /// переименование его не трогает: иначе пришлось бы переписывать каждую
+    /// перекладку в неё, а папка каталога («Discord») и вовсе не наша.
+    /// </remarks>
+    public IReadOnlyDictionary<string, string> FolderLabels { get; init; } = new Dictionary<string, string>();
+
     /// <summary>Поднимать прокси для Telegram Desktop вместе с движками (<see cref="TgWsProxy"/>).</summary>
     /// <remarks>Выключен по умолчанию: Telegram надо ещё подключить к нему ссылкой.</remarks>
     public bool TelegramProxy { get; init; }
