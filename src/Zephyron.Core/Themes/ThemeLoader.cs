@@ -40,8 +40,8 @@ public static class ThemeLoader
     /// 30.09 («пару расцветок на любой вкус»). Основами
     /// они не служат: основа — только тёмная и светлая, чтобы чужая тема
     /// не зависела от темы, которую мы однажды поправим. С картинкой едут
-    /// пять: «Аврора» с фирменным фоном (12.10), NyaView (прежняя «Рыбка»,
-    /// живой фон владельца), HotGr и Peach Static — арт владельца (12.10).
+    /// пять: «Аврора» с фирменным фоном (12.10), NyaView (живой фон
+    /// владельца), HotGr и Peach Static — арт владельца (12.10).
     /// «Слойка 1» и Blissfield убраны 12.10 по его же слову.
     /// </remarks>
     public static IReadOnlyList<string> Shipped { get; } = ["dark", "light", "grey", "tinted", "violet", "ocean", "coffee", "rose", "cream", "aurora", "HotGr", "NyaView", "Peach Static"];
