@@ -2,7 +2,6 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:gui="clr-namespace:Zephyron.Gui"
-             xmlns:local="clr-namespace:Zephyron.Gui"
              Background="{DynamicResource Chrome}">
 
     <UserControl.Resources>
@@ -132,12 +131,32 @@
 
             <StackPanel Grid.Row="0">
 
-                <ContentControl Style="{StaticResource PageHead}"
-                                local:PageHead.Title="Маршруты"
-                                local:PageHead.Subtitle="Куда идёт каждый сервис: напрямую, через десинк или через туннель.">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!--
+                        Пояснение под заголовком переехало в подсказку.
+                        Решение владельца 21.09: список маршрутов занимал
+                        треть полосы, а прочитывают эти строки один раз
+                        и больше к ним не возвращаются. Под заголовком — одна
+                        строка о своих правилах и о перетаскивании (макет 13.10).
+                    -->
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Маршруты" Style="{StaticResource Title}" />
+
                             <ContentControl Style="{StaticResource Info}" Margin="6,0,0,0"
                                             Content="Куда идёт каждый сервис: напрямую, через десинк или через туннель. Выбор пишется в config\rules.user.yaml и применяется при следующем запуске движков.&#x0a;&#x0a;Сервис вроде YouTube — папка, внутри — маршруты. Строки и папки перетаскиваются мышью: между строками — новый порядок, на папку — внутрь, на одиночный маршрут — новая папка из двух. Куда идёт маршрут, от этого не меняется.&#x0a;&#x0a;Имя означает зону: example.com покрывает и www.example.com, и cdn.example.com.&#x0a;&#x0a;Программа — папка из двух маршрутов: «Домены» и «Адреса». Сначала они пустые и выключены; пока идёт «Наблюдение» и включено автопополнение, туда дописывается всё, что программа открывает. Путь каждому выберите сами.&#x0a;&#x0a;«Десинк» означает «мимо туннеля, чинит пресет»: рецепт не назначается, и если имя не попало ни в один список пресета, с ним не сделают ничего.&#x0a;&#x0a;«Напрямую» — мимо туннеля и мимо десинка: имя уходит в исключения, и winws2 его не трогает вовсе, как и прибитое в hosts.&#x0a;&#x0a;Проверить, что применится, можно в «Проверке блокировок»." />
+                        </StackPanel>
+
+                        <TextBlock x:Name="OwnSummary" Style="{StaticResource Caption}"
+                                   Margin="0,6,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
                         <!--
                             Список, а не кнопка. Кнопка подписывалась
                             действием — «По алфавиту», — и какой порядок
@@ -164,10 +183,7 @@
                                 Content="Перечитать" Click="OnReload"
                                 ToolTip="Перечитывает правила, пресет и файл hosts с диска. Нужно, если правили их снаружи программы." />
                     </StackPanel>
-                </ContentControl>
-
-                <TextBlock x:Name="OwnSummary" Style="{StaticResource Caption}"
-                           Margin="0,8,0,0" TextWrapping="Wrap" />
+                </Grid>
 
                 <!--
                     Одно поле на поиск и на свой домен (владелец, 23.09).
