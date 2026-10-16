@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#08090f">
+<title>Zephyron</title>
+<style>
+/* ==================== ТОКЕНЫ ==================== */
+:root{
+  color-scheme: dark;
+
+  --bg-deep:#08090f;
+
+  --surf-0:rgba(255,255,255,.025);
+  --surf-1:rgba(20,23,31,.55);
+  --surf-2:rgba(16,19,26,.85);
+
+  --line:#21252f;
+  --line-2:#2a303d;
+
+  --txt-1:#eef1f7;
+  --txt-2:#a8b0c2;
+  --txt-3:#7b849b;
+  --txt-4:#545c72;
+
+  --accent:#22d3ee;
+  --accent-soft:rgba(34,211,238,.12);
+  --accent-line:rgba(34,211,238,.38);
+
+  --purple:#a855f7;
+  --purple-soft:rgba(168,85,247,.12);
+  --purple-line:rgba(168,85,247,.35);
+
+  --ok:#10b981;
+  --warn:#fbbf24;
+  --err:#f43f5e;
+  --ok-soft:rgba(16,185,129,.10);
+  --warn-soft:rgba(251,191,36,.10);
+  --err-soft:rgba(244,63,94,.10);
+  --err-line:rgba(244,63,94,.34);
+
+  --r-xs:8px; --r-sm:10px; --r-md:12px; --r-lg:16px; --r-full:999px;
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px;
+  --s-5:20px; --s-6:24px; --s-7:32px;
+
+  --mono:'SF Mono','Fira Code',ui-monospace,monospace;
+
+  --inset:inset 0 1px 0 rgba(255,255,255,.03);
+  --shadow-1:0 8px 24px rgba(0,0,0,.35);
+  --shadow-2:0 14px 44px rgba(0,0,0,.5);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg-deep);color:var(--txt-1);
+  font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  font-size:13px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;min-height:100vh;
+}
+.hero-big,.kv dd,.panel-note,.mod-note,.banner-note,.engine,.log-line,input{
+  user-select:text;
+}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#262b38;border-radius:var(--r-full)}
+::-webkit-scrollbar-thumb:hover{background:#333a49}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-xs)}
+
+/* ==================== ФОН ==================== */
+.bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+
+.bg-svg{position:absolute;inset:0;width:100%;height:100%;opacity:.85}
+
+.bg-grid{
+  position:absolute;inset:-10%;
+  background-image:
+    linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);
+  background-size:44px 44px,44px 44px;
+  -webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 40%,#000 20%,transparent 90%);
+  mask-image:radial-gradient(ellipse 70% 60% at 50% 40%,#000 20%,transparent 90%);
+}
+
+.particles{position:absolute;inset:0}
+.pt{
+  position:absolute;width:3px;height:3px;border-radius:50%;
+  background:var(--accent);opacity:0;
+  animation:rise linear infinite;
+}
+@keyframes rise{
+  0%  {transform:translateY(0);opacity:0}
+  10% {opacity:.55}
+  90% {opacity:.55}
+  100%{transform:translateY(-100vh);opacity:0}
+}
+
+.glow{position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none}
+.glow-1{width:600px;height:600px;top:-200px;left:-150px;
+  background:radial-gradient(circle,rgba(34,211,238,.10),transparent 70%);opacity:.7}
+.glow-2{width:600px;height:600px;bottom:-220px;right:-180px;
+  background:radial-gradient(circle,rgba(168,85,247,.09),transparent 70%);opacity:.7}
+.vignette{position:fixed;inset:0;z-index:1;pointer-events:none;
+  box-shadow:inset 0 0 220px 40px rgba(0,0,0,.85)}
+
+/* ==================== КНОПКИ ==================== */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:8px 14px;border-radius:var(--r-sm);
+  background:var(--surf-0);border:1px solid var(--line);
+  color:var(--txt-2);
+  font-family:inherit;font-size:12.5px;font-weight:500;
+  cursor:pointer;white-space:nowrap;
+  transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease;
+}
+.btn:hover{color:var(--txt-1);background:rgba(255,255,255,.05);border-color:var(--line-2)}
+.btn:active{transform:translateY(1px)}
+.btn svg{width:13px;height:13px;stroke-width:1.75;fill:none;stroke:currentColor;
+  stroke-linecap:round;stroke-linejoin:round;flex:none}
+.btn--primary{
+  background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent);
+}
+.btn--primary:hover{background:rgba(34,211,238,.20);color:#fff}
+.btn--ghost{background:transparent;border-color:transparent;color:var(--txt-3)}
+.btn--ghost:hover{background:var(--surf-0);border-color:var(--line);color:var(--txt-1)}
+.btn--icon{width:32px;height:32px;padding:0;border-radius:var(--r-sm)}
+
+/* ==================== НАВИГАЦИЯ ==================== */
+.tb{
+  position:sticky;top:16px;z-index:50;
+  display:flex;align-items:center;gap:var(--s-2);
+  width:fit-content;max-width:calc(100% - 32px);
+  margin:16px auto 0;padding:6px 8px;
+  background:var(--surf-2);
+  border:1px solid var(--line);
+  border-radius:var(--r-lg);
+  backdrop-filter:blur(22px) saturate(1.2);
+  -webkit-backdrop-filter:blur(22px) saturate(1.2);
+  box-shadow:var(--shadow-2);
+}
+.brand{display:flex;align-items:center;gap:10px;padding:0 12px 0 6px}
+.brand-mark{
+  width:28px;height:28px;border-radius:var(--r-xs);
+  background:var(--accent-soft);border:1px solid var(--accent-line);
+  display:grid;place-items:center;color:var(--accent);
+  box-shadow:inset 0 0 14px rgba(34,211,238,.15);
+  overflow:hidden;flex:none;
+}
+.brand-mark svg{width:15px;height:15px;stroke-width:2;fill:none;stroke:currentColor;
+  stroke-linecap:round;stroke-linejoin:round}
+.brand-mark svg .z-bottom{transition:transform .45s cubic-bezier(.2,.8,.2,1)}
+body.running .brand-mark svg .z-bottom{transform:translate(1.6px,1.4px)}
+
+/* имя + версия в одну строку */
+.brand-text{
+  display:inline-flex;align-items:baseline;gap:6px;
+  line-height:1;min-width:0;white-space:nowrap;
+}
+.brand-name{font-weight:600;font-size:13px;letter-spacing:.2px;line-height:1}
+.brand-version{
+  font-family:var(--mono);font-size:9.5px;font-weight:400;
+  color:var(--txt-4);letter-spacing:.15px;line-height:1;
+  opacity:.75;
+}
+
+.dot{width:6px;height:6px;border-radius:50%;background:var(--txt-4);flex:none;
+  transition:background .25s,box-shadow .25s}
+.dot--ok{background:var(--ok);animation:pulse 2s infinite}
+.dot--warn{background:var(--warn);animation:pulseA 1.4s infinite}
+.dot--err{background:var(--err)}
+@keyframes pulse{
+  0%{box-shadow:0 0 0 0 rgba(16,185,129,.55)}
+  70%{box-shadow:0 0 0 7px rgba(16,185,129,0)}
+  100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}
+}
+@keyframes pulseA{
+  0%{box-shadow:0 0 0 0 rgba(251,191,36,.55)}
+  70%{box-shadow:0 0 0 7px rgba(251,191,36,0)}
+  100%{box-shadow:0 0 0 0 rgba(251,191,36,0)}
+}
+
+.nav{display:flex;align-items:center;gap:2px;position:relative}
+.nav-i{
+  display:flex;align-items:center;gap:7px;
+  padding:7px 12px;border-radius:var(--r-sm);
+  background:transparent;border:1px solid transparent;
+  color:var(--txt-3);font-family:inherit;font-size:12px;font-weight:500;
+  cursor:pointer;white-space:nowrap;position:relative;
+  transition:all .18s ease;
+}
+.nav-i svg{width:14px;height:14px;stroke-width:1.7;fill:none;stroke:currentColor;
+  stroke-linecap:round;stroke-linejoin:round}
+.nav-i:hover{color:var(--txt-2);background:var(--surf-0)}
+.nav-i.is-on{color:var(--accent);background:var(--accent-soft);border-color:var(--accent-line)}
+.nav-i.is-on::after{
+  content:'';position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);
+  width:16px;height:2px;border-radius:2px;background:var(--accent);
+  box-shadow:0 0 10px rgba(34,211,238,.20);
+}
+
+/* ==================== МЕНЮ «ЕЩЁ» ==================== */
+.nav-more-wrap{position:relative}
+.nav-more-wrap .nav-i .chev{
+  width:10px;height:10px;margin-left:-2px;
+  transition:transform .22s ease;
+}
+.nav-more-wrap .nav-i.is-on .chev{transform:rotate(180deg)}
+.nav-more{
+  position:absolute;top:calc(100% + 12px);right:0;
+  min-width:238px;
+  background:var(--surf-2);
+  border:1px solid var(--line-2);
+  border-radius:var(--r-md);
+  backdrop-filter:blur(22px) saturate(1.2);
+  -webkit-backdrop-filter:blur(22px) saturate(1.2);
+  box-shadow:var(--shadow-2);
+  padding:6px;
+  opacity:0;visibility:hidden;transform:translateY(-6px);
+  transition:opacity .18s ease,transform .18s ease,visibility .18s;
+  z-index:60;
+}
+.nav-more.is-on{opacity:1;visibility:visible;transform:translateY(0)}
+.nav-more-i{
+  display:flex;align-items:center;gap:11px;width:100%;
+  padding:9px 12px;border-radius:var(--r-sm);
+  background:transparent;border:0;text-align:left;
+  font-family:inherit;font-size:12.5px;color:var(--txt-2);
+  cursor:pointer;
+  transition:background .15s ease,color .15s ease;
+}
+.nav-more-i svg{width:14px;height:14px;stroke-width:1.7;fill:none;stroke:currentColor;
+  stroke-linecap:round;stroke-linejoin:round;flex:none;color:var(--txt-3);
+  transition:color .15s ease}
+.nav-more-i:hover{background:var(--accent-soft);color:var(--txt-1)}
+.nav-more-i:hover svg{color:var(--accent)}
+.nav-more-sep{height:1px;background:var(--line);margin:5px 8px}
+
+/* ==================== КОНТЕНТ ==================== */
+.ct{
+  position:relative;z-index:5;
+  max-width:1080px;margin:0 auto;
+  padding:var(--s-7) 24px 120px;
+  display:flex;flex-direction:column;gap:var(--s-4);
+}
+
+/* ==================== ХИРО ==================== */
+.hero{
+  display:flex;flex-direction:column;align-items:center;gap:var(--s-5);
+  padding:var(--s-6) 0 var(--s-4);text-align:center;
+}
+.hero-pill{
+  display:inline-flex;align-items:center;gap:9px;
+  padding:7px 16px;border-radius:var(--r-full);
+  background:rgba(90,98,120,.12);
+  border:1px solid var(--line-2);
+  color:var(--txt-3);
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.4px;
+  transition:background .25s,border-color .25s,color .25s;
+}
+.hero-pill.is-ok{background:var(--ok-soft);border-color:rgba(16,185,129,.28);color:var(--ok)}
+.hero-pill.is-warn{background:var(--warn-soft);border-color:rgba(251,191,36,.30);color:var(--warn)}
+.hero-pill.is-err{background:var(--err-soft);border-color:var(--err-line);color:var(--err)}
+
+.hero-timer{display:flex;flex-direction:column;align-items:center;gap:10px}
+.hero-big{
+  font-family:var(--mono);font-weight:500;
+  font-size:64px;letter-spacing:-2.4px;line-height:1;
+  color:var(--txt-4);
+  font-variant-numeric:tabular-nums;
+  transition:color .3s ease;
+}
+.hero-big.is-ok{color:var(--txt-1)}
+.hero-big.is-warn{color:var(--warn)}
+.hero-big.is-err{color:var(--err)}
+
+.hero-bar{
+  width:220px;height:4px;border-radius:var(--r-full);
+  background:rgba(255,255,255,.06);overflow:hidden;position:relative;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.4);
+}
+.hero-bar i{
+  display:block;height:100%;width:0;
+  background:var(--txt-4);
+  border-radius:inherit;
+  transition:width .5s ease,background .3s ease;
+}
+.hero-bar i.is-ok{width:100%;background:linear-gradient(90deg,var(--ok),#34d399);
+  box-shadow:0 0 12px rgba(16,185,129,.5)}
+.hero-bar i.is-err{width:100%;background:var(--err)}
+
+.hero-bar .mark{
+  position:absolute;top:0;bottom:0;left:-30%;width:30%;
+  background:var(--warn);opacity:0;border-radius:inherit;
+}
+.hero-bar.is-starting .mark{opacity:1;animation:sweep 1.6s linear infinite}
+@keyframes sweep{from{left:-30%}to{left:100%}}
+
+.hero-cap{
+  font-family:var(--mono);font-size:10.5px;
+  text-transform:uppercase;letter-spacing:1.4px;
+  color:var(--txt-3);
+}
+
+.power{
+  display:inline-flex;align-items:center;gap:12px;
+  padding:14px 28px;border-radius:var(--r-md);
+  background:var(--accent-soft);border:1px solid var(--accent-line);
+  color:var(--accent);
+  font-family:inherit;font-size:13.5px;font-weight:600;
+  cursor:pointer;letter-spacing:.2px;
+  transition:all .2s ease;
+  box-shadow:0 0 28px rgba(34,211,238,.14);
+}
+.power:hover{background:rgba(34,211,238,.20);box-shadow:0 0 36px rgba(34,211,238,.28)}
+.power:active{transform:translateY(1px)}
+.power svg{width:16px;height:16px;stroke-width:2;fill:none;stroke:currentColor;
+  stroke-linecap:round;stroke-linejoin:round}
+.power.is-stop{
+  background:var(--err-soft);border-color:var(--err-line);color:var(--err);
+  box-shadow:0 0 22px rgba(244,63,94,.14);
+}
+.power.is-stop:hover{background:rgba(244,63,94,.18)}
+
+/* ==================== МЕТРИКА СЕТИ ==================== */
+.net{
+  display:flex;align-items:center;gap:14px;
+  padding:9px 16px;
+  background:var(--surf-0);
+  border:1px solid var(--line);
+  border-radius:var(--r-md);
+  font-family:var(--mono);font-size:11px;
+  color:var(--txt-3);
+  overflow:hidden;
+}
+.net-item{
+  display:inline-flex;align-items:baseline;gap:5px;
+  white-space:nowrap;
+  transition:opacity .25s ease;
+}
+.net-item.is-idle{opacity:.4}
+.net-cap{
+  font-size:9.5px;text-transform:uppercase;letter-spacing:1px;
+  color:var(--txt-4);font-family:inherit;
+}
+.net-item b{
+  font-weight:500;font-size:11.5px;letter-spacing:-.2px;
+  color:var(--txt-1);font-variant-numeric:tabular-nums;
+}
+.net-item i{font-style:normal;font-size:9.5px;color:var(--txt-4)}
+.net-item--down b{color:var(--accent)}
+.net-item--up   b{color:var(--purple)}
+.net-item--ping b{color:var(--ok)}
+.net-item--loss b{color:var(--warn)}
+
+.net-spark{
+  flex:1;min-width:60px;height:18px;
+  display:flex;align-items:flex-end;gap:1px;
+  padding:0 2px;
+}
+.net-spark span{
+  flex:1;min-width:1px;border-radius:1px;
+  background:var(--accent);opacity:.55;
+  transition:height .35s ease,background .25s ease;
+}
+.net-item.is-idle ~ .net-spark span{background:var(--txt-4)}
+
+/* ==================== ПАНЕЛЬ РЕЖИМА ==================== */
+.panel{
+  padding:var(--s-5) var(--s-6);
+  background:var(--surf-1);
+  border:1px solid var(--line);
+  border-radius:var(--r-lg);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  box-shadow:var(--inset);
+}
+.panel-head{display:flex;align-items:baseline;gap:12px;margin-bottom:var(--s-4)}
+.panel-title{
+  font-size:10.5px;text-transform:uppercase;
+  letter-spacing:1.3px;color:var(--txt-3);font-weight:600;
+}
+.panel-tag{font-family:var(--mono);font-size:10.5px;color:var(--txt-4)}
+
+.segs{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s-2);
+  margin-bottom:var(--s-4);
+}
+.seg{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:12px 14px;border-radius:var(--r-sm);
+  background:var(--surf-0);border:1px solid var(--line-2);
+  color:var(--txt-2);font-family:inherit;font-size:12.5px;font-weight:500;
+  cursor:pointer;transition:all .18s ease;
+}
+.seg svg{width:14px;height:14px;stroke-width:1.75;fill:none;stroke:currentColor;
+  stroke-linecap:round;stroke-linejoin:round}
+.seg:hover{background:rgba(255,255,255,.05);color:var(--txt-1)}
+.seg.is-on{
+  background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent);
+  box-shadow:inset 0 0 0 1px rgba(34,211,238,.12),0 0 20px rgba(34,211,238,.08);
+}
+
+.seg-i{
+  width:14px;height:14px;flex:none;
+  display:inline-grid;place-items:center;
+  color:var(--txt-4);
+  transition:color .18s ease;
+  pointer-events:none;
+}
+.seg-i svg{width:14px;height:14px;stroke-width:1.6;fill:none;stroke:currentColor;
+  stroke-linecap:round;stroke-linejoin:round}
+.seg:hover .seg-i{color:var(--txt-2)}
+.seg.is-on .seg-i{color:var(--accent)}
+
+.panel-foot{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:20px;flex-wrap:wrap;
+}
+.panel-note{
+  font-size:12.5px;color:var(--txt-2);line-height:1.65;max-width:56ch;
+  transition:opacity .2s ease;
+}
+
+.engines{display:flex;gap:8px;flex-wrap:wrap;flex:none}
+.engine-pill{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:6px 8px 6px 11px;
+  background:var(--surf-0);
+  border:1px solid var(--line);
+  border-radius:var(--r-xs);
+  font-size:11.5px;color:var(--txt-3);
+  transition:border-color .2s ease,background .2s ease,color .2s ease;
+}
+.engine-pill .dot{width:6px;height:6px}
+.engine-pill.is-on{
+  color:var(--txt-1);
+  border-color:rgba(16,185,129,.28);
+  background:var(--ok-soft);
+}
+.engine-pill.is-on .dot{background:var(--ok);animation:pulse 2s infinite}
+.engine-pill.is-starting{
+  color:var(--warn);
+  border-color:rgba(251,191,36,.28);
+  background:var(--warn-soft);
+}
+.engine-pill.is-starting .dot{background:var(--warn);animation:pulseA 1.4s infinite}
+
+.engine-pill .gear{
+  width:22px;height:22px;padding:0;
+  display:grid;place-items:center;
+  background:transparent;border:0;border-radius:6px;
+  color:var(--txt-4);cursor:pointer;
+  transition:color .15s ease,background .15s ease;
+}
+.engine-pill .gear:hover{color:var(--txt-1);background:rgba(255,255,255,.06)}
+.engine-pill .gear svg{width:11px;height:11px;stroke-width:1.8;fill:none;stroke:currentColor;
+  stroke-linecap:round;stroke-linejoin:round}
+
+.engine-line{
+  display:none;align-items:center;gap:10px;
+  margin-top:var(--s-4);padding:10px 12px;
+  border-radius:var(--r-xs);
+  background:var(--warn-soft);border:1px solid rgba(251,191,36,.28);
+  color:var(--warn);font-size:11.5px;line-height:1.5;
+}
+.engine-line svg{width:14px;height:14px;stroke-width:1.75;fill:none;stroke:currentColor;
+  stroke-linecap:round;stroke-linejoin:round;flex:none}
+.engine-line.is-on{display:flex}
+
+/* ==================== БАННЕРЫ ==================== */
+.banner{
+  display:flex;align-items:center;gap:14px;
+  padding:14px 16px;
+  background:var(--surf-1);
+  border:1px solid var(--line);
+  border-radius:var(--r-md);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  box-shadow:var(--inset);
+}
+.banner--accent{border-color:rgba(34,211,238,.30);background:rgba(34,211,238,.045)}
+.banner--warn{border-color:rgba(251,191,36,.28);background:rgba(251,191,36,.04)}
+
+.banner-ic{
+  width:32px;height:32px;border-radius:var(--r-xs);flex:none;
+  display:grid;place-items:center;
+  background:var(--accent-soft);color:var(--accent);
+}
+.banner--warn .banner-ic{background:var(--warn-soft);color:var(--warn)}
+.banner-ic svg{width:16px;height:16px;stroke-width:1.75;fill:none;stroke:currentColor;
+  stroke-linecap:round;stroke-linejoin:round}
+
+.banner-body{flex:1;min-width:0}
+.banner-title{font-size:13px;font-weight:600}
+.banner-note{font-size:12px;color:var(--txt-3);margin-top:3px}
+
+.banner-actions{display:flex;align-items:center;gap:var(--s-2);flex:none}
+.banner-close{width:26px;height:26px;padding:0;background:transparent;
+  border-color:transparent;color:var(--txt-4)}
+.banner-close:hover{color:var(--txt-1);background:var(--surf-0)}
+.banner-close svg{width:12px;height:12px}
+
+/* ==================== СЕТКА КАРТОЧЕК ==================== */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:var(--s-4)}
+.mod{
+  display:flex;flex-direction:column;gap:var(--s-4);
+  padding:var(--s-5) var(--s-6);
+  background:var(--surf-1);
+  border:1px solid var(--line);
+  border-radius:var(--r-lg);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  box-shadow:var(--inset);
+  transition:border-color .2s ease,transform .2s ease,box-shadow .2s ease;
+}
+.mod:hover{
+  border-color:var(--line-2);transform:translateY(-1px);
+  box-shadow:var(--inset),var(--shadow-1);
+}
+.mod-head{display:flex;align-items:flex-start;gap:14px}
+.mod-ic{
+  width:34px;height:34px;border-radius:var(--r-sm);flex:none;
+  display:grid;place-items:center;
+  background:var(--accent-soft);border:1px solid rgba(34,211,238,.22);
+  color:var(--accent);
+}
+.mod-ic svg{width:16px;height:16px;stroke-width:1.7;fill:none;stroke:currentColor;
+  stroke-linecap:round;stroke-linejoin:round}
+.mod-ic--p{background:var(--purple-soft);border-color:var(--purple-line);color:var(--purple)}
+.mod-ic--e{background:var(--ok-soft);border-color:rgba(16,185,129,.22);color:var(--ok)}
+
+.mod-title{
+  font-size:10.5px;text-transform:uppercase;
+  letter-spacing:1.3px;color:var(--txt-3);font-weight:600;
+}
+.mod-name{font-size:13.5px;font-weight:500;margin-top:4px;color:var(--txt-1)}
+.mod-note{font-size:12px;color:var(--txt-3);margin-top:5px;line-height:1.55}
+
+.mod-foot{margin-top:auto;display:flex;justify-content:flex-end;gap:6px}
+
+.kv{
+  display:grid;grid-template-columns:auto 1fr;gap:8px 20px;
+  font-size:12px;align-items:baseline;margin-top:6px;
+}
+.kv dt{color:var(--txt-3)}
+.kv dd{font-family:var(--mono);color:var(--txt-1);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.inline{display:flex;align-items:flex-start;gap:14px}
+.inline-body{flex:1;min-width:0}
+.inline-title{font-size:13px;font-weight:500;color:var(--txt-1)}
+.inline-note{font-size:12px;color:var(--txt-3);margin-top:5px;line-height:1.55}
+.inline-note strong{color:var(--txt-2);font-weight:500}
+
+.sw{
+  width:38px;height:22px;border-radius:var(--r-full);flex:none;
+  background:rgba(255,255,255,.06);
+  border:1px solid var(--line-2);
+  position:relative;cursor:pointer;padding:0;
+  transition:background .22s ease,border-color .22s ease;
+}
+.sw::after{
+  content:'';position:absolute;top:2px;left:2px;
+  width:16px;height:16px;border-radius:50%;
+  background:var(--txt-3);
+  transition:left .22s ease,background .22s ease,box-shadow .22s ease;
+}
+.sw.is-on{background:var(--accent-soft);border-color:var(--accent-line)}
+.sw.is-on::after{left:18px;background:var(--accent);box-shadow:0 0 10px rgba(34,211,238,.7)}
+
+/* ==================== БЫСТРЫЕ ДЕЙСТВИЯ ==================== */
+.quick{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:var(--s-2);
+  padding-top:var(--s-3);
+}
+.quick .btn{
+  padding:12px 12px;
+  background:var(--surf-1);
+  border-color:var(--line);
+  box-shadow:var(--inset);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+}
+.quick .btn:hover{background:var(--surf-0);border-color:var(--line-2)}
+
+/* ==================== ПОДВАЛ ==================== */
+.ft{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:var(--s-4);flex-wrap:wrap;
+  margin-top:var(--s-2);padding:var(--s-4) 4px 0;
+  border-top:1px solid var(--line);
+  font-family:var(--mono);font-size:11px;color:var(--txt-3);
+}
+.ft-l,.ft-r{display:flex;align-items:center;gap:14px}
+.ft .v{color:var(--txt-4)}
+.ft strong{color:var(--txt-2);font-weight:500}
+
+/* ==================== ЛОГ-FAB ==================== */
+.log-fab{
+  position:fixed;right:20px;bottom:20px;z-index:80;
+  display:flex;align-items:center;gap:8px;
+  padding:10px 16px;border-radius:var(--r-md);
+  background:var(--surf-2);border:1px solid var(--line-2);
+  backdrop-filter:blur(20px) saturate(1.2);
+  -webkit-backdrop-filter:blur(20px) saturate(1.2);
+  color:var(--txt-2);font-family:inherit;font-size:11.5px;font-weight:500;
+  cursor:pointer;box-shadow:var(--shadow-2);
+  transition:color .2s ease,border-color .2s ease,bottom .3s cubic-bezier(.4,0,.2,1);
+}
+.log-fab:hover{color:var(--accent);border-color:var(--accent-line)}
+.log-fab.is-open{bottom:236px}
+.log-fab svg{width:14px;height:14px;stroke-width:1.8;fill:none;stroke:currentColor;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform .25s ease}
+.log-fab.is-open svg{transform:rotate(180deg)}
+.log-fab .cnt{
+  font-family:var(--mono);font-size:10px;
+  background:var(--accent-soft);color:var(--accent);
+  padding:1px 7px;border-radius:var(--r-xs);
+}
+
+/* ==================== ЛОГ-КОНСОЛЬ ==================== */
+.log-con{
+  position:fixed;left:0;right:0;bottom:0;z-index:70;
+  height:220px;
+  background:rgba(13,15,23,.9);
+  border-top:1px solid var(--line-2);
+  backdrop-filter:blur(22px);
+  -webkit-backdrop-filter:blur(22px);
+  transform:translateY(100%);
+  transition:transform .32s cubic-bezier(.4,0,.2,1);
+  display:flex;flex-direction:column;
+}
+.log-con.is-open{transform:translateY(0)}
+.log-hd{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:9px 16px;border-bottom:1px solid var(--line);flex:none;
+  font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--txt-3);
+}
+.log-hd-l{display:flex;align-items:center;gap:8px}
+.log-bd{
+  flex:1;overflow-y:auto;padding:8px 16px;
+  font-family:var(--mono);font-size:11px;line-height:1.75;
+}
+.log-line{display:flex;gap:10px;color:var(--txt-2)}
+.log-line .ts{color:var(--txt-4);flex:none}
+.log-line .lv{flex:none;width:38px;font-size:9.5px}
+.log-line.info .lv{color:var(--accent)}
+.log-line.ok .lv{color:var(--ok)}
+.log-line.warn .lv{color:var(--warn)}
+.log-line.err .lv{color:var(--err)}
+.log-line.acc .lv{color:var(--purple)}
+
+/* ==================== АДАПТИВ ==================== */
+@media(max-width:900px){
+  .nav-i span{display:none}
+  .nav-i{padding:8px 10px}
+  .hero-big{font-size:48px}
+  .grid-2{grid-template-columns:1fr}
+  .quick{grid-template-columns:repeat(2,1fr)}
+  .segs{grid-template-columns:1fr}
+  .banner{flex-wrap:wrap}
+  .banner-actions{margin-left:44px}
+  .nav-more-i span{display:inline}
+  .panel-foot{flex-direction:column;align-items:flex-start}
+}
+@media(max-width:640px){
+  .ct{padding:24px 14px 100px}
+  .hero-big{font-size:40px}
+  .hero-bar{width:160px}
+  .panel,.mod{padding:18px}
+  .quick{grid-template-columns:1fr}
+  .ft{flex-direction:column;align-items:flex-start;gap:8px}
+  .net{gap:10px;padding:8px 12px}
+  .net-cap{display:none}
+  .brand-version{display:none}
+}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;
+  }
+  .pt{display:none}
+  .bg-svg{opacity:.35}
+}
+</style>
+</head>
+<body>
+
+<!-- ==================== ФОН ==================== -->
+<div class="bg" aria-hidden="true">
+  <svg class="bg-svg" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+    <defs>
+      <filter id="liquid" x="-10%" y="-10%" width="120%" height="120%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.0018 0.012" numOctaves="3" seed="12">
+          <animate attributeName="baseFrequency" dur="40s"
+            values="0.0018 0.012;0.0028 0.018;0.0014 0.010;0.0018 0.012"
+            repeatCount="indefinite"/>
+        </feTurbulence>
+        <feDisplacementMap in="SourceGraphic" scale="70"/>
+      </filter>
+      <linearGradient id="waveGrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#a855f7" stop-opacity="0.22"/>
+        <stop offset="50%" stop-color="#22d3ee" stop-opacity="0.12"/>
+        <stop offset="100%" stop-color="#ec4899" stop-opacity="0.18"/>
+      </linearGradient>
+    </defs>
+    <g filter="url(#liquid)">
+      <rect x="-10%" y="-10%" width="120%" height="25%" fill="url(#waveGrad)" opacity="0.55"/>
+      <rect x="-10%" y="35%" width="120%" height="18%" fill="url(#waveGrad)" opacity="0.35"/>
+      <rect x="-10%" y="72%" width="120%" height="22%" fill="url(#waveGrad)" opacity="0.45"/>
+    </g>
+  </svg>
+  <div class="bg-grid"></div>
+  <div class="particles" id="particles"></div>
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+</div>
+<div class="vignette" aria-hidden="true"></div>
+
+<!-- ==================== НАВИГАЦИЯ ==================== -->
+<header class="tb">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24">
+        <path d="M5 5h14L13 13"/>
+        <path class="z-bottom" d="M11 13 5 19h14"/>
+      </svg>
+    </span>
+    <span class="brand-text">
+      <span class="brand-name">Zephyron</span>
+      <span class="brand-version">0.15.13</span>
+    </span>
+    <span class="dot" id="topDot" aria-hidden="true"></span>
+  </div>
+
+  <nav class="nav" role="tablist" aria-label="Разделы">
+    <button class="nav-i is-on" role="tab" aria-selected="true" data-view="Главная">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 10v10h14V10"/></svg>
+      <span>Главная</span>
+    </button>
+    <button class="nav-i" role="tab" aria-selected="false" data-view="VPN">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.4 8.4 8 9 4.6-.6 8-4 8-9V6l-8-3Z"/></svg>
+      <span>VPN</span>
+    </button>
+    <button class="nav-i" role="tab" aria-selected="false" data-view="Десинк">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>
+      <span>Десинк</span>
+    </button>
+    <button class="nav-i" role="tab" aria-selected="false" data-view="Маршруты">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="18" r="2.4"/><path d="M8 6h7a3 3 0 0 1 3 3v6"/></svg>
+      <span>Маршруты</span>
+    </button>
+    <button class="nav-i" role="tab" aria-selected="false" data-view="TG Proxy">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 4-9.6 16-2-6.4L3 11.6 21 4Z"/></svg>
+      <span>TG Proxy</span>
+    </button>
+
+    <div class="nav-more-wrap">
+      <button class="nav-i" id="moreBtn" aria-haspopup="true" aria-expanded="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg>
+        <span>Ещё</span>
+        <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+
+      <div class="nav-more" id="moreMenu" role="menu">
+        <button class="nav-more-i" role="menuitem" data-page="Проверка блокировок">
+          <svg viewBox="0 0 24 24"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          Проверка блокировок
+        </button>
+        <button class="nav-more-i" role="menuitem" data-page="Замер скорости">
+          <svg viewBox="0 0 24 24"><path d="M12 20a8 8 0 1 1 8-8"/><path d="m12 12 5-3"/></svg>
+          Замер скорости
+        </button>
+        <button class="nav-more-i" role="menuitem" data-page="DNS">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><circle cx="7" cy="7" r=".9"/><circle cx="7" cy="17" r=".9"/></svg>
+          DNS
+        </button>
+        <button class="nav-more-i" role="menuitem" data-page="Файл hosts">
+          <svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>
+          Файл hosts
+        </button>
+        <button class="nav-more-i" role="menuitem" data-page="Наблюдение">
+          <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M2 20h20"/></svg>
+          Наблюдение
+        </button>
+        <button class="nav-more-i" role="menuitem" data-page="Диагностика">
+          <svg viewBox="0 0 24 24"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>
+          Диагностика
+        </button>
+
+        <div class="nav-more-sep"></div>
+
+        <button class="nav-more-i" role="menuitem" data-page="Оформление">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>
+          Оформление
+        </button>
+      </div>
+    </div>
+  </nav>
+</header>
+
+<!-- ==================== КОНТЕНТ ==================== -->
+<main class="ct">
+
+  <!-- ═══ БАННЕР ОБНОВЛЕНИЯ ═══ -->
+  <div class="banner banner--accent" id="updateCard">
+    <div class="banner-ic" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
+    </div>
+    <div class="banner-body">
+      <div class="banner-title">Доступна версия 1.5.0</div>
+      <div class="banner-note">Правки десинка для новых сборок TLS, исправление автозапуска при смене режима.</div>
+    </div>
+    <div class="banner-actions">
+      <button class="btn btn--ghost">Что нового</button>
+      <button class="btn btn--ghost" id="updLater">Не сейчас</button>
+      <button class="btn btn--primary">Обновить</button>
+    </div>
+  </div>
+
+  <!-- ═══ ХИРО ═══ -->
+  <section class="hero">
+    <div class="hero-pill" id="heroPill" role="status" aria-live="polite">
+      <span class="dot" id="heroDot" aria-hidden="true"></span>
+      <span id="heroPillText">обход не запущен</span>
+    </div>
+
+    <div class="hero-timer">
+      <div class="hero-big" id="heroBig">—</div>
+      <div class="hero-bar" id="heroBar" aria-hidden="true">
+        <i id="heroBarFill"></i>
+        <span class="mark"></span>
+      </div>
+      <div class="hero-cap" id="heroCap">uptime · не запущено</div>
+    </div>
+
+    <button class="power" id="powerBtn">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>
+      <span id="powerText">Запустить</span>
+    </button>
+  </section>
+
+  <!-- ═══ МЕТРИКА СЕТИ ═══ -->
+  <div class="net" id="netBar" aria-label="Метрика сети">
+    <span class="net-item net-item--down is-idle" id="cellDown">
+      <span class="net-cap">↓</span><b id="netDown">0.0</b><i>Мбит/с</i>
+    </span>
+    <span class="net-item net-item--up is-idle" id="cellUp">
+      <span class="net-cap">↑</span><b id="netUp">0.0</b><i>Мбит/с</i>
+    </span>
+    <span class="net-item net-item--ping is-idle" id="cellPing">
+      <span class="net-cap">~</span><b id="netPing">—</b><i id="netPingU"></i>
+    </span>
+    <span class="net-item net-item--loss is-idle" id="cellLoss">
+      <span class="net-cap">!</span><b id="netLoss">—</b><i id="netLossU"></i>
+    </span>
+    <span class="net-spark" id="netSpark" aria-hidden="true"></span>
+  </div>
+
+  <!-- ═══ ПАНЕЛЬ РЕЖИМА ═══ -->
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">Режим работы ZY</span>
+      <span class="panel-tag" id="modeTag">desync · winws2</span>
+    </div>
+
+    <div class="segs" role="tablist" aria-label="Режим">
+      <button class="seg is-on" role="tab" aria-selected="true" data-mode="desync">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>
+        Десинк
+        <span class="seg-i" aria-hidden="true"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.2v4.2M8 4.9h.01"/></svg></span>
+      </button>
+      <button class="seg" role="tab" aria-selected="false" data-mode="tunnel">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Туннель
+        <span class="seg-i" aria-hidden="true"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.2v4.2M8 4.9h.01"/></svg></span>
+      </button>
+      <button class="seg" role="tab" aria-selected="false" data-mode="route">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="18" r="2.4"/><path d="M8 6h7a3 3 0 0 1 3 3v6"/></svg>
+        Гибрид
+        <span class="seg-i" aria-hidden="true"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5"/><path d="M8 7.2v4.2M8 4.9h.01"/></svg></span>
+      </button>
+    </div>
+
+    <div class="panel-foot">
+      <p class="panel-note" id="modeNote">
+        winws2 вмешивается в рукопожатие TLS так, что фильтр оператора не опознаёт имя.
+        Трафик идёт напрямую, своим обычным путём, и адрес остаётся домашним.
+      </p>
+
+      <div class="engines">
+        <div class="engine-pill" id="engineDesync">
+          <span class="dot" aria-hidden="true"></span>
+          <span id="desyncState">Десинк остановлен</span>
+          <button class="gear" title="Пресеты и рецепты" aria-label="Пресеты и рецепты">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M5.2 18.8l2.1-2.1M16.7 7.3l2.1-2.1"/></svg>
+          </button>
+        </div>
+
+        <div class="engine-pill" id="engineTunnel">
+          <span class="dot" aria-hidden="true"></span>
+          <span id="tunnelState">Туннель остановлен</span>
+          <button class="gear" title="Настройки туннеля" aria-label="Настройки туннеля">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M5.2 18.8l2.1-2.1M16.7 7.3l2.1-2.1"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="engine-line" id="engineLine">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+      Туннель требует подписки или WARP — без них поднимать нечего.
+    </div>
+  </div>
+
+  <!-- ═══ ПРЕСЕТ + ПОДКЛЮЧЕНИЕ ═══ -->
+  <section class="grid-2">
+
+    <article class="mod">
+      <header class="mod-head">
+        <div class="mod-ic mod-ic--p" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16v13H4z"/><path d="M4 7l3-4h10l3 4"/><path d="M9 12h6"/></svg>
+        </div>
+        <div>
+          <div class="mod-title">Текущий пресет</div>
+          <div class="mod-name">Universal V11 Lite</div>
+          <p class="mod-note">Universal V10 с узким перехватом UDP.</p>
+        </div>
+      </header>
+      <footer class="mod-foot">
+        <button class="btn" data-log="Открыт выбор пресета">
+          Изменить
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </footer>
+    </article>
+
+    <article class="mod">
+      <header class="mod-head">
+        <div class="mod-ic" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4z"/><path d="M4 10h16M9 10v8"/></svg>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div class="mod-title">Параметры подключения</div>
+          <dl class="kv">
+            <dt>Сервер</dt><dd>Автоподбор</dd>
+            <dt>DNS</dt><dd>8.8.4.4</dd>
+            <dt>Подписки</dt><dd>1: Подписка 1</dd>
+          </dl>
+        </div>
+      </header>
+    </article>
+
+  </section>
+
+  <!-- ═══ АВТОЗАПУСК + ОБНОВЛЕНИЕ ═══ -->
+  <section class="grid-2">
+
+    <article class="mod">
+      <header class="mod-head">
+        <div class="mod-ic mod-ic--e" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 2v10l7 4"/><circle cx="12" cy="12" r="9"/></svg>
+        </div>
+        <div class="inline" style="flex:1">
+          <button class="sw" id="autostartSwitch" role="switch" aria-checked="false"
+                  aria-label="Автозапуск"></button>
+          <div class="inline-body">
+            <div class="inline-title">Автозапуск</div>
+            <p class="inline-note">
+              При входе в Windows поднимется режим <strong id="autostartMode">Десинк</strong>.
+              Права администратора задача получает сразу — запрос UAC не появляется.
+            </p>
+          </div>
+        </div>
+      </header>
+    </article>
+
+    <article class="mod">
+      <header class="mod-head">
+        <div class="mod-ic mod-ic--e" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>
+        </div>
+        <div class="inline" style="flex:1">
+          <button class="sw is-on" id="updateSwitch" role="switch" aria-checked="true"
+                  aria-label="Проверять обновления при запуске"></button>
+          <div class="inline-body">
+            <div class="inline-title">Обновление</div>
+            <p class="inline-note" id="updateStatus">Текущая версия: 0.15.13 · проверяется при запуске программы.</p>
+          </div>
+        </div>
+      </header>
+      <footer class="mod-foot">
+        <button class="btn" id="checkUpdates">Проверить</button>
+      </footer>
+    </article>
+
+  </section>
+
+  <!-- ═══ БЫСТРЫЕ ДЕЙСТВИЯ ═══ -->
+  <section class="quick">
+    <button class="btn" data-log="Открыт раздел «Проверка блокировок»">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Проверить блокировки
+    </button>
+    <button class="btn" data-log="Открыт журнал" data-open-log="1">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+      Открыть журнал
+    </button>
+    <button class="btn" data-log="Открыт раздел «Диагностика»">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg>
+      Диагностика
+    </button>
+    <button class="btn" data-log="Открыта папка config">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      Открыть конфиг
+    </button>
+  </section>
+
+  <!-- ═══ БАННЕР ПОДДЕРЖКИ ═══ -->
+  <div class="banner banner--warn" id="supportCard">
+    <div class="banner-ic" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>
+    </div>
+    <div class="banner-body">
+      <div class="banner-title">Нравится Zephyron?</div>
+      <div class="banner-note">Поставьте звезду на GitHub, подпишитесь на канал или поддержите донатом.</div>
+    </div>
+    <div class="banner-actions">
+      <button class="btn btn--ghost" data-log="Открыта страница GitHub">Звезда</button>
+      <button class="btn btn--ghost" data-log="Открыт Telegram-канал">Канал</button>
+      <button class="btn" data-log="Открыта страница поддержки">Поддержать</button>
+      <button class="btn btn--icon banner-close" id="supHide" aria-label="Скрыть">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ ПОДВАЛ ═══ -->
+  <footer class="ft">
+    <div class="ft-l">
+      <span class="dot" id="footDot" aria-hidden="true"></span>
+      <span id="footState">Обход не запущен</span>
+    </div>
+    <div class="ft-r">
+      <span class="v">config.json</span>
+      <strong id="footConfig">—</strong>
+    </div>
+  </footer>
+
+</main>
+
+<!-- ==================== ЛОГ-FAB ==================== -->
+<button class="log-fab" id="logBtn" aria-label="Открыть журнал">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+  <span id="logBtnText">Журнал</span>
+  <span class="cnt" id="logCnt">0</span>
+</button>
+
+<!-- ==================== ЛОГ-КОНСОЛЬ ==================== -->
+<div class="log-con" id="logCon" aria-hidden="true">
+  <div class="log-hd">
+    <div class="log-hd-l">
+      <span class="dot dot--ok" style="width:5px;height:5px"></span>
+      журнал событий
+    </div>
+    <button class="btn btn--icon" id="clearLog" title="Очистить" aria-label="Очистить"
+            style="width:24px;height:24px">
+      <svg viewBox="0 0 24 24" style="width:11px;height:11px"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>
+    </button>
+  </div>
+  <div class="log-bd" id="logBody"></div>
+</div>
+
+<script>
+/* ================= ЧАСТИЦЫ ================= */
+(function(){
+  const host = document.getElementById('particles');
+  const colors = ['#22d3ee','#a855f7','#22d3ee','#10b981','#22d3ee'];
+  for (let i = 0; i < 26; i++){
+    const p = document.createElement('i');
+    p.className = 'pt';
+    p.style.left = (Math.random() * 100).toFixed(2) + '%';
+    p.style.bottom = '-10px';
+    const c = colors[i % colors.length];
+    p.style.background = c;
+    p.style.animationDuration = (12 + Math.random() * 14).toFixed(1) + 's';
+    p.style.animationDelay = (-Math.random() * 20).toFixed(1) + 's';
+    p.style.width = p.style.height = (2 + Math.random() * 3).toFixed(1) + 'px';
+    host.appendChild(p);
+  }
+})();
+
+/* ================= ЖУРНАЛ ================= */
+const logBody = document.getElementById('logBody');
+const logCnt  = document.getElementById('logCnt');
+let logTotal = 0;
+function log(msg, level = 'info'){
+  const t = new Date();
+  const ts = String(t.getHours()).padStart(2,'0') + ':' +
+             String(t.getMinutes()).padStart(2,'0') + ':' +
+             String(t.getSeconds()).padStart(2,'0');
+  const labels = {info:'INF', ok:'OK', warn:'WRN', err:'ERR', acc:'EVT'};
+  const line = document.createElement('div');
+  line.className = 'log-line ' + level;
+  line.innerHTML = `<span class="ts">${ts}</span><span class="lv">${labels[level]}</span><span>${msg}</span>`;
+  logBody.appendChild(line);
+  logBody.scrollTop = logBody.scrollHeight;
+  logTotal++; logCnt.textContent = logTotal;
+  while(logBody.children.length > 150) logBody.removeChild(logBody.firstChild);
+}
+
+/* ================= ЛОГ-КОНСОЛЬ ================= */
+const logCon = document.getElementById('logCon');
+const logBtn = document.getElementById('logBtn');
+const logBtnText = document.getElementById('logBtnText');
+function toggleLog(force){
+  const open = force !== undefined ? force : !logCon.classList.contains('is-open');
+  logCon.classList.toggle('is-open', open);
+  logBtn.classList.toggle('is-open', open);
+  logCon.setAttribute('aria-hidden', String(!open));
+  logBtnText.textContent = open ? 'Скрыть' : 'Журнал';
+}
+logBtn.addEventListener('click', e => { e.stopPropagation(); toggleLog(); });
+document.getElementById('clearLog').addEventListener('click', e => {
+  e.stopPropagation();
+  logBody.innerHTML = ''; logTotal = 0; logCnt.textContent = '0';
+  log('Журнал очищен', 'warn');
+});
+
+/* ================= НАВИГАЦИЯ ================= */
+document.querySelectorAll('.nav-i[data-view]').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.nav-i[data-view]').forEach(x => {
+      x.classList.remove('is-on');
+      x.setAttribute('aria-selected', 'false');
+    });
+    el.classList.add('is-on');
+    el.setAttribute('aria-selected', 'true');
+    log('Переход: «' + el.dataset.view + '»', 'acc');
+  });
+});
+
+/* ================= МЕНЮ «ЕЩЁ» ================= */
+const moreBtn  = document.getElementById('moreBtn');
+const moreMenu = document.getElementById('moreMenu');
+
+function closeMore(){
+  moreMenu.classList.remove('is-on');
+  moreBtn.classList.remove('is-on');
+  moreBtn.setAttribute('aria-expanded', 'false');
+}
+function openMore(){
+  moreMenu.classList.add('is-on');
+  moreBtn.classList.add('is-on');
+  moreBtn.setAttribute('aria-expanded', 'true');
+}
+
+moreBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  moreMenu.classList.contains('is-on') ? closeMore() : openMore();
+});
+
+moreMenu.querySelectorAll('.nav-more-i').forEach(el => {
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    log('Открыт раздел: ' + el.dataset.page, 'acc');
+    closeMore();
+  });
+});
+
+document.addEventListener('click', e => {
+  if (!moreMenu.contains(e.target) && !moreBtn.contains(e.target)) closeMore();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeMore();
+});
+
+/* ================= СОСТОЯНИЕ ================= */
+const MODES = {
+  desync:{
+    name:'Десинк', tag:'desync · winws2',
+    text:'winws2 вмешивается в рукопожатие TLS так, что фильтр оператора не опознаёт имя. Трафик идёт напрямую, своим обычным путём, и адрес остаётся домашним.',
+    engines:['desync']
+  },
+  tunnel:{
+    name:'Туннель', tag:'tunnel · sing-box',
+    text:'sing-box поднимает сетевой адаптер и уводит через него трафик. Адрес становится зарубежным. Требует подписки или WARP.',
+    engines:['tunnel']
+  },
+  route:{
+    name:'Гибрид', tag:'route · winws2 + sing-box',
+    text:'Оба движка сразу. Что названо в маршрутах «через VPN», уходит в туннель; остальное идёт напрямую, и закрытое по имени чинит десинк.',
+    engines:['desync','tunnel']
+  }
+};
+
+let mode = 'desync';
+let state = 'idle';
+let startedAt = 0;
+
+const $ = id => document.getElementById(id);
+const els = {
+  topDot:$('topDot'),
+  heroPill:$('heroPill'), heroDot:$('heroDot'), heroPillText:$('heroPillText'),
+  heroBig:$('heroBig'), heroBar:$('heroBar'), heroBarFill:$('heroBarFill'),
+  heroCap:$('heroCap'),
+  powerBtn:$('powerBtn'), powerText:$('powerText'),
+  modeTag:$('modeTag'), modeNote:$('modeNote'),
+  engineDesync:$('engineDesync'), engineTunnel:$('engineTunnel'),
+  desyncState:$('desyncState'), tunnelState:$('tunnelState'),
+  engineLine:$('engineLine'),
+  autostartMode:$('autostartMode'),
+  updateStatus:$('updateStatus'),
+  footDot:$('footDot'), footState:$('footState'), footConfig:$('footConfig')
+};
+
+function fmtUptime(sec){
+  const h = String(Math.floor(sec/3600)).padStart(2,'0');
+  const m = String(Math.floor((sec%3600)/60)).padStart(2,'0');
+  const s = String(Math.floor(sec%60)).padStart(2,'0');
+  return `${h}:${m}:${s}`;
+}
+
+function render(){
+  const m = MODES[mode];
+  const on = m.engines;
+  const running = state === 'running' || state === 'starting';
+
+  els.heroPill.classList.toggle('is-ok',   state === 'running');
+  els.heroPill.classList.toggle('is-warn', state === 'starting');
+  els.heroPill.classList.toggle('is-err',  state === 'error');
+
+  els.heroDot.className = 'dot' +
+    (state === 'running' ? ' dot--ok' :
+     state === 'starting' ? ' dot--warn' :
+     state === 'error' ? ' dot--err' : '');
+
+  if (state === 'idle'){
+    els.heroPillText.textContent = 'обход не запущен';
+    els.heroBig.textContent = '—';
+    els.heroBig.className = 'hero-big';
+    els.heroBar.classList.remove('is-starting');
+    els.heroBarFill.className = '';
+    els.heroCap.textContent = 'uptime · не запущено';
+    els.footState.textContent = 'Обход не запущен';
+  } else if (state === 'starting'){
+    els.heroPillText.textContent = 'поднимается · ' + m.name.toLowerCase();
+    els.heroBig.textContent = '00:00:00';
+    els.heroBig.className = 'hero-big is-warn';
+    els.heroBar.classList.add('is-starting');
+    els.heroBarFill.className = '';
+    els.heroCap.textContent = 'uptime · поднимается';
+    els.footState.textContent = 'Поднимаю…';
+  } else if (state === 'running'){
+    els.heroPillText.textContent = 'защита работает · ' + m.name.toLowerCase();
+    els.heroBig.textContent = fmtUptime((Date.now() - startedAt)/1000);
+    els.heroBig.className = 'hero-big is-ok';
+    els.heroBar.classList.remove('is-starting');
+    els.heroBarFill.className = 'is-ok';
+    els.heroCap.textContent = 'uptime · ' + m.tag.split(' · ')[1];
+    els.footState.textContent = 'Защита работает';
+  } else if (state === 'error'){
+    els.heroPillText.textContent = 'ошибка запуска';
+    els.heroBig.textContent = '00:00:00';
+    els.heroBig.className = 'hero-big is-err';
+    els.heroBar.classList.remove('is-starting');
+    els.heroBarFill.className = 'is-err';
+    els.heroCap.textContent = 'uptime · ошибка';
+    els.footState.textContent = 'Ошибка запуска';
+  }
+
+  els.topDot.className = 'dot' +
+    (state === 'running' ? ' dot--ok' :
+     state === 'starting' ? ' dot--warn' :
+     state === 'error' ? ' dot--err' : '');
+
+  els.footDot.className = 'dot' +
+    (state === 'running' ? ' dot--ok' :
+     state === 'starting' ? ' dot--warn' :
+     state === 'error' ? ' dot--err' : '');
+
+  els.powerBtn.classList.toggle('is-stop', running);
+  els.powerText.textContent = running ? 'Остановить' : 'Запустить';
+  els.powerBtn.querySelector('svg').innerHTML = running
+    ? '<rect x="7" y="7" width="10" height="10" rx="1.5"/>'
+    : '<path d="M6 4l14 8-14 8z"/>';
+
+  els.modeTag.textContent = m.tag;
+  els.modeNote.textContent = m.text;
+  document.querySelectorAll('.seg').forEach(x => {
+    const isOn = x.dataset.mode === mode;
+    x.classList.toggle('is-on', isOn);
+    x.setAttribute('aria-selected', String(isOn));
+  });
+
+  const dOn = on.includes('desync');
+  const tOn = on.includes('tunnel');
+
+  els.engineDesync.classList.toggle('is-on',       dOn && state === 'running');
+  els.engineDesync.classList.toggle('is-starting', dOn && state === 'starting');
+  els.engineTunnel.classList.toggle('is-on',       tOn && state === 'running');
+  els.engineTunnel.classList.toggle('is-starting', tOn && state === 'starting');
+
+  els.desyncState.textContent = !dOn ? 'Десинк выключен'
+    : state === 'running' ? 'Десинк работает'
+    : state === 'starting' ? 'Десинк поднимается' : 'Десинк остановлен';
+
+  els.tunnelState.textContent = !tOn ? 'Туннель выключен'
+    : state === 'running' ? 'Туннель работает'
+    : state === 'starting' ? 'Туннель поднимается' : 'Туннель остановлен';
+
+  els.engineLine.classList.toggle('is-on', mode === 'tunnel');
+
+  els.autostartMode.textContent = m.name;
+
+  document.body.classList.toggle('running', state === 'running');
+}
+
+function start(){
+  state = 'starting';
+  log('Запуск: ' + MODES[mode].name.toLowerCase(), 'acc');
+  render();
+  setTimeout(() => {
+    state = 'running';
+    startedAt = Date.now();
+    const m = MODES[mode];
+    if (m.engines.includes('desync')) log('winws2 запущен', 'ok');
+    if (m.engines.includes('tunnel')) log('sing-box запущен', 'ok');
+    render();
+  }, 2600);
+}
+function stop(){
+  state = 'idle'; startedAt = 0;
+  const m = MODES[mode];
+  if (m.engines.includes('desync')) log('winws2 остановлен', 'warn');
+  if (m.engines.includes('tunnel')) log('sing-box остановлен', 'warn');
+  render();
+}
+function toggle(){ (state === 'running' || state === 'starting') ? stop() : start(); }
+
+els.powerBtn.addEventListener('click', toggle);
+
+/* ================= РЕЖИМ ================= */
+document.querySelectorAll('.seg').forEach(el => {
+  el.addEventListener('click', () => {
+    const was = mode;
+    mode = el.dataset.mode;
+    if (was !== mode) log('Режим: ' + MODES[mode].name.toLowerCase(), 'acc');
+    els.modeNote.style.opacity = '0';
+    setTimeout(() => { render(); els.modeNote.style.opacity = '1'; }, 130);
+  });
+});
+
+/* ================= УСЛОВНЫЕ БАННЕРЫ ================= */
+$('updLater').addEventListener('click', () => {
+  $('updateCard').remove();
+  log('Обновление отложено до следующей версии', 'info');
+});
+$('supHide').addEventListener('click', () => {
+  $('supportCard').remove();
+  log('Карточка поддержки скрыта', 'info');
+});
+
+/* ================= ПЕРЕКЛЮЧАТЕЛИ ================= */
+document.querySelectorAll('.sw').forEach(s => {
+  s.addEventListener('click', () => {
+    s.classList.toggle('is-on');
+    const on = s.classList.contains('is-on');
+    s.setAttribute('aria-checked', String(on));
+    if (s.id === 'autostartSwitch'){
+      log(on ? 'Задача автозапуска создана' : 'Задача автозапуска удалена', on ? 'ok' : 'warn');
+    } else if (s.id === 'updateSwitch'){
+      log(on ? 'Проверка обновлений включена' : 'Проверка обновлений отключена', on ? 'ok' : 'warn');
+    }
+  });
+});
+
+/* ================= ПРОВЕРКА ОБНОВЛЕНИЙ ================= */
+$('checkUpdates').addEventListener('click', () => {
+  const s = $('updateStatus');
+  const prev = s.textContent;
+  s.textContent = 'Проверяю…';
+  log('Проверка обновлений…', 'info');
+  setTimeout(() => {
+    s.textContent = prev;
+    log('Обновлений нет', 'ok');
+  }, 1400);
+});
+
+/* ================= ЖИВЫЕ КНОПКИ ================= */
+document.querySelectorAll('[data-log]').forEach(el => {
+  el.addEventListener('click', () => {
+    log(el.dataset.log, 'acc');
+    if (el.dataset.openLog) toggleLog(true);
+  });
+});
+
+/* ================= КОНФИГ ================= */
+$('footConfig').textContent = new Date().toLocaleString('ru-RU', {
+  day:'2-digit', month:'2-digit', year:'numeric',
+  hour:'2-digit', minute:'2-digit'
+}).replace(',', '');
+
+/* ================= ТИК UPTIME ================= */
+setInterval(() => {
+  if (state === 'running'){
+    els.heroBig.textContent = fmtUptime((Date.now() - startedAt)/1000);
+  }
+}, 1000);
+
+/* ================= МЕТРИКА СЕТИ ================= */
+(function(){
+  const N = 32;
+  const spark = document.getElementById('netSpark');
+  const bars  = [];
+  for (let i = 0; i < N; i++){
+    const b = document.createElement('span');
+    spark.appendChild(b);
+    bars.push(b);
+  }
+
+  const el = {
+    down:  document.getElementById('netDown'),
+    up:    document.getElementById('netUp'),
+    ping:  document.getElementById('netPing'),
+    pingU: document.getElementById('netPingU'),
+    loss:  document.getElementById('netLoss'),
+    lossU: document.getElementById('netLossU'),
+    cellDown: document.getElementById('cellDown'),
+    cellUp:   document.getElementById('cellUp'),
+    cellPing: document.getElementById('cellPing'),
+    cellLoss: document.getElementById('cellLoss')
+  };
+
+  const sim  = { down:0, up:0, ping:0, loss:0 };
+  const hist = new Array(N).fill(0);
+
+  function sample(){
+    const run  = state === 'running';
+    const boot = state === 'starting';
+
+    let td, tu, tp;
+    if (run){
+      td = 5 + Math.abs(Math.sin(Date.now() / 7400)) * 16 + Math.random() * 20;
+      tu = 0.6 + Math.random() * 5.5;
+      tp = 13 + Math.random() * 24;
+      sim.loss = Math.random() < 0.07 ? +(Math.random() * 2.4).toFixed(1) : 0;
+    } else if (boot){
+      td = 0.4 + Math.random() * 1.2;
+      tu = 0.1 + Math.random() * 0.6;
+      tp = 0; sim.loss = 0;
+    } else {
+      td = tu = tp = 0; sim.loss = 0;
+    }
+
+    sim.down += (td - sim.down) * (run ? 0.34 : 0.20);
+    sim.up   += (tu - sim.up)   * (run ? 0.30 : 0.20);
+    sim.ping  = tp ? (sim.ping ? sim.ping + (tp - sim.ping) * 0.25 : tp) : 0;
+
+    if (sim.down < 0.05) sim.down = 0;
+    if (sim.up   < 0.05) sim.up   = 0;
+
+    hist.push(sim.down); hist.shift();
+
+    const peak = Math.max(1, ...hist);
+    bars.forEach((b, i) => {
+      b.style.height = Math.max(2, (hist[i] / peak) * 100) + '%';
+      b.style.background = hist[i] > peak * 0.7 ? 'var(--purple)' : 'var(--accent)';
+    });
+
+    const f    = v => v >= 100 ? v.toFixed(0) : v.toFixed(1);
+    const live = run || boot;
+
+    el.down.textContent = f(sim.down);
+    el.up.textContent   = f(sim.up);
+    el.ping.textContent  = sim.ping ? Math.round(sim.ping) : '—';
+    el.pingU.textContent = sim.ping ? 'мс' : '';
+    el.loss.textContent  = live ? sim.loss.toFixed(1) : '—';
+    el.lossU.textContent = live ? '%' : '';
+
+    el.cellDown.classList.toggle('is-idle', !live);
+    el.cellUp.classList.toggle('is-idle',   !live);
+    el.cellPing.classList.toggle('is-idle', !live);
+    el.cellLoss.classList.toggle('is-idle', !live);
+  }
+
+  sample();
+  setInterval(sample, 1000);
+})();
+
+/* ================= СТАРТ ================= */
+log('Zephyron v0.15.13 готов', 'acc');
+log('Профиль: Universal V11 Lite', 'info');
+log('Обход не запущен', 'warn');
+render();
+</script>
+</body>
+</html>
