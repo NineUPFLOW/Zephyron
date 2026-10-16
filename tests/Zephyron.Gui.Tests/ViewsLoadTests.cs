@@ -37,7 +37,7 @@ public sealed class ViewsLoadTests
         { "Диагностика", () => new DoctorView() },
         { "Наблюдение", () => new WatchView() },
         { "Оформление", () => new AppearanceView() },
-        { "Ещё", () => new MoreView() },
+        { "Прочее", () => new MoreView() },
         { "Первый запуск", () => new OnboardingView() },
     };
 

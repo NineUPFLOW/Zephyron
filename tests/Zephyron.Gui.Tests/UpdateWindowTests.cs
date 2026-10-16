@@ -82,8 +82,12 @@ public sealed class UpdateWindowTests
         Assert.NotNull(root);
 
         var xaml = File.ReadAllText(Path.Combine(root!.FullName, "gui", "Zephyron.Gui", "MainWindow.xaml"));
+
+        // Два вида пунктов: полоса разделов сверху (RailItem) и выпадающее
+        // меню «Ещё» (NavMenuItem, макет 16.10). Сверяются оба: раздел
+        // чейнджлога есть у любого пункта меню, где бы тот ни стоял.
         var items = System.Text.RegularExpressions.Regex.Matches(
-            xaml, @"Style=""\{StaticResource RailItem\}"" Content=""([^""]+)"" Tag=""([^""]+)"" local:MenuIcon\.Glyph=""&#x([0-9A-Fa-f]+);""");
+            xaml, @"Style=""\{StaticResource (?:RailItem|NavMenuItem)\}"" Content=""([^""]+)"" Tag=""([^""]+)"" local:MenuIcon\.Glyph=""&#x([0-9A-Fa-f]+);""");
 
         Assert.True(items.Count >= 13, $"пунктов меню нашлось {items.Count}: разметка меню поменялась, тест её не узнаёт");
 

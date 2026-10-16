@@ -183,6 +183,51 @@ public static class Themes
             dictionary[key] = Frozen(new SolidColorBrush(color));
         }
 
+        // Цвета, которых нет среди слотов темы: их макет зовёт ok, purple
+        // и «мягкими» оттенками. Слотами их сделать нельзя — чужие темы
+        // и theme.json знают ровно четырнадцать слотов, и лишний сломал бы
+        // и проверку числа слотов, и разбор чужого файла. Поэтому они
+        // выводятся из самой темы: «работает» — от зелёного из макета
+        // (на светлой подложке затемнённого, иначе он теряет контраст),
+        // а мягкие — сам цвет темы в четверть силы, чтобы чужая тема
+        // получила свои оттенки, а не наши.
+        bool light = theme[ThemeSlots.Backdrop].Luminance > 0.5;
+
+        var ok = ThemeColor.Parse(light ? "#1A7F37" : "#10B981");
+
+        dictionary["OkColor"] = ToColor(ok);
+        dictionary["Ok"] = Frozen(new SolidColorBrush(ToColor(ok)));
+
+        var purple = ThemeColor.Parse(light ? "#6D28D9" : "#A855F7");
+
+        dictionary["PurpleColor"] = ToColor(purple);
+        dictionary["Purple"] = Frozen(new SolidColorBrush(ToColor(purple)));
+
+        foreach (var (key, slot) in new[]
+                 {
+                     ("AccentSoft", ThemeSlots.Accent),
+                     ("OkSoft", ThemeSlots.Accent),
+                     ("WarnSoft", ThemeSlots.Warn),
+                     ("ErrSoft", ThemeSlots.Danger),
+                     ("PurpleSoft", ThemeSlots.Accent),
+                 })
+        {
+            // Мягкие — тот же цвет в четверть силы. У зелёного и сиреневого
+            // своего слота нет, и берётся зелёный из макета: «работает»
+            // и «второй акцент» — их роли.
+            var source = key switch
+            {
+                "OkSoft" => ok,
+                "PurpleSoft" => purple,
+                _ => theme[slot],
+            };
+
+            var tint = source with { A = (byte)Math.Round(source.A * 0.24) };
+
+            dictionary[key + "Color"] = ToColor(tint);
+            dictionary[key] = Frozen(new SolidColorBrush(ToColor(tint)));
+        }
+
         // Шрифт человека — один на всю программу (владелец, 24.09: «лучше
         // было бы, если бы на всю программу был один шрифт»): интерфейс,
         // заголовки и данные. «Как в теме» — шрифты темы, как задумано.

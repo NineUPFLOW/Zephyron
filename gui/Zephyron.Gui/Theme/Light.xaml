@@ -81,11 +81,33 @@
     <SolidColorBrush x:Key="OnAccent" Color="{StaticResource OnAccentColor}" />
     <SolidColorBrush x:Key="WarnFill" Color="{StaticResource WarnFillColor}" />
 
-    <!-- Comfortaa — основной: округлый и мягкий, в тон милому оформлению.
-         Segoe UI — запас, если её нет в системе. -->
-    <FontFamily x:Key="UiFont">Comfortaa, Segoe UI</FontFamily>
+    <!--
+        Зелёный «работает», второй акцент макета и мягкие оттенки — те же
+        ключи, что в Palette.xaml. Тёмные оттенки: на светлом фоне нежный
+        зелёный теряет контраст, поэтому «работает» здесь тёмно-зелёный,
+        как и текстовый цвет состояния. Мягкие — той же прозрачностью.
+    -->
+    <Color x:Key="OkColor">#FF1A7F37</Color>
+    <Color x:Key="PurpleColor">#FF6D28D9</Color>
+    <Color x:Key="AccentSoftColor">#22C2185B</Color>
+    <Color x:Key="OkSoftColor">#1A1A7F37</Color>
+    <Color x:Key="WarnSoftColor">#1A8A5200</Color>
+    <Color x:Key="ErrSoftColor">#1AC62828</Color>
+    <Color x:Key="PurpleSoftColor">#226D28D9</Color>
+
+    <SolidColorBrush x:Key="Ok" Color="{StaticResource OkColor}" />
+    <SolidColorBrush x:Key="Purple" Color="{StaticResource PurpleColor}" />
+    <SolidColorBrush x:Key="AccentSoft" Color="{StaticResource AccentSoftColor}" />
+    <SolidColorBrush x:Key="OkSoft" Color="{StaticResource OkSoftColor}" />
+    <SolidColorBrush x:Key="WarnSoft" Color="{StaticResource WarnSoftColor}" />
+    <SolidColorBrush x:Key="ErrSoft" Color="{StaticResource ErrSoftColor}" />
+    <SolidColorBrush x:Key="PurpleSoft" Color="{StaticResource PurpleSoftColor}" />
+
+    <!-- Segoe UI — как в макете и в тёмной палитре: тема меняет оттенки,
+         а не гарнитуру, и переключение света не должно менять весь шрифт. -->
+    <FontFamily x:Key="UiFont">Segoe UI</FontFamily>
     <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas</FontFamily>
-    <FontFamily x:Key="DisplayFont">Comfortaa, Segoe UI</FontFamily>
+    <FontFamily x:Key="DisplayFont">Segoe UI</FontFamily>
 
     <!--
         Фон окна для тем с картинкой (Themes.cs). У встроенных картинки нет:

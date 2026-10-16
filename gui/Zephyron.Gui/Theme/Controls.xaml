@@ -548,49 +548,60 @@
     </Style>
 
     <!--
-        Пункт бокового меню. Выбранный — таблетка, залитая акцентом целиком:
-        в меню всегда выбран ровно один раздел, и заливка читается сразу,
-        без левой черты у края.
+        Пункт меню — по макету (.nav-i). Прозрачная таблетка; выбранный
+        подкрашен мягким акцентом, обведён и подчёркнут светящейся чертой
+        снизу. Значок и подпись в строку.
+
+        Мягкая подложка, а не заливка акцентом целиком (прежняя боковая
+        полоса красила выбранный пункт в цвет кнопки): в макете акцент
+        оставлен кнопкам, а в меню его только четверть силы — иначе на
+        голубом пункте пропадала разница с нажатой кнопкой.
     -->
     <Style x:Key="RailItem" TargetType="RadioButton">
         <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="Margin" Value="10,3" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <!--
-                        Пункт — таблетка. Выбранный залит акцентом целиком:
-                        в меню всегда выбран ровно один раздел, и залитая
-                        таблетка показывает это сразу, без левой черты у края.
-                    -->
-                    <Border x:Name="Shape" Background="Transparent"
-                            CornerRadius="{StaticResource RMd}"
-                            BorderThickness="{StaticResource Stroke}" BorderBrush="Transparent"
-                            Padding="12,9">
-                        <StackPanel Orientation="Horizontal">
-                            <!--
-                                Значок (MenuIcon.cs). Колонка постоянной ширины:
-                                знаки разной ширины иначе сдвигали бы подписи,
-                                и столбец текста шёл бы лесенкой.
-                            -->
-                            <TextBlock x:Name="Glyph"
-                                       Text="{Binding (local:MenuIcon.Glyph), RelativeSource={RelativeSource TemplatedParent}}"
-                                       FontFamily="{DynamicResource IconFont}" FontSize="16"
-                                       Width="18" Margin="0,0,12,0" TextAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource Muted}" />
+                    <Grid>
+                        <Border x:Name="Shape" Background="Transparent"
+                                CornerRadius="{StaticResource RSm}"
+                                BorderThickness="{StaticResource Stroke}" BorderBrush="Transparent"
+                                Padding="12,7">
+                            <StackPanel Orientation="Horizontal">
+                                <!--
+                                    Значок (MenuIcon.cs). Колонка постоянной ширины:
+                                    знаки разной ширины иначе сдвигали бы подписи,
+                                    и столбец текста шёл бы лесенкой.
+                                -->
+                                <TextBlock x:Name="Glyph"
+                                           Text="{Binding (local:MenuIcon.Glyph), RelativeSource={RelativeSource TemplatedParent}}"
+                                           FontFamily="{DynamicResource IconFont}" FontSize="14"
+                                           Width="16" Margin="0,0,7,0" TextAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource Faint}" />
 
-                            <TextBlock x:Name="Label"
-                                       Text="{TemplateBinding Content}"
-                                       Foreground="{DynamicResource Muted}"
-                                       FontSize="13" VerticalAlignment="Center" />
+                                <TextBlock x:Name="Label"
+                                           Text="{TemplateBinding Content}"
+                                           Foreground="{DynamicResource Muted}"
+                                           FontSize="12" VerticalAlignment="Center" />
 
-                            <!-- Точка «есть новое» (RailBadge.cs). -->
-                            <Ellipse x:Name="Badge" Width="7" Height="7" Margin="8,1,0,0"
-                                     VerticalAlignment="Center" Fill="{DynamicResource Accent}"
-                                     Visibility="Collapsed" />
-                        </StackPanel>
-                    </Border>
+                                <!-- Точка «есть новое» (RailBadge.cs). -->
+                                <Ellipse x:Name="Badge" Width="7" Height="7" Margin="8,1,0,0"
+                                         VerticalAlignment="Center" Fill="{DynamicResource Accent}"
+                                         Visibility="Collapsed" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Черта под выбранным — как .nav-i.is-on::after в макете. -->
+                        <Border x:Name="Underline" Height="2" Width="16" CornerRadius="1"
+                                VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,-5"
+                                Background="{DynamicResource Accent}" Visibility="Collapsed">
+                            <Border.Effect>
+                                <DropShadowEffect ShadowDepth="0" BlurRadius="10" Opacity="0.45"
+                                                  Color="{DynamicResource AccentColor}" />
+                            </Border.Effect>
+                        </Border>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="local:RailBadge.Shown" Value="True">
                             <Setter TargetName="Badge" Property="Visibility" Value="Visible" />
@@ -601,11 +612,12 @@
                             <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Surface}" />
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentFill}" />
-                            <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource OnAccent}" />
-                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource OnAccent}" />
-                            <Setter TargetName="Label" Property="FontWeight" Value="SemiBold" />
-                            <Setter TargetName="Badge" Property="Fill" Value="{DynamicResource OnAccent}" />
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentSoft}" />
+                            <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Badge" Property="Fill" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Underline" Property="Visibility" Value="Visible" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -761,20 +773,147 @@
     </Style>
 
     <!--
-        Боковое меню. Фон — стилем, а не в разметке окна: стекло (Glass.cs)
-        при выключении сбрасывает фон, и стиль после сброса возвращается сам.
-        RailFill — подложка цвета подложки у встроенных тем и плотная
-        плашка у тем с картинкой (владелец, 23.09: «шрифт становится
-        слишком незаметен, стоит сделать подложку»).
+        Оболочка окна по эталонному макету (docs/design/mockup.html): меню —
+        плавающая таблетка сверху по центру, под ней раздел, внизу строка
+        состояния и над ней выдвижной журнал. Прежняя боковая колонка ушла:
+        макет ставит меню сверху, и это не вкус, а договор оформления.
     -->
-    <Style x:Key="RailPanel" TargetType="Border">
-        <!-- Плавающая карточка, а не полоса от края до края: у меню свои
-             скруглённые углы со всех сторон и рамка на тон светлее фона. -->
+    <Style x:Key="TopBar" TargetType="Border">
+        <!-- Прозрачная подложка во всю ширину строки: сама таблетка плавает
+             по центру, а фон под ней — фон темы. -->
+        <Setter Property="Background" Value="{DynamicResource Chrome}" />
+        <Setter Property="Padding" Value="16,16,16,0" />
+    </Style>
+
+    <Style x:Key="TopPill" TargetType="Border">
+        <!-- Фон — стилем, а не в разметке: стекло (Glass.cs) при выключении
+             сбрасывает фон, и стиль после сброса возвращается сам. RailFill —
+             подложка цвета подложки у встроенных тем и плотная плашка у тем
+             с картинкой. -->
         <Setter Property="Background" Value="{DynamicResource RailFill}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
         <Setter Property="BorderThickness" Value="{StaticResource Stroke}" />
         <Setter Property="CornerRadius" Value="{StaticResource RLg}" />
+        <Setter Property="Padding" Value="{StaticResource PillPad}" />
         <Setter Property="local:Glass.IsOn" Value="True" />
+    </Style>
+
+    <!-- Знак программы: плитка с рисунком, как .brand-mark в макете. -->
+    <Style x:Key="BrandMark" TargetType="Border">
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="CornerRadius" Value="{StaticResource RSm}" />
+        <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!--
+        «Ещё» — кнопка с выпадающим меню (макет, .nav-more-wrap): стрелка
+        вниз поворачивается, когда меню открыто. Вид — как у пункта меню,
+        выбранный вид — при открытом меню.
+    -->
+    <Style x:Key="NavToggle" TargetType="ToggleButton">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Shape" Background="Transparent"
+                            CornerRadius="{StaticResource RSm}"
+                            BorderThickness="{StaticResource Stroke}" BorderBrush="Transparent"
+                            Padding="12,7">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="Glyph" Text="&#xE712;" FontFamily="{DynamicResource IconFont}"
+                                       FontSize="14" Width="16" Margin="0,0,7,0" TextAlignment="Center"
+                                       VerticalAlignment="Center" Foreground="{DynamicResource Faint}" />
+                            <TextBlock x:Name="Label" Text="{TemplateBinding Content}"
+                                       Foreground="{DynamicResource Muted}" FontSize="12" VerticalAlignment="Center" />
+                            <TextBlock x:Name="Chev" Text="&#xE70D;" FontFamily="{DynamicResource IconFont}"
+                                       FontSize="9" Margin="5,1,0,0" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Muted}" />
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Surface}" />
+                            <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Text}" />
+                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Text}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentSoft}" />
+                            <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Chev" Property="Foreground" Value="{DynamicResource Accent}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Выпадающее меню «Ещё» — карточка, как .nav-more в макете. -->
+    <Style x:Key="NavMenu" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource RailFill}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+        <Setter Property="BorderThickness" Value="{StaticResource Stroke}" />
+        <Setter Property="CornerRadius" Value="{StaticResource RMd}" />
+        <Setter Property="Padding" Value="6" />
+        <Setter Property="MinWidth" Value="238" />
+        <Setter Property="local:Glass.IsOn" Value="True" />
+    </Style>
+
+    <!--
+        Пункт выпадающего меню (макет, .nav-more-i): строка со значком,
+        подсветка мягким акцентом под курсором.
+    -->
+    <Style x:Key="NavMenuItem" TargetType="RadioButton">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Shape" Background="Transparent"
+                            CornerRadius="{StaticResource RSm}" Padding="12,9">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="Glyph"
+                                       Text="{Binding (local:MenuIcon.Glyph), RelativeSource={RelativeSource TemplatedParent}}"
+                                       FontFamily="{DynamicResource IconFont}" FontSize="14"
+                                       Width="16" Margin="0,0,11,0" TextAlignment="Center"
+                                       VerticalAlignment="Center" Foreground="{DynamicResource Faint}" />
+                            <TextBlock x:Name="Label" Text="{TemplateBinding Content}"
+                                       Foreground="{DynamicResource Muted}" FontSize="12.5" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentSoft}" />
+                            <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Text}" />
+                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Accent}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Accent}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Строка состояния внизу (макет, .ft): что делает обход слева, время
+        и кнопка журнала справа. Прозрачная, как полоса меню, — фон общий
+        на всё окно.
+    -->
+    <Style x:Key="StatusBar" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource Chrome}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+        <Setter Property="BorderThickness" Value="0,1,0,0" />
+        <Setter Property="Padding" Value="20,9" />
     </Style>
 
     <!--
@@ -1091,6 +1230,205 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!--
+        Карточка раздела — по макету (.panel, .mod): мягкая подложка, тонкая
+        рамка и подъём под курсором у тех, что отвечают на наведение. Подъём —
+        общим признаком (Lift), а не здесь: он включается по месту, и стекло
+        под карточкой за сдвигом трансформом не едет, поэтому у темы со стеклом
+        подъёма нет (см. Lift.cs).
+    -->
+    <Style x:Key="MockCard" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource Surface}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+        <Setter Property="BorderThickness" Value="{StaticResource Stroke}" />
+        <Setter Property="CornerRadius" Value="{StaticResource RLg}" />
+        <Setter Property="Padding" Value="{StaticResource CardPad}" />
+        <Setter Property="local:Glass.IsOn" Value="True" />
+    </Style>
+
+    <!--
+        Пилюля состояния героя (макет, .hero-pill): таблетка с точкой и словом.
+        Цвет ставится из кода по состоянию (ShowDot), поэтому здесь только
+        форма: фон и рамку задаёт тот же цвет мягким оттенком через привязку
+        к Foreground — так цвет один, а оттенков три, и разойтись им нечем.
+    -->
+    <Style x:Key="StatePill" TargetType="Border">
+        <Setter Property="CornerRadius" Value="{StaticResource RPill}" />
+        <Setter Property="BorderThickness" Value="{StaticResource Stroke}" />
+        <Setter Property="Padding" Value="16,7" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="Background" Value="{DynamicResource Surface}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+        <Setter Property="local:Glass.IsOn" Value="True" />
+    </Style>
+
+    <!--
+        Сегмент выбора (макет, .seg): три равные кнопки-таблетки, выбранная
+        подкрашена мягким акцентом. Применяется к RadioButton: выбор из трёх
+        взаимоисключающих — это радиокнопка, а не кнопка с состоянием.
+    -->
+    <Style x:Key="Segment" TargetType="RadioButton">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Shape" Background="{DynamicResource Surface}"
+                            BorderBrush="{DynamicResource Border}" BorderThickness="{StaticResource Stroke}"
+                            CornerRadius="{StaticResource RSm}" Padding="14,12">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Raised}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentSoft}" />
+                            <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                            <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Кнопка-значок круглой формы (макет, .gear): шестерня внутри строки
+        движка. Прозрачная, светлеет под курсором.
+    -->
+    <Style x:Key="GearButton" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Width" Value="22" />
+        <Setter Property="Height" Value="22" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Shape" Background="Transparent" CornerRadius="6">
+                        <TextBlock Text="{TemplateBinding Content}" FontFamily="{DynamicResource IconFont}"
+                                   FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Faint}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Raised}" />
+                            <Setter TargetName="Shape" Property="Opacity" Value="1" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Метка движка (макет, .engine-pill): точка, имя, состояние и шестерня.
+        Цвет — из кода по состоянию (ShowEngine), поэтому фон и рамку берёт
+        Foreground: у «работает» зелёный, у «поднимается» жёлтый, у прочих
+        прозрачный.
+    -->
+    <Style x:Key="EnginePill" TargetType="Border">
+        <Setter Property="CornerRadius" Value="{StaticResource RSm}" />
+        <Setter Property="BorderThickness" Value="{StaticResource Stroke}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+        <Setter Property="Background" Value="{DynamicResource Surface}" />
+        <Setter Property="Padding" Value="11,6,8,6" />
+        <Setter Property="local:Glass.IsOn" Value="True" />
+    </Style>
+
+    <!--
+        Баннер (макет, .banner): значок плиткой, заголовок, пояснение и кнопки.
+        Accent-вид — обновление, Warn-вид — просьба о поддержке.
+    -->
+    <Style x:Key="Banner" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource Surface}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+        <Setter Property="BorderThickness" Value="{StaticResource Stroke}" />
+        <Setter Property="CornerRadius" Value="{StaticResource RMd}" />
+        <Setter Property="Padding" Value="16,14" />
+        <Setter Property="local:Glass.IsOn" Value="True" />
+    </Style>
+
+    <!--
+        Значок баннера — плитка с обводкой (макет, .banner-ic). Цвет задаётся
+        содержимым: голубой у обновления, жёлтый у поддержки.
+    -->
+    <Style x:Key="BannerIcon" TargetType="Border">
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="CornerRadius" Value="{StaticResource RSm}" />
+        <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!--
+        Кнопка быстрого действия (макет, .quick .btn): карточка с подписью
+        и значком, шириной в четверть ряда.
+    -->
+    <Style x:Key="QuickButton" TargetType="Button" BasedOn="{StaticResource Ghost}">
+        <Setter Property="Background" Value="{DynamicResource Surface}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+        <Setter Property="Padding" Value="12" />
+    </Style>
+
+    <!--
+        Кнопка журнала (макет, .log-fab): плавающая таблетка внизу справа.
+        При открытом журнале поднимается над консолью — это делает разметка,
+        двигая нижний отступ.
+    -->
+    <Style x:Key="LogFab" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="FontSize" Value="11.5" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Shape" Background="{DynamicResource RailFill}"
+                            BorderBrush="{DynamicResource Border}" BorderThickness="{StaticResource Stroke}"
+                            CornerRadius="{StaticResource RMd}" Padding="16,10">
+                        <StackPanel Orientation="Horizontal">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                            <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Полоса метрики сети (макет, .net): строка показаний приёма, отдачи,
+        задержки и потерь, а справа столбики истории.
+    -->
+    <Style x:Key="NetBar" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource Surface}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+        <Setter Property="BorderThickness" Value="{StaticResource Stroke}" />
+        <Setter Property="CornerRadius" Value="{StaticResource RMd}" />
+        <Setter Property="Padding" Value="16,9" />
+        <Setter Property="local:Glass.IsOn" Value="True" />
+    </Style>
+
+    <!-- Заголовок карточки (макет, .mod-title): прописными, мельче, серым. -->
+    <Style x:Key="CardTitle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="Foreground" Value="{DynamicResource Faint}" />
+        <Setter Property="FontSize" Value="10.5" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- Имя карточки (макет, .mod-name): крупнее заголовка, основным цветом. -->
+    <Style x:Key="CardName" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="Foreground" Value="{DynamicResource Text}" />
+        <Setter Property="FontSize" Value="13.5" />
     </Style>
 
 </ResourceDictionary>

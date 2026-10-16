@@ -64,6 +64,20 @@ public partial class StatusView : UserControl
 
     private readonly DispatcherTimer _refresh = new() { Interval = CalmInterval };
 
+    /// <summary>
+    /// Секундный ход крупного таймера героя (макет, .hero-big).
+    /// </summary>
+    /// <remarks>
+    /// Отдельно от опроса: опрос — раз в две секунды и читает файлы, а таймер
+    /// обязан идти ровно по секундам, иначе цифры дёргаются. Момент запуска
+    /// берётся из состояния надзора (StartedAt), а не из щелчка по кнопке:
+    /// движки поднимает отдельный процесс, и окно о них узнаёт с задержкой.
+    /// </remarks>
+    private readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromSeconds(1) };
+
+    /// <summary>С какого времени считать работу; <c>null</c> — не работает.</summary>
+    private DateTimeOffset? _runningSince;
+
     private DateTimeOffset? _startingSince;
 
     private void OnTelegram(object sender, RoutedEventArgs e) => OpenLink(About.Telegram);
@@ -281,6 +295,7 @@ public partial class StatusView : UserControl
         // процесс и пишет своё состояние в файл. Две секунды достаточно,
         // чтобы нажатие «Запустить» отозвалось раньше, чем человек усомнится.
         _refresh.Tick += (_, _) => Update();
+        _tick.Tick += (_, _) => ShowUptime();
 
         Loaded += (_, _) =>
         {
@@ -308,12 +323,14 @@ public partial class StatusView : UserControl
                 StartAnimations();
 
             _refresh.Start();
+            _tick.Start();
         };
 
         Unloaded += (_, _) =>
         {
             UpdateNotice.Changed -= OnUpdateChanged;
             _refresh.Stop();
+            _tick.Stop();
 
             // Анимация на скрытом виде продолжала бы будить композитор
             // впустую. Само состояние запуска при этом сохраняется.
@@ -615,8 +632,12 @@ public partial class StatusView : UserControl
 
         if (!running)
         {
+            _runningSince = null;
+            _broken = false;
+            _wary = false;
             ShowDot("Faint");
             ShowStateBar("Faint");
+            ShowUptime();
 
             StateLine.Text = "Остановлено";
 
@@ -646,8 +667,12 @@ public partial class StatusView : UserControl
 
         var colour = healthy ? "Accent" : broken ? "Danger" : "Warn";
 
+        _runningSince = state.StartedAt;
+        _broken = broken;
+        _wary = !healthy && !broken;
         ShowDot(colour);
         ShowStateBar(colour);
+        ShowUptime();
 
         StateLine.Text = healthy
             ? "Работает"
@@ -1031,6 +1056,54 @@ public partial class StatusView : UserControl
             // теме выглядит у мелкой метки не предупреждением, а выцветшей
             // серостью — у неё нет площади, чтобы донести приглушённый оттенок.
             colourKey == "Warn" ? "WarnFill" : colourKey);
+
+    /// <summary>
+    /// Крупный таймер работы в герое (макет, .hero-big): «ЧЧ:ММ:СС».
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Считается от <see cref="_runningSince"/> — времени начала из состояния
+    /// надзора, а не от щелчка. Движки поднимает отдельный процесс, и по щелчку
+    /// отсчёт начинался бы раньше, чем что-то заработало.
+    /// </para>
+    /// <para>
+    /// Прочерк, когда стоит: у неработающего обхода нет наработки, а «00:00:00»
+    /// читалось бы как «только что поднялся».
+    /// </para>
+    /// </remarks>
+    private void ShowUptime()
+    {
+        // Пока поднимается — нули и жёлтый, как в макете: отсчёт пойдёт
+        // с той секунды, когда движки доложат о готовности.
+        if (_startingSince is not null)
+        {
+            UptimeText.Text = "00:00:00";
+            UptimeText.Foreground = (Brush)FindResource("Warn");
+            return;
+        }
+
+        if (_runningSince is not { } since)
+        {
+            UptimeText.Text = "—";
+            UptimeText.Foreground = (Brush)FindResource("Faint");
+            return;
+        }
+
+        var span = DateTimeOffset.Now - since;
+
+        UptimeText.Text = $"{(int)span.TotalHours:D2}:{span.Minutes:D2}:{span.Seconds:D2}";
+
+        // Цвет — по состоянию: работающий светлый, с оговорками жёлтый,
+        // с отказавшим движком красный. Так же, как полоса под ним.
+        UptimeText.Foreground = (Brush)FindResource(
+            _broken ? "Danger" : _wary ? "Warn" : "Text");
+    }
+
+    /// <summary>Движок отказал: таймер и полоса красные.</summary>
+    private bool _broken;
+
+    /// <summary>Работает с оговорками: таймер и полоса жёлтые.</summary>
+    private bool _wary;
 
     /// <summary>
     /// Движки, которые поднимутся при нынешней настройке.

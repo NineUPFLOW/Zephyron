@@ -43,18 +43,15 @@
     <sys:Double x:Key="S6">32</sys:Double>
 
     <!-- Размеры оболочки окна. -->
-    <sys:Double x:Key="RailWidth">244</sys:Double>
-    <sys:Double x:Key="MarkSize">40</sys:Double>
+    <sys:Double x:Key="MarkSize">28</sys:Double>
 
     <!-- Поля страницы раздела: шире горизонталь, чем вертикаль, — так
          карточки стоят по центру взгляда, а не упираются в края. -->
     <Thickness x:Key="PagePad">32,28,32,28</Thickness>
     <Thickness x:Key="CardPad">20,18,20,18</Thickness>
-    <Thickness x:Key="RailPad">20,24,20,20</Thickness>
-
-    <!-- Поля карточки меню от краёв окна: слева и сверху/снизу воздух,
-         справа нет — правый край и так отбит от поля раздела. -->
-    <Thickness x:Key="RailInset">12,12,0,12</Thickness>
+    <!-- Поля таблетки меню внутри её рамки (TopPill): теснее карточки,
+         потому что внутри не текст, а ряд таблеток-пунктов. -->
+    <Thickness x:Key="PillPad">6,5</Thickness>
 
     <!-- Толщина линий и рамок. Тонкая для разделителей, обычная для границ.
          Ровно Thickness, а не Double: WPF подставляет число в BorderThickness,
