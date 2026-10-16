@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Threading;
 using Zephyron.Core;
 using Zephyron.Core.Diagnostics;
@@ -877,7 +878,36 @@ public partial class StatusView : UserControl
         Dot.Fill = brush;
         FooterDot.Fill = brush;
         DotGlow.Color = colourKey != "Faint" && brush is SolidColorBrush solid ? solid.Color : Colors.Transparent;
+
+        // Работающий обход дышит светом (макет, .dot--ok: pulse 2s infinite).
+        // Заводится один раз: опрос идёт раз в две секунды, и перезапуск
+        // анимации на каждом круге выглядел бы рывком, а не дыханием.
+        bool pulse = Motion.Enabled && colourKey == "Accent";
+
+        if (pulse == _pulsing)
+            return;
+
+        _pulsing = pulse;
+
+        if (!pulse)
+        {
+            DotGlow.BeginAnimation(DropShadowEffect.OpacityProperty, null);
+            DotGlow.Opacity = 0.7;
+            return;
+        }
+
+        DotGlow.BeginAnimation(DropShadowEffect.OpacityProperty, new DoubleAnimation
+        {
+            From = 0.35,
+            To = 0.85,
+            Duration = new Duration(TimeSpan.FromSeconds(2)),
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever,
+        });
     }
+
+    /// <summary>Дышит ли сейчас свет точки: чтобы не заводить анимацию заново.</summary>
+    private bool _pulsing;
 
     /// <summary>
     /// Строка внизу: состояние с длительностью и время сборки конфига туннеля.
