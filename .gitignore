@@ -113,3 +113,6 @@ config/*.tmp
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Временные файлы агента
+.agent_tmp/
