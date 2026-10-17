@@ -22,8 +22,8 @@
     "warn-fill": "#FBBF24"
   },
   "fonts": {
-    "ui": "Segoe UI",
-    "mono": "Cascadia Mono, Consolas",
-    "display": "Segoe UI"
+    "ui": "Inter",
+    "mono": "Fira Code",
+    "display": "Inter"
   }
 }

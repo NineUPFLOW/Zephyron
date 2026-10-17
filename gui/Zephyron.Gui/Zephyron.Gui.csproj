@@ -103,6 +103,24 @@
   </ItemGroup>
 
   <!--
+    Шрифты макета — Inter и Fira Code, как в docs/design/mockup.html
+    (font-family: Inter, … ; переменная mono: 'SF Mono','Fira Code', …).
+    Владелец 17.10: «шрифт программы полностью должен быть как в HTML
+    примере». Встроены ресурсом, а не положены рядом: pack-адрес находит
+    их и из тестов, и из чужой сборки, и человеку не нужно ставить гарнитуры
+    в Windows — иначе окно у него открылось бы системным Segoe UI, а у нас
+    Inter.
+
+    Ресурсом, а не Content: Content копировался бы в build\ папкой рядом
+    с программой, и выпуск нёс бы те же файлы дважды — и внутри сборки,
+    и подле неё.
+  -->
+  <ItemGroup>
+    <Resource Include="Assets\Fonts\Inter\*.ttf" />
+    <Resource Include="Assets\Fonts\FiraCode\*.ttf" />
+  </ItemGroup>
+
+  <!--
     Неявные using от WinForms сняты. Иначе UserControl и Brush становятся
     двусмысленными между System.Windows.Forms/System.Drawing и WPF — сразу
     по всему коду, во всех разделах, а WinForms здесь нужен ровно ради

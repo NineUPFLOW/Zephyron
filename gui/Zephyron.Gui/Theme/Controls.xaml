@@ -1277,9 +1277,9 @@
 
     <!--
         Пилюля состояния героя (макет, .hero-pill): таблетка с точкой и словом.
-        Цвет ставится из кода по состоянию (ShowDot), поэтому здесь только
-        форма: фон и рамку задаёт тот же цвет мягким оттенком через привязку
-        к Foreground — так цвет один, а оттенков три, и разойтись им нечем.
+        Цвет ставится из кода по состоянию (ShowDot): мягкая заливка, «черта»
+        рамкой, сам цвет подписью — три оттенка одного цвета, как у макета
+        (.is-ok/.is-warn/.is-err). Здесь только форма и серый покой.
     -->
     <Style x:Key="StatePill" TargetType="Border">
         <Setter Property="CornerRadius" Value="{StaticResource RPill}" />
@@ -1288,7 +1288,6 @@
         <Setter Property="HorizontalAlignment" Value="Center" />
         <Setter Property="Background" Value="{DynamicResource Surface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
-        <Setter Property="local:Glass.IsOn" Value="True" />
     </Style>
 
     <!--

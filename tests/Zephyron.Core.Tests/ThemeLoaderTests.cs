@@ -114,7 +114,7 @@ public sealed class ThemeLoaderTests : IDisposable
         Assert.Equal("#F2D335", theme[ThemeSlots.Accent].ToString());
         Assert.Equal("#14171F", theme[ThemeSlots.Surface].ToString());
         Assert.Equal("Bahnschrift Condensed", theme.Fonts.Display);
-        Assert.Equal("Segoe UI", theme.Fonts.Ui);
+        Assert.Equal("Inter", theme.Fonts.Ui);
     }
 
     /// <summary>Опечатка в имени слота — ошибка, а не молча пропущенный цвет.</summary>

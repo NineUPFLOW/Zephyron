@@ -77,6 +77,7 @@ public static class Themes
     {
         var builtIn = new ResourceDictionary { Source = new Uri(DarkPath, UriKind.Absolute) };
         builtIn["UiScaleTransform"] = Scale(1);
+        BuiltInFonts(builtIn);
 
         Swap(builtIn);
         Glass.Set(null, System.Windows.Media.Stretch.UniformToFill);
@@ -143,6 +144,7 @@ public static class Themes
 
         // Масштаб — настройка человека, а не темы: переживает и отказ темы.
         builtIn["UiScaleTransform"] = Scale(look.Scale);
+        BuiltInFonts(builtIn);
 
         Swap(builtIn);
         Glass.Set(null, System.Windows.Media.Stretch.UniformToFill);
@@ -300,7 +302,10 @@ public static class Themes
         // заголовки и данные. «Как в теме» — шрифты темы, как задумано.
         if (look.Font is { } font)
         {
-            var family = new FontFamily(font);
+            // Выбранное человеком имя может совпасть со встроенным (Inter,
+            // Fira Code) — тогда берём файл из сборки, а не системную
+            // гарнитуру, которой на Windows может и не быть.
+            var family = Bundled(font);
             dictionary["UiFont"] = family;
             dictionary["MonoFont"] = family;
             dictionary["DisplayFont"] = family;
@@ -396,6 +401,10 @@ public static class Themes
             // (владелец, 23.09: «давай попробуем и под боковым меню»).
             dictionary["Chrome"] = Frozen(new SolidColorBrush(Colors.Transparent));
 
+            // «Главная» красит себя подложкой темы: арт стоит в её правой
+            // колонке, и под ним должна быть та же подложка, а не узор окна.
+            dictionary["HomeBackdrop"] = backdrop;
+
             var surface = theme[ThemeSlots.Surface];
 
             if (image is not null && look.Blur && background.Blur > 0)
@@ -437,8 +446,22 @@ public static class Themes
             dictionary["SideArt"] = Frozen(new SolidColorBrush(Colors.Transparent));
             dictionary["BackdropDim"] = 1.0;
             dictionary["BackdropDecoOpacity"] = 1.0;
-            dictionary["Chrome"] = backdrop;
+
+            // Разделы прозрачные и у темы без своего фона — иначе они закрывают
+            // узор окна. Прежде здесь стояла подложка цветом фона, и сетка,
+            // свечения, волны и точки (MainWindow) рисовались, но были скрыты
+            // разделами: «фон не виден» (владелец 17.10). Узор окна — тот же
+            // вид по умолчанию, что в макете, и раздел его не заслоняет.
+            dictionary["Chrome"] = Frozen(new SolidColorBrush(Colors.Transparent));
+
+            // Подложка меню остаётся плотной: пункты — тонкий текст, и узор
+            // под ними рябил бы. Это единственное, что фоном не просвечивает.
             dictionary["RailFill"] = backdrop;
+
+            // «Главная» прозрачна: узор окна — тот же вид по умолчанию, что
+            // в макете, и раздел его не заслоняет (владелец 17.10: «фон
+            // не виден»).
+            dictionary["HomeBackdrop"] = Frozen(new SolidColorBrush(Colors.Transparent));
         }
 
         return dictionary;
@@ -567,14 +590,23 @@ public static class Themes
     /// Шрифт темы: из её папки, если файлы есть, иначе системный.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Файл ищется по имени семейства внутри его папки («./fonts/#Имя»),
     /// а системное имя стоит запасом: не нашёлся файл — будет Segoe UI,
     /// а не квадраты вместо букв.
+    /// </para>
+    /// <para>
+    /// Своих файлов у темы нет — берётся встроенный шрифт программы
+    /// (<see cref="Bundled"/>), а не системный: гарнитуры макета Inter
+    /// и Fira Code в Windows не стоят, и без этой ветки окно у человека
+    /// открылось бы системным Segoe UI (владелец 17.10: «шрифт программы
+    /// полностью должен быть как в HTML примере»).
+    /// </para>
     /// </remarks>
     private static FontFamily Font(Theme theme, string names)
     {
         if (theme.Fonts.Files.Count == 0)
-            return new FontFamily(names);
+            return Bundled(names);
 
         var folder = new Uri(theme.Folder.TrimEnd('\\') + "\\");
 
@@ -584,6 +616,48 @@ public static class Themes
             .SelectMany(dir => names.Split(',').Select(n => $"./{(dir == "." ? string.Empty : dir + "/")}#{n.Trim()}"));
 
         return new FontFamily(folder, string.Join(", ", local.Append(names).Append("Segoe UI")));
+    }
+
+    /// <summary>
+    /// Встроенные шрифты программы: семейство макета и его папка в сборке.
+    /// </summary>
+    /// <remarks>
+    /// Имена — из самих файлов (таблица name, запись 1): «Inter» и «Fira Code».
+    /// Папки те же, куда кладёт их <c>Zephyron.Gui.csproj</c>.
+    /// </remarks>
+    private static readonly (string Family, string Folder)[] BundledFonts =
+    [
+        ("Inter", "Assets/Fonts/Inter"),
+        ("Fira Code", "Assets/Fonts/FiraCode"),
+    ];
+
+    /// <summary>
+    /// Встроенный шрифт по именам семейств: знакомое берётся из сборки,
+    /// незнакомое и запасное — системное.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Так шрифт макета доезжает до человека, не требуя ставить гарнитуры
+    /// в Windows. Имя, которого нет среди встроенных (чужой шрифт темы
+    /// без файлов), остаётся системным — как было.
+    /// </para>
+    /// <para>
+    /// Сборка названа явно (<c>Zephyron;component</c>), а не через
+    /// <c>pack://application:,,,/</c>: тот разрешается от сборки входа,
+    /// и из тестов, где вход — не окно, шрифт бы не нашёлся.
+    /// </para>
+    /// </remarks>
+    private static FontFamily Bundled(string names)
+    {
+        var parts = names.Split(',').Select(n => n.Trim()).Where(n => n.Length > 0).ToList();
+
+        var local = parts.SelectMany(name => BundledFonts
+            .Where(font => font.Family.Equals(name, StringComparison.OrdinalIgnoreCase))
+            .Select(font => $"./{font.Folder}/#{font.Family}"));
+
+        var all = local.Concat(parts).Append("Segoe UI");
+
+        return new FontFamily(new Uri("pack://application:,,,/Zephyron;component/"), string.Join(", ", all));
     }
 
     private static BitmapImage Load(string path, int decodeWidth)
@@ -684,6 +758,23 @@ public static class Themes
     private static Color ToColor(ThemeColor color) => Color.FromArgb(color.A, color.R, color.G, color.B);
 
     private static ScaleTransform Scale(double scale) => Frozen(new ScaleTransform(scale, scale));
+
+    /// <summary>
+    /// Встроенные шрифты в словарь темы: он пришёл из XAML (или откатился
+    /// на встроенную палитру), а там имена системные.
+    /// </summary>
+    /// <remarks>
+    /// Без этого окно, собранное из <c>Palette.xaml</c> — при первом запуске
+    /// до выбора темы и при отказе темы, — шло бы системным Segoe UI, тогда
+    /// как окно с темой из папки — Inter. Один и тот же шрифт должен быть
+    /// у обоих.
+    /// </remarks>
+    private static void BuiltInFonts(ResourceDictionary dictionary)
+    {
+        dictionary["UiFont"] = Bundled("Inter");
+        dictionary["DisplayFont"] = Bundled("Inter");
+        dictionary["MonoFont"] = Bundled("Fira Code");
+    }
 
     private static T Frozen<T>(T freezable) where T : Freezable
     {

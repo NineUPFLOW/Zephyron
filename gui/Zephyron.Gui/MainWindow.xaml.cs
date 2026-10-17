@@ -238,11 +238,17 @@ public partial class MainWindow : Window
 
     private void ShowOnboarding()
     {
+        // Кнопка журнала уходит на время мастера: у него свои кнопки в том же
+        // правом нижнем углу, и таблетка садилась прямо на «Запустить»
+        // (владелец 17.10: «кнопка журнала мешает кнопкам мастера»).
+        LogOverlay.Visibility = Visibility.Collapsed;
+
         var onboarding = new OnboardingView();
         onboarding.Completed += (_, _) =>
         {
             var status = new StatusView();
             Section.Content = status;
+            LogOverlay.Visibility = Visibility.Visible;
             Motion.Page(status);
         };
 
@@ -415,7 +421,13 @@ public partial class MainWindow : Window
         UiStallWatch.Section = title ?? name;
 
         // Ушли из мастера в другой раздел — он закрыт, как «Пропустить».
-        (Section.Content as OnboardingView)?.Leave();
+        if (Section.Content is OnboardingView leaving)
+        {
+            leaving.Leave();
+
+            // Мастер прятал кнопку журнала — вернуть её разделу.
+            LogOverlay.Visibility = Visibility.Visible;
+        }
 
         Section.Content = name switch
         {

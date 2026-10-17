@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:Zephyron.Gui"
              xmlns:views="clr-namespace:Zephyron.Gui.Views"
-             Background="{DynamicResource Backdrop}">
+             Background="{DynamicResource HomeBackdrop}">
 
     <UserControl.Resources>
         <!-- Строка-ключ и значение: имя слева, значение справа, как в карточках. -->

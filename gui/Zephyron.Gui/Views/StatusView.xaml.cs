@@ -666,7 +666,7 @@ public partial class StatusView : UserControl
         bool broken = services.Any(s =>
             s.Health is ServiceHealth.Dead or ServiceHealth.Faulted);
 
-        var colour = healthy ? "Accent" : broken ? "Danger" : "Warn";
+        var colour = healthy ? "Ok" : broken ? "Danger" : "Warn";
 
         _runningSince = state.StartedAt;
         _broken = broken;
@@ -879,10 +879,18 @@ public partial class StatusView : UserControl
         FooterDot.Fill = brush;
         DotGlow.Color = colourKey != "Faint" && brush is SolidColorBrush solid ? solid.Color : Colors.Transparent;
 
+        // Пилюля героя — тем же цветом, что точка (макет, .hero-pill.is-ok
+        // и соседние): мягкая заливка, «черта» рамкой, сам цвет подписью.
+        // Прежде пилюля была всегда серой, и цвет состояния читался только
+        // по точке в 7 точек — макет отдаёт ему всю таблетку.
+        StatePill.Background = (Brush)FindResource(PillSoft(colourKey));
+        StatePill.BorderBrush = (Brush)FindResource(PillLine(colourKey));
+        StateLine.Foreground = brush;
+
         // Работающий обход дышит светом (макет, .dot--ok: pulse 2s infinite).
         // Заводится один раз: опрос идёт раз в две секунды, и перезапуск
         // анимации на каждом круге выглядел бы рывком, а не дыханием.
-        bool pulse = Motion.Enabled && colourKey == "Accent";
+        bool pulse = Motion.Enabled && colourKey == "Ok";
 
         if (pulse == _pulsing)
             return;
@@ -908,6 +916,34 @@ public partial class StatusView : UserControl
 
     /// <summary>Дышит ли сейчас свет точки: чтобы не заводить анимацию заново.</summary>
     private bool _pulsing;
+
+    /// <summary>
+    /// Мягкая заливка пилюли состояния по цвету состояния (макет,
+    /// .hero-pill.is-ok и соседние).
+    /// </summary>
+    /// <remarks>
+    /// Серый покой — не «мягкий серый», которого в палитре нет, а подложка
+    /// с рамкой: у макета стоящая пилюля нейтральна (rgba(90,98,120,.12)
+    /// на line-2), и подкрашивать её цветом нечем.
+    /// </remarks>
+    private static string PillSoft(string colourKey) => colourKey switch
+    {
+        "Ok" => "OkSoft",
+        "Warn" => "WarnSoft",
+        "Danger" => "ErrSoft",
+        "Accent" => "AccentSoft",
+        _ => "Surface",
+    };
+
+    /// <summary>«Черта» пилюли — рамка мягче заливки, как у макета.</summary>
+    private static string PillLine(string colourKey) => colourKey switch
+    {
+        "Ok" => "OkLine",
+        "Warn" => "WarnLine",
+        "Danger" => "ErrLine",
+        "Accent" => "AccentLine",
+        _ => "Border",
+    };
 
     /// <summary>
     /// Строка внизу: состояние с длительностью и время сборки конфига туннеля.
@@ -1694,6 +1730,9 @@ public partial class StatusView : UserControl
             ContentColumn.MaxWidth = double.PositiveInfinity;
             ArtColumn.Width = new GridLength(0);
             ArtLayer.Visibility = Visibility.Collapsed;
+
+            // Во всю ширину — значит фон темы (картинка, видео) под разделами:
+            // подложка раздела обязана быть прозрачной, иначе она его скроет.
             SetResourceReference(BackgroundProperty, "Chrome");
         }
         else
@@ -1701,7 +1740,7 @@ public partial class StatusView : UserControl
             ContentColumn.MaxWidth = 1080;
             ArtColumn.Width = new GridLength(1, GridUnitType.Star);
             ArtLayer.Visibility = Visibility.Visible;
-            SetResourceReference(BackgroundProperty, "Backdrop");
+            SetResourceReference(BackgroundProperty, "HomeBackdrop");
 
             // Слой мог прятаться — разложить заново, когда станет известен размер.
             Dispatcher.BeginInvoke(PlaceArt, System.Windows.Threading.DispatcherPriority.Loaded);
