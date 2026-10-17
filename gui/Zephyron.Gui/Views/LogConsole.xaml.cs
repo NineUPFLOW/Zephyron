@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 
 namespace Zephyron.Gui.Views;
@@ -41,6 +42,10 @@ public partial class LogConsole : UserControl
         InitializeComponent();
 
         _timer.Tick += (_, _) => Reload();
+
+        // Высота консоли известна только после разбора разметки: сдвиг
+        // в закрытое положение берётся у неё, а не числом в двух местах.
+        Loaded += (_, _) => Slide.Y = Console.Height;
     }
 
     private static string Path => System.IO.Path.Combine("runtime", "supervisor.log");
@@ -54,10 +59,30 @@ public partial class LogConsole : UserControl
     {
         _open = !_open;
 
-        Slide.BeginAnimation(TranslateTransform.YProperty, null);
-        Slide.Y = _open ? 0 : Console.Height;
+        double closed = Console.Height;
+        double to = _open ? 0 : closed;
 
-        Fab.Margin = _open ? new Thickness(0, 0, 20, Console.Height + 16) : new Thickness(0, 0, 20, 20);
+        // Выезд — той же пружиной, что у прочих появлений окна (Motion):
+        // выключенные анимации гасят и его, и консоль встаёт на место сразу.
+        if (Motion.Enabled)
+        {
+            Slide.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation
+            {
+                To = to,
+                Duration = TimeSpan.FromMilliseconds(320),
+                EasingFunction = new CubicEase
+                {
+                    EasingMode = EasingMode.EaseOut,
+                },
+            });
+        }
+        else
+        {
+            Slide.BeginAnimation(TranslateTransform.YProperty, null);
+            Slide.Y = to;
+        }
+
+        Fab.Margin = _open ? new Thickness(0, 0, 20, closed + 16) : new Thickness(0, 0, 20, 20);
         FabGlyph.Text = _open ? "\uE70E" : "\uE70D";
         FabText.Text = _open ? "Скрыть" : "Журнал";
 

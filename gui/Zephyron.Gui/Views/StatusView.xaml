@@ -92,7 +92,12 @@
             <Rectangle x:Name="ArtShade" />
         </Grid>
 
-        <ScrollViewer Grid.Column="1" Style="{StaticResource PageScroll}" Padding="32,16,32,40">
+        <!--
+            Поля страницы — как у .ct макета: сверху 32, по бокам 24, снизу
+            запас 120, чтобы последняя карточка не упиралась в край и под неё
+            не заезжала кнопка журнала.
+        -->
+        <ScrollViewer Grid.Column="1" Style="{StaticResource PageScroll}" Padding="24,32,24,120">
             <StackPanel>
 
                 <!--
@@ -259,7 +264,7 @@
                     и метки движков с шестернями. Одной карточкой во всю ширину,
                     как в макете.
                 -->
-                <Border Style="{StaticResource MockCard}" Margin="0,0,0,16" Padding="24,18,24,18">
+                <Border Style="{StaticResource MockCard}" Margin="0,0,0,16" Padding="24,20,24,20">
                     <StackPanel>
                         <Grid Margin="4,0,4,10">
                             <TextBlock Style="{StaticResource CardTitle}" Text="Режим работы ZY" />

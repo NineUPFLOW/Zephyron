@@ -40,6 +40,15 @@
                    Opacity="{DynamicResource BackdropDim}" />
 
         <!--
+            Волны под всем окном (макет, .bg-svg): три полосы, колышущиеся
+            краями, переходом сиреневый → голубой → розовый. Рисуются сами
+            (Aurora.cs). В макете колыхание даёт фильтр SVG, которого в WPF
+            нет, — поэтому полосы собираются из синусоид.
+        -->
+        <local:Aurora x:Name="WaveField" Grid.RowSpan="2" IsHitTestVisible="False"
+                      Opacity="{DynamicResource BackdropDecoOpacity}" />
+
+        <!--
             Мягкие сферы по углам (макет, .glow-1/.glow-2): голубая слева
             вверху, сиреневая справа внизу. Цвет — из темы (AccentGlow,
             PurpleGlow), потому идут со всякой темой. Размытие макета (blur 90)
@@ -117,8 +126,8 @@
                    Opacity="{DynamicResource BackdropDecoOpacity}">
             <Rectangle.Fill>
                 <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.75" RadiusY="0.8">
-                    <GradientStop Color="Transparent" Offset="0.55" />
-                    <GradientStop Color="#66000000" Offset="1" />
+                    <GradientStop Color="Transparent" Offset="0.5" />
+                    <GradientStop Color="#D9000000" Offset="1" />
                 </RadialGradientBrush>
             </Rectangle.Fill>
         </Rectangle>
@@ -217,7 +226,12 @@
             -->
             <views:LogConsole x:Name="LogOverlay" Panel.ZIndex="{StaticResource ZTop}" />
 
-            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,68">
+            <!--
+                Всплывающие карточки — выше кнопки журнала: уведомление
+                важнее, и стоять под таблеткой оно не должно.
+            -->
+            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,68"
+                        Panel.ZIndex="90">
 
                 <!--
                     После обновления: звезда на GitHub и канал. Один раз на каждую

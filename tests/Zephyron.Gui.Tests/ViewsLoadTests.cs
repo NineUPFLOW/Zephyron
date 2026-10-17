@@ -39,6 +39,7 @@ public sealed class ViewsLoadTests
         { "Оформление", () => new AppearanceView() },
         { "Прочее", () => new MoreView() },
         { "Первый запуск", () => new OnboardingView() },
+        { "Журнал поверх окна", () => new LogConsole() },
     };
 
     /// <param name="name">
