@@ -60,7 +60,7 @@
                             Visibility="{Binding ApplyShown}" />
 
                     <Border Grid.Column="2" MinWidth="122" CornerRadius="10" Padding="18,8"
-                            BorderBrush="{DynamicResource Accent}" BorderThickness="1.5"
+                            BorderBrush="{DynamicResource Accent}" BorderThickness="1"
                             VerticalAlignment="Center" Visibility="{Binding MarkShown}">
                         <TextBlock Text="Выбран" FontWeight="SemiBold" HorizontalAlignment="Center"
                                    Foreground="{DynamicResource Accent}" />

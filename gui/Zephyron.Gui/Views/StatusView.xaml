@@ -259,11 +259,15 @@
                     и метки движков с шестернями. Одной карточкой во всю ширину,
                     как в макете.
                 -->
-                <Border Style="{StaticResource MockCard}" Margin="0,0,0,16" Padding="24,20">
+                <Border Style="{StaticResource MockCard}" Margin="0,0,0,16" Padding="24,18,24,18">
                     <StackPanel>
-                        <TextBlock Style="{StaticResource CardTitle}" Text="Режим работы ZY" Margin="4,0,0,10" />
+                        <Grid Margin="4,0,4,10">
+                            <TextBlock Style="{StaticResource CardTitle}" Text="Режим работы ZY" />
+                            <TextBlock x:Name="ModeTag" Style="{StaticResource CardTitle}" FontFamily="{DynamicResource MonoFont}"
+                                       HorizontalAlignment="Right" Text="" />
+                        </Grid>
 
-                        <Grid Margin="0,0,0,16">
+                        <Grid Margin="0,0,0,14">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="8" />
@@ -276,7 +280,8 @@
                                          GroupName="WorkMode" Tag="Desync" Click="OnMode">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <TextBlock Style="{StaticResource LineGlyph}" FontSize="16" Text="&#xE9E9;"
-                                               Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
+                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                               Margin="0,0,9,0" />
                                     <TextBlock x:Name="ModeDesyncName" FontWeight="SemiBold" FontSize="14.5" VerticalAlignment="Center" />
                                     <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                                     Content="winws2: вмешивается в рукопожатие TLS так, что фильтр оператора не опознаёт имя. Трафик идёт напрямую, своим обычным путём, и адрес остаётся домашним.&#x0a;&#x0a;Лечит блокировки по имени и не лечит отказы по стране: сайт видит тот же адрес, что и без него." />
@@ -287,7 +292,8 @@
                                          GroupName="WorkMode" Tag="Tunnel" Click="OnMode">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <TextBlock Style="{StaticResource LineGlyph}" FontSize="16" Text="&#xE774;"
-                                               Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
+                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                               Margin="0,0,9,0" />
                                     <TextBlock x:Name="ModeTunnelName" FontWeight="SemiBold" FontSize="14.5" VerticalAlignment="Center" />
                                     <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                                     Content="sing-box: поднимает сетевой адаптер и уводит через него трафик. Адрес становится зарубежным, и это лечит отказы по стране.&#x0a;&#x0a;В этом режиме забирает всё, кроме поставленного «напрямую», — как обычный VPN. Без исключений (настройки туннеля) — вообще всё.&#x0a;&#x0a;Требует подписки или WARP: без них поднимать нечего." />
@@ -298,7 +304,8 @@
                                          GroupName="WorkMode" Tag="Route" Click="OnMode">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <TextBlock Style="{StaticResource LineGlyph}" FontSize="16" Text="&#xE8AB;"
-                                               Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
+                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
+                                               Margin="0,0,9,0" />
                                     <TextBlock x:Name="ModeRouteName" FontWeight="SemiBold" FontSize="14.5" VerticalAlignment="Center" />
                                     <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                                     Content="Оба движка сразу. Что названо в маршрутах «через VPN», уходит в туннель; остальное идёт напрямую, и закрытое по имени чинит десинк.&#x0a;&#x0a;Адрес для сайтов из маршрутов — зарубежный, для прочих — домашний: российские сервисы не видят VPN." />
@@ -313,7 +320,7 @@
                             </Grid.ColumnDefinitions>
 
                             <TextBlock x:Name="ModeText" Style="{StaticResource Caption}" VerticalAlignment="Center"
-                                       TextWrapping="Wrap" MaxWidth="56" Text="" Margin="4,0,16,0" />
+                                       TextWrapping="Wrap" MaxWidth="560" Text="" Margin="4,0,16,0" />
 
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                 <Border x:Name="DesyncChip" Style="{StaticResource EnginePill}">
@@ -508,21 +515,13 @@
                         </Grid>
                     </Border>
 
+                    <!--
+                        Панель обновления сама несёт значок и заголовок
+                        (UpdatePanel): своей плитки и заголовка карточка
+                        не заводит, иначе значок стоял бы дважды.
+                    -->
                     <Border Grid.Column="2" Style="{StaticResource MockCard}" local:Lift.IsOn="True">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <Border Grid.Column="0" Style="{StaticResource IconTile}" Width="34" Height="34" Margin="0,0,14,0"
-                                    Background="{DynamicResource OkSoft}" BorderBrush="{DynamicResource Ok}">
-                                <TextBlock Style="{StaticResource TileGlyph}" FontSize="16" Text="&#xE896;"
-                                           Foreground="{DynamicResource Ok}" />
-                            </Border>
-
-                            <views:UpdatePanel Grid.Column="1" x:Name="Updates" />
-                        </Grid>
+                        <views:UpdatePanel x:Name="Updates" />
                     </Border>
                 </Grid>
 

@@ -557,16 +557,16 @@
         оставлен кнопкам, а в меню его только четверть силы — иначе на
         голубом пункте пропадала разница с нажатой кнопкой.
     -->
-    <Style x:Key="RailItem" TargetType="RadioButton">
+    <Style x:Key="RailItem" TargetType="ToggleButton">
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
-                <ControlTemplate TargetType="RadioButton">
+                <ControlTemplate TargetType="ToggleButton">
                     <Grid>
                         <Border x:Name="Shape" Background="Transparent"
                                 CornerRadius="{StaticResource RSm}"
                                 BorderThickness="{StaticResource Stroke}" BorderBrush="Transparent"
-                                Padding="12,7">
+                                Padding="16,9">
                             <StackPanel Orientation="Horizontal">
                                 <!--
                                     Значок (MenuIcon.cs). Колонка постоянной ширины:
@@ -575,15 +575,15 @@
                                 -->
                                 <TextBlock x:Name="Glyph"
                                            Text="{Binding (local:MenuIcon.Glyph), RelativeSource={RelativeSource TemplatedParent}}"
-                                           FontFamily="{DynamicResource IconFont}" FontSize="14"
-                                           Width="16" Margin="0,0,7,0" TextAlignment="Center"
+                                           FontFamily="{DynamicResource IconFont}" FontSize="15"
+                                           Width="17" Margin="0,0,8,0" TextAlignment="Center"
                                            VerticalAlignment="Center"
                                            Foreground="{DynamicResource Faint}" />
 
                                 <TextBlock x:Name="Label"
                                            Text="{TemplateBinding Content}"
                                            Foreground="{DynamicResource Muted}"
-                                           FontSize="12" VerticalAlignment="Center" />
+                                           FontSize="13" VerticalAlignment="Center" />
 
                                 <!-- Точка «есть новое» (RailBadge.cs). -->
                                 <Ellipse x:Name="Badge" Width="7" Height="7" Margin="8,1,0,0"
@@ -654,7 +654,7 @@
         <Setter Property="Background" Value="{DynamicResource Raised}" />
         <Setter Property="Foreground" Value="{DynamicResource Text}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
-        <Setter Property="BorderThickness" Value="1.5" />
+        <Setter Property="BorderThickness" Value="{StaticResource Stroke}" />
         <Setter Property="Padding" Value="12,9" />
         <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
         <Setter Property="FontSize" Value="12" />
@@ -767,7 +767,7 @@
     <Style x:Key="SettingsGroup" TargetType="Border">
         <Setter Property="Background" Value="{DynamicResource Surface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
-        <Setter Property="BorderThickness" Value="1.5" />
+        <Setter Property="BorderThickness" Value="{StaticResource Stroke}" />
         <Setter Property="CornerRadius" Value="14" />
         <Setter Property="local:Glass.IsOn" Value="True" />
     </Style>
@@ -796,6 +796,14 @@
         <Setter Property="CornerRadius" Value="{StaticResource RLg}" />
         <Setter Property="Padding" Value="{StaticResource PillPad}" />
         <Setter Property="local:Glass.IsOn" Value="True" />
+        <!-- Тень карточки (макет, shadow-2): таблетка парит над содержимым.
+             Мягче макетной — у него тень рассчитана на браузер, где она
+             почти не стоит кадров. -->
+        <Setter Property="Effect">
+            <Setter.Value>
+                <DropShadowEffect BlurRadius="24" ShadowDepth="6" Direction="270" Opacity="0.45" Color="Black" />
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- Знак программы: плитка с рисунком, как .brand-mark в макете. -->
@@ -818,22 +826,22 @@
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Foreground" Value="{DynamicResource Muted}" />
         <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
-        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontSize" Value="13" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
                     <Border x:Name="Shape" Background="Transparent"
                             CornerRadius="{StaticResource RSm}"
                             BorderThickness="{StaticResource Stroke}" BorderBrush="Transparent"
-                            Padding="12,7">
+                            Padding="16,9">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock x:Name="Glyph" Text="&#xE712;" FontFamily="{DynamicResource IconFont}"
-                                       FontSize="14" Width="16" Margin="0,0,7,0" TextAlignment="Center"
+                                       FontSize="15" Width="17" Margin="0,0,8,0" TextAlignment="Center"
                                        VerticalAlignment="Center" Foreground="{DynamicResource Faint}" />
                             <TextBlock x:Name="Label" Text="{TemplateBinding Content}"
-                                       Foreground="{DynamicResource Muted}" FontSize="12" VerticalAlignment="Center" />
+                                       Foreground="{DynamicResource Muted}" FontSize="13" VerticalAlignment="Center" />
                             <TextBlock x:Name="Chev" Text="&#xE70D;" FontFamily="{DynamicResource IconFont}"
-                                       FontSize="9" Margin="5,1,0,0" VerticalAlignment="Center"
+                                       FontSize="10" Margin="6,1,0,0" VerticalAlignment="Center"
                                        Foreground="{DynamicResource Muted}" />
                         </StackPanel>
                     </Border>
@@ -871,11 +879,12 @@
         Пункт выпадающего меню (макет, .nav-more-i): строка со значком,
         подсветка мягким акцентом под курсором.
     -->
-    <Style x:Key="NavMenuItem" TargetType="RadioButton">
+    <Style x:Key="NavMenuItem" TargetType="ToggleButton">
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="Template">
             <Setter.Value>
-                <ControlTemplate TargetType="RadioButton">
+                <ControlTemplate TargetType="ToggleButton">
                     <Border x:Name="Shape" Background="Transparent"
                             CornerRadius="{StaticResource RSm}" Padding="12,9">
                         <StackPanel Orientation="Horizontal">
@@ -895,6 +904,7 @@
                             <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Accent}" />
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentSoft}" />
                             <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Accent}" />
                             <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Accent}" />
                         </Trigger>
@@ -938,27 +948,44 @@
     <Style x:Key="Switch" TargetType="ToggleButton">
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Focusable" Value="False" />
-        <Setter Property="Width" Value="42" />
-        <Setter Property="Height" Value="24" />
+        <!-- Размер закреплён, а не «по месту»: тумблер — это форма, а не
+             растягиваемая плашка. Прежде ширина задавалась, а высота нет,
+             и в колонке на всю строку тумблер вытягивался в высокий овал —
+             владелец 16.10: «почему они овальные, это выглядит убого».
+             Теперь и ширина, и высота свои, и оба выравнивания — центр. -->
+        <Setter Property="Width" Value="38" />
+        <Setter Property="Height" Value="22" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
+                    <!--
+                        Дорожка — цветом поверхности (макет: rgba(255,255,255,.06)
+                        над тёмным), в покое кружок серый, во включённом —
+                        мягкий акцент с голубым кружком и свечением. Как .sw
+                        в макете.
+                    -->
                     <Border x:Name="Track" CornerRadius="{StaticResource RPill}"
-                            Background="{DynamicResource Raised}"
+                            Background="{DynamicResource Surface}"
                             BorderBrush="{DynamicResource Border}"
                             BorderThickness="{StaticResource Stroke}">
-                        <Ellipse x:Name="Knob" Width="18" Height="18"
+                        <Ellipse x:Name="Knob" Width="16" Height="16"
                                  HorizontalAlignment="Left" Margin="2,0,0,0"
-                                 Fill="{DynamicResource Muted}" />
+                                 Fill="{DynamicResource Faint}" />
                     </Border>
 
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Track" Property="Background" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentSoft}" />
                             <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource Accent}" />
                             <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
                             <Setter TargetName="Knob" Property="Margin" Value="0,0,2,0" />
-                            <Setter TargetName="Knob" Property="Fill" Value="White" />
+                            <Setter TargetName="Knob" Property="Fill" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Knob" Property="Effect">
+                                <Setter.Value>
+                                    <DropShadowEffect ShadowDepth="0" BlurRadius="10" Opacity="0.7"
+                                                      Color="{DynamicResource AccentColor}" />
+                                </Setter.Value>
+                            </Setter>
                         </Trigger>
 
                         <Trigger Property="IsMouseOver" Value="True">

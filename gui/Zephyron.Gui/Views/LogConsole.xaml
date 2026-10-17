@@ -1,0 +1,71 @@
+<UserControl x:Class="Zephyron.Gui.Views.LogConsole"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Zephyron.Gui"
+             Focusable="False">
+
+    <!--
+        Журнал поверх окна (макет, .log-con + .log-fab): плавающая кнопка
+        внизу справа, консоль выезжает из-под нижнего края. Стоит поверх
+        всякого раздела — журнал читают, глядя на то, о чём он пишет,
+        и уводить человека в отдельное окно значило бы разрывать взгляд.
+        Отдельное окно (LogWindow) остаётся у «Диагностики»: там журнал
+        разбирают, а не поглядывают.
+    -->
+    <Grid>
+        <!-- Консоль: прижата к низу, скрыта сдвигом на свою высоту. -->
+        <Border x:Name="Console" Height="220" VerticalAlignment="Bottom"
+                Background="{DynamicResource RailFill}"
+                BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0"
+                local:Glass.IsOn="True" RenderTransformOrigin="0.5,1">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="Slide" Y="220" />
+            </Border.RenderTransform>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" BorderBrush="{DynamicResource Border}" BorderThickness="0,0,0,1"
+                        Padding="16,9">
+                    <Grid>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Ellipse Width="5" Height="5" Fill="{DynamicResource Ok}" VerticalAlignment="Center" />
+                            <TextBlock Text="журнал событий" Margin="8,0,0,0"
+                                       FontFamily="{DynamicResource UiFont}" FontSize="10"
+                                       Foreground="{DynamicResource Faint}" />
+                        </StackPanel>
+
+                        <Button Grid.Column="1" Style="{StaticResource IconGhost}" Content="&#xE74D;"
+                                HorizontalAlignment="Right" Padding="6,4" MinWidth="0"
+                                Click="OnClear" ToolTip="Очистить" />
+                    </Grid>
+                </Border>
+
+                <ScrollViewer x:Name="Scroller" Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                              Padding="16,8">
+                    <ItemsControl x:Name="Lines" />
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <!-- Кнопка журнала: поднимается над открытой консолью (макет, .log-fab.is-open). -->
+        <Button x:Name="Fab" Style="{StaticResource LogFab}"
+                HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,20,20"
+                Click="OnToggle" ToolTip="Журнал событий">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock x:Name="FabGlyph" Style="{StaticResource LineGlyph}" Text="&#xE70D;"
+                           FontSize="12" VerticalAlignment="Center" />
+                <TextBlock x:Name="FabText" Text="Журнал" Margin="8,0,0,0" VerticalAlignment="Center" />
+                <Border x:Name="FabCount" Margin="8,0,0,0" CornerRadius="{StaticResource RSm}"
+                        Background="{DynamicResource AccentSoft}" Padding="7,1" VerticalAlignment="Center">
+                    <TextBlock x:Name="FabCountText" Text="0"
+                               FontFamily="{DynamicResource MonoFont}" FontSize="10"
+                               Foreground="{DynamicResource Accent}" />
+                </Border>
+            </StackPanel>
+        </Button>
+    </Grid>
+</UserControl>

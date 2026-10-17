@@ -63,12 +63,34 @@ public partial class AppearanceView : UserControl
     private void ShowAnimations(AppSettings settings)
     {
         AnimationsSwitch.IsChecked = settings.Animations;
+        ParticlesSwitch.IsChecked = settings.Particles;
 
         // Выключены в Windows — наш выключатель ничего не решает, и сказать
         // это надо здесь же, а не оставлять человека щёлкать без толку.
         if (!SystemParameters.ClientAreaAnimation)
             AnimationsNote.Text = "Выключены в самой Windows (Параметры → Специальные возможности → "
                 + "Визуальные эффекты) — пока они там выключены, окно не анимирует ничего.";
+    }
+
+    /// <summary>Частицы фона: сохраняет и просит окно переложить фон.</summary>
+    private void OnParticles(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
+            var next = settings with { Particles = !settings.Particles };
+
+            next.Save(AppSettings.DefaultPath);
+            ShowAnimations(next);
+
+            // Окно перекладывает фон по этому событию: точки встают или гаснут
+            // сразу, а не со следующего запуска.
+            Themes.ParticlesChanged();
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Не удалось сохранить: " + ex.GetBaseException().Message;
+        }
     }
 
     private void OnHomeWidth(object sender, RoutedEventArgs e)

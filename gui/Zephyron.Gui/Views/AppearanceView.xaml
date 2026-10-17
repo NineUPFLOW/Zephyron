@@ -154,7 +154,7 @@
                             </Button>
 
                             <Border x:Name="DimRow" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}"
-                                    BorderThickness="1.5" CornerRadius="14" Padding="16,11">
+                                    BorderThickness="1" CornerRadius="14" Padding="16,11">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
@@ -249,6 +249,28 @@
                                                Text="Разделы появляются плавно, карточки — по очереди, уведомления выезжают снизу, в мастере бегут точки. Выключенные — всё показывается сразу." />
                                 </StackPanel>
                                 <ToggleButton Grid.Column="1" x:Name="AnimationsSwitch" Style="{StaticResource Switch}"
+                                              IsHitTestVisible="False" Focusable="False" VerticalAlignment="Center" />
+                            </Grid>
+                        </Button>
+
+                        <!--
+                            Частицы фона (владелец, 16.10: «где частицы?
+                            также возможность их отключать тоже должна быть»).
+                            Отдельно от анимаций: точки двигаются постоянно,
+                            а не коротким движением при появлении.
+                        -->
+                        <Button Style="{StaticResource Choice}" Click="OnParticles" Margin="0,0,0,7">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Частицы фона" FontWeight="SemiBold" />
+                                    <TextBlock Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap"
+                                               Text="Светящиеся точки всплывают по всему окну. Видны у тем без своей картинки: под фоном темы они были бы второй жизнью поверх первой." />
+                                </StackPanel>
+                                <ToggleButton Grid.Column="1" x:Name="ParticlesSwitch" Style="{StaticResource Switch}"
                                               IsHitTestVisible="False" Focusable="False" VerticalAlignment="Center" />
                             </Grid>
                         </Button>

@@ -42,6 +42,27 @@ public static class Themes
     public static bool WideHome { get; private set; }
 
     /// <summary>
+    /// У применённой темы нет своего фона, и виден узор окна — сетка,
+    /// свечения и частицы (макет, .bg). Частицы спрашивают это у темы,
+    /// а не у словаря ресурсов: словарей в окне несколько, и ключ пришлось бы
+    /// искать по всем.
+    /// </summary>
+    public static bool BackdropDeco { get; private set; } = true;
+
+    /// <summary>
+    /// Тема применилась — фон окна перекладывается заново.
+    /// </summary>
+    /// <remarks>
+    /// Частицы и узор живут только у темы без своего фона (<see cref="BackdropDeco"/>),
+    /// а тема меняется вживую из «Оформления»: без события точки остались бы
+    /// идти поверх картинки новой темы или стоять на встроенной.
+    /// </remarks>
+    public static event EventHandler? Applied;
+
+    /// <summary>Настройка «Частицы» сменилась — фон окна перекладывается заново.</summary>
+    public static void ParticlesChanged() => Applied?.Invoke(null, EventArgs.Empty);
+
+    /// <summary>
     /// Применяет тему по имени папки; при отказе — встроенную из XAML.
     /// </summary>
     /// <summary>
@@ -61,6 +82,8 @@ public static class Themes
         Glass.Set(null, System.Windows.Media.Stretch.UniformToFill);
         BackdropVideo.Take(builtIn);
         Current = DefaultId;
+        BackdropDeco = true;
+        Applied?.Invoke(null, EventArgs.Empty);
     }
 
     public static ThemeApplied Apply(string? id, AppSettings? settings = null)
@@ -94,6 +117,8 @@ public static class Themes
                     BackdropVideo.Take(dictionary);
                     Current = wanted;
                     WideHome = theme.HomeFullWidth;
+                    BackdropDeco = theme.Background is null || !look.Background;
+                    Applied?.Invoke(null, EventArgs.Empty);
                     return new ThemeApplied(wanted, true, []);
                 }
 
@@ -124,6 +149,8 @@ public static class Themes
         BackdropVideo.Take(builtIn);
         Current = fallback == LightPath ? "light" : DefaultId;
         WideHome = false;
+        BackdropDeco = true;
+        Applied?.Invoke(null, EventArgs.Empty);
 
         return new ThemeApplied(wanted, false, problems);
     }
@@ -154,6 +181,8 @@ public static class Themes
                 Swap(dictionary);
                 Glass.Set(dictionary["GlassImage"] as ImageSource, System.Windows.Media.Stretch.UniformToFill);
                 BackdropVideo.Take(dictionary);
+                BackdropDeco = dictionary["BackdropDecoOpacity"] is double shown && shown >= 1;
+                Applied?.Invoke(null, EventArgs.Empty);
             }
             else
             {
@@ -227,6 +256,44 @@ public static class Themes
             dictionary[key + "Color"] = ToColor(tint);
             dictionary[key] = Frozen(new SolidColorBrush(ToColor(tint)));
         }
+
+        // «Черты» макета (--accent-line и прочие): тот же цвет, но бледнее
+        // заливки. Ими обведены кнопка питания, метки состояния и баннеры.
+        // Доли взяты у макета: акцент — 38 %, зелёный и жёлтый — 28 %,
+        // красный — 34 %. Выводятся из цвета темы, чтобы чужая тема получила
+        // свои оттенки, а не наши.
+        foreach (var (key, slot, share) in new[]
+                 {
+                     ("AccentLine", ThemeSlots.Accent, 0.38),
+                     ("OkLine", ThemeSlots.Accent, 0.28),
+                     ("WarnLine", ThemeSlots.Warn, 0.28),
+                     ("ErrLine", ThemeSlots.Danger, 0.34),
+                 })
+        {
+            var source = key == "OkLine" ? ok : theme[slot];
+            var line = source with { A = (byte)Math.Round(255 * share) };
+
+            dictionary[key + "Color"] = ToColor(line);
+            dictionary[key] = Frozen(new SolidColorBrush(ToColor(line)));
+        }
+
+        // Узор фона макета (сетка, свечения) и заливки баннеров — из цветов
+        // темы, а не из литералов: на светлой теме сетка обязана быть тёмной,
+        // иначе её не видно вовсе.
+        dictionary["BackdropGridColor"] = ToColor(theme[ThemeSlots.Text] with { A = 6 });
+        dictionary["BackdropGrid"] = Frozen(new SolidColorBrush(ToColor(theme[ThemeSlots.Text] with { A = 6 })));
+
+        dictionary["AccentGlowColor"] = ToColor(theme[ThemeSlots.Accent] with { A = 26 });
+        dictionary["AccentGlow"] = Frozen(new SolidColorBrush(ToColor(theme[ThemeSlots.Accent] with { A = 26 })));
+
+        dictionary["PurpleGlowColor"] = ToColor(purple with { A = 23 });
+        dictionary["PurpleGlow"] = Frozen(new SolidColorBrush(ToColor(purple with { A = 23 })));
+
+        dictionary["BannerAccentColor"] = ToColor(theme[ThemeSlots.Accent] with { A = 11 });
+        dictionary["BannerAccent"] = Frozen(new SolidColorBrush(ToColor(theme[ThemeSlots.Accent] with { A = 11 })));
+
+        dictionary["BannerWarnColor"] = ToColor(theme[ThemeSlots.Warn] with { A = 10 });
+        dictionary["BannerWarn"] = Frozen(new SolidColorBrush(ToColor(theme[ThemeSlots.Warn] with { A = 10 })));
 
         // Шрифт человека — один на всю программу (владелец, 24.09: «лучше
         // было бы, если бы на всю программу был один шрифт»): интерфейс,
@@ -320,6 +387,11 @@ public static class Themes
 
             dictionary["BackdropDim"] = dim;
 
+            // Узор макета (сетка, свечения) под своим фоном не рисуется:
+            // два фона разом — каша. Узор — вид по умолчанию, а не надстройка
+            // над картинкой темы.
+            dictionary["BackdropDecoOpacity"] = 0.0;
+
             // Разделы прозрачные: под ними тот же фон, что под всем окном
             // (владелец, 23.09: «давай попробуем и под боковым меню»).
             dictionary["Chrome"] = Frozen(new SolidColorBrush(Colors.Transparent));
@@ -364,6 +436,7 @@ public static class Themes
             dictionary["BackdropImage"] = Frozen(new SolidColorBrush(Colors.Transparent));
             dictionary["SideArt"] = Frozen(new SolidColorBrush(Colors.Transparent));
             dictionary["BackdropDim"] = 1.0;
+            dictionary["BackdropDecoOpacity"] = 1.0;
             dictionary["Chrome"] = backdrop;
             dictionary["RailFill"] = backdrop;
         }

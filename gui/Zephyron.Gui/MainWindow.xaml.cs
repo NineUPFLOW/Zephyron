@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Interop;
 using System.Windows.Threading;
 using Zephyron.Core;
@@ -32,6 +33,13 @@ public partial class MainWindow : Window
         Motion.Mark(Mark);
         ShowOnboardingIfNeeded();
         Loaded += (_, _) => ShowGreetingIfDue();
+
+        // Частицы фона (Particles.cs): раскладываются по ширине окна при
+        // первом показе и при каждой смене темы — у темы со своим фоном
+        // они гаснут, у встроенной снова идут.
+        ParticleField.SizeChanged += (_, _) => ParticleField.Start();
+        ParticleField.Loaded += (_, _) => ParticleField.Start();
+        Themes.Applied += (_, _) => ParticleField.Start();
 
         SourceInitialized += (_, _) =>
         {
@@ -252,7 +260,7 @@ public partial class MainWindow : Window
     /// </remarks>
     public void RestartOnboarding()
     {
-        RailStatus.IsChecked = true;
+        MarkSection("status");
         ShowOnboarding();
     }
 
@@ -354,12 +362,57 @@ public partial class MainWindow : Window
     {
         // Отрабатывает и при разборе разметки, когда Section ещё не создан:
         // IsChecked="True" у первого пункта поднимает событие раньше времени.
-        if (Section is null || sender is not RadioButton { Tag: string name })
+        if (Section is null || sender is not ToggleButton { Tag: string name })
+            return;
+
+        // Отметка — только на одном пункте: и в полосе сверху, и в меню
+        // «Ещё» (ToggleButton групп не знает, и без этого отметились бы
+        // оба — макет отмечает раздел, где вы есть, а не где были).
+        MarkSection(name);
+
+        // Меню «Ещё» закрывается выбором: иначе оно осталось бы висеть
+        // поверх открытого раздела.
+        MoreToggle.IsChecked = false;
+
+        Show(name, (sender as ToggleButton)?.Content as string);
+    }
+
+    /// <summary>
+    /// Отмечает выбранным пункт с этим разделом — в полосе сверху или
+    /// в меню «Ещё», снимая отметку со всех прочих.
+    /// </summary>
+    /// <remarks>
+    /// Единственное место, где ставится отметка. Пунктов тринадцать в двух
+    /// контейнерах, и всякий, кто отметил бы себя сам, оставил бы отмеченным
+    /// и прежний раздел: подсветка показывала бы «Главную», когда видно
+    /// «Проверку блокировок».
+    /// </remarks>
+    private void MarkSection(string section)
+    {
+        foreach (var item in NavItems())
+            item.IsChecked = item.Tag as string == section;
+    }
+
+    /// <summary>Все пункты разделов — и полоса сверху, и меню «Ещё».</summary>
+    private IEnumerable<ToggleButton> NavItems() =>
+        Rail.Children.OfType<ToggleButton>().Concat(NavMore.Children.OfType<ToggleButton>());
+
+    /// <summary>
+    /// Показывает раздел: создаёт его и ставит на место прежнего.
+    /// </summary>
+    /// <remarks>
+    /// Отдельно от <see cref="OnSection"/>: тот отвечает на щелчок и на
+    /// отметку, а сюда приходят и без щелчка — по имени раздела, из быстрых
+    /// действий «Главной» и из уведомлений.
+    /// </remarks>
+    private void Show(string name, string? title = null)
+    {
+        if (Section is null)
             return;
 
         // Для сторожа подвисаний: к разделу, который открывают, и привязывается
         // задержка — создание раздела и есть частая её причина.
-        UiStallWatch.Section = (sender as RadioButton)?.Content as string ?? name;
+        UiStallWatch.Section = title ?? name;
 
         // Ушли из мастера в другой раздел — он закрыт, как «Пропустить».
         (Section.Content as OnboardingView)?.Leave();
@@ -388,6 +441,25 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// Выбор раздела из меню «Ещё»: отмечает пункт, закрывает меню и
+    /// открывает раздел — тем же <see cref="OnSection"/>.
+    /// </summary>
+    /// <remarks>
+    /// Снятие отметки с нажатого пункта до перехода — нарочное. ToggleButton
+    /// по нажатию себя переключает, и пункт, который уже был отмечен, гас бы
+    /// до того, как <see cref="OnSection"/> поставит отметку заново; при
+    /// переходе в другой раздел гасли бы оба разом, и на кадр подсветки
+    /// не было бы вовсе.
+    /// </remarks>
+    private void OnMorePick(object sender, RoutedEventArgs e)
+    {
+        if (sender is ToggleButton item)
+            item.IsChecked = false;
+
+        OnSection(sender, e);
+    }
+
+    /// <summary>
     /// Открывает раздел по имени из <c>Tag</c> пункта меню — для быстрых
     /// действий «Главной».
     /// </summary>
@@ -398,11 +470,15 @@ public partial class MainWindow : Window
     /// </remarks>
     public void Open(string section)
     {
-        foreach (var item in Rail.Children.OfType<RadioButton>())
+        foreach (var item in NavItems())
         {
             if (item.Tag as string == section)
             {
-                item.IsChecked = true;
+                // Отметка снимается перед переходом: щелчка не было, и пункт
+                // остался бы отмеченным, если уже был. Переход идёт тем же
+                // путём, что и щелчок, — с отметкой и сменой раздела разом.
+                item.IsChecked = false;
+                OnSection(item, new RoutedEventArgs());
                 return;
             }
         }

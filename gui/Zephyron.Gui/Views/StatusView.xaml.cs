@@ -1370,6 +1370,16 @@ public partial class StatusView : UserControl
         ModeTunnelName.Text = WorkModes.Name(WorkMode.Tunnel);
         ModeRouteName.Text = WorkModes.Name(WorkMode.Route);
 
+        // Метка у заголовка (макет, .panel-tag): чем режим поднимается.
+        // Те же слова, что в макете: движки, а не наше имя режима.
+        ModeTag.Text = mode switch
+        {
+            WorkMode.Desync => "desync · winws2",
+            WorkMode.Tunnel => "tunnel · sing-box",
+            WorkMode.Route => "route · winws2 + sing-box",
+            _ => "режим не выбран",
+        };
+
         // Пояснение — выбранного режима. «Без исключений» — настройка внутри
         // «Туннеля»: включённая, она меняет смысл режима, и молчать о ней нельзя.
         ModeText.Text = mode is not { } chosen
@@ -1688,7 +1698,7 @@ public partial class StatusView : UserControl
         }
         else
         {
-            ContentColumn.MaxWidth = 940;
+            ContentColumn.MaxWidth = 1080;
             ArtColumn.Width = new GridLength(1, GridUnitType.Star);
             ArtLayer.Visibility = Visibility.Visible;
             SetResourceReference(BackgroundProperty, "Backdrop");

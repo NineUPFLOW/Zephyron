@@ -64,6 +64,35 @@
     <Color x:Key="ErrSoftColor">#1AF43F5E</Color>
     <Color x:Key="PurpleSoftColor">#1FA855F7</Color>
 
+    <!--
+        «Черты» макета (accent-line, ok-line и прочие): тот же цвет, но
+        прозрачнее заливки. Ими обведены кнопка питания, метки состояния
+        и баннеры — у макета рамка всегда мягче заливки, иначе элемент
+        читается как нажатый. Значения — доли от цвета: 38 % у акцента,
+        28 % у зелёного и жёлтого, 34 % у красного.
+    -->
+    <Color x:Key="AccentLineColor">#6122D3EE</Color>
+    <Color x:Key="OkLineColor">#4710B981</Color>
+    <Color x:Key="WarnLineColor">#47FBBF24</Color>
+    <Color x:Key="ErrLineColor">#57F43F5E</Color>
+
+    <!--
+        Узор фона макета (.bg-grid, .glow-1/.glow-2). Сетка — цветом текста
+        в два с лишним процента: на тёмной теме это светлые волосяные линии,
+        на светлой — тёмные, и узор виден в обеих. Свечения — акцентом
+        и сиреневым в десятую долю силы. Тема со своим фоном узор не рисует:
+        он часть вида по умолчанию, а не всякой темы (Themes.Build кладёт
+        BackdropDeco).
+    -->
+    <Color x:Key="BackdropGridColor">#06EEF1F7</Color>
+    <Color x:Key="AccentGlowColor">#1A22D3EE</Color>
+    <Color x:Key="PurpleGlowColor">#17A855F7</Color>
+
+    <!-- Заливки баннеров (banner accent, banner warn): цвет в четыре
+         с половиной процента — заметно как оттенок, не как плашка. -->
+    <Color x:Key="BannerAccentColor">#0B22D3EE</Color>
+    <Color x:Key="BannerWarnColor">#0AFBBF24</Color>
+
     <SolidColorBrush x:Key="Backdrop" Color="{StaticResource BackdropColor}" />
     <SolidColorBrush x:Key="Surface" Color="{StaticResource SurfaceColor}" />
     <SolidColorBrush x:Key="Raised" Color="{StaticResource RaisedColor}" />
@@ -90,6 +119,17 @@
     <SolidColorBrush x:Key="ErrSoft" Color="{StaticResource ErrSoftColor}" />
     <SolidColorBrush x:Key="PurpleSoft" Color="{StaticResource PurpleSoftColor}" />
 
+    <SolidColorBrush x:Key="AccentLine" Color="{StaticResource AccentLineColor}" />
+    <SolidColorBrush x:Key="OkLine" Color="{StaticResource OkLineColor}" />
+    <SolidColorBrush x:Key="WarnLine" Color="{StaticResource WarnLineColor}" />
+    <SolidColorBrush x:Key="ErrLine" Color="{StaticResource ErrLineColor}" />
+
+    <SolidColorBrush x:Key="BackdropGrid" Color="{StaticResource BackdropGridColor}" />
+    <SolidColorBrush x:Key="AccentGlow" Color="{StaticResource AccentGlowColor}" />
+    <SolidColorBrush x:Key="PurpleGlow" Color="{StaticResource PurpleGlowColor}" />
+    <SolidColorBrush x:Key="BannerAccent" Color="{StaticResource BannerAccentColor}" />
+    <SolidColorBrush x:Key="BannerWarn" Color="{StaticResource BannerWarnColor}" />
+
     <!--
         Шрифт назван явно. По умолчанию WPF берёт Segoe UI в начертании,
         которое на тёмном фоне выглядит тоньше, чем задумано, — а цифры
@@ -107,6 +147,13 @@
     -->
     <SolidColorBrush x:Key="BackdropImage" Color="Transparent" />
     <sys:Double x:Key="BackdropDim">1</sys:Double>
+
+    <!--
+        Виден ли узор фона (сетка и свечения макета). Единица — тема своего
+        фона не несёт, и узор рисуется; ноль — у темы своя картинка или видео,
+        и узор под ней был бы кашей из двух фонов (Themes.Build).
+    -->
+    <sys:Double x:Key="BackdropDecoOpacity">1</sys:Double>
     <SolidColorBrush x:Key="Chrome" Color="{StaticResource BackdropColor}" />
     <SolidColorBrush x:Key="RailFill" Color="{StaticResource BackdropColor}" />
     <!-- Арт сбоку на «Главной» (Themes.cs): у встроенных тем картинки нет, колонка пуста. -->

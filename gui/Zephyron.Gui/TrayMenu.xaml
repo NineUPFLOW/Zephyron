@@ -87,7 +87,7 @@
         Подложку карточки (Card.Background) и оттенок (Plate.Background) ставит
         код при каждом показе — по настройкам «Меню в трее» в оформлении.
     -->
-    <Border x:Name="Card" Margin="14" CornerRadius="12" BorderThickness="1.5"
+    <Border x:Name="Card" Margin="14" CornerRadius="12" BorderThickness="1"
             BorderBrush="{DynamicResource Border}" Background="{DynamicResource Surface}"
             LayoutTransform="{DynamicResource UiScaleTransform}">
         <Border.Effect>

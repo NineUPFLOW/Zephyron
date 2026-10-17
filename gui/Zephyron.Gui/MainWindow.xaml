@@ -41,55 +41,86 @@
 
         <!--
             Мягкие сферы по углам (макет, .glow-1/.glow-2): голубая слева
-            вверху, сиреневая справа внизу. Цвет темы, а не картинка, — потому
-            идут со всякой темой. Размытие макета (blur 90) заменено мягким
-            радиальным переходом: тот же вид, но без размытия в реальном
-            времени, которое на слабой видеокарте стоит кадров.
-        -->
-        <Rectangle Grid.RowSpan="2" IsHitTestVisible="False">
-            <Rectangle.Fill>
-                <RadialGradientBrush Center="0,0" GradientOrigin="0,0" RadiusX="0.9" RadiusY="1.2">
-                    <GradientStop Color="#1A22D3EE" Offset="0" />
-                    <GradientStop Color="#0022D3EE" Offset="1" />
-                </RadialGradientBrush>
-            </Rectangle.Fill>
-        </Rectangle>
+            вверху, сиреневая справа внизу. Цвет — из темы (AccentGlow,
+            PurpleGlow), потому идут со всякой темой. Размытие макета (blur 90)
+            заменено мягким радиальным переходом: тот же вид, но без размытия
+            в реальном времени, которое на слабой видеокарте стоит кадров.
 
-        <Rectangle Grid.RowSpan="2" IsHitTestVisible="False">
-            <Rectangle.Fill>
-                <RadialGradientBrush Center="1,1" GradientOrigin="1,1" RadiusX="0.9" RadiusY="1.2">
-                    <GradientStop Color="#17A855F7" Offset="0" />
-                    <GradientStop Color="#00A855F7" Offset="1" />
-                </RadialGradientBrush>
-            </Rectangle.Fill>
-        </Rectangle>
+            Вместе с сеткой ниже сферы составляют узор фона (.bg). Он виден,
+            только когда у темы нет своего фона: Opacity берётся из
+            BackdropDecoOpacity, и под картинкой или видео темы узор пропадает
+            (Themes.Build) — иначе поверх картинки легла бы вторая, чужая.
+        -->
+        <Grid Grid.RowSpan="2" IsHitTestVisible="False"
+              Opacity="{DynamicResource BackdropDecoOpacity}">
+            <Rectangle IsHitTestVisible="False">
+                <Rectangle.Fill>
+                    <RadialGradientBrush Center="0,0" GradientOrigin="0,0" RadiusX="0.9" RadiusY="1.2">
+                        <GradientStop Color="{DynamicResource AccentGlowColor}" Offset="0" />
+                        <GradientStop Color="Transparent" Offset="1" />
+                    </RadialGradientBrush>
+                </Rectangle.Fill>
+            </Rectangle>
+
+            <Rectangle IsHitTestVisible="False">
+                <Rectangle.Fill>
+                    <RadialGradientBrush Center="1,1" GradientOrigin="1,1" RadiusX="0.9" RadiusY="1.2">
+                        <GradientStop Color="{DynamicResource PurpleGlowColor}" Offset="0" />
+                        <GradientStop Color="Transparent" Offset="1" />
+                    </RadialGradientBrush>
+                </Rectangle.Fill>
+            </Rectangle>
+
+            <!--
+                Сетка под всем окном (макет, .bg-grid): волосяные линии через
+                44 точки, растворяющиеся к краям. Растворение — маской, а не
+                цветом линий: у краёв сетка пропадает совсем, как в макете.
+            -->
+            <Rectangle IsHitTestVisible="False">
+                <Rectangle.Fill>
+                    <DrawingBrush TileMode="Tile" Viewport="0,0,44,44" ViewportUnits="Absolute">
+                        <DrawingBrush.Drawing>
+                            <GeometryDrawing>
+                                <GeometryDrawing.Pen>
+                                    <Pen Brush="{DynamicResource BackdropGrid}" Thickness="1" />
+                                </GeometryDrawing.Pen>
+                                <GeometryDrawing.Geometry>
+                                    <RectangleGeometry Rect="0,0,44,44" />
+                                </GeometryDrawing.Geometry>
+                            </GeometryDrawing>
+                        </DrawingBrush.Drawing>
+                    </DrawingBrush>
+                </Rectangle.Fill>
+                <Rectangle.OpacityMask>
+                    <RadialGradientBrush Center="0.5,0.4" GradientOrigin="0.5,0.4" RadiusX="0.7" RadiusY="0.6">
+                        <GradientStop Color="#FF000000" Offset="0.2" />
+                        <GradientStop Color="#00000000" Offset="1" />
+                    </RadialGradientBrush>
+                </Rectangle.OpacityMask>
+            </Rectangle>
+
+            <!--
+                Частицы (макет, .particles/.pt): точки, всплывающие снизу
+                вверх. Рисуются сами (Particles.cs); живут только при
+                выключенном фоне темы — под картинкой они были бы второй
+                жизнью поверх первой.
+            -->
+            <local:Particles x:Name="ParticleField" IsHitTestVisible="False" />
+        </Grid>
 
         <!--
-            Сетка под всем окном (макет, .bg-grid): волосяные линии через 44
-            точки, растворяющиеся к краям. Растворение — маской, а не цветом
-            линий: у краёв сетка пропадает совсем, как в макете.
+            Затемнение по краям окна (макет, .vignette): мягкая тень внутрь,
+            прижимающая взгляд к содержимому. Поверх узора, но под
+            содержимым; мышь не ловит — под ней ничего нет.
         -->
-        <Rectangle Grid.RowSpan="2" IsHitTestVisible="False" Opacity="0.6">
+        <Rectangle Grid.RowSpan="2" IsHitTestVisible="False" Margin="-40"
+                   Opacity="{DynamicResource BackdropDecoOpacity}">
             <Rectangle.Fill>
-                <DrawingBrush TileMode="Tile" Viewport="0,0,44,44" ViewportUnits="Absolute">
-                    <DrawingBrush.Drawing>
-                        <GeometryDrawing>
-                            <GeometryDrawing.Pen>
-                                <Pen Brush="#0AFFFFFF" Thickness="1" />
-                            </GeometryDrawing.Pen>
-                            <GeometryDrawing.Geometry>
-                                <RectangleGeometry Rect="0,0,44,44" />
-                            </GeometryDrawing.Geometry>
-                        </GeometryDrawing>
-                    </DrawingBrush.Drawing>
-                </DrawingBrush>
-            </Rectangle.Fill>
-            <Rectangle.OpacityMask>
-                <RadialGradientBrush Center="0.5,0.4" GradientOrigin="0.5,0.4" RadiusX="0.7" RadiusY="0.6">
-                    <GradientStop Color="#FF000000" Offset="0.2" />
-                    <GradientStop Color="#00000000" Offset="1" />
+                <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.75" RadiusY="0.8">
+                    <GradientStop Color="Transparent" Offset="0.55" />
+                    <GradientStop Color="#66000000" Offset="1" />
                 </RadialGradientBrush>
-            </Rectangle.OpacityMask>
+            </Rectangle.Fill>
         </Rectangle>
 
         <!--
@@ -119,42 +150,51 @@
                         Разделы. Полоса, а не колонка: макет ставит меню
                         сверху. Rail — имя контейнера пунктов; по нему
                         Open() находит нужный пункт и отмечает его.
+
+                        Пункт — ToggleButton, а не RadioButton (16.10). RadioButton
+                        делит отметку по имени группы, и разделы из «Ещё» с полосой
+                        сверху оказывались в двух разных группах: зайдя в «Ещё»,
+                        человек видел отмеченным чужой пункт, а вернуться на
+                        «Главную» не мог — там отметка уже стояла, и щелчок ничего
+                        не поднимал. ToggleButton групп не знает, отметку снимает
+                        OnSection вручную — один источник правды на все пункты.
                     -->
                     <StackPanel x:Name="Rail" Orientation="Horizontal" VerticalAlignment="Center">
-                        <RadioButton x:Name="RailStatus" Style="{StaticResource RailItem}" Content="Главная" Tag="status" local:MenuIcon.Glyph="&#xE80F;" IsChecked="True" Checked="OnSection" />
-                        <RadioButton Style="{StaticResource RailItem}" Content="VPN" Tag="vpn" local:MenuIcon.Glyph="&#xE774;" Checked="OnSection" />
-                        <RadioButton Style="{StaticResource RailItem}" Content="Десинк" Tag="desync" local:MenuIcon.Glyph="&#xE9E9;" Checked="OnSection" />
-                        <RadioButton Style="{StaticResource RailItem}" Content="Маршруты" Tag="routes" local:MenuIcon.Glyph="&#xE816;" Checked="OnSection" />
-                        <RadioButton Style="{StaticResource RailItem}" Content="TG Proxy" Tag="tgproxy" local:MenuIcon.Glyph="&#xE724;" Checked="OnSection" />
+                        <ToggleButton x:Name="RailStatus" Style="{StaticResource RailItem}" Content="Главная" Tag="status" local:MenuIcon.Glyph="&#xE80F;" IsChecked="True" Click="OnSection" />
+                        <ToggleButton Style="{StaticResource RailItem}" Content="VPN" Tag="vpn" local:MenuIcon.Glyph="&#xE774;" Click="OnSection" />
+                        <ToggleButton Style="{StaticResource RailItem}" Content="Десинк" Tag="desync" local:MenuIcon.Glyph="&#xE9E9;" Click="OnSection" />
+                        <ToggleButton Style="{StaticResource RailItem}" Content="Маршруты" Tag="routes" local:MenuIcon.Glyph="&#xE816;" Click="OnSection" />
+                        <ToggleButton Style="{StaticResource RailItem}" Content="TG Proxy" Tag="tgproxy" local:MenuIcon.Glyph="&#xE724;" Click="OnSection" />
 
                         <!--
                             «Ещё» — меню инструментов разбора и настроек,
                             как .nav-more в макете. Открывается по нажатию,
                             закрывается по уходу мыши (StaysOpen=False)
-                            и по выбору пункта.
+                            и по выбору пункта (OnMorePick).
                         -->
                         <ToggleButton x:Name="MoreToggle" Style="{StaticResource NavToggle}" Content="Ещё" />
 
-                        <Popup IsOpen="{Binding IsChecked, ElementName=MoreToggle, Mode=TwoWay}"
+                        <Popup x:Name="MoreMenu" IsOpen="{Binding IsChecked, ElementName=MoreToggle, Mode=TwoWay}"
                                StaysOpen="False" PlacementTarget="{Binding ElementName=MoreToggle}"
-                               Placement="Bottom" AllowsTransparency="True" PopupAnimation="Fade">
+                               Placement="Bottom" AllowsTransparency="True" PopupAnimation="Fade"
+                               VerticalOffset="10">
                             <Border Style="{StaticResource NavMenu}">
                                 <StackPanel x:Name="NavMore">
-                                    <RadioButton Style="{StaticResource NavMenuItem}" Content="Проверка блокировок" Tag="check" local:MenuIcon.Glyph="&#xE721;" Checked="OnSection" />
-                                    <RadioButton Style="{StaticResource NavMenuItem}" Content="Замер скорости" Tag="speed" local:MenuIcon.Glyph="&#xEC4A;" Checked="OnSection" />
-                                    <RadioButton Style="{StaticResource NavMenuItem}" Content="DNS" Tag="dns" local:MenuIcon.Glyph="&#xE968;" Checked="OnSection" />
-                                    <RadioButton Style="{StaticResource NavMenuItem}" Content="Файл hosts" Tag="hosts" local:MenuIcon.Glyph="&#xE8A5;" Checked="OnSection" />
-                                    <RadioButton Style="{StaticResource NavMenuItem}" Content="Наблюдение" Tag="watch" local:MenuIcon.Glyph="&#xE9D2;" Checked="OnSection" />
-                                    <RadioButton Style="{StaticResource NavMenuItem}" Content="Диагностика" Tag="doctor" local:MenuIcon.Glyph="&#xE9D9;" Checked="OnSection" />
+                                    <ToggleButton Style="{StaticResource NavMenuItem}" Content="Проверка блокировок" Tag="check" local:MenuIcon.Glyph="&#xE721;" Click="OnMorePick" />
+                                    <ToggleButton Style="{StaticResource NavMenuItem}" Content="Замер скорости" Tag="speed" local:MenuIcon.Glyph="&#xEC4A;" Click="OnMorePick" />
+                                    <ToggleButton Style="{StaticResource NavMenuItem}" Content="DNS" Tag="dns" local:MenuIcon.Glyph="&#xE968;" Click="OnMorePick" />
+                                    <ToggleButton Style="{StaticResource NavMenuItem}" Content="Файл hosts" Tag="hosts" local:MenuIcon.Glyph="&#xE8A5;" Click="OnMorePick" />
+                                    <ToggleButton Style="{StaticResource NavMenuItem}" Content="Наблюдение" Tag="watch" local:MenuIcon.Glyph="&#xE9D2;" Click="OnMorePick" />
+                                    <ToggleButton Style="{StaticResource NavMenuItem}" Content="Диагностика" Tag="doctor" local:MenuIcon.Glyph="&#xE9D9;" Click="OnMorePick" />
                                     <Border Style="{StaticResource RowLine}" Margin="8,5" />
-                                    <RadioButton Style="{StaticResource NavMenuItem}" Content="Оформление" Tag="look" local:MenuIcon.Glyph="&#xE790;" Checked="OnSection" />
+                                    <ToggleButton Style="{StaticResource NavMenuItem}" Content="Оформление" Tag="look" local:MenuIcon.Glyph="&#xE790;" Click="OnMorePick" />
                                     <!--
                                         Раздел программы (MoreView) звался
                                         «Ещё», как и это меню. Переименован
                                         в «Прочее», иначе «Ещё» открывало бы
                                         меню с пунктом «Ещё».
                                     -->
-                                    <RadioButton Style="{StaticResource NavMenuItem}" Content="Прочее" Tag="more" local:MenuIcon.Glyph="&#xE713;" Checked="OnSection" />
+                                    <ToggleButton Style="{StaticResource NavMenuItem}" Content="Прочее" Tag="more" local:MenuIcon.Glyph="&#xE713;" Click="OnMorePick" />
                                 </StackPanel>
                             </Border>
                         </Popup>
@@ -169,7 +209,15 @@
                 <views:StatusView />
             </ContentControl>
 
-            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24">
+            <!--
+                Журнал поверх окна (макет, .log-con + .log-fab): кнопка внизу
+                справа и выезжающая консоль. Стоит над разделом, а не внутри
+                него: журнал читают, глядя на то, о чём он пишет, и он должен
+                переживать смену раздела.
+            -->
+            <views:LogConsole x:Name="LogOverlay" Panel.ZIndex="{StaticResource ZTop}" />
+
+            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,68">
 
                 <!--
                     После обновления: звезда на GitHub и канал. Один раз на каждую
@@ -179,7 +227,7 @@
                 -->
                 <Border x:Name="GreetingToast" Visibility="Collapsed" MaxWidth="500" Margin="0,0,0,12"
                         Background="{DynamicResource Surface}"
-                        BorderBrush="{DynamicResource Warn}" BorderThickness="1.5"
+                        BorderBrush="{DynamicResource Warn}" BorderThickness="1"
                         CornerRadius="{StaticResource RLg}" Padding="18,15">
                     <StackPanel>
                         <Grid>
@@ -236,7 +284,7 @@
                 -->
                 <Border x:Name="Toast" Visibility="Collapsed" MaxWidth="460"
                         Background="{DynamicResource Surface}"
-                        BorderBrush="{DynamicResource Accent}" BorderThickness="1.5"
+                        BorderBrush="{DynamicResource Accent}" BorderThickness="1"
                         CornerRadius="{StaticResource RLg}" Padding="18,15">
                     <StackPanel>
                         <TextBlock x:Name="ToastTitle" FontWeight="SemiBold" TextWrapping="Wrap" />

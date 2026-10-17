@@ -51,7 +51,7 @@
                                     </Grid.ColumnDefinitions>
                                     <Border Width="40" Height="26" CornerRadius="6" Margin="0,0,14,0"
                                             Background="{Binding Swatch}" BorderBrush="{DynamicResource Border}"
-                                            BorderThickness="1.5" />
+                                            BorderThickness="1" />
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding Label}" />
                                         <TextBlock Text="{Binding Note}" Style="{StaticResource Caption}" Margin="0,2,0,0" />
