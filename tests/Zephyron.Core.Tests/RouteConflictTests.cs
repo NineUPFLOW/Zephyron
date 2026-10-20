@@ -179,6 +179,84 @@ public sealed class RouteConflictTests : IDisposable
         Assert.Empty(RouteConflicts.Find(engine.RuleSet));
     }
 
+    /// <summary>
+    /// Слои из файлов: заводской и свой (как у владельца — rules.yaml и rules.user.yaml).
+    /// </summary>
+    private RuleEngine LoadLayers(string baseYaml, Action<UserRulesFile> user)
+    {
+        var basePath = Path.Combine(_root, "config", "rules.yaml");
+        var userPath = Path.Combine(_root, "config", "rules.user.yaml");
+        File.WriteAllText(basePath, baseYaml);
+
+        var file = UserRulesFile.Load(userPath);
+        user(file);
+        file.Save();
+
+        var engine = RuleSetLoader.LoadLayered(basePath, userPath);
+        RuleSetExpander.Expand(engine.RuleSet, _root);
+
+        return engine;
+    }
+
+    private static Connections.ConnectionEvent To(string host) => Connections.ConnectionEvent.Describe(host);
+
+    /// <summary>
+    /// Узкая часть, записанная в файл после широкой, всё равно решает свои имена
+    /// (14.10: «Обновления Discord → напрямую» стояло после «Сайт и переписка → десинк»
+    /// и было мертво — след слияния и раздела частей Discord).
+    /// </summary>
+    [Fact]
+    public void ANarrowPartBeatsItsWideListEvenWrittenBelowIt()
+    {
+        Write("discord.txt", "discord.com", "discordapp.com");
+        Write("discord-updates.txt", "updates.discord.com");
+
+        var engine = LoadLayers("rules: []\ndefault:\n  mode: desync\n", file =>
+        {
+            file.Set(MatchKind.HostList, "config/lists/discord.txt", RoutingMode.Desync);
+            file.Set(MatchKind.HostList, "config/lists/discord-updates.txt", RoutingMode.Direct);
+        });
+
+        Assert.Equal(RoutingMode.Direct, engine.Evaluate(To("updates.discord.com")).Mode);
+        Assert.Equal(RoutingMode.Desync, engine.Evaluate(To("discord.com")).Mode);
+        Assert.Empty(RouteConflicts.Find(engine.RuleSet));
+    }
+
+    /// <summary>
+    /// Свой путь сервиса поверх заводского правила на тот же список — выбор, а не спор
+    /// (14.10: github.txt «через VPN» против заводского «десинк, pass»).
+    /// </summary>
+    [Fact]
+    public void AUserChoiceOverTheSameBaseListIsNotAConflict()
+    {
+        Write("github.txt", "github.com", "githubusercontent.com");
+        Write("chatgpt.txt", "chatgpt.com");
+
+        var engine = LoadLayers("""
+            rules:
+              - match: hostlist
+                value: "config/lists/github.txt"
+                mode: desync
+              - match: domain
+                value: "*.chatgpt.com"
+                mode: proxy
+            default:
+              mode: desync
+            """, file =>
+        {
+            file.Set(MatchKind.HostList, "config/lists/github.txt", RoutingMode.Proxy);
+            file.Set(MatchKind.HostList, "config/lists/chatgpt.txt", RoutingMode.Direct);
+        });
+
+        var conflicts = RouteConflicts.Find(engine.RuleSet);
+
+        // github.txt против github.txt — выбор; chatgpt.txt против заводского
+        // домена — тот самый спор, ради которого раздел заведён.
+        var conflict = Assert.Single(conflicts);
+        Assert.Equal("config/lists/chatgpt.txt", conflict.Winner.Value);
+        Assert.Equal("*.chatgpt.com", conflict.Loser.Value);
+    }
+
     [Fact]
     public void TheShippedRulesDoNotArgueWithThemselves()
     {

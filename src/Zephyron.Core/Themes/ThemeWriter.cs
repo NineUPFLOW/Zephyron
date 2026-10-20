@@ -31,6 +31,13 @@ public sealed record ThemeDraft
 
     public double Blur { get; init; } = 24;
 
+    /// <summary>Картинка на «Главной», уложенная руками (<see cref="ThemeBackground.HomeX"/>); <c>null</c> — как прежде.</summary>
+    public double? HomeX { get; init; }
+
+    public double? HomeY { get; init; }
+
+    public double? HomeSize { get; init; }
+
     /// <summary>
     /// «Главная» на всю ширину с этой темой (<see cref="Theme.HomeFullWidth"/>).
     /// </summary>
@@ -115,13 +122,19 @@ public static class ThemeWriter
                 File.Copy(source, copy, overwrite: true);
             }
 
-            json["background"] = new JsonObject
+            var background = new JsonObject
             {
                 ["image"] = name,
                 ["fit"] = draft.Fit.ToString().ToLowerInvariant(),
                 ["dim"] = Math.Round(draft.Dim, 2),
                 ["blur"] = Math.Round(draft.Blur),
             };
+
+            // Только если уложена руками: без этого «Главная» раскладывает как прежде.
+            if (draft.HomeX is { } x && draft.HomeY is { } y && draft.HomeSize is { } size)
+                background["home"] = new JsonObject { ["x"] = Math.Round(x, 3), ["y"] = Math.Round(y, 3), ["size"] = Math.Round(size, 3) };
+
+            json["background"] = background;
         }
         else
         {

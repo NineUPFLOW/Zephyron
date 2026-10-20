@@ -280,7 +280,7 @@ public partial class DnsView : UserControl
                 Name = p.Name,
                 Address = p.TlsAddress ?? p.Udp[0],
                 Note = p.Note ?? string.Empty,
-                Chosen = p.Choosable && string.Equals(p.TlsAddress, settings.DnsServer, StringComparison.Ordinal),
+                Chosen = !settings.UseRouterDns && p.Choosable && string.Equals(p.TlsAddress, settings.DnsServer, StringComparison.Ordinal),
                 Own = p.Own,
                 Choosable = p.Choosable,
                 Udp = p.Udp.Count > 0 ? p.Udp[0] : string.Empty,
@@ -303,10 +303,42 @@ public partial class DnsView : UserControl
             ? settings.DnsServer
             : $"{known.Name} · {known.TlsAddress}";
 
-        if (settings.DnsAuto)
+        if (settings.UseRouterDns)
+            ChosenName.Text = $"Роутер · {settings.RouterDnsAddress}:53 · UDP/LAN";
+        else if (settings.DnsAuto)
             ChosenName.Text += " · автовыбор";
+        var fallback = RouterDnsConnection.ConfigWarning(settings);
+        if (fallback is not null)
+        {
+            ChosenName.Text = "Запасной DoH · DNS роутера не применяется в текущем конфиге";
+            ShowRouterStatus(fallback, RouterDnsFit.Unknown);
+        }
+        else if (!settings.UseRouterDns)
+        {
+            ShowRouterStatus("Перед включением программа проверит роутер: отвечает ли он и не подменяет ли заблокированные имена.", null);
+        }
+        else if (_lastCheck is { } last && last.Address == settings.RouterDnsAddress)
+        {
+            ShowRouterStatus(Enabled(last.Check), last.Check.Fit);
+        }
+        else
+        {
+            // Включён до этого запуска окна: проверить заново, чтобы предупреждение
+            // о подмене не пропадало с перезапуском. Раз на адрес за запуск.
+            ShowRouterStatus("Включён. Действует после перезапуска движков.", null);
+            _lastCheck = null;
+            if (_recheckedFor != settings.RouterDnsAddress)
+            {
+                _recheckedFor = settings.RouterDnsAddress;
+                _ = CheckRouterAsync(settings.RouterDnsAddress, enabled: true);
+            }
+        }
+        RouterDnsSwitch.IsChecked = settings.UseRouterDns;
+        RouterDnsIp.Text = settings.RouterDnsAddress;
+        TunnelMode.IsEnabled = !settings.UseRouterDns;
 
-        AutoDnsSwitch.IsChecked = settings.DnsAuto;
+        // Автовыбор при DNS роутера хранится, но не действует (RouterDnsSettings.Select).
+        AutoDnsSwitch.IsChecked = settings.DnsAuto && !settings.UseRouterDns;
 
         // Заполняем, не поднимая события выбора: иначе показ состояния
         // тут же записал бы его обратно в настройки и позвал уведомление
@@ -322,6 +354,133 @@ public partial class DnsView : UserControl
 
         // Цена пути — те же слова, что в мастере первого запуска.
         TunnelHint.Text = DnsRoutes.Explain(settings);
+    }
+
+    /// <summary>
+    /// Последняя проверка роутера за этот запуск окна — чтобы предупреждение
+    /// стояло и при новом заходе на вкладку (вкладка создаётся заново).
+    /// </summary>
+    private static (string Address, RouterDnsCheck Check)? _lastCheck;
+
+    /// <summary>Адрес, который уже перепроверялся при показе вкладки.</summary>
+    private static string? _recheckedFor;
+
+    /// <summary>Подпись под карточкой: жёлтая — предупреждение, красная — отказ.</summary>
+    private void ShowRouterStatus(string text, RouterDnsFit? fit)
+    {
+        RouterDnsStatus.Text = text;
+
+        if (fit is RouterDnsFit.Spoofs or RouterDnsFit.Unknown)
+            RouterDnsStatus.SetResourceReference(TextBlock.ForegroundProperty, "Warn");
+        else if (fit is RouterDnsFit.Silent)
+            RouterDnsStatus.SetResourceReference(TextBlock.ForegroundProperty, "Danger");
+        else
+            RouterDnsStatus.ClearValue(TextBlock.ForegroundProperty);
+    }
+
+    /// <summary>Итог проверки для включённого DNS роутера.</summary>
+    private static string Enabled(RouterDnsCheck check) => check.Fit switch
+    {
+        RouterDnsFit.Spoofs => check.Text + " DNS роутера всё равно включён: если сайты под десинком или напрямую перестанут открываться, выключите его.",
+        RouterDnsFit.Silent => check.Text + " DNS роутера включён, но сейчас не отвечает.",
+        _ => check.Text + " DNS роутера включён — действует после перезапуска движков.",
+    };
+
+    /// <summary>Проверить роутер и включить его DNS — с предупреждением, если он подменяет.</summary>
+    /// <remarks>
+    /// Включение идёт через проверку: роутер, подменяющий закрытые имена,
+    /// молча закрыл бы сайты под десинком (замер 15.10 у владельца,
+    /// <see cref="RouterDnsConnection.CheckAsync"/>). Не запрещает — только
+    /// молчащий роутер (<see cref="RouterDnsCheck.Allows"/>).
+    /// </remarks>
+    private async Task<bool> SaveRouterDnsAsync()
+    {
+        if (!RouterDnsSettings.TryNormalize(RouterDnsIp.Text, out var address))
+        {
+            ShowRouterStatus("Введите адрес роутера в домашней сети, например 192.168.1.1. IPv6, имена и публичные DNS здесь не подходят.", RouterDnsFit.Silent);
+            return false;
+        }
+
+        var check = await CheckRouterAsync(address, enabled: false);
+        if (check is null || !check.Allows)
+            return false;
+
+        try
+        {
+            var settings = RouterDnsSettings.Select(AppSettings.Load(), address);
+            settings.Save(AppSettings.DefaultPath);
+            ShowChosen(settings);
+            Status.Text = check.Warns
+                ? "DNS роутера включён с предупреждением — смотрите карточку. Перезапустите движки."
+                : "DNS роутера включён. Перезапустите движки.";
+            this.Offer("DNS роутера включён");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            ShowRouterStatus("Не удалось сохранить: " + ex.GetBaseException().Message, RouterDnsFit.Silent);
+            return false;
+        }
+    }
+
+    /// <summary>Проверка роутера с запертыми на её время кнопками; <c>null</c> — сорвалась.</summary>
+    /// <param name="enabled">DNS роутера уже включён — подпись говорит о включённом.</param>
+    private async Task<RouterDnsCheck?> CheckRouterAsync(string address, bool enabled)
+    {
+        RouterDnsSwitch.IsEnabled = RouterDnsUse.IsEnabled = RouterDnsTest.IsEnabled = false;
+        ShowRouterStatus("Проверяю роутер: отвечает ли он и не подменяет ли заблокированные имена…", null);
+        try
+        {
+            var check = await RouterDnsConnection.CheckAsync(address, CancellationToken.None);
+            _lastCheck = (address, check);
+            ShowRouterStatus(enabled ? Enabled(check) : check.Allows ? check.Text : check.Text + " DNS роутера не включён.", check.Fit);
+            return check;
+        }
+        catch (Exception ex)
+        {
+            ShowRouterStatus("Проверка не выполнена: " + ex.GetBaseException().Message, RouterDnsFit.Silent);
+            return null;
+        }
+        finally
+        {
+            RouterDnsSwitch.IsEnabled = RouterDnsUse.IsEnabled = RouterDnsTest.IsEnabled = true;
+        }
+    }
+
+    private async void OnRouterDnsUse(object sender, RoutedEventArgs e)
+    {
+        if (await SaveRouterDnsAsync())
+            RouterDnsSwitch.IsChecked = true;
+    }
+
+    private async void OnRouterDnsToggle(object sender, RoutedEventArgs e)
+    {
+        if (RouterDnsSwitch.IsChecked == true)
+        {
+            // Выключатель встаёт сам, только когда проверка пропустила.
+            RouterDnsSwitch.IsChecked = false;
+            RouterDnsSwitch.IsChecked = await SaveRouterDnsAsync();
+            return;
+        }
+        try
+        {
+            var settings = AppSettings.Load() with { UseRouterDns = false };
+            settings.Save(AppSettings.DefaultPath);
+            ShowChosen(settings);
+            ShowRouterStatus($"DNS роутера выключен. Вернулись прежние: {ChosenName.Text}, путь — {DnsRoutes.Word(settings.DnsVia)}. Перезапустите движки.", null);
+            this.Offer("DNS роутера выключен");
+        }
+        catch (Exception ex)
+        { RouterDnsSwitch.IsChecked = true; ShowRouterStatus("Не удалось сохранить: " + ex.GetBaseException().Message, RouterDnsFit.Silent); }
+    }
+
+    private async void OnRouterDnsTest(object sender, RoutedEventArgs e)
+    {
+        if (!RouterDnsSettings.TryNormalize(RouterDnsIp.Text, out var address))
+        { ShowRouterStatus("Введите адрес роутера в домашней сети, например 192.168.1.1.", RouterDnsFit.Silent); return; }
+
+        var enabled = AppSettings.Load() is { UseRouterDns: true } now && now.RouterDnsAddress == address;
+        await CheckRouterAsync(address, enabled);
     }
 
     /// <summary>Показывает, кого спрашивает сама Windows.</summary>
@@ -386,7 +545,7 @@ public partial class DnsView : UserControl
 
         try
         {
-            var settings = AppSettings.Load(AppSettings.DefaultPath) with { DnsServer = address, DnsAuto = false };
+            var settings = AppSettings.Load(AppSettings.DefaultPath) with { DnsServer = address, DnsAuto = false, UseRouterDns = false };
             settings.Save(AppSettings.DefaultPath);
 
             ShowChosen(settings);
@@ -531,7 +690,10 @@ public partial class DnsView : UserControl
         try
         {
             var settings = AppSettings.Load(AppSettings.DefaultPath);
-            var next = settings with { DnsAuto = !settings.DnsAuto };
+            // При DNS роутера выключатель показан выключенным, хотя автовыбор
+            // мог сохраниться включённым: щелчок по нему — «включить», а не
+            // переворот сохранённого.
+            var next = settings with { DnsAuto = settings.UseRouterDns || !settings.DnsAuto, UseRouterDns = false };
 
             next.Save(AppSettings.DefaultPath);
             ShowChosen(next);
@@ -564,7 +726,7 @@ public partial class DnsView : UserControl
     {
         var settings = AppSettings.Load(AppSettings.DefaultPath);
 
-        if (!settings.DnsAuto)
+        if (!settings.DnsAuto || settings.UseRouterDns)
             return;
 
         if (DnsSurvey.Fastest(all) is not { TlsAddress: { } address } best)
@@ -608,7 +770,7 @@ public partial class DnsView : UserControl
         // при разборе разметки: соседние элементы к тому мгновению ещё
         // не созданы. На вкладке маршрутов это стоило падения при
         // создании вкладки, и повторять его здесь незачем.
-        if (!IsInitialized || _filling || sender is not ComboBox box || box.SelectedIndex < 0)
+        if (!IsInitialized || _filling || AppSettings.Load().UseRouterDns || sender is not ComboBox box || box.SelectedIndex < 0)
             return;
 
         try

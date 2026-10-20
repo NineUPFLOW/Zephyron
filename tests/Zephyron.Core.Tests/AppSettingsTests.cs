@@ -114,11 +114,12 @@ public sealed class AppSettingsTests : IDisposable
     }
 
     /// <summary>
-    /// Всех переводят на V11 Lite один раз (03.10); выключенный десинк так и остаётся.
+    /// Всех переводят на пресет по умолчанию один раз (03.10, тогда V11 Lite,
+    /// с 19.10 — V12 Lite); выключенный десинк так и остаётся.
     /// </summary>
     [Theory]
-    [InlineData("""{ "PresetName": "Universal V10" }""", "Universal V11 Lite")]
-    [InlineData("""{ "PresetName": "Default v1 (game filter)" }""", "Universal V11 Lite")]
+    [InlineData("""{ "PresetName": "Universal V10" }""", AppSettings.DefaultPresetName)]
+    [InlineData("""{ "PresetName": "Default v1 (game filter)" }""", AppSettings.DefaultPresetName)]
     [InlineData("""{ "PresetName": null }""", null)]
     [InlineData("""{ "PresetV11Lite": true, "PresetName": "Universal V10" }""", "Universal V10")]
     public void PresetIsMovedToV11LiteOnce(string json, string? expected)
@@ -129,6 +130,37 @@ public sealed class AppSettingsTests : IDisposable
 
         Assert.Equal(expected, read.PresetName);
         Assert.True(read.PresetV11Lite);
+    }
+
+    /// <summary>
+    /// С V11 Lite на V12 Lite переводят один раз (19.10); прочие пресеты и выключенный десинк не трогают.
+    /// </summary>
+    [Theory]
+    [InlineData("""{ "PresetV11Lite": true, "PresetName": "Universal V11 Lite" }""", "Universal V12 Lite")]
+    [InlineData("""{ "PresetV11Lite": true, "PresetName": "universal v11 lite" }""", "Universal V12 Lite")]
+    [InlineData("""{ "PresetV11Lite": true, "PresetName": "Universal V11" }""", "Universal V11")]
+    [InlineData("""{ "PresetV11Lite": true, "PresetName": "white sni (circular)" }""", "white sni (circular)")]
+    [InlineData("""{ "PresetV11Lite": true, "PresetName": null }""", null)]
+    [InlineData("""{ "PresetV11Lite": true, "PresetV12Lite": true, "PresetName": "Universal V11 Lite" }""", "Universal V11 Lite")]
+    public void V11LiteIsMovedToV12LiteOnce(string json, string? expected)
+    {
+        File.WriteAllText(_path, json);
+
+        var read = AppSettings.Load(_path);
+
+        Assert.Equal(expected, read.PresetName);
+        Assert.True(read.PresetV12Lite);
+    }
+
+    /// <summary>Вернувшийся на V11 Lite после перевода на нём и остаётся.</summary>
+    [Fact]
+    public void V11LiteChosenAfterTheMoveStays()
+    {
+        File.WriteAllText(_path, """{ "PresetV11Lite": true, "PresetName": "Universal V11 Lite" }""");
+
+        (AppSettings.Load(_path) with { PresetName = "Universal V11 Lite" }).Save(_path);
+
+        Assert.Equal("Universal V11 Lite", AppSettings.Load(_path).PresetName);
     }
 
     /// <summary>Свежие настройки с выбранным потом V10 ещё раз не переводятся.</summary>

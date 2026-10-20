@@ -132,7 +132,7 @@ public sealed record AppSettings
     /// <summary>Название пресета Zapret; <c>null</c> — не запускать десинк.</summary>
     /// <remarks>
     /// <para>
-    /// По умолчанию — Universal V11 Lite: он идёт в сборке и покрывает больше всего
+    /// По умолчанию — Universal V12 Lite: он идёт в сборке и покрывает больше всего
     /// случаев. Пустое значение означало бы, что при первом запуске десинк
     /// молча не работает, а человек об этом узнаёт по неоткрывающимся сайтам.
     /// Если такого пресета нет, обзор состояния скажет об этом прямо.
@@ -161,14 +161,25 @@ public sealed record AppSettings
     /// 149 имён из 153.
     /// </para>
     /// <para>
+    /// Был V11 Lite, стал V12 Lite (владелец, 19.10): тот же пресет и секция
+    /// «Hetzner TCP» над IP fallback. Провайдер пускает к иностранному хостингу
+    /// только «белые» имена; замер 19.10 на V12 Lite, A/B/A профилем pass:
+    /// ответ API 7tv в 112 КБ — 10 из 10 с секцией, 0 из 5 без неё;
+    /// www.hetzner.com и docs.hetzner.com — 4 из 4 и 0 из 2, nextcloud.com —
+    /// 4 из 4 и 1 из 2; keys.openpgp.org, forum.syncthing.net и framagit.org
+    /// открываются и так, с секцией — тоже (12 из 12).
+    /// </para>
+    /// <para>
     /// Смена касается только новых установок. Настройки переживают обновление
     /// намеренно — в них работа человека, — поэтому у тех, кто уже запускался,
-    /// останется прежний выбор, и меняется он в меню.
+    /// останется прежний выбор, и меняется он в меню. Исключения — разовые
+    /// переводы по слову владельца: всех на V11 Lite (<see cref="PresetOnce"/>,
+    /// 03.10) и с V11 Lite на V12 Lite (<see cref="LiteToV12Once"/>, 19.10).
     /// </para>
     /// </remarks>
     public string? PresetName { get; init; } = DefaultPresetName;
 
-    public const string DefaultPresetName = "Universal V11 Lite";
+    public const string DefaultPresetName = "Universal V12 Lite";
 
     /// <summary>Тег сервера либо <c>null</c> для автоподбора по задержке.</summary>
     public string? PreferredServer { get; init; }
@@ -217,6 +228,10 @@ public sealed record AppSettings
     /// </remarks>
     public string DnsServer { get; init; } = GoogleDns;
 
+    /// <summary>Для PBR роутер должен получить реальные DNS-запросы, а не только прямой трафик сайта.</summary>
+    public bool UseRouterDns { get; init; }
+    public string RouterDnsAddress { get; init; } = "192.168.1.1";
+
     /// <summary>Адрес Google, который работает по DoH и там, где 8.8.8.8 закрыт.</summary>
     public const string GoogleDns = "8.8.4.4";
 
@@ -233,6 +248,9 @@ public sealed record AppSettings
     /// отменил бы решение человека.
     /// </remarks>
     public bool DnsAuto { get; init; }
+
+    /// <summary>Перечитать подписку только после того, как штатный сторож не нашёл живых выходов.</summary>
+    public bool RefreshSubscriptionWhenNoLiveExits { get; init; }
 
     /// <summary>
     /// Game filter поверх пресета: десинк начала соединений игр.
@@ -757,6 +775,10 @@ public sealed record AppSettings
     /// кто его выключил. Один раз: выбравший после перевода другой пресет
     /// его и сохраняет.
     /// </para>
+    /// <para>
+    /// Переводит на нынешнее умолчание: с 19.10 настройки старше 03.10
+    /// встают сразу на V12 Lite.
+    /// </para>
     /// </remarks>
     private static AppSettings PresetOnce(AppSettings read) =>
         read.PresetV11Lite == true
@@ -765,6 +787,38 @@ public sealed record AppSettings
             {
                 PresetName = read.PresetName is null ? null : DefaultPresetName,
                 PresetV11Lite = true,
+            };
+
+    /// <summary>
+    /// Переведён ли V11 Lite на Universal V12 Lite разовым переводом (19.10); <c>null</c> — настройки старше.
+    /// </summary>
+    public bool? PresetV12Lite { get; init; }
+
+    /// <summary>
+    /// Разовый перевод с Universal V11 Lite на V12 Lite (владелец, 19.10).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Владелец: «переводи разово всех с V11 Lite на V12 Lite — как перевод
+    /// 03.10, остальные пресеты не трогай». V12 Lite — тот же V11 Lite
+    /// и секция «Hetzner TCP» (замер — у <see cref="PresetName"/>), а на
+    /// V11 Lite стоит почти всякий: он был умолчанием и целью перевода 03.10.
+    /// </para>
+    /// <para>
+    /// В отличие от 03.10 переводится только V11 Lite: выбравший другой пресет
+    /// выбрал его сам. Один раз: вернувшийся после перевода на V11 Lite
+    /// на нём и остаётся.
+    /// </para>
+    /// </remarks>
+    private static AppSettings LiteToV12Once(AppSettings read) =>
+        read.PresetV12Lite == true
+            ? read
+            : read with
+            {
+                PresetName = string.Equals(read.PresetName, "Universal V11 Lite", StringComparison.OrdinalIgnoreCase)
+                    ? "Universal V12 Lite"
+                    : read.PresetName,
+                PresetV12Lite = true,
             };
 
     /// <summary>
@@ -795,7 +849,7 @@ public sealed record AppSettings
     /// и следующее чтение перевело бы их ещё раз: включённый человеком game
     /// filter молча выключился бы.
     /// </remarks>
-    public static AppSettings Fresh => new() { WarpIsPath = true, GameFilterReset = true, PresetV11Lite = true };
+    public static AppSettings Fresh => new() { WarpIsPath = true, GameFilterReset = true, PresetV11Lite = true, PresetV12Lite = true };
 
     /// <summary>Есть ли выход кроме WARP: подписка или отдельные ключи.</summary>
     [JsonIgnore]
@@ -856,11 +910,11 @@ public sealed record AppSettings
             // Mullvad тоже: его убрали из списка 10.10, и выбравший его
             // остался бы с DoH на адрес без имени для сертификата — туннель
             // без имён.
-            return PresetOnce(GameFilterOnce(WarpAsPath(read with
+            return LiteToV12Once(PresetOnce(GameFilterOnce(WarpAsPath(read with
             {
                 Mode = read.Engines.Mode,
                 DnsServer = read.DnsServer is "8.8.8.8" or MullvadDns ? GoogleDns : read.DnsServer,
-            })));
+            }))));
         }
         catch (Exception)
         {
@@ -1050,7 +1104,7 @@ public sealed record AppSettings
     /// </para>
     /// </remarks>
     [JsonIgnore]
-    public bool NeedsDnsEngine => !NeedsProxy && NeedsDesync && DnsVia == DnsRoute.Tunnel;
+    public bool NeedsDnsEngine => !NeedsProxy && NeedsDesync && (UseRouterDns || DnsVia == DnsRoute.Tunnel);
 
     public string DescribeServer() => PreferredServer ?? "авто (по задержке)";
 

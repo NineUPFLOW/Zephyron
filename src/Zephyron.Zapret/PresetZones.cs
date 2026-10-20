@@ -50,6 +50,24 @@ public sealed class PresetZones
 
         foreach (var section in preset.Sections)
         {
+            // Секция с одним списком и без имён в строке — множество этого
+            // списка, общее для всех сборок: «Маршруты» перечитывают пресет
+            // на каждую пересборку, а реестр блокировок секции «Russia
+            // blacklist» — 117 тысяч имён (замер 15.10: 9 МБ на сборку).
+            if (section.InlineDomains.Count == 0 && section.HostListPaths.Count == 1)
+            {
+                try
+                {
+                    var list = HostListReader.Read(section.HostListPaths[0], zapretRoot, out _);
+                    sections.Add((section, ListZones.GetValue(list, ZonesOf)));
+                    continue;
+                }
+                catch (Exception)
+                {
+                    // Как и ниже: без списка секция остаётся без имён.
+                }
+            }
+
             var zones = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var inline in section.InlineDomains)
@@ -76,6 +94,18 @@ public sealed class PresetZones
         return new PresetZones(sections);
     }
 
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<IReadOnlyList<string>, HashSet<string>> ListZones = new();
+
+    private static HashSet<string> ZonesOf(IReadOnlyList<string> list)
+    {
+        var zones = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var name in list)
+            Add(zones, name);
+
+        return zones;
+    }
+
     /// <summary>
     /// Секция, которая заберёт эти имена себе; <c>null</c> — ни одна.
     /// </summary>
@@ -85,6 +115,34 @@ public sealed class PresetZones
     /// </remarks>
     public ZapretSection? FirstFor(IReadOnlyList<string> domains) =>
         AllFor(domains).FirstOrDefault();
+
+    /// <summary>
+    /// Первая секция, которая берёт этот список файлом; <c>null</c> — ни одна.
+    /// </summary>
+    /// <remarks>
+    /// Для большого перечня (реестр блокировок, 15.10) вместо <see cref="FirstFor"/>:
+    /// «первая секция, покрывающая хоть одно имя из ста семнадцати тысяч», —
+    /// не ответ про перечень. Замер 15.10: <see cref="FirstFor"/> по реестру —
+    /// 0,2–0,3 с в потоке окна и ответ «GitHub», потому что среди имён реестра
+    /// есть покрытые его секцией. Имена, которые забирают секции выше, получают
+    /// их рецепт, остальные — рецепт этой. Свой список в поставке называется
+    /// <c>zy-</c>…, у пресета — без приставки: сравнивается имя файла.
+    /// </remarks>
+    public ZapretSection? ForList(string list)
+    {
+        var wanted = ListName(list);
+
+        return _sections
+            .Select(s => s.Section)
+            .FirstOrDefault(section => section.HostListPaths.Any(path =>
+                string.Equals(ListName(path), wanted, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private static string ListName(string path)
+    {
+        var name = Path.GetFileNameWithoutExtension(path.Trim().Trim('"'));
+        return name.StartsWith("zy-", StringComparison.OrdinalIgnoreCase) ? name[3..] : name;
+    }
 
     /// <summary>
     /// Та же первая секция, но с подробностями для отчёта.

@@ -117,17 +117,26 @@ public sealed class RoutingRule
     /// Готовит правило к использованию и валидирует <see cref="Value"/>.
     /// Бросает <see cref="RuleConfigurationException"/> на неразбираемом значении.
     /// </summary>
+    /// <remarks>
+    /// Один раз на правило: <see cref="Match"/> и <see cref="Value"/> задаются
+    /// только при создании. Прежде каждая сборка движка компилировала выражения
+    /// заново, а первый проход по свежему скомпилированному выражению стоит
+    /// ~0,15 мс. «Маршруты» собирают движок «без своего правила» на каждую
+    /// часть со своим маршрутом (ServiceRouting.Describe): замер 15.10 на
+    /// правилах владельца — 155 правил, сотни частей, чтение раздела 7,5 с,
+    /// из них 3,6–5,2 с на это.
+    /// </remarks>
     public void Compile()
     {
         switch (Match)
         {
             case MatchKind.Process:
             case MatchKind.Domain:
-                _glob = GlobMatcher.Compile(Value);
+                _glob ??= GlobMatcher.Compile(Value);
                 break;
 
             case MatchKind.Ip:
-                _cidr = IpCidrRange.Parse(Value);
+                _cidr ??= IpCidrRange.Parse(Value);
                 break;
 
             case MatchKind.IpSet:
@@ -312,6 +321,23 @@ public sealed class RoutingRule
 
         HostListDomains = domains;
 
+        // Тот же список — то же множество: движков в окне несколько
+        // («Маршруты», «Наблюдение», проверка блокировок), и у каждого было
+        // своё множество зон реестра на 117 тысяч имён. Замер 15.10: движок
+        // с развёрнутыми списками — 10 МБ. Список из HostListReader один
+        // на файл, пока тот не изменился, а множество только читается —
+        // делить его между потоками безопасно.
+        var compiled = CompiledLists.GetValue(domains, CompileList);
+        _hostZones = compiled.Zones;
+        _hostGlobs = compiled.Globs;
+    }
+
+    private sealed record CompiledList(HashSet<string> Zones, IReadOnlyList<GlobMatcher> Globs);
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<IReadOnlyList<string>, CompiledList> CompiledLists = new();
+
+    private static CompiledList CompileList(IReadOnlyList<string> domains)
+    {
         // Обычная запись — зона без звёздочек внутри — ищется по множеству,
         // а не своим выражением. Прежде у каждой записи было своё Regex,
         // и имя прогонялось через все подряд: замер 24.09 — открытие
@@ -338,8 +364,7 @@ public sealed class RoutingRule
                 globs.Add(GlobMatcher.Compile(trimmed.StartsWith("*.", StringComparison.Ordinal) ? trimmed : "*." + trimmed));
         }
 
-        _hostZones = zones;
-        _hostGlobs = globs;
+        return new CompiledList(zones, globs);
     }
 
     /// <summary>Само имя или любой его хвост после точки — в множестве зон.</summary>
@@ -378,10 +403,16 @@ public enum RuleSource
 
     /// <summary>
     /// Включено выключателем в настройках, а не записано в файле
-    /// (<see cref="VpnHiding"/>). В порядке вычисления — как базовое:
-    /// своё правило человека главнее.
+    /// (<see cref="VpnHiding"/>). С 14.10 в порядке вычисления — сразу за
+    /// своими именами и раньше своих списков (<see cref="RuleEngine.Tier"/>).
     /// </summary>
     Setting,
+
+    /// <summary>
+    /// Нижний слой: ниже всех правил всех классов (<see cref="RuZones"/>, 15.10).
+    /// Действует, только если ни одно другое правило не решило.
+    /// </summary>
+    Fallback,
 }
 
 /// <summary>

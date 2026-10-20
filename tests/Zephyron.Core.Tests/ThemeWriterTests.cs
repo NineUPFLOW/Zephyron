@@ -57,6 +57,9 @@ public sealed class ThemeWriterTests : IDisposable
             Fit = BackgroundFit.Contain,
             Dim = 0.65,
             Blur = 30,
+            HomeX = 0.86,
+            HomeY = 0.5,
+            HomeSize = 0.8,
         }, root: _root);
 
         var load = ThemeLoader.Load(id, _root);
@@ -71,6 +74,9 @@ public sealed class ThemeWriterTests : IDisposable
         Assert.Equal("Bahnschrift", theme.Fonts.Ui);
         Assert.Equal(BackgroundFit.Contain, theme.Background!.Fit);
         Assert.Equal(0.65, theme.Background.Dim);
+        Assert.Equal(0.86, theme.Background.HomeX);
+        Assert.Equal(0.5, theme.Background.HomeY);
+        Assert.Equal(0.8, theme.Background.HomeSize);
         Assert.EndsWith("background.jpg", theme.Background.Image);
         Assert.False(theme.HomeFullWidth);
     }

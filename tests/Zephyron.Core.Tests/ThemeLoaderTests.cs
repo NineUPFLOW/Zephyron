@@ -166,6 +166,33 @@ public sealed class ThemeLoaderTests : IDisposable
         Assert.Equal(30, background.Blur);
         Assert.EndsWith("wall.jpg", background.Image);
         Assert.False(background.IsVideo);
+
+        // Не уложена руками — «Главная» раскладывает как до 15.10.
+        Assert.False(background.HomePlaced);
+    }
+
+    /// <summary>Картинка на «Главной», уложенная руками (15.10); за пределами — замечание.</summary>
+    [Fact]
+    public void TheHomePlacementIsReadAndChecked()
+    {
+        var load = Write("home", """
+            { "base": "dark", "background": { "image": "wall.jpg", "home": { "x": 0.86, "y": 0.5, "size": 0.8 } } }
+            """, ("wall.jpg", 16));
+
+        Assert.True(load.Ok, string.Join("; ", load.Problems));
+        Assert.True(load.Theme!.Background!.HomePlaced);
+        Assert.Equal(0.86, load.Theme.Background.HomeX);
+        Assert.Equal(0.8, load.Theme.Background.HomeSize);
+
+        var wrong = Write("wrong", """
+            { "base": "dark", "background": { "image": "wall.jpg", "home": { "x": 1.5, "y": 0.3, "size": 0.8 } } }
+            """, ("wall.jpg", 16));
+        Assert.Contains(wrong.Problems, p => p.Contains("середина картинки"));
+
+        var big = Write("big", """
+            { "base": "dark", "background": { "image": "wall.jpg", "home": { "x": 0.5, "y": 0.5, "size": 9 } } }
+            """, ("wall.jpg", 16));
+        Assert.Contains(big.Problems, p => p.Contains("размер картинки"));
     }
 
     /// <summary>

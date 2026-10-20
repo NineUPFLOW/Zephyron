@@ -212,8 +212,36 @@ public static class ThemeLoader
             if (blur is < 0 or > 80)
                 problems.Add($"размытие фона {blur} — нужно число от 0 до 80");
 
+            // Картинка на «Главной», уложенная руками (15.10).
+            double? homeX = null, homeY = null, homeSize = null;
+
+            if (bg.TryGetProperty("home", out var home) && home.ValueKind == JsonValueKind.Object)
+            {
+                homeX = Number(home, "x");
+                homeY = Number(home, "y");
+                homeSize = Number(home, "size");
+
+                if (homeX is null || homeY is null || homeSize is null)
+                    problems.Add("картинка на «Главной» — нужны x, y и size");
+                else if (homeX is < 0 or > 1 || homeY is < 0 or > 1)
+                    problems.Add($"середина картинки на «Главной» {homeX}, {homeY} — нужны числа от 0 до 1");
+                else if (homeSize is < SideArtLayout.MinSize or > SideArtLayout.MaxSize)
+                    problems.Add($"размер картинки на «Главной» {homeSize} — нужно от {SideArtLayout.MinSize} до {SideArtLayout.MaxSize}");
+            }
+
             if (image is not null)
-                background = new ThemeBackground { Image = image, Fit = fit, Dim = Math.Clamp(dim, 0, 1), Blur = Math.Clamp(blur, 0, 80) };
+            {
+                background = new ThemeBackground
+                {
+                    Image = image,
+                    Fit = fit,
+                    Dim = Math.Clamp(dim, 0, 1),
+                    Blur = Math.Clamp(blur, 0, 80),
+                    HomeX = homeX is { } x ? Math.Clamp(x, 0, 1) : null,
+                    HomeY = homeY is { } y ? Math.Clamp(y, 0, 1) : null,
+                    HomeSize = homeSize is { } size ? Math.Clamp(size, SideArtLayout.MinSize, SideArtLayout.MaxSize) : null,
+                };
+            }
         }
 
         if (problems.Count > 0 && colors.Count < ThemeSlots.All.Count)

@@ -8,6 +8,7 @@ using System.Windows.Threading;
 using Zephyron.Core;
 using Zephyron.Core.Diagnostics;
 using Zephyron.Core.Rules;
+using Zephyron.Core.Themes;
 using Zephyron.Core.Updates;
 using Zephyron.Proxy;
 using Zephyron.Supervisor;
@@ -137,32 +138,42 @@ public partial class StatusView : UserControl
         if (art is not { } content || width <= 0 || height <= 0 || content.Size.Height <= 0 || content.Size.Width <= 0)
         {
             Art.Fill = null;
+            ArtGround.Fill = null;
             ArtShade.Fill = null;
             return;
         }
 
         double aspect = content.Size.Width / content.Size.Height;
-        double w = height * aspect, h = height;
-
-        // Уже страницы — растягиваем до её ширины: пустая полоса справа хуже обрезки.
-        if (w < width)
-        {
-            w = width;
-            h = width / aspect;
-        }
 
         double column = ArtColumn.ActualWidth;
         bool side = column >= ArtColumnMin;
         double centre = side ? width - column / 2 : width / 2;
 
-        double left = centre - w / 2;
+        // Уложенная руками на миниатюре в редакторе тем (владелец 15.10) —
+        // где положили, а под ней градиент; иначе как прежде: по высоте
+        // страницы, середина — посередине колонки.
+        var placement = TryFindResource(HomePlacement.Key) as HomePlacement;
+
+        var (left, top, w, h) = placement is { } placed
+            ? SideArtLayout.Place(width, height, aspect, placed.X, placed.Y, placed.Size)
+            : SideArtLayout.Fit(width, height, centre, aspect);
 
         var fill = content.Make();
         fill.Stretch = Stretch.Fill;
         fill.TileMode = TileMode.None;
         fill.ViewportUnits = BrushMappingMode.Absolute;
-        fill.Viewport = new Rect(left, (height - h) / 2, w, h);
+        fill.Viewport = new Rect(left, top, w, h);
         Art.Fill = fill;
+
+        if (placement is not null)
+        {
+            ArtGround.Fill = TryFindResource(HomePlacement.GroundKey) as Brush;
+            Art.OpacityMask = HomePlacement.Feather(new Rect(left, top, w, h));
+            Shade(width, column, side);
+            return;
+        }
+
+        ArtGround.Fill = null;
 
         // Левый край картинки — в подложку, без черты. Растворение кончается
         // до колонки с артом (не позже 80 % пути от края картинки до неё),
@@ -185,6 +196,12 @@ public partial class StatusView : UserControl
                 },
             };
 
+        Shade(width, column, side);
+    }
+
+    /// <summary>Затемнение поверх арта: плотное под карточками, лёгкое в колонке.</summary>
+    private void Shade(double width, double column, bool side)
+    {
         var backdrop = TryFindResource("BackdropColor") is Color c ? c : Colors.Black;
         double dim = TryFindResource("BackdropDim") is double d ? d : 1.0;
 
@@ -268,6 +285,9 @@ public partial class StatusView : UserControl
 
         if (window.Changed)
         {
+            // И режим: «Игнорировать исключения» живёт в этом окне и меняет
+            // пояснение «Гибрида» и «Туннеля», а ShowModes зовётся не по времени.
+            ShowModes(AppSettings.Load(AppSettings.DefaultPath));
             Update();
             this.Offer("Настройки туннеля изменены");
         }
@@ -534,7 +554,11 @@ public partial class StatusView : UserControl
         PresetValue.Text = settings.DescribePreset();
         ShowPresetNote(settings.PresetName);
         ServerValue.Text = TunnelStatus.ServerLine(settings, _exit);
-        DnsValue.Text = settings.DnsServer;
+        DnsValue.Text = settings.UseRouterDns
+            ? RouterDnsConnection.ConfigWarning(settings) is not null
+                ? $"Запасной DoH · {settings.DnsServer} (DNS роутера недоступен)"
+                : $"Роутер · {settings.RouterDnsAddress}:53 · UDP"
+            : settings.DnsServer;
         SubscriptionValue.Text = seen.Subscriptions;
 
         var state = seen.State;
@@ -1111,26 +1135,42 @@ public partial class StatusView : UserControl
             return;
 
         _engines = rows;
+        ShowEngines(rows);
+    }
 
+    private void ShowEngines(IReadOnlyList<EngineRow> rows)
+    {
         // Движки — в карточке «Режим» (04.10), оба при любом режиме (владелец:
         // «пусть эти движки будут и в десинке, и в туннеле»): не нужный режиму
         // скажет «выключен», как в трее, а высота карточки от режима не зависит.
-        ShowEngine(rows.FirstOrDefault(r => r.Name == "winws2"), DesyncDot, DesyncState, DesyncPid);
+        ShowEngine(rows.FirstOrDefault(r => r.Name == "winws2"), DesyncDot, DesyncState, DesyncPid, _desyncIdle);
         ShowEngine(rows.FirstOrDefault(r => r.Name == "sing-box"), TunnelDot, TunnelState, TunnelPid);
     }
+
+    /// <summary>
+    /// Десинк включён, а не поднимается: всё забрал туннель.
+    /// </summary>
+    /// <remarks>
+    /// Так при «Игнорировать исключения» (<see cref="EngineChoice.DesyncRuns"/>).
+    /// 19.10 в чате у XesSarix «Гибрид» был выбран, а десинк стоял «выключен»,
+    /// и он спросил почему: причина была только красной строкой под карточкой.
+    /// </remarks>
+    private string? _desyncIdle;
 
     /// <summary>Строка состояния движка в его карточке.</summary>
     /// <remarks>
     /// Нет строки — движок в этот запуск не поднимали: выключен или нет
     /// подписки. «Остановлен» здесь соврало бы, что он был.
     /// </remarks>
-    private void ShowEngine(EngineRow? row, System.Windows.Shapes.Ellipse dot, TextBlock state, TextBlock pid)
+    /// <param name="idle">Почему не поднимали включённый; <c>null</c> — выключен.</param>
+    private void ShowEngine(EngineRow? row, System.Windows.Shapes.Ellipse dot, TextBlock state, TextBlock pid, string? idle = null)
     {
         if (row is null)
         {
             dot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "Faint");
-            state.Text = "выключен";
-            pid.Text = string.Empty;
+            state.Text = idle is null ? "выключен" : "не нужен";
+            pid.Text = idle is null ? string.Empty : "всё через VPN";
+            pid.ToolTip = idle;
             return;
         }
 
@@ -1269,13 +1309,25 @@ public partial class StatusView : UserControl
 
         // Пояснение — выбранного режима. «Без исключений» — настройка внутри
         // «Туннеля»: включённая, она меняет смысл режима, и молчать о ней нельзя.
+        // У «Гибрида» она отменяет само пояснение: маршруты не решают ничего,
+        // всё уходит в VPN, а десинк не поднимается (EngineChoice.DesyncRuns).
         ModeText.Text = mode is not { } chosen
             ? "Режим не выбран — движки не поднимутся."
-            : WorkModes.Explain(chosen)
-                + (chosen == WorkMode.Tunnel && engines.IgnoreExclusions
-                    ? " Сейчас без исключений: в VPN идёт и «напрямую»."
-                    : string.Empty);
+            : chosen == WorkMode.Route && engines.IgnoreExclusions
+                ? "Сейчас без исключений: всё идёт через VPN, маршруты и десинк не действуют."
+                : WorkModes.Explain(chosen)
+                    + (chosen == WorkMode.Tunnel && engines.IgnoreExclusions
+                        ? " Сейчас без исключений: в VPN идёт и «напрямую»."
+                        : string.Empty);
         ModeText.ToolTip = ModeText.Text;
+
+        _desyncIdle = engines.Desync && !engines.DesyncRuns
+            ? "Включено «Игнорировать исключения» в настройках туннеля: всё идёт через VPN, "
+                + "и десинку чинить нечего. Выключите его — заработают маршруты и десинк."
+            : null;
+
+        if (_engines is { } shown)
+            ShowEngines(shown);
 
         // «Ничего не поднято» режимом не считается — ни один сегмент не выбран.
         ModeDesync.IsChecked = mode == WorkMode.Desync;

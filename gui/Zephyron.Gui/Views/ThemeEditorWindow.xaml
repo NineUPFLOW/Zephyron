@@ -132,6 +132,49 @@
                                 </StackPanel>
                                 <ComboBox Grid.Column="1" x:Name="AlphaChoice" VerticalAlignment="Center" SelectionChanged="OnChanged" />
                             </Grid>
+
+                            <!--
+                                Картинка на «Главной» (владелец 15.10: «сделай миниатюру главной
+                                и дай возможность разместить там фон, всё остальное заливается
+                                градиентом»). Миниатюра рисуется тем же расчётом, что «Главная»
+                                (SideArtLayout, HomePlacement): тянуть — двигать, колесо или
+                                ползунок — размер.
+                            -->
+                            <Border Height="1" Background="{DynamicResource Border}" Margin="0,16,0,14" />
+
+                            <TextBlock Text="Картинка на «Главной»" />
+                            <TextBlock Style="{StaticResource Caption}" Margin="0,2,0,0" TextWrapping="Wrap"
+                                       Text="Тяните картинку по миниатюре «Главной», колесом или ползунком — размер. Что картинка не закрывает, зальётся градиентом из фона окна в её цвет." />
+
+                            <Border x:Name="HomeMini" Width="480" Height="307" Margin="0,10,0,0"
+                                    HorizontalAlignment="Left" CornerRadius="10" ClipToBounds="True"
+                                    BorderBrush="{DynamicResource Border}" BorderThickness="1.5"
+                                    Background="{DynamicResource Backdrop}" Cursor="SizeAll"
+                                    MouseLeftButtonDown="OnMiniDown" MouseMove="OnMiniMove"
+                                    MouseLeftButtonUp="OnMiniUp" MouseWheel="OnMiniWheel">
+                                <Grid>
+                                    <Rectangle x:Name="MiniGround" />
+                                    <Rectangle x:Name="MiniArt" />
+                                    <Rectangle x:Name="MiniShade" />
+                                    <Canvas x:Name="MiniCards" IsHitTestVisible="False" />
+                                </Grid>
+                            </Border>
+
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Размер" VerticalAlignment="Center" />
+                                <Slider Grid.Column="1" x:Name="SizeSlider" Minimum="0.2" Maximum="3"
+                                        VerticalAlignment="Center" ValueChanged="OnSize" />
+                                <TextBlock Grid.Column="2" x:Name="SizeText" Style="{StaticResource Mono}"
+                                           Width="52" TextAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+
+                            <Button Style="{StaticResource Ghost}" Content="Как было: по высоте, посередине колонки"
+                                    HorizontalAlignment="Left" Margin="0,10,0,0" Click="OnHomeReset" />
                         </StackPanel>
                     </StackPanel>
                 </Border>

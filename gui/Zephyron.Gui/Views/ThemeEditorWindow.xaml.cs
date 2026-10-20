@@ -2,7 +2,10 @@ using System.ComponentModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using Zephyron.Core;
 using Zephyron.Core.Themes;
@@ -71,6 +74,21 @@ public partial class ThemeEditorWindow : Window
     private readonly bool _editingWasFine;
     private string? _image;
     private bool _ready;
+
+    // Арт на «Главной»: точка центра и увеличение (SideArtLayout, 15.10).
+    // Картинка на «Главной», уложенная руками (HomePlacement, 15.10); _placed — уложена.
+    private double _homeX = 0.5, _homeY = 0.5, _homeSize = 1;
+    private bool _placed;
+    private bool _dragging;
+
+    /// <summary>Картинка для миниатюры «Главной»; у видео — его кадр.</summary>
+    private BitmapSource? _poster;
+
+    /// <summary>
+    /// Применить на окне — не на каждое движение мыши: сборка темы считает
+    /// стекло (размытие всей картинки), и протяжка точки им захлебнулась бы.
+    /// </summary>
+    private readonly DispatcherTimer _settle = new() { Interval = TimeSpan.FromMilliseconds(300) };
     private bool _saved;
 
     /// <summary>Тема, которую записали и применили; <c>null</c> — отменили.</summary>
@@ -91,6 +109,17 @@ public partial class ThemeEditorWindow : Window
         _editingWasFine = editing is not null && ThemeLoader.Load(editing).Ok;
         _colors = ThemeSlots.All.ToDictionary(s => s, s => from[s] with { A = s == ThemeSlots.Surface ? from[s].A : (byte)255 });
         _image = from.Background?.Image;
+        if (from.Background is { HomePlaced: true } placed)
+        {
+            (_homeX, _homeY, _homeSize) = (placed.HomeX!.Value, placed.HomeY!.Value, placed.HomeSize!.Value);
+            _placed = true;
+        }
+
+        _settle.Tick += (_, _) =>
+        {
+            _settle.Stop();
+            Changed();
+        };
 
         Heading.Text = editing is null ? "Своя тема" : $"Правка темы «{from.Name}»";
         Title = Heading.Text;
@@ -160,6 +189,9 @@ public partial class ThemeEditorWindow : Window
                 Fit = (BackgroundFit)Math.Max(0, FitChoice.SelectedIndex),
                 Dim = Dims[Math.Max(0, DimChoice.SelectedIndex)],
                 Blur = Blurs[Math.Max(0, BlurChoice.SelectedIndex)],
+                HomeX = _placed ? _homeX : null,
+                HomeY = _placed ? _homeY : null,
+                HomeSize = _placed ? _homeSize : null,
             },
         HomeFullWidth = _from.HomeFullWidth,
     };
@@ -189,6 +221,9 @@ public partial class ThemeEditorWindow : Window
               + string.Join("; ", problems.Take(2)).Replace("не читается: ", string.Empty)
               + (problems.Count > 2 ? $" и ещё {problems.Count - 2}." : "."));
 
+        // Миниатюра «Главной» — теми же цветами и затемнением.
+        ShowMini();
+
         // Картинка тоже может не читаться — тогда поправить цвета мало,
         // и «Поправить» стоит показать всё равно: светлее текст — читаемее.
         if (problems.Count > 0)
@@ -202,6 +237,213 @@ public partial class ThemeEditorWindow : Window
         ImageName.Text = _image is null ? "нет — фон сплошной, цветом «Фон окна»" : Path.GetFileName(_image);
         ClearImage.IsEnabled = _image is not null;
         ImageSettings.Visibility = _image is null ? Visibility.Collapsed : Visibility.Visible;
+
+        _poster = _image is null ? null : Poster(_image);
+        ShowMini();
+    }
+
+    /// <summary>Картинка для миниатюры: сама картинка в малом размере, у видео — его кадр.</summary>
+    private static BitmapSource? Poster(string path)
+    {
+        try
+        {
+            if (Path.GetExtension(path).Equals(".mp4", StringComparison.OrdinalIgnoreCase))
+                return VideoPoster.Load(path, size: 480);
+
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.UriSource = new Uri(path);
+            image.DecodePixelWidth = 640;
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.EndInit();
+            image.Freeze();
+            return image;
+        }
+        catch (Exception)
+        {
+            // Нечитаемая картинка — миниатюра без неё; сама тема скажет о ней проверкой.
+            return null;
+        }
+    }
+
+    /// <summary>Доля страницы «Главной», занятая колонкой арта, — у окна владельца 300 из 1240.</summary>
+    private const double MiniColumn = 300.0 / 1240;
+
+    /// <summary>Где карточки «Главной» — доли страницы: слева до колонки, рядами.</summary>
+    private static readonly (double X, double Y, double W, double H)[] MiniCardsAt =
+    [
+        (0.03, 0.10, 0.70, 0.16),
+        (0.03, 0.30, 0.345, 0.20), (0.385, 0.30, 0.345, 0.20),
+        (0.03, 0.55, 0.70, 0.17),
+        (0.03, 0.76, 0.345, 0.15), (0.385, 0.76, 0.345, 0.15),
+    ];
+
+    private double MiniAspect => _poster is { PixelWidth: > 0, PixelHeight: > 0 } p ? (double)p.PixelWidth / p.PixelHeight : 1;
+
+    /// <summary>Место картинки на миниатюре — тем же расчётом, что у «Главной».</summary>
+    private Rect MiniPlace()
+    {
+        double width = HomeMini.Width, height = HomeMini.Height;
+
+        var (left, top, w, h) = _placed
+            ? SideArtLayout.Place(width, height, MiniAspect, _homeX, _homeY, _homeSize)
+            : SideArtLayout.Fit(width, height, width * (1 - MiniColumn / 2), MiniAspect);
+
+        return new Rect(left, top, w, h);
+    }
+
+    /// <summary>Миниатюра «Главной»: градиент, картинка, затемнение под карточками и сами карточки.</summary>
+    private void ShowMini()
+    {
+        var place = MiniPlace();
+        var (_, _, size) = SideArtLayout.Measure(HomeMini.Width, HomeMini.Height, (place.Left, place.Top, place.Width, place.Height));
+
+        var was = _ready;
+        _ready = false;
+        SizeSlider.Value = Math.Clamp(size, SizeSlider.Minimum, SizeSlider.Maximum);
+        _ready = was;
+        SizeText.Text = _placed ? $"{size * 100:0} %" : "как было";
+
+        if (_poster is null)
+        {
+            MiniArt.Fill = MiniGround.Fill = MiniShade.Fill = null;
+            MiniCards.Children.Clear();
+            return;
+        }
+
+        var backdrop = _colors[ThemeSlots.Backdrop];
+
+        MiniGround.Fill = _placed ? HomePlacement.Ground(_poster, backdrop) : null;
+        MiniArt.Fill = new ImageBrush(_poster)
+        {
+            Stretch = Stretch.Fill,
+            ViewportUnits = BrushMappingMode.Absolute,
+            Viewport = place,
+        };
+        MiniArt.OpacityMask = _placed ? HomePlacement.Feather(place) : null;
+
+        // Затемнение, как у «Главной»: плотное под карточками, лёгкое в колонке.
+        double dim = Dims[Math.Max(0, DimChoice.SelectedIndex)];
+        MiniShade.Fill = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0),
+            EndPoint = new Point(1, 0),
+            GradientStops =
+            {
+                new GradientStop(System.Windows.Media.Color.FromArgb((byte)(dim * 255), backdrop.R, backdrop.G, backdrop.B), 1 - MiniColumn - 0.1),
+                new GradientStop(System.Windows.Media.Color.FromArgb(30, backdrop.R, backdrop.G, backdrop.B), 1 - MiniColumn * 0.3),
+            },
+        };
+
+        var surface = Draft()[ThemeSlots.Surface];
+        var line = _colors[ThemeSlots.Border];
+        var card = new SolidColorBrush(System.Windows.Media.Color.FromArgb(surface.A, surface.R, surface.G, surface.B));
+        var edge = new SolidColorBrush(System.Windows.Media.Color.FromRgb(line.R, line.G, line.B));
+
+        MiniCards.Children.Clear();
+
+        foreach (var (x, y, w, h) in MiniCardsAt)
+        {
+            var shape = new System.Windows.Shapes.Rectangle
+            {
+                Width = w * HomeMini.Width,
+                Height = h * HomeMini.Height,
+                RadiusX = 5,
+                RadiusY = 5,
+                Fill = card,
+                Stroke = edge,
+                StrokeThickness = 1,
+            };
+
+            Canvas.SetLeft(shape, x * HomeMini.Width);
+            Canvas.SetTop(shape, y * HomeMini.Height);
+            MiniCards.Children.Add(shape);
+        }
+    }
+
+    private Point _dragFrom;
+    private (double X, double Y) _dragStart;
+
+    private void OnMiniDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_poster is null)
+            return;
+
+        // Первая протяжка начинает с того, как картинка лежала, — без прыжка.
+        Adopt();
+        _dragging = true;
+        _dragFrom = e.GetPosition(HomeMini);
+        _dragStart = (_homeX, _homeY);
+        HomeMini.CaptureMouse();
+    }
+
+    private void OnMiniMove(object sender, MouseEventArgs e)
+    {
+        if (!_dragging)
+            return;
+
+        var shift = e.GetPosition(HomeMini) - _dragFrom;
+        _homeX = Math.Clamp(_dragStart.X + shift.X / HomeMini.Width, 0, 1);
+        _homeY = Math.Clamp(_dragStart.Y + shift.Y / HomeMini.Height, 0, 1);
+        ShowMini();
+        Settle();
+    }
+
+    private void OnMiniUp(object sender, MouseButtonEventArgs e)
+    {
+        _dragging = false;
+        HomeMini.ReleaseMouseCapture();
+    }
+
+    private void OnMiniWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (_poster is null)
+            return;
+
+        e.Handled = true;
+        Adopt();
+        _homeSize = Math.Clamp(_homeSize * Math.Pow(1.1, e.Delta / 120.0), SideArtLayout.MinSize, SideArtLayout.MaxSize);
+        ShowMini();
+        Settle();
+    }
+
+    private void OnSize(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!_ready || _poster is null)
+            return;
+
+        Adopt();
+        _homeSize = e.NewValue;
+        ShowMini();
+        Settle();
+    }
+
+    /// <summary>Перейти к уложенной руками — с того места, где картинка лежит сейчас.</summary>
+    private void Adopt()
+    {
+        if (_placed)
+            return;
+
+        var place = MiniPlace();
+        (_homeX, _homeY, _homeSize) = SideArtLayout.Measure(HomeMini.Width, HomeMini.Height, (place.Left, place.Top, place.Width, place.Height));
+        _homeX = Math.Clamp(_homeX, 0, 1);
+        _homeY = Math.Clamp(_homeY, 0, 1);
+        _homeSize = Math.Clamp(_homeSize, SideArtLayout.MinSize, SideArtLayout.MaxSize);
+        _placed = true;
+    }
+
+    private void OnHomeReset(object sender, RoutedEventArgs e)
+    {
+        _placed = false;
+        ShowMini();
+        Changed();
+    }
+
+    /// <summary>Применить на окне, когда протяжка или ползунок затихнут.</summary>
+    private void Settle()
+    {
+        _settle.Stop();
+        _settle.Start();
     }
 
     private void OnColor(object sender, RoutedEventArgs e)
@@ -274,6 +516,9 @@ public partial class ThemeEditorWindow : Window
         }
 
         _image = dialog.FileName;
+
+        // Новая картинка — новый кадр: прежнее место к ней не относится.
+        _placed = false;
         ShowImage();
         Changed();
     }
@@ -344,6 +589,9 @@ public partial class ThemeEditorWindow : Window
             Fit = (BackgroundFit)Math.Max(0, FitChoice.SelectedIndex),
             Dim = Dims[Math.Max(0, DimChoice.SelectedIndex)],
             Blur = Blurs[Math.Max(0, BlurChoice.SelectedIndex)],
+            HomeX = _placed ? _homeX : null,
+            HomeY = _placed ? _homeY : null,
+            HomeSize = _placed ? _homeSize : null,
             HomeFullWidth = _from.HomeFullWidth,
         };
 

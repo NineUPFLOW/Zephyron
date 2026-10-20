@@ -53,13 +53,23 @@ public static class RouteConflicts
         // уже разложил их по приоритету класса и по слою. Полагаться на него
         // обязательно — спор решается именно очерёдностью, и своя сортировка
         // отвечала бы на вопрос про другой движок.
+        // Реестр блокировок и российские зоны (15.10) — мимо: перечень на
+        // 117 тысяч имён и нижний слой «если ничто не решило» перекрыты всем,
+        // что выше, по замыслу, и спором это не назвать. Владелец: «можно их
+        // просто не высчитывать, как было и до этого».
         var byName = ruleSet.Rules
             .Where(r => r.Enabled && r.Match is MatchKind.Domain or MatchKind.HostList)
+            .Where(r => r.Source != RuleSource.Fallback && !Services.ServiceCatalog.IsBulk(r.Value))
             .Select(rule => (Rule: rule, Zones: Zones(rule).ToList()))
             .Where(pair => pair.Zones.Count > 0)
             .ToList();
 
         var found = new List<RouteConflict>();
+
+        // Первое правило, покрывающее зону, — словарём зон, а не перебором
+        // всех зон всех правил выше (ZoneIndex): с реестром блокировок
+        // (117 тысяч имён, 15.10) перебор шёл бы минутами.
+        var index = new ZoneIndex(byName.Select(pair => pair.Zones));
 
         for (int loser = 1; loser < byName.Count; loser++)
         {
@@ -67,18 +77,18 @@ public static class RouteConflicts
 
             foreach (var zone in byName[loser].Zones)
             {
-                for (int winner = 0; winner < loser; winner++)
+                int winner = index.First(zone);
+
+                if (winner < 0 || winner >= loser)
+                    continue;
+
+                // Первое совпавшее и решает: дальше по списку до этого
+                // имени дело уже не дойдёт, и правило, стоящее третьим,
+                // проигрывает не нам, а второму.
+                if (byName[winner].Rule.Mode != byName[loser].Rule.Mode
+                    && !Overrides(byName[winner].Rule, byName[loser].Rule))
                 {
-                    if (!byName[winner].Zones.Any(w => Covers(w, zone)))
-                        continue;
-
-                    // Первое совпавшее и решает: дальше по списку до этого
-                    // имени дело уже не дойдёт, и правило, стоящее третьим,
-                    // проигрывает не нам, а второму.
-                    if (byName[winner].Rule.Mode != byName[loser].Rule.Mode)
-                        shadowed.Add((zone, byName[winner].Rule));
-
-                    break;
+                    shadowed.Add((zone, byName[winner].Rule));
                 }
             }
 
@@ -98,6 +108,21 @@ public static class RouteConflicts
         return found;
     }
 
+    /// <summary>
+    /// Выбор человека поверх заводского правила на тот же список или домен — не спор.
+    /// </summary>
+    /// <remarks>
+    /// Так и задумано: «Маршруты» пишут свой путь сервису, а заводское правило
+    /// остаётся умолчанием под ним. 14.10 карточка звала спором github.txt
+    /// «через VPN» (выбор владельца) против заводского github.txt «десинк, pass»,
+    /// и рядом с настоящими поломками это приучало раздел пропускать.
+    /// </remarks>
+    private static bool Overrides(RoutingRule winner, RoutingRule loser) =>
+        winner.Source == RuleSource.User
+        && loser.Source == RuleSource.Base
+        && winner.Match == loser.Match
+        && string.Equals(winner.Value.TrimStart('*', '.'), loser.Value.TrimStart('*', '.'), StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Зоны, на которые правило распространяется.</summary>
     /// <remarks>
     /// Звёздочка и точка снимаются: <c>*.chatgpt.com</c> и <c>chatgpt.com</c> —
@@ -110,9 +135,4 @@ public static class RouteConflicts
         MatchKind.HostList => rule.HostListDomains.Select(d => d.TrimStart('*', '.')),
         _ => [],
     };
-
-    /// <summary>Покрывает ли зона имя — сама себя или как суффикс.</summary>
-    private static bool Covers(string zone, string name) =>
-        name.Equals(zone, StringComparison.OrdinalIgnoreCase)
-        || name.EndsWith("." + zone, StringComparison.OrdinalIgnoreCase);
 }

@@ -111,7 +111,7 @@ internal static class SupervisorHost
         if (settings.NeedsDesync)
             arguments += $" --preset \"{settings.PresetName}\"";
 
-        if (settings.NeedsProxy && settings.DnsVia == DnsRoute.Auto)
+        if (settings.NeedsProxy && !settings.UseRouterDns && settings.DnsVia == DnsRoute.Auto)
             arguments += " --dns-via-auto";
 
         if (settings.VerifyTraffic)
@@ -471,7 +471,7 @@ internal static class SupervisorHost
         // остальные такие решения.
         var settings = AppSettings.Load(AppSettings.DefaultPath);
 
-        services.Add(new SingBoxService(
+        var service = new SingBoxService(
             singBox, options.ProxyConfig, 9090, trafficPort,
             bypassWhenDead: settings.BypassWhenTunnelDead,
             preferredExit: Warp.PreferredExit(settings),
@@ -481,7 +481,27 @@ internal static class SupervisorHost
             watchUrl: Ping.UrlOf(settings))
         {
             OutputLogPath = Path.Combine("runtime", "sing-box.log"),
-        });
+        };
+        var refresher = new Zephyron.Subscriptions.NoLiveSubscriptionRefresh(
+            Path.Combine("runtime", "no-live-subscription-refresh.state.json"));
+        service.NoLiveExitsAsync = async ct =>
+        {
+            var current = AppSettings.Load(AppSettings.DefaultPath);
+            if (!current.RefreshSubscriptionWhenNoLiveExits || current.WarpEnabled) return;
+            var urls = SubscriptionBook.Load().Pool.Select(entry => entry.Url).ToList();
+            if (urls.Count == 0 && !string.IsNullOrWhiteSpace(current.SubscriptionUrl)) urls.Add(current.SubscriptionUrl);
+            var result = await refresher.TryAsync(urls, ct);
+            if (!result.Attempted) return;
+            Console.WriteLine(result.Downloaded
+                ? "[подписки] после отказа всех выходов перечитана одна подписка; проверки и обход сохранены"
+                : "[подписки] панель недоступна; старый список сохранён, повтор с увеличенной паузой");
+            if (result.Changed)
+            {
+                SubscriptionRefreshNotice.Write(Environment.ProcessId);
+                Console.WriteLine("[подписки] список изменился; применится через штатный перезапуск, не из надзора");
+            }
+        };
+        services.Add(service);
 
         return true;
     }
@@ -546,7 +566,11 @@ internal static class SupervisorHost
             ? []
             : TunnelEndpoints.TunAddresses(options.ProxyConfig);
 
-        var arguments = WinwsCommandLine.Build(preset, exclude, own, gameFilter, servers, fakeRange, udpOff, tun, settings.Capture, keep);
+        // Виртуальные локалки Радмина и Hamachi — всегда, и без туннеля тоже:
+        // это расшифрованная игра на их адаптере (LocalNetworks.VirtualLans, 14.10).
+        var lans = Zephyron.Core.Rules.LocalNetworks.VirtualLans;
+
+        var arguments = WinwsCommandLine.Build(preset, exclude, own, gameFilter, servers, fakeRange, udpOff, tun, settings.Capture, keep, lans);
 
         // Ширина перехвата (PresetCapture): в журнал — что вышло на деле,
         // а не что выбрано: пресет с полным фильтром уровню не поддаётся.
@@ -557,7 +581,10 @@ internal static class SupervisorHost
                 : "Перехват: у пресета полный фильтр (--wf-raw), уровень не применён.");
         }
 
-        bool carried = TunnelCapture.Carries(arguments, servers, fakeRange, udpOff, tun);
+        bool carried = TunnelCapture.Carries(arguments, servers, fakeRange, udpOff, tun, lans);
+
+        if (carried)
+            Console.WriteLine($"Десинк не перехватывает виртуальные локалки Радмина и Hamachi: {string.Join(", ", lans)}.");
 
         if (fakeRange is not null && carried)
             Console.WriteLine($"Десинк не перехватывает трафик в туннель: подменные адреса {fakeRange}.");
@@ -574,7 +601,7 @@ internal static class SupervisorHost
 
         if (servers.Count > 0)
         {
-            int skipped = TunnelCapture.Applied(arguments, servers, fakeRange, udpOff, tun);
+            int skipped = TunnelCapture.Applied(arguments, servers, fakeRange, udpOff, tun, lans);
 
             Console.WriteLine(skipped == 0
                 ? "Серверы туннеля остались в перехвате десинка: у пресета свой --wf-raw-filter файлом."

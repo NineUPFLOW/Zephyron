@@ -65,9 +65,9 @@ public sealed class RuleEngine
         // «напрямую», а «*.crunchyroll.com → через VPN» — списку Crunchyroll.
         // Решение владельца 23.09: своё правило побеждает. Имя, названное
         // человеком поимённо, — это и есть его выбор для этого имени.
-        var sorted = ordered
+        var sorted = PartOrder.Apply(ordered
             .OrderBy(r => Tier(r.Match, r.Source, r.Value))
-            .ToList();
+            .ToList());
 
         return new RuleEngine(new RuleSet
         {
@@ -77,6 +77,9 @@ public sealed class RuleEngine
             Operating = operating,
         });
     }
+
+    /// <summary>Группа нижнего слоя — больше любой группы обычных классов.</summary>
+    public const int FallbackTier = 100;
 
     /// <summary>
     /// Группа, внутри которой решает порядок в файле; меньше — раньше.
@@ -98,13 +101,26 @@ public sealed class RuleEngine
     /// </remarks>
     public static int Tier(MatchKind match, RuleSource source, string? value = null)
     {
+        // Нижний слой (RuZones, 15.10) — после всех классов, и адресных тоже:
+        // «если нет никаких других правил» значит и своих по адресу.
+        if (source == RuleSource.Fallback)
+            return FallbackTier;
+
         bool user = source == RuleSource.User;
         bool ownName = match == MatchKind.Domain
             || (match == MatchKind.HostList && OwnLists.IsOwn(value));
 
-        return MatchKindPriority.Of(match) * 4
-            + (user ? 0 : 2)
-            + (user && ownName ? 0 : 1);
+        // Правила из настроек («Прятать VPN», VpnHiding) — сразу за своими
+        // именами и раньше своих списков. Стояли наравне с заводскими, то есть
+        // после списков: 14.10 у владельца «*.checkip.amazonaws.com → напрямую»
+        // перекрывал его же amazon.txt, и с Amazon «через VPN» приложение
+        // узнало бы свой адрес уже через туннель — ровно то, от чего прячем.
+        // Имя, вписанное человеком поимённо, остаётся сильнее (решение 23.09).
+        int layer = source == RuleSource.Setting ? 1
+            : user ? (ownName ? 0 : 2)
+            : 3;
+
+        return MatchKindPriority.Of(match) * 4 + layer;
     }
 
     /// <summary>

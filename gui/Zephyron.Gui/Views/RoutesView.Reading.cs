@@ -116,6 +116,23 @@ public partial class RoutesView
         return _shared;
     }
 
+    /// <summary>
+    /// Отпустить общий раздел — окно закрыто по-настоящему (MainWindow.Release, 15.10).
+    /// </summary>
+    /// <remarks>
+    /// Раздел живёт статически ради быстрых заходов, и после закрытия окна
+    /// он держал бы сотню карточек и прочитанные правила. Новое окно построит
+    /// новый — прочитанные в фоне правила к тому времени дёшевы (общие списки).
+    /// </remarks>
+    public static void Release()
+    {
+        if (_shared?.Parent is System.Windows.Controls.ContentControl host)
+            host.Content = null;
+
+        _shared = null;
+        _early = null;
+    }
+
     private void Reload() => _ = ReloadAsync();
 
     private async Task ReloadAsync()
@@ -209,7 +226,7 @@ public partial class RoutesView
         {
             var keys = services
                 .SelectMany(s => s.Item2)
-                .Where(part => !part.Part.ByAddress)
+                .Where(part => !part.Part.ByAddress && !part.Part.Bulk)
                 .Select(part => RouteKeys.Make(RouteKeys.HostList, part.Part.List))
                 .Concat(userRules.Entries
                     .Where(e => e.Match == MatchKind.Domain || (e.Match == MatchKind.HostList && OwnLists.IsOwn(e.Value)))

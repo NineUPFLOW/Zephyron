@@ -119,4 +119,25 @@ public sealed record ThemeBackground
 
     /// <summary>Радиус размытия под карточками и меню, в точках; 0 — без размытия.</summary>
     public double Blur { get; init; } = 24;
+
+    /// <summary>
+    /// Где на «Главной» середина картинки, долей ширины страницы; <c>null</c> —
+    /// как прежде, по середине колонки арта (<see cref="SideArtLayout"/>).
+    /// </summary>
+    /// <remarks>
+    /// Владелец 15.10: «сделай миниатюру главной и дай возможность разместить
+    /// там фон, всё остальное заливается градиентом». Картинка кладётся
+    /// в редакторе тем куда угодно и любого размера; что она не закрывает —
+    /// градиент из фона окна в цвет картинки.
+    /// </remarks>
+    public double? HomeX { get; init; }
+
+    /// <summary>Где середина картинки по высоте, долей высоты страницы.</summary>
+    public double? HomeY { get; init; }
+
+    /// <summary>Высота картинки долей высоты страницы.</summary>
+    public double? HomeSize { get; init; }
+
+    /// <summary>Картинка на «Главной» уложена руками.</summary>
+    public bool HomePlaced => HomeX is not null && HomeY is not null && HomeSize is not null;
 }
