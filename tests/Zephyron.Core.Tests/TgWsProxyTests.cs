@@ -47,6 +47,71 @@ public sealed class TgWsProxyTests
         Assert.DoesNotContain("--secret", arguments);
     }
 
+    /// <summary>Все значения ключа: «--dc-ip 2:… --dc-ip 4:…» → [2:…, 4:…].</summary>
+    private static List<string> Values(IReadOnlyList<string> arguments, string key) =>
+        [.. arguments.Select((a, i) => (a, i)).Where(p => p.a == key).Select(p => arguments[p.i + 1])];
+
+    /// <summary>
+    /// --default-domains снимает у прокси прямые адреса по умолчанию; задаём их
+    /// явно только выключателем — по умолчанию он выключен (владелец 21.10).
+    /// </summary>
+    [Fact]
+    public void DirectPathToDc2AndDc4IsOffByDefault()
+    {
+        var arguments = TgWsProxy.Arguments(1443);
+
+        Assert.Empty(Values(arguments, "--dc-ip"));
+        Assert.Contains("--default-domains", arguments);
+        Assert.DoesNotContain("--cf-connect-timeout", arguments);
+
+        // Так же и из настроек, записанных до этих выключателей.
+        Assert.Equal(new TgWsProxyRoutes(), TgWsProxyRoutes.From(new AppSettings()));
+    }
+
+    [Fact]
+    public void RoutesFromTheTabBecomeKeys()
+    {
+        var main = TgWsProxy.Arguments(1443, new TgWsProxyRoutes(DirectMain: true));
+        Assert.Equal(["2:149.154.167.220", "4:149.154.167.220"], Values(main, "--dc-ip"));
+        Assert.Contains("--default-domains", main);
+
+        var all = TgWsProxy.Arguments(1443, new TgWsProxyRoutes(DirectMain: true, DirectOther: true));
+        Assert.Equal(
+            ["2:149.154.167.220", "4:149.154.167.220", "1:149.154.174.100", "3:149.154.174.100", "5:149.154.170.100"],
+            Values(all, "--dc-ip"));
+
+        var quick = TgWsProxy.Arguments(1443, new TgWsProxyRoutes(CfConnectTimeout: 3));
+        Assert.Equal(["3"], Values(quick, "--cf-connect-timeout"));
+
+        // Мусор в настройках — ожидание прокси по умолчанию, а не ключ, на котором он упадёт.
+        Assert.DoesNotContain("--cf-connect-timeout", TgWsProxy.Arguments(1443, new TgWsProxyRoutes(CfConnectTimeout: 0)));
+        Assert.DoesNotContain("--cf-connect-timeout", TgWsProxy.Arguments(1443, new TgWsProxyRoutes(CfConnectTimeout: 600)));
+    }
+
+    [Fact]
+    public void RouteSettingsSurviveTheSettingsFile()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"zephyron-tgroutes-{Guid.NewGuid():N}.json");
+
+        try
+        {
+            File.WriteAllText(path, """{ "TelegramProxy": true }""");
+            var old = AppSettings.Load(path);
+            Assert.False(old.TelegramProxyDirect);
+            Assert.False(old.TelegramProxyDirectOther);
+            Assert.Equal(TgWsProxy.DefaultCfConnectTimeout, old.TelegramProxyCfTimeout);
+
+            (old with { TelegramProxyDirect = true, TelegramProxyDirectOther = true, TelegramProxyCfTimeout = 3 }).Save(path);
+            var read = AppSettings.Load(path);
+
+            Assert.Equal(new TgWsProxyRoutes(true, true, 3), TgWsProxyRoutes.From(read));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Fact]
     public void ServiceRefusesWithoutExecutableOrSecret()
     {
@@ -90,6 +155,41 @@ public sealed class TgWsProxyTests
         // Движки стоят — прокси поднимется с ними, жаловаться не на что.
         var stopped = new SupervisorState { SupervisorProcessId = -1, StartedAt = DateTimeOffset.Now, Services = [] };
         Assert.Equal(DoctorLevel.Ok, Assert.Single(Doctor.TelegramProxy(settings, executable: here, state: stopped)).Level);
+    }
+
+    /// <summary>
+    /// «Всегда» (с 0.15.2): прокси держит окно, своим файлом состояния, и надзор
+    /// движков его не знает. До 20.10 «Диагностика» при живом прокси звала
+    /// перезапускать движки.
+    /// </summary>
+    [Fact]
+    public void DoctorSeesTheProxyTheWindowHolds()
+    {
+        var settings = new AppSettings { TelegramProxy = true, TelegramProxyAlways = true, TelegramProxySecret = TgWsProxy.NewSecret() };
+        var here = typeof(TgWsProxyTests).Assembly.Location;
+        var proxy = new ServiceState { Name = TgWsProxyService.ServiceName, Health = ServiceHealth.Healthy };
+
+        // Движки работают без прокси (так и задумано), прокси у окна — живой и здоровый.
+        var engines = new SupervisorState { SupervisorProcessId = Environment.ProcessId, StartedAt = DateTimeOffset.Now, Services = [] };
+        var window = new SupervisorState { SupervisorProcessId = Environment.ProcessId, StartedAt = DateTimeOffset.Now, Services = [proxy] };
+
+        var held = Assert.Single(Doctor.TelegramProxy(settings, executable: here, state: engines, kept: window));
+        Assert.Equal(DoctorLevel.Ok, held.Level);
+        Assert.Contains("Работает", held.Text);
+
+        // Окно закрыто — прокси поднимется вместе с ним, а не с движками.
+        var gone = window with { SupervisorProcessId = -1 };
+        var later = Assert.Single(Doctor.TelegramProxy(settings, executable: here, state: engines, kept: gone));
+        Assert.Equal(DoctorLevel.Ok, later.Level);
+        Assert.Contains("окном", later.Text);
+
+        // Надзор, поднятый до включения «всегда», держит свой — тоже в счёт.
+        var byEngines = engines with { Services = [proxy] };
+        Assert.Equal(DoctorLevel.Ok, Assert.Single(Doctor.TelegramProxy(settings, executable: here, state: byEngines, kept: gone)).Level);
+
+        // Без «всегда» прежняя проверка: движки без прокси — оговорка.
+        var withEngines = settings with { TelegramProxyAlways = false };
+        Assert.Equal(DoctorLevel.Warn, Assert.Single(Doctor.TelegramProxy(withEngines, executable: here, state: engines, kept: window)).Level);
     }
 
     /// <summary>

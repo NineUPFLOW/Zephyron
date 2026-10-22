@@ -61,6 +61,7 @@ internal static class TunnelConfig
             // запуск не ждёт панелей, которые всё равно не понадобятся.
             IReadOnlyList<ProxyServer> fromSubscription = [];
             int sourceCount = 0, keyCount = 0, reserved = 0;
+            IReadOnlyList<PoolPart> deferred = [];
 
             if (!settings.WarpEnabled)
             {
@@ -76,8 +77,11 @@ internal static class TunnelConfig
                 if (sources.Count == 0 && !string.IsNullOrWhiteSpace(settings.SubscriptionUrl))
                     sources.Add(new PoolSource("Основная", settings.SubscriptionUrl));
 
-                // Отдельные ключи — последним источником пула (0.9.0).
-                var pool = await SubscriptionPool.BuildAsync(sources, cancellationToken, keys: book.PoolKeys);
+                // Отдельные ключи — последним источником пула (0.9.0). Панели
+                // с запасом моложе суток запуск не ждёт — их спросят после
+                // (SubscriptionPool.StartFromReserveFor, SubscriptionRecheck).
+                var pool = await SubscriptionPool.BuildAsync(sources, cancellationToken, keys: book.PoolKeys, deferPanels: true);
+                deferred = pool.Parts.Where(p => p.Deferred).ToList();
                 fromSubscription = pool.Servers;
                 sourceCount = sources.Count;
                 keyCount = book.PoolKeys.Count;
@@ -108,6 +112,12 @@ internal static class TunnelConfig
                         ? $"«{part.Source.Name}» не ответила — серверы из запаса от {part.ReserveAt:dd.MM HH:mm}"
                         : $"«{part.Source.Name}» не прочиталась и запаса нет: {part.Error}");
                 }
+
+                foreach (var part in deferred)
+                {
+                    Journal.Write("подписка",
+                        $"«{part.Source.Name}»: запуск из запаса от {part.ReserveAt:dd.MM HH:mm}, панель спрошу после запуска");
+                }
             }
 
             var servers = Warp.TunnelExits(settings, fromSubscription);
@@ -137,8 +147,15 @@ internal static class TunnelConfig
             // и тогда пусть движок перебирает всех. В списке вкладки мёртвые
             // видны по-прежнему; удачный замер вернёт сервер со следующим
             // запуском.
+            //
+            // Так же закреплённые в пулах и пул, мёртвый целиком (идеи №6, 19.10):
+            // выброшенный пул без серверов исчез бы из конфига, и его маршруты
+            // молча ушли бы в пул по умолчанию — даже когда человек велел ждать.
+            var keep = ServerPools.KeptDespiteDeath(settings.EnginePools, servers.Select(s => s.Tag), dead);
+
             var alive = servers
-                .Where(s => !dead.Contains(s.Tag) || s.Tag == Warp.PreferredExit(settings) || s.IsSelfRegistering)
+                .Where(s => !dead.Contains(s.Tag) || s.Tag == Warp.PreferredExit(settings) || s.IsSelfRegistering
+                    || keep.Contains(s.Tag))
                 .ToList();
 
             int dropped = servers.Count - alive.Count;
@@ -213,6 +230,10 @@ internal static class TunnelConfig
                     [settings.SubscriptionUrl, .. SubscriptionBook.Load().Entries.Select(e => e.Url)]),
                 PreferredServerTag = Warp.PreferredExit(settings),
 
+                // Без «Selective Routing» и при WARP пулов нет — их маршруты
+                // идут в пул по умолчанию.
+                Pools = settings.EnginePools,
+
                 // «Игнорировать исключения» сюда больше не передаётся:
                 // с 23.09 она отменяет все прямые правила, а не одно
                 // российское, и делает это режимом — ProxyStrict, где
@@ -261,6 +282,7 @@ internal static class TunnelConfig
                 // на http://cp.cloudflare.com.
                 LatencyTestUrl = Ping.UrlOf(settings),
                 TlsFragment = settings.TlsFragment,
+                StoreFakeIp = settings.FakeIpMemory,
                 AutoPickPerEntry = Math.Max(0, settings.AutoPickPerEntry),
                 KnownLatency = ServerHealthCache.Load().Latencies(),
             });
@@ -287,6 +309,10 @@ internal static class TunnelConfig
 
             if (result.SkippedServers.Count > 0)
                 note += $", {result.SkippedServers.Count} пропущено";
+
+            // Не ждём: запуск идёт следом и не должен стоять за панелью.
+            if (deferred.Count > 0)
+                _ = SubscriptionRecheck.RunAsync(deferred);
 
             return new BuildOutcome(true, note + ".", routerDns.Warning);
         }

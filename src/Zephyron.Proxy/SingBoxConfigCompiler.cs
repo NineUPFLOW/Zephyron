@@ -74,8 +74,9 @@ public sealed class SingBoxOptions
     /// <remarks>
     /// <para>
     /// Рядом с прочим рантаймом, а не в корне рабочего каталога, куда движок
-    /// положил бы <c>cache.db</c> по умолчанию. Файл появляется только у тех,
-    /// у кого включён MASQUE, — остальным он не нужен и не заводится.
+    /// положил бы <c>cache.db</c> по умолчанию. Файл появляется у тех,
+    /// у кого включён MASQUE или память подставных адресов
+    /// (<see cref="StoreFakeIp"/>), — остальным он не нужен и не заводится.
     /// </para>
     /// <para>
     /// В конфиг уходит полным путём, и это не придирка к аккуратности.
@@ -87,6 +88,18 @@ public sealed class SingBoxOptions
     /// </para>
     /// </remarks>
     public string CachePath { get; init; } = Path.Combine("runtime", "engine-cache.db");
+
+    /// <summary>
+    /// Хранить таблицу подставных адресов (fakeip → имя) в файле кэша,
+    /// чтобы после перезапуска имена получали те же адреса.
+    /// </summary>
+    /// <remarks>
+    /// Выключено по умолчанию: это настройка человека
+    /// (<c>AppSettings.FakeIpMemory</c>), а не свойство конфига, и сборки
+    /// для проверок и тестов файл кэша заводить не должны. Поле sing-box —
+    /// <c>store_fakeip</c>; принято движком 1.14.3 (проверка 20.10).
+    /// </remarks>
+    public bool StoreFakeIp { get; init; }
 
     /// <summary>
     /// Апстрим DNS. Указывается адресом, а не именем: имя потребовало бы
@@ -139,17 +152,46 @@ public sealed class SingBoxOptions
 
     /// <summary>
     /// «Авто»: резолвер ходит через переключатель пути DNS (<c>dns-path</c>) —
-    /// напрямую при запуске, через туннель, когда надзор увидит, что тот жив.
+    /// напрямую при запуске, через туннель, когда надзор увидит, что прямой
+    /// путь лежит, а туннель жив.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Переключает надзор через Clash API (SingBoxService), а не пересборкой:
     /// пересборка значила бы перезапуск движка. Имена серверов подписки и
     /// панелей разрешаются через <c>bootstrap</c>, как при «через туннель».
+    /// </para>
+    /// <para>
+    /// Между «напрямую» и «туннель» — ступень «тот же резолвер по TCP, порт 53»
+    /// (20.10): сервер <see cref="DnsTcpTag"/> и правило DNS по режиму
+    /// <see cref="DnsTcpMode"/>, который надзор ставит через Clash API
+    /// (<c>PATCH /configs</c>). Замер 20.10 у владельца: UDP к 8.8.4.4 и 1.1.1.1
+    /// заворачивается на НСДИ (whoami — 193.232.93.x, закрытые имена — отказ),
+    /// TCP к тем же адресам отвечает честно за 10–60 мс; на ntc.party то же
+    /// у Дом.ру (DoH-ветка, №188–193). Режим движок проверяет на каждый запрос,
+    /// в отличие от <c>fallback</c> форка, который платит за молчащий DoH 5 с
+    /// на каждое имя (опыт 20.10). Только при DoH с адресом: по TCP идёт тот же
+    /// адрес, а DNS роутера и UDP этой ступени не нужны.
+    /// </para>
     /// </remarks>
     public bool DnsViaAuto { get; init; }
 
     /// <summary>Тег переключателя пути DNS при «авто».</summary>
     public const string DnsPathTag = "dns-path";
+
+    /// <summary>Тег резолвера по TCP при «авто» — тот же адрес, порт 53.</summary>
+    public const string DnsTcpTag = "remote-tcp";
+
+    /// <summary>Режим Clash API, в котором имена спрашиваются по TCP (<see cref="DnsTcpTag"/>).</summary>
+    public const string DnsTcpMode = "dns-tcp";
+
+    /// <summary>Режим Clash API по умолчанию: правило TCP не действует.</summary>
+    public const string DnsRuleMode = "Rule";
+
+    /// <summary>Есть ли в этом конфиге ступень TCP (<see cref="DnsTcpTag"/>).</summary>
+    internal bool DnsTcpStep =>
+        !RouterDns && DnsViaAuto && !DnsThroughTunnel && DnsServerType == "https"
+        && System.Net.IPAddress.TryParse(DnsServer, out _);
 
     /// <summary>
     /// Имена панелей подписок: при <see cref="DnsThroughTunnel"/> они
@@ -273,6 +315,12 @@ public sealed class SingBoxOptions
     /// <c>null</c> — выбирать по задержке.
     /// </summary>
     public string? PreferredServerTag { get; init; }
+
+    /// <summary>
+    /// Пулы серверов (<see cref="ServerPools"/>): своя группа выбора у каждого,
+    /// на который ссылается хоть одно правило.
+    /// </summary>
+    public IReadOnlyList<ServerPool> Pools { get; init; } = [];
 
     public string LogLevel { get; init; } = "warn";
 
@@ -465,9 +513,10 @@ public sealed class SingBoxConfigCompiler
         var root = new JsonObject
         {
             ["log"] = new JsonObject { ["level"] = options.LogLevel },
-            ["dns"] = BuildDns(options, CollectProxyDomains(ruleSet, tags.Count > 0), tags.Count > 0, ruleSet),
+            ["certificate"] = Certificates(),
+            ["dns"] = BuildDns(options, tags.Count > 0, ruleSet),
             ["inbounds"] = BuildInbounds(options, CollectProxyAddresses(ruleSet)),
-            ["outbounds"] = BuildOutbounds(usable, tags, options),
+            ["outbounds"] = BuildOutbounds(usable, tags, options, PoolsInUse(ruleSet, options)),
             ["route"] = BuildRoute(ruleSet, tags, options),
             ["experimental"] = new JsonObject
             {
@@ -489,13 +538,17 @@ public sealed class SingBoxConfigCompiler
         if (endpoints.Count > 0)
             root["endpoints"] = endpoints;
 
-        // Кэш движка нужен ровно одному выходу — MASQUE: движок заводит себе
-        // учётную запись Cloudflare сам и хранит её там. Без кэша он
-        // регистрировался бы заново при каждом запуске, плодя записи и теряя
-        // единственное, ради чего всё затевалось: работать, когда подписки
-        // уже нет. Включается вместе с ним, а не всем подряд — файл
-        // переживает удаление программы и хранит ещё и выбор в селекторе.
-        if (usable.Any(s => s.IsSelfRegistering))
+        // Кэш движка нужен двоим. MASQUE: движок заводит себе учётную запись
+        // Cloudflare сам и хранит её там; без кэша он регистрировался бы
+        // заново при каждом запуске, плодя записи и теряя единственное, ради
+        // чего всё затевалось, — работать, когда подписки уже нет. И память
+        // подставных адресов (с 20.10, по выключателю): без неё после
+        // перезапуска имена «через VPN» получают другие fakeip, а браузер
+        // со старыми в кэше упирается в отказ. Иначе файл не заводится:
+        // он переживает удаление программы и хранит ещё и выбор в селекторе.
+        bool masque = usable.Any(s => s.IsSelfRegistering);
+
+        if (masque || options.StoreFakeIp)
         {
             var cache = Path.GetFullPath(options.CachePath);
 
@@ -506,12 +559,19 @@ public sealed class SingBoxConfigCompiler
             if (!string.IsNullOrEmpty(directory))
                 Directory.CreateDirectory(directory);
 
-            ((JsonObject)root["experimental"]!)["cache_file"] = new JsonObject
+            var cacheFile = new JsonObject
             {
                 ["enabled"] = true,
                 ["path"] = cache,
-                ["store_masque_config"] = true,
             };
+
+            if (masque)
+                cacheFile["store_masque_config"] = true;
+
+            if (options.StoreFakeIp)
+                cacheFile["store_fakeip"] = true;
+
+            ((JsonObject)root["experimental"]!)["cache_file"] = cacheFile;
         }
 
         return new CompilationResult
@@ -522,6 +582,28 @@ public sealed class SingBoxConfigCompiler
             ServerTags = tags,
         };
     }
+
+    /// <summary>
+    /// Чем движок проверяет сертификаты: встроенным списком корней Mozilla,
+    /// а не хранилищем Windows.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// sing-box падал сам с 0xc0000005 в <c>crypto/x509</c> (<c>systemVerify</c>) —
+    /// <c>root_windows.go</c>, <c>CertFreeCertificateChain</c>: 11.10, 12.10
+    /// и ещё четыре раза в журнале владельца к 19.10; надзор поднимал его
+    /// за 2–10 с, и туннель на это время пропадал. Своим списком Go проверяет цепочку сам и к
+    /// Windows не обращается вовсе — тот путь, где падало, не вызывается.
+    /// </para>
+    /// <para>
+    /// Цена: корни, поставленные в Windows руками, движок больше не знает.
+    /// Это корпоративный перехват и проверка HTTPS антивирусом, если она
+    /// перехватывает и сам sing-box, — тогда его DoH и серверы с настоящим
+    /// TLS не пройдут проверку. Серверы REALITY и с <c>insecure</c> сертификат
+    /// так не проверяют и не заденутся. Вживую не проверено (19.10).
+    /// </para>
+    /// </remarks>
+    private static JsonObject Certificates() => new() { ["store"] = "mozilla" };
 
     /// <summary>
     /// Собирает минимальный конфиг для проверки одного сервера.
@@ -542,6 +624,9 @@ public sealed class SingBoxConfigCompiler
     private const string BootstrapTag = "bootstrap";
 
     private const string OverrideTag = "pinned";
+
+    /// <summary>Имя-сигнал Mozilla: NXDOMAIN на него выключает DoH Firefox по умолчанию.</summary>
+    internal const string FirefoxCanary = "use-application-dns.net";
 
     /// <param name="resolvedAddress">
     /// Адрес сервера, выясненный заранее и в обход системного резолвера.
@@ -585,6 +670,10 @@ public sealed class SingBoxConfigCompiler
         var root = new JsonObject
         {
             ["log"] = log,
+
+            // Тем же, что у движка: замер сервера обязан проверять его
+            // сертификат так же, как потом будет проверять туннель.
+            ["certificate"] = Certificates(),
             ["inbounds"] = new JsonArray { probe },
             ["outbounds"] = server.IsEndpoint
                 ? new JsonArray { new JsonObject { ["type"] = "direct", ["tag"] = "direct" } }
@@ -715,39 +804,6 @@ public sealed class SingBoxConfigCompiler
         return tags;
     }
 
-    /// <summary>
-    /// Домены, которые по правилам уходят в прокси. При выборочном перехвате
-    /// только им выдаётся адрес fakeip — и только они попадают в туннель.
-    /// </summary>
-    /// <param name="haveServers">
-    /// Есть ли куда вести. Без серверов домен регистрации WARP получил бы
-    /// fakeip и ушёл в <c>direct</c> с подменённым адресом — то есть никуда.
-    /// </param>
-    private static IReadOnlyList<string> CollectProxyDomains(RuleSet ruleSet, bool haveServers)
-    {
-        if (ruleSet.Operating != OperatingMode.Selective)
-            return Array.Empty<string>();
-
-        var proxied = ruleSet.Rules.Where(r => r.Mode == RoutingMode.Proxy);
-
-        // Домены из правил по одному имени и из списков — вперемешку: для
-        // fakeip разницы нет, а для человека список это тот же набор доменов,
-        // только записанный одной строкой.
-        var domains = proxied
-            .Where(r => r.Match == MatchKind.Domain)
-            .Select(r => r.Value)
-            .Concat(proxied
-                .Where(r => r.Match == MatchKind.HostList)
-                .SelectMany(r => r.HostListDomains));
-
-        return domains
-            .Select(v => v.StartsWith("*.", StringComparison.Ordinal) ? v[2..] : v)
-            .Where(v => !v.Contains('*'))
-
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
-
     /// <summary>Адрес — сетью: «35.190.80.1» → «35.190.80.1/32»; сеть и не адрес — как есть.</summary>
     /// <remarks>
     /// <c>route_address</c> и <c>route_exclude_address</c> sing-box принимает
@@ -793,7 +849,6 @@ public sealed class SingBoxConfigCompiler
 
     private static JsonObject BuildDns(
         SingBoxOptions options,
-        IReadOnlyList<string> proxyDomains,
         bool haveServers, RuleSet ruleSet)
     {
         var remote = new JsonObject
@@ -845,6 +900,19 @@ public sealed class SingBoxConfigCompiler
             },
         };
 
+        // Ступень «по TCP» для «авто»: тот же адрес, порт 53, без detour —
+        // прямым путём. Включается правилом по режиму в конце списка
+        // (см. SingBoxOptions.DnsViaAuto).
+        if (options.DnsTcpStep)
+        {
+            servers.Add(new JsonObject
+            {
+                ["tag"] = SingBoxOptions.DnsTcpTag,
+                ["type"] = "tcp",
+                ["server"] = options.DnsServer,
+            });
+        }
+
         if (bootstrap)
         {
             // Имена самих серверов подписки разрешаются в обход туннеля,
@@ -888,7 +956,22 @@ public sealed class SingBoxConfigCompiler
         // Fakeip выдаёт каждому домену собственный адрес, поэтому соответствие
         // «адрес → домен» точное 1:1, и доменные правила работают без догадок
         // по реальным адресам CDN.
-        var rules = new JsonArray();
+        var rules = new JsonArray
+        {
+            // Сигнал Firefox: «в этой сети свой DoH не включать». Firefox,
+            // которому DoH не включали руками, спрашивает это имя у системного
+            // резолвера и при NXDOMAIN ходит в DNS Windows — то есть к нам.
+            // Иначе он разрешал имена сам, по DoH мимо движка: имена «через VPN»
+            // получали настоящие адреса вместо fakeip и в «Гибриде» шли мимо
+            // туннеля (замер 04.10). Включённый руками DoH сигнал не слушает —
+            // про него говорит «Диагностика» (BrowserDoh).
+            new JsonObject
+            {
+                ["domain"] = new JsonArray { FirefoxCanary },
+                ["action"] = "predefined",
+                ["rcode"] = "NXDOMAIN",
+            },
+        };
 
         if (options.AddressOverrides.Count > 0)
         {
@@ -908,27 +991,30 @@ public sealed class SingBoxConfigCompiler
         {
             // Сохраняем порядок доменных правил: прямым доменам нужны реальные ответы роутера,
             // в том числе прямым исключениям полного туннеля; проксируемым оставляем FakeIP.
-            foreach (var rule in RouterDomainRules(ruleSet, haveServers)) rules.Add(rule);
+            foreach (var rule in OrderedDomainRules(ruleSet, haveServers)) rules.Add(rule);
             if (options.Scope != TunnelScope.ProxyOnly && haveServers
                 && ruleSet.Operating is OperatingMode.ProxyAll or OperatingMode.ProxyStrict)
                 rules.Add(new JsonObject { ["query_type"] = new JsonArray { "A", "AAAA" }, ["server"] = "fake" });
         }
-        else if (options.Scope == TunnelScope.ProxyOnly && proxyDomains.Count > 0)
+        else if (options.Scope == TunnelScope.ProxyOnly && ruleSet.Operating == OperatingMode.Selective)
         {
             // Выборочный fakeip: подменяем ответ только тем доменам, которые
             // идут в прокси. Всем остальным отдаётся настоящий адрес, и их
             // трафик в туннель не попадает — этим и достигается развод
             // с десинком.
-            var suffixes = new JsonArray();
-            foreach (var domain in proxyDomains)
-                suffixes.Add(domain);
-
-            rules.Add(new JsonObject
-            {
-                ["domain_suffix"] = suffixes,
-                ["query_type"] = new JsonArray { "A", "AAAA" },
-                ["server"] = "fake",
-            });
+            //
+            // В очереди маршрутов, а не списком всех имён «через VPN» (19.10).
+            // Список не знал очереди: правило VPN, перекрытое правилом выше
+            // («напрямую», «десинк»), всё равно давало имени fakeip — с 0.11.2.
+            // Маршрут вёл имя мимо туннеля, а адрес у него был подменный:
+            // соединение заходило в TUN и шло через движок, а после перезапуска
+            // кэш Windows отдавал адрес, которого движок уже не помнил, —
+            // «missing fakeip record». Теперь, как у DNS роутера, правило выше,
+            // пересекающееся с VPN ниже, пишется раньше и получает настоящий
+            // адрес. Имена с маской посередине fakeip не получают, как и прежде
+            // (у DNS роутера — получают регуляркой; там это было и до 19.10).
+            foreach (var rule in Merged(OrderedDomainRules(ruleSet, haveServers, proxyGlobs: false)))
+                rules.Add(rule);
         }
         else if (options.Scope != TunnelScope.ProxyOnly)
         {
@@ -960,13 +1046,33 @@ public sealed class SingBoxConfigCompiler
             });
         }
 
+        // Последним, перед final: всё, что иначе ушло бы в remote, в режиме
+        // dns-tcp идёт по TCP. Правила выше — fakeip, подставные адреса,
+        // панели — остаются как есть. Правила очереди маршрутов, которые
+        // называют remote явно (имя выше пересекающегося VPN), в этом режиме
+        // по-прежнему спрашивают DoH: таких имён единицы, и ради них
+        // усложнять очередь не стоит.
+        if (options.DnsTcpStep)
+        {
+            rules.Add(new JsonObject
+            {
+                ["clash_mode"] = SingBoxOptions.DnsTcpMode,
+                ["server"] = SingBoxOptions.DnsTcpTag,
+            });
+        }
+
         dns["rules"] = rules;
         dns["final"] = "remote";
 
         return dns;
     }
 
-    private static IEnumerable<JsonObject> RouterDomainRules(RuleSet ruleSet, bool haveServers)
+    /// <summary>
+    /// Доменные правила DNS в очереди маршрутов: VPN — fakeip, а правило выше,
+    /// пересекающееся с VPN ниже, — настоящий адрес.
+    /// </summary>
+    /// <param name="proxyGlobs">Давать ли fakeip именам с маской посередине (регуляркой).</param>
+    private static IEnumerable<JsonObject> OrderedDomainRules(RuleSet ruleSet, bool haveServers, bool proxyGlobs = true)
     {
         var applicable = (ruleSet.Operating switch
         {
@@ -990,6 +1096,7 @@ public sealed class SingBoxConfigCompiler
                 bool suffix = value.StartsWith("*.", StringComparison.Ordinal);
                 string name = suffix ? value[2..] : value;
                 bool glob = name.Contains('*');
+                if (proxy && glob && !proxyGlobs) continue;
                 if (!proxy && ruleSet.Operating == OperatingMode.Selective
                     && !laterProxy.Overlaps(name, suffix, glob)) continue;
                 node[glob ? "domain_regex" : suffix ? "domain_suffix" : "domain"] =
@@ -1002,6 +1109,10 @@ public sealed class SingBoxConfigCompiler
                 foreach (var entry in rule.HostListDomains)
                 {
                     string name = entry.StartsWith("*.", StringComparison.Ordinal) ? entry[2..] : entry;
+
+                    // domain_suffix звёздочку посередине не понимает: такая строка
+                    // молча не совпала бы ни с чем (так же отбрасывал прежний сбор).
+                    if (name.Contains('*')) continue;
                     if (!proxy && ruleSet.Operating == OperatingMode.Selective
                         && !laterProxy.Overlaps(name, suffix: true, glob: false)) continue;
                     names.Add(name);
@@ -1017,6 +1128,51 @@ public sealed class SingBoxConfigCompiler
         }
         result.Reverse();
         return result;
+    }
+
+    /// <summary>
+    /// Соседние правила с одним резолвером и одними суффиксами — одним правилом.
+    /// </summary>
+    /// <remarks>
+    /// Очередь от склейки не меняется: склеиваются только стоящие подряд.
+    /// Без неё «Гибрид» получал бы правило DNS на каждый список VPN, тогда как
+    /// прежде все они шли одним.
+    /// </remarks>
+    private static IEnumerable<JsonObject> Merged(IEnumerable<JsonObject> rules)
+    {
+        JsonObject? open = null;
+
+        foreach (var rule in rules)
+        {
+            if (open is not null && Mergeable(open, rule))
+            {
+                var into = open["domain_suffix"]!.AsArray();
+
+                foreach (var name in rule["domain_suffix"]!.AsArray())
+                    into.Add(name!.GetValue<string>());
+
+                continue;
+            }
+
+            if (open is not null)
+                yield return open;
+
+            open = rule;
+        }
+
+        if (open is not null)
+            yield return open;
+    }
+
+    private static bool Mergeable(JsonObject a, JsonObject b)
+    {
+        static bool OnlySuffixes(JsonObject rule) =>
+            rule.ContainsKey("domain_suffix")
+            && rule.Select(p => p.Key).All(k => k is "domain_suffix" or "server" or "query_type");
+
+        return OnlySuffixes(a) && OnlySuffixes(b)
+            && a.Count == b.Count
+            && (string?)a["server"] == (string?)b["server"];
     }
 
     /// <summary>Индекс суффиксов не перемножает 117 тысяч имён на каждый список VPN.</summary>
@@ -1220,7 +1376,8 @@ public sealed class SingBoxConfigCompiler
     private static JsonArray BuildOutbounds(
         IReadOnlyList<ProxyServer> servers,
         IReadOnlyDictionary<ProxyServer, string> tags,
-        SingBoxOptions options)
+        SingBoxOptions options,
+        IReadOnlyList<ServerPool> pools)
     {
         var outbounds = new JsonArray
         {
@@ -1298,15 +1455,7 @@ public sealed class SingBoxConfigCompiler
         // Статический список этого не умеет: раньше по умолчанию брался
         // первый сервер подписки, и если он мёртв — а у провайдера
         // это обычное дело, — прокси не работал вовсе.
-        outbounds.Add(new JsonObject
-        {
-            ["type"] = "urltest",
-            ["tag"] = LatencyTag,
-            ["outbounds"] = members,
-            ["url"] = options.LatencyTestUrl,
-            ["interval"] = options.LatencyTestInterval,
-            ["tolerance"] = options.LatencyTolerance,
-        });
+        outbounds.Add(LatencyGroup(LatencyTag, members, options));
 
         // Поверх — селектор: только он позволяет закрепить конкретный сервер
         // вручную через Clash API. По умолчанию указывает на автоподбор.
@@ -1342,6 +1491,9 @@ public sealed class SingBoxConfigCompiler
             ["outbounds"] = selectorMembers,
             ["default"] = pinned ?? LatencyTag,
         });
+
+        foreach (var pool in pools)
+            AddPool(outbounds, pool, servers, tags, options);
 
         // «Авто» для DNS (владелец, 05.10): резолвер ходит через свой
         // переключатель — при запуске напрямую, пока туннель не прогрет,
@@ -1875,6 +2027,168 @@ public sealed class SingBoxConfigCompiler
         return servers.Where(keep.Contains).ToList();
     }
 
+    /// <summary>Пулы, в которые ведёт хоть одно действующее правило «через VPN».</summary>
+    /// <remarks>
+    /// Группа пула без маршрутов — лишний автоподбор: движок мерил бы его
+    /// серверы, а трафика через него нет. Цена пула — проверки (идеи №6),
+    /// и платить её стоит только за пулы с маршрутами.
+    /// </remarks>
+    private static IReadOnlyList<ServerPool> PoolsInUse(RuleSet ruleSet, SingBoxOptions options)
+    {
+        if (options.Pools.Count == 0)
+            return [];
+
+        var servers = ruleSet.Rules
+            .Where(r => r.Enabled && !r.Off && r.Mode == RoutingMode.Proxy)
+            .Select(r => r.Server)
+            .Append(ruleSet.DefaultMode == RoutingMode.Proxy ? ruleSet.DefaultServer : null);
+
+        var used = ServerPools.Referenced(servers, options.Pools);
+
+        return [.. options.Pools.Where(p => used.Contains(p.Id))];
+    }
+
+    /// <summary>Серверы пула, попавшие в конфиг, — в порядке подписки.</summary>
+    private static List<ProxyServer> PoolMembers(
+        ServerPool pool, IEnumerable<ProxyServer> servers, IReadOnlyDictionary<ProxyServer, string> tags)
+    {
+        var wanted = pool.Servers.ToHashSet(StringComparer.Ordinal);
+
+        return servers.Where(s => wanted.Contains(s.Tag) || wanted.Contains(tags[s])).ToList();
+    }
+
+    /// <summary>
+    /// Группы пула: свой автоподбор и своя группа выбора поверх него.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Устроено так же, как пул по умолчанию (<c>auto</c> над <c>auto-latency</c>):
+    /// надзор ставит в группу выбора первый ответивший сервер пула, человек —
+    /// закреплённый. Мёртвые по замерам — мимо автоподбора, но не до пустоты;
+    /// «только зарубежные» пулу не указ: пул «Россия» заводят ради своих.
+    /// </para>
+    /// <para>
+    /// В группе выбора есть и пул по умолчанию — туда надзор уводит маршруты
+    /// молчащего пула (<see cref="AppSettings.DeadPoolToDefault"/>), — и прямой
+    /// выход, как у <c>auto</c>. Ни одного сервера пула в конфиге нет (все
+    /// пропали из подписок) — группы нет, и правила пула ведут в пул по
+    /// умолчанию (<see cref="ResolveOutbound"/>).
+    /// </para>
+    /// </remarks>
+    private static void AddPool(
+        JsonArray outbounds,
+        ServerPool pool,
+        IReadOnlyList<ProxyServer> servers,
+        IReadOnlyDictionary<ProxyServer, string> tags,
+        SingBoxOptions options)
+    {
+        var members = PoolMembers(pool, servers, tags);
+
+        if (members.Count == 0)
+            return;
+
+        var alive = members.Where(s => !options.DeadServerTags.Contains(tags[s])).ToList();
+        var picked = CapPerEntry(alive.Count > 0 ? alive : members, options);
+
+        var latency = new JsonArray();
+        foreach (var server in picked)
+            latency.Add(tags[server]);
+
+        outbounds.Add(LatencyGroup(ServerPools.LatencyTag(pool.Id), latency, options));
+
+        var selector = new JsonArray { ServerPools.LatencyTag(pool.Id) };
+        foreach (var server in members)
+            selector.Add(tags[server]);
+
+        selector.Add(options.SelectorTag);
+        selector.Add("direct");
+
+        var pinned = pool.Preferred is { } wanted
+            ? members.Select(s => tags[s]).FirstOrDefault(t => t == wanted)
+                ?? members.Where(s => s.Tag == wanted).Select(s => tags[s]).FirstOrDefault()
+            : null;
+
+        outbounds.Add(new JsonObject
+        {
+            ["type"] = "selector",
+            ["tag"] = ServerPools.SelectorTag(pool.Id),
+            ["outbounds"] = selector,
+            ["default"] = pinned ?? ServerPools.LatencyTag(pool.Id),
+        });
+    }
+
+    /// <summary>Группа автоподбора — общая (<see cref="LatencyTag"/>) и у каждого пула.</summary>
+    private static JsonObject LatencyGroup(string tag, JsonArray members, SingBoxOptions options)
+    {
+        var group = new JsonObject
+        {
+            ["type"] = "urltest",
+            ["tag"] = tag,
+            ["outbounds"] = members,
+            ["url"] = options.LatencyTestUrl,
+            ["interval"] = options.LatencyTestInterval,
+            ["tolerance"] = options.LatencyTolerance,
+        };
+
+        if (IdleTimeoutFor(options.LatencyTestInterval) is { } idle)
+            group["idle_timeout"] = idle;
+
+        return group;
+    }
+
+    /// <summary>
+    /// <c>idle_timeout</c> группы автоподбора, когда интервал замера длиннее
+    /// его значения по умолчанию; <c>null</c> — не писать, хватает умолчания.
+    /// </summary>
+    /// <remarks>
+    /// sing-box требует, чтобы интервал не превышал <c>idle_timeout</c>
+    /// (по умолчанию 30 минут), и проверяет это только при запуске службы:
+    /// <c>sing-box check</c> такой конфиг пропускает. Пункт «раз в час» в
+    /// «Проверке серверов» поэтому ронял движок на каждом запуске — «interval
+    /// must be less or equal than idle_timeout», код 1 (обсуждение №29, 18.10).
+    /// Замер 20.10 на 1.14.3-extended-2.7.3: 30m поднимается, 31m и 60m —
+    /// FATAL, 60m с idle_timeout 60m поднимается. Ставится равным интервалу:
+    /// группа, простаивающая дольше одного замера, засыпает, как и задумано.
+    /// </remarks>
+    internal static string? IdleTimeoutFor(string interval)
+    {
+        // Длительность Go: «5m», «1h30m», «90s». Не разобрали — не пишем.
+        var text = interval.Trim();
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(text, @"^(\d+(h|m|s))+$"))
+            return null;
+
+        var span = TimeSpan.Zero;
+
+        foreach (System.Text.RegularExpressions.Match part in System.Text.RegularExpressions.Regex.Matches(text, @"(\d+)(h|m|s)"))
+        {
+            if (!int.TryParse(part.Groups[1].Value, out var count))
+                return null;
+
+            span += part.Groups[2].Value switch
+            {
+                "h" => TimeSpan.FromHours(count),
+                "m" => TimeSpan.FromMinutes(count),
+                _ => TimeSpan.FromSeconds(count),
+            };
+        }
+
+        return span > DefaultIdleTimeout ? text : null;
+    }
+
+    /// <summary><c>idle_timeout</c> групп автоподбора у sing-box по умолчанию.</summary>
+    private static readonly TimeSpan DefaultIdleTimeout = TimeSpan.FromMinutes(30);
+
+    /// <summary>Группа выбора пула, если она есть в конфиге; <c>null</c> — пула нет или он пуст.</summary>
+    private static string? PoolOutbound(
+        string? server, IReadOnlyDictionary<ProxyServer, string> tags, SingBoxOptions options)
+    {
+        if (ServerPools.Find(options.Pools, ServerPools.IdOf(server)) is not { } pool)
+            return null;
+
+        return PoolMembers(pool, tags.Keys, tags).Count > 0 ? ServerPools.SelectorTag(pool.Id) : null;
+    }
+
     private static JsonObject BuildRoute(
         RuleSet ruleSet,
         IReadOnlyDictionary<ProxyServer, string> tags,
@@ -1915,7 +2229,7 @@ public sealed class SingBoxConfigCompiler
         // без этой оговорки означает «интернет наполовину сломан».
         // Остальные правила при этом действительно лишние: всё, что не выведено
         // явно, и так уходит в туннель по final.
-        var final = ResolveFinal(ruleSet, options, haveServers);
+        var final = ResolveFinal(ruleSet, tags, options, haveServers);
 
         IReadOnlyList<RoutingRule> applicable = ruleSet.Operating switch
         {
@@ -2283,7 +2597,8 @@ public sealed class SingBoxConfigCompiler
         }
     }
 
-    private static string ResolveFinal(RuleSet ruleSet, SingBoxOptions options, bool haveServers) =>
+    private static string ResolveFinal(
+        RuleSet ruleSet, IReadOnlyDictionary<ProxyServer, string> tags, SingBoxOptions options, bool haveServers) =>
         ruleSet.Operating switch
         {
             // Десинк туннеля не касается вовсе, так что для sing-box этот
@@ -2291,7 +2606,12 @@ public sealed class SingBoxConfigCompiler
             OperatingMode.Off or OperatingMode.DesyncOnly => "direct",
             OperatingMode.ProxyAll or OperatingMode.ProxyStrict =>
                 haveServers ? options.SelectorTag : "direct",
-            _ => ResolveOutbound(ruleSet.DefaultMode, ruleSet.DefaultServer, null, options, haveServers),
+            // Сервер умолчания тегом движку не передавался и прежде (null вместо
+            // тегов) — так и осталось; пул умолчания — передаётся.
+            _ => ruleSet.DefaultMode == RoutingMode.Proxy && haveServers
+                && PoolOutbound(ruleSet.DefaultServer, tags, options) is { } pool
+                    ? pool
+                    : ResolveOutbound(ruleSet.DefaultMode, ruleSet.DefaultServer, null, options, haveServers),
         };
 
     private static string ResolveOutbound(
@@ -2311,6 +2631,11 @@ public sealed class SingBoxConfigCompiler
 
         if (string.IsNullOrWhiteSpace(server) || server.Equals("auto", StringComparison.OrdinalIgnoreCase))
             return options.SelectorTag;
+
+        // Пул: его группа, если она в конфиге; пропавший или опустевший —
+        // пул по умолчанию, как и неизвестный сервер ниже.
+        if (ServerPools.IdOf(server) is not null)
+            return tags is not null && PoolOutbound(server, tags, options) is { } pool ? pool : options.SelectorTag;
 
         if (tags is not null)
         {

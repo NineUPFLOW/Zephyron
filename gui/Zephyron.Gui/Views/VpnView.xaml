@@ -80,6 +80,42 @@
                                     </Border>
                                 </Grid>
 
+                                <!--
+                                    Расход полоской, как в Happ (владелец 19.10): израсходовано
+                                    из лимита, срок, «!» при слишком быстром темпе. Без лимита
+                                    полоска пустая и пишет «/ ∞».
+                                -->
+                                <Grid Margin="0,7,0,0" Visibility="{Binding UsageShown}" ToolTip="{Binding UsageTip}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Grid Height="20">
+                                        <Border CornerRadius="10" BorderThickness="1"
+                                                BorderBrush="{DynamicResource Border}" Background="{DynamicResource Surface}" />
+
+                                        <Grid Margin="1.5">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="{Binding UsedStar}" />
+                                                <ColumnDefinition Width="{Binding LeftStar}" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border CornerRadius="9" Background="{Binding UsageFill}" Opacity="0.45" />
+                                        </Grid>
+
+                                        <TextBlock Text="{Binding UsageLabel}" FontSize="12"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Grid>
+
+                                    <TextBlock Grid.Column="1" Text="{Binding UsageExpires}" FontSize="12"
+                                               Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Margin="14,0,0,0" />
+
+                                    <TextBlock Grid.Column="2" Text="&#xE7BA;" FontFamily="{DynamicResource IconFont}" FontSize="15"
+                                               Foreground="{DynamicResource Warn}" VerticalAlignment="Center" Margin="10,0,0,0"
+                                               Visibility="{Binding PaceShown}" />
+                                </Grid>
+
                                 <TextBlock Text="{Binding Detail}" Style="{StaticResource Caption}"
                                            Margin="0,5,0,0" TextWrapping="Wrap" />
 
@@ -144,6 +180,70 @@
                 </DataTemplate>
 
                 <!--
+                    Папка пула (идеи №6): имя, сколько серверов, кто закреплён,
+                    сколько маршрутов ведёт сюда. Сервер кладут сюда, бросив
+                    его строку на папку.
+                -->
+                <DataTemplate DataType="{x:Type views:PoolRow}">
+                    <Button Style="{StaticResource Choice}" BorderBrush="{Binding Edge}"
+                            Margin="0,10,0,6" Opacity="{Binding Fade}" Click="OnPoolFolder"
+                            AllowDrop="True" DragEnter="OnPoolDragOver" DragOver="OnPoolDragOver"
+                            DragLeave="OnPoolDragLeave" Drop="OnPoolDrop">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Path Grid.Column="0" Style="{StaticResource Chevron}" Margin="5,0,6,0">
+                                <Path.RenderTransform>
+                                    <RotateTransform Angle="{Binding ChevronAngle}" />
+                                </Path.RenderTransform>
+                            </Path>
+
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="15"
+                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+
+                                    <Border Grid.Column="1" CornerRadius="8" Padding="9,1" Margin="10,0,0,0"
+                                            HorizontalAlignment="Left" VerticalAlignment="Center"
+                                            BorderBrush="{DynamicResource Border}" BorderThickness="1">
+                                        <TextBlock Text="{Binding Count}" FontSize="12" Foreground="{DynamicResource Muted}" />
+                                    </Border>
+                                </Grid>
+
+                                <TextBlock Text="{Binding Detail}" Style="{StaticResource Caption}"
+                                           Margin="0,5,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <!--
+                                Автоподбор тумблером (владелец 20.10: «сделай автовыбор
+                                тумблером для каждого пула»), как «в работе» у подписки.
+                            -->
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="автоподбор" Style="{StaticResource Caption}" VerticalAlignment="Center"
+                                           Margin="0,0,8,0" />
+                                <ToggleButton Style="{StaticResource Switch}" Margin="0,0,14,0" VerticalAlignment="Center"
+                                              IsChecked="{Binding Auto, Mode=OneWay}" IsEnabled="{Binding CanSwitch}"
+                                              ToolTip="Автоподбор внутри пула: берёт быстрейший живой сервер. Выключите — пул держится одного сервера: выбранного прежде или быстрейшего сейчас"
+                                              ToolTipService.ShowOnDisabled="True"
+                                              Click="OnPoolAuto" />
+                                <Button Style="{StaticResource IconGhost}" Content="&#xE712;" VerticalAlignment="Center"
+                                        ToolTip="Ещё: переименовать, удалить"
+                                        Click="OnPoolMore" />
+                            </StackPanel>
+                        </Grid>
+                    </Button>
+                </DataTemplate>
+
+                <!--
                     Сервер (макет владельца 12.10): флаг, имя, «Сейчас» у выхода
                     движка, задержка крупно, полоски надёжности, плашка протокола
                     из самого сервера, адрес колонкой, «Выбрать» и «⋮». На узком
@@ -151,7 +251,8 @@
                 -->
                 <DataTemplate DataType="{x:Type views:ServerRow}">
                     <Border Style="{StaticResource Card}" Margin="20,0,0,6" Padding="14,9"
-                            BorderBrush="{Binding Edge}" Opacity="{Binding Fade}">
+                            BorderBrush="{Binding Edge}" Opacity="{Binding Fade}"
+                            PreviewMouseLeftButtonDown="OnServerPress" MouseMove="OnServerDrag">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -250,7 +351,7 @@
                             <!-- Протокол — из самого сервера: защита и транспорт. -->
                             <Grid Grid.Column="5" Width="132" Margin="0,0,14,0"
                                   Visibility="{Binding WideShown, RelativeSource={RelativeSource AncestorType=views:VpnView}}">
-                                <Border CornerRadius="13" Padding="11,4" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                <Border CornerRadius="{StaticResource RPill}" Padding="11,4" HorizontalAlignment="Left" VerticalAlignment="Center"
                                         BorderBrush="{DynamicResource Border}" BorderThickness="1"
                                         Background="{DynamicResource Raised}" Visibility="{Binding ChipShown}">
                                     <TextBlock Text="{Binding Chip}" FontSize="12" TextTrimming="CharacterEllipsis" />
@@ -631,6 +732,32 @@
                     </Grid>
                 </Border>
 
+            </StackPanel>
+
+            <!--
+                Пулы серверов (владелец 19.10, идеи №6): папки серверов через
+                все подписки, в которые ведут маршруты «через VPN». Сервер
+                кладут в пул перетаскиванием на папку или из «⋯» строки.
+                Стоят над подписками: их мало, а подписки раскрываются
+                на сотни строк.
+            -->
+            <StackPanel x:Name="PoolsBlock">
+                <Grid Margin="4,24,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="Пулы серверов" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+
+                    <Button Grid.Column="2" Style="{StaticResource Ghost}" Content="Новый пул" Click="OnNewPool" />
+                </Grid>
+
+                <TextBlock x:Name="PoolsLine" Style="{StaticResource Caption}" Margin="4,8,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <StackPanel x:Name="SubsBlock">
                 <!-- Подписки: заголовок со сводкой, добавление — по кнопке (макет 01.10). -->
                 <Grid x:Name="SubsHeader" Margin="4,24,0,0">
                     <Grid.ColumnDefinitions>

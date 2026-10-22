@@ -81,7 +81,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <Border Width="26" Height="26" CornerRadius="13" Background="{DynamicResource Danger}"
+                        <Border Width="26" Height="26" CornerRadius="{StaticResource RSm}" Background="{DynamicResource Danger}"
                                 VerticalAlignment="Top" Margin="0,1,14,0">
                             <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE711;" FontSize="12"
                                        Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -121,7 +121,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <Border x:Name="DoneMark" Width="40" Height="40" CornerRadius="20"
+                        <Border x:Name="DoneMark" Width="40" Height="40" CornerRadius="{StaticResource RMd}"
                                 Background="{DynamicResource Accent}" VerticalAlignment="Center">
                             <TextBlock x:Name="DoneGlyph" FontFamily="{StaticResource IconFont}" Text="&#xE73E;" FontSize="18"
                                        Foreground="{DynamicResource Backdrop}"

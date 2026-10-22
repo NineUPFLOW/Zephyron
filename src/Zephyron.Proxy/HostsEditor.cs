@@ -285,17 +285,15 @@ public static class HostsEditor
                 continue;
             }
 
-            content[group.Key] = (entry.Enabled ? string.Empty : "# ")
-                + entry.Address + " " + string.Join(' ', left)
-                + (entry.Note is { } note ? " # " + note : string.Empty);
+            content[group.Key] = Format(entry.Enabled, entry.Address, left, entry.Note);
         }
 
         // Опустевший наш блок уходит вместе с отметками — как и у Unpin:
         // иначе в файле копятся следы от сервисов, которых давно нет.
         var (start, end) = FindBlock(content);
 
-        if (start >= 0 && !content.Skip(start + 1).Take(end - start - 1).Any(l => Split(l) is not null))
-            content.RemoveRange(start, end - start + 1);
+        if (start >= 0 && !Own(content, start, end).Any(l => (Split(l) ?? SplitDisabled(l)) is not null))
+            DropBlock(content, start, end);
 
         Write(target, content);
         return (backup, removed);
@@ -320,9 +318,16 @@ public static class HostsEditor
     /// он означает, что хост есть.
     /// </para>
     /// </remarks>
+    /// <param name="progress">Каждый проверенный адрес — сразу, как ответил или промолчал.</param>
+    /// <remarks>
+    /// По восемь адресов разом (19.10): раздел проверяет теперь весь файл,
+    /// у владельца это 43 адреса, и молчащий ждёт 4 с — по одному вышло бы
+    /// под три минуты. Адреса разные, так что залпом в один узел это не бьёт.
+    /// </remarks>
     public static async Task<IReadOnlyList<PinHealth>> CheckAsync(
         IReadOnlyList<HostsEntry> entries,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IProgress<PinHealth>? progress = null)
     {
         var byAddress = entries
             .Where(e => e.Enabled)
@@ -335,43 +340,59 @@ public static class HostsEditor
         // и без этой поправки проверка объявила бы мёртвыми рабочие записи.
         bool haveIpV6 = await HasIpV6Async(cancellationToken);
 
-        foreach (var group in byAddress)
-        {
-            if (cancellationToken.IsCancellationRequested)
-                break;
+        using var gate = new SemaphoreSlim(8);
 
+        async Task CheckOne(IGrouping<string, HostsEntry> group)
+        {
             // Петля и нули ставят, чтобы имя не открывалось. Это не мёртвый
             // адрес, а намеренная заглушка, и тревожить о ней незачем.
             if (IPAddress.TryParse(group.Key, out var parsed) && BlockCheck.IsStub(parsed))
-                continue;
+                return;
 
             int names = group.Sum(g => g.Names.Count);
+            PinHealth health;
 
             if (!haveIpV6 && parsed?.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
             {
-                result.Add(new PinHealth
+                health = new PinHealth
                 {
                     Address = group.Key,
                     Names = names,
                     Alive = false,
                     Tested = false,
                     Skipped = "в этой сети нет IPv6",
-                });
+                };
+            }
+            else
+            {
+                await gate.WaitAsync(cancellationToken);
 
-                continue;
+                try
+                {
+                    var watch = System.Diagnostics.Stopwatch.StartNew();
+                    bool alive = await AnswersAsync(group.Key, cancellationToken);
+
+                    health = new PinHealth
+                    {
+                        Address = group.Key,
+                        Names = names,
+                        Alive = alive,
+                        Elapsed = watch.Elapsed,
+                    };
+                }
+                finally
+                {
+                    gate.Release();
+                }
             }
 
-            var watch = System.Diagnostics.Stopwatch.StartNew();
-            bool alive = await AnswersAsync(group.Key, cancellationToken);
+            lock (result)
+                result.Add(health);
 
-            result.Add(new PinHealth
-            {
-                Address = group.Key,
-                Names = names,
-                Alive = alive,
-                Elapsed = watch.Elapsed,
-            });
+            progress?.Report(health);
         }
+
+        await Task.WhenAll(byAddress.Select(CheckOne));
 
         return result.OrderByDescending(r => r.Names).ToList();
     }
@@ -500,7 +521,7 @@ public static class HostsEditor
             if (start < 0)
                 return result;
 
-            foreach (var line in lines.Skip(start + 1).Take(end - start - 1))
+            foreach (var line in Own(lines, start, end))
             {
                 if (Split(line) is { } pair && Marked(line))
                     result.Add(pair.Name);
@@ -583,7 +604,7 @@ public static class HostsEditor
 
         if (start >= 0)
         {
-            foreach (var line in lines.Skip(start + 1).Take(end - start - 1))
+            foreach (var line in Own(lines, start, end))
             {
                 if (Split(line) is not { } pair)
                     continue;
@@ -618,6 +639,10 @@ public static class HostsEditor
         var kept = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         var marked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        // Выключенные в окне строки блока (SetEnabled) переживают перезапись
+        // как есть: без этого первое же закрепление стирало бы их молча.
+        var disabled = new List<(string Name, string Line)>();
+
         // Без новой подписи блок сохраняет прежнюю: её пишет окно при закреплении
         // («Claude — XBOX DNS»), а само обновление пинов (PinRefresh) ничего
         // нового о происхождении блока не знает.
@@ -630,10 +655,19 @@ public static class HostsEditor
 
         // Уже прибитое нами сохраняется: закрепляют по одному сервису,
         // и переписывать блок целиком значило бы снимать все прежние.
+        var nested = new List<string>();
+        var at = -1;
+
         if (start >= 0)
         {
-            foreach (var line in lines.Skip(start + 1).Take(end - start - 1))
+            foreach (var line in Own(lines, start, end))
             {
+                if (SplitDisabled(line) is { } off)
+                {
+                    disabled.Add((off.Name, line.Trim()));
+                    continue;
+                }
+
                 if (Split(line) is not { } pair)
                     continue;
 
@@ -647,6 +681,9 @@ public static class HostsEditor
                     marked.Add(pair.Name);
             }
 
+            // Чужой блок внутри нашего — не наш: см. Nested.
+            nested = Nested(lines, start, end);
+            at = start;
             lines.RemoveRange(start, end - start + 1);
         }
 
@@ -687,12 +724,32 @@ public static class HostsEditor
                 block.Add($"{address} {name}{mark}");
         }
 
+        // Прибитое заново заменяет и выключенную строку того же имени.
+        foreach (var (name, line) in disabled)
+        {
+            if (!entries.Keys.Any(n => string.Equals(n.TrimStart('*', '.'), name, StringComparison.OrdinalIgnoreCase)))
+                block.Add(line);
+        }
+
         block.Add(BlockEnd);
         block.Add(string.Empty);
 
-        // В начало, но после шапки из комментариев: она объясняет формат файла,
-        // и вытеснять её вниз незачем.
-        lines.InsertRange(HeaderLength(lines), block);
+        // Блок встаёт на прежнее место, а впервые — в начало, после шапки
+        // из комментариев: она объясняет формат файла, и вытеснять её вниз
+        // незачем. Вложенные чужие блоки — прямо перед нашим: их строки
+        // стояли выше наших записей и выше и остаются, так что разрешение
+        // имён от нашей перезаписи не меняется.
+        if (nested.Count > 0)
+            block.InsertRange(0, nested);
+
+        int place = at >= 0 ? at : HeaderLength(lines);
+
+        // Пустая строка после блока уже есть — вторую не добавляем, иначе
+        // каждая перезапись на прежнем месте копила бы их по одной.
+        if (place < lines.Count && lines[place].Trim().Length == 0)
+            block.RemoveAt(block.Count - 1);
+
+        lines.InsertRange(place, block);
 
         Write(target, lines);
 
@@ -724,16 +781,33 @@ public static class HostsEditor
         var backup = Backup(target);
         var drop = new HashSet<string>(names.Select(n => n.TrimStart('*', '.')), StringComparer.OrdinalIgnoreCase);
         var left = 0;
+        var pinned = 0;
 
+        var foreign = NestedLines(lines, start, end);
+
+        // Выключенные строки блока тоже наши: снимаются по имени вместе
+        // с действующими и держат блок, пока они в нём есть. Строки
+        // вложенного чужого блока не наши и не трогаются.
         for (int i = end - 1; i > start; i--)
         {
-            if (Split(lines[i]) is not { } pair)
+            if (foreign.Contains(i))
+                continue;
+
+            bool on = Split(lines[i]) is not null;
+
+            if ((Split(lines[i]) ?? SplitDisabled(lines[i])) is not { } pair)
                 continue;
 
             if (drop.Contains(pair.Name))
+            {
                 lines.RemoveAt(i);
-            else
-                left++;
+                continue;
+            }
+
+            left++;
+
+            if (on)
+                pinned++;
         }
 
         // Пустой блок убирается целиком — иначе в файле копятся наши следы
@@ -743,12 +817,12 @@ public static class HostsEditor
             (start, end) = FindBlock(lines);
 
             if (start >= 0)
-                lines.RemoveRange(start, end - start + 1);
+                DropBlock(lines, start, end);
         }
 
         Write(target, lines);
 
-        return new PinResult { Backup = backup, Pinned = left, Shadowed = [] };
+        return new PinResult { Backup = backup, Pinned = pinned, Shadowed = [] };
     }
 
     /// <summary>
@@ -864,7 +938,7 @@ public static class HostsEditor
         if (start < 0)
             return result;
 
-        foreach (var line in lines.Skip(start + 1).Take(end - start - 1))
+        foreach (var line in Own(lines, start, end))
         {
             if (Split(line) is { } pair)
                 result[pair.Name] = pair.Address;
@@ -914,6 +988,82 @@ public static class HostsEditor
     }
 
     /// <summary>
+    /// Строки нашего блока без вложенных чужих блоков.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Zapret GUI ставит свой блок «перед первой строкой-записью»
+    /// (<c>_insert_managed_hosts_block</c> в <c>src/hosts/hosts.py</c>,
+    /// прочитано 19.10). Наш блок стоит первым, первая запись файла — наша,
+    /// и всякий раз, как Zapret GUI применяет пины, его блок встаёт внутрь
+    /// нашего: так у владельца 19.10, строки 136–190 внутри 131–275.
+    /// Помешать этому мы не можем, значит, обязаны так жить.
+    /// </para>
+    /// <para>
+    /// До 19.10 всё между нашими отметками считалось нашим: 82 записи Zapret GUI
+    /// числились нашими пинами, а первое же закрепление стирало его разметку
+    /// и переписывало его записи в наш блок как свои.
+    /// </para>
+    /// </remarks>
+    private static IEnumerable<string> Own(IReadOnlyList<string> lines, int start, int end)
+    {
+        var nested = NestedLines(lines, start, end);
+
+        for (int i = start + 1; i < end; i++)
+        {
+            if (!nested.Contains(i))
+                yield return lines[i];
+        }
+    }
+
+    /// <summary>Номера строк вложенных чужих блоков — вместе с их отметками.</summary>
+    private static HashSet<int> NestedLines(IReadOnlyList<string> lines, int start, int end)
+    {
+        var result = new HashSet<int>();
+        int depth = 0;
+
+        for (int i = start + 1; i < end; i++)
+        {
+            var text = lines[i].Trim();
+
+            if (text.StartsWith("# >>>", StringComparison.Ordinal))
+                depth++;
+
+            if (depth > 0)
+                result.Add(i);
+
+            if (depth > 0 && text.StartsWith("# <<<", StringComparison.Ordinal))
+                depth--;
+        }
+
+        return result;
+    }
+
+    /// <summary>Вложенные чужие блоки дословно, в прежнем порядке.</summary>
+    private static List<string> Nested(IReadOnlyList<string> lines, int start, int end) =>
+        NestedLines(lines, start, end).Order().Select(i => lines[i]).ToList();
+
+    /// <summary>
+    /// Убирает наш блок, оставляя на его месте вложенные чужие.
+    /// </summary>
+    /// <remarks>
+    /// Опустевший наш блок уходит, но блок Zapret GUI внутри него — не наш,
+    /// и стереть его значило бы снять чужие пины молча.
+    /// </remarks>
+    private static void DropBlock(List<string> lines, int start, int end)
+    {
+        var nested = Nested(lines, start, end);
+
+        lines.RemoveRange(start, end - start + 1);
+        lines.InsertRange(start, nested);
+    }
+
+    /// <summary>Открывает ли строка чужой блок или раздел (<c># &gt;&gt;&gt;</c>, <c># --- … ---</c>).</summary>
+    private static bool OpensForeign(string text) =>
+        text.StartsWith("# >>>", StringComparison.Ordinal)
+        || (text.StartsWith("# ---", StringComparison.Ordinal) && text.EndsWith("---", StringComparison.Ordinal));
+
+    /// <summary>
     /// Сколько строк занимает шапка файла.
     /// </summary>
     /// <remarks>
@@ -932,6 +1082,11 @@ public static class HostsEditor
             if (text.Length != 0 && !text.StartsWith('#'))
                 break;
 
+            // Чужой блок или раздел — уже не шапка: встав после его
+            // открывающей строки, наш блок оказался бы внутри чужого.
+            if (OpensForeign(text))
+                break;
+
             i++;
         }
 
@@ -943,11 +1098,13 @@ public static class HostsEditor
     {
         var watch = new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
         var (start, end) = FindBlock(lines);
+        var nested = start >= 0 ? NestedLines(lines, start, end) : [];
         var found = new List<string>();
 
         for (int i = 0; i < lines.Count; i++)
         {
-            if (start >= 0 && i >= start && i <= end)
+            // Вложенный чужой блок — чужие строки, хоть и внутри нашего.
+            if (start >= 0 && i >= start && i <= end && !nested.Contains(i))
                 continue;
 
             if (Split(lines[i]) is { } pair && watch.Contains(pair.Name))
@@ -976,6 +1133,85 @@ public static class HostsEditor
             ? (parts[0], parts[1])
             : null;
     }
+
+    /// <summary>Адрес и первое имя выключенной строки; <c>null</c> — не выключенная запись.</summary>
+    /// <remarks>
+    /// Под решёткой должны стоять адрес и имя, иначе это настоящий комментарий —
+    /// заголовок нашего блока, подпись сервиса.
+    /// </remarks>
+    private static (string Address, string Name)? SplitDisabled(string line)
+    {
+        var text = line.Trim().TrimStart('﻿');
+
+        return text.StartsWith('#') ? Split(text.TrimStart('#')) : null;
+    }
+
+    /// <summary>
+    /// Включает или выключает имена в названных строках — решёткой в начале строки.
+    /// </summary>
+    /// <param name="targets">Номер строки из <see cref="HostsEntry.Line"/> и имя в ней.</param>
+    /// <returns>Путь к копии и сколько имён сменило состояние.</returns>
+    /// <remarks>
+    /// <para>
+    /// Заведено 19.10 под редизайн раздела: выключенная запись лежит в файле
+    /// и возвращается одним нажатием — так пин снимают на время, для замера
+    /// A/B/A, не набирая потом адрес заново.
+    /// </para>
+    /// <para>
+    /// Имя, а не строка: в строке их бывает несколько, и выключить
+    /// <c>t.me</c> не значит выключить соседний <c>api.telegram.org</c>.
+    /// Выбранные имена тогда уходят отдельной строкой сразу под прежней,
+    /// с тем же адресом и подписью.
+    /// </para>
+    /// <para>
+    /// Строка правится по свежему разбору; имя, которого в ней уже нет, пропускается —
+    /// между показом и нажатием файл мог переписать кто угодно.
+    /// </para>
+    /// </remarks>
+    public static (string Backup, int Changed) SetEnabled(
+        IReadOnlyCollection<(int Line, string Name)> targets,
+        bool enabled,
+        string? path = null)
+    {
+        var target = path ?? HostsFile.DefaultPath;
+        var content = File.ReadAllLines(target).ToList();
+        var backup = Backup(target);
+
+        var entries = Parse(target).ToDictionary(e => e.Line);
+        int changed = 0;
+
+        // С конца: вставленная строка не должна сдвигать ещё не тронутые.
+        foreach (var group in targets.GroupBy(t => t.Line).OrderByDescending(g => g.Key))
+        {
+            if (!entries.TryGetValue(group.Key, out var entry) || entry.Enabled == enabled)
+                continue;
+
+            var wanted = group.Select(t => t.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var picked = entry.Names.Where(wanted.Contains).ToList();
+            var rest = entry.Names.Where(n => !wanted.Contains(n)).ToList();
+
+            if (picked.Count == 0)
+                continue;
+
+            changed += picked.Count;
+
+            if (rest.Count == 0)
+            {
+                content[group.Key] = Format(enabled, entry.Address, entry.Names, entry.Note);
+                continue;
+            }
+
+            content[group.Key] = Format(entry.Enabled, entry.Address, rest, entry.Note);
+            content.Insert(group.Key + 1, Format(enabled, entry.Address, picked, entry.Note));
+        }
+
+        Write(target, content);
+        return (backup, changed);
+    }
+
+    private static string Format(bool enabled, string address, IEnumerable<string> names, string? note) =>
+        (enabled ? string.Empty : "# ") + address + " " + string.Join(' ', names)
+        + (note is { } text ? " # " + text : string.Empty);
 
     private static string Backup(string path)
     {

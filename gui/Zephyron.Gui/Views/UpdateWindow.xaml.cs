@@ -125,7 +125,7 @@ public partial class UpdateWindow : Window
     private void ShowReleases(IReadOnlyList<ReleaseInfo> releases)
     {
         _releases = releases
-            .OrderByDescending(r => Version.TryParse(r.Version, out var v) ? v : new Version(0, 0))
+            .OrderByDescending(r => r.Version, UpdateCheck.Order)
             .ToList();
 
         ShowTimeline(_releases);
@@ -212,7 +212,6 @@ public partial class UpdateWindow : Window
         ["vpn"] = "",
         ["desync"] = "",
         ["routes"] = "",
-        ["tgproxy"] = "",
         ["check"] = "",
         ["speed"] = "",
         ["dns"] = "",
@@ -222,6 +221,16 @@ public partial class UpdateWindow : Window
         ["look"] = "",
         ["more"] = "",
         ["general"] = "",
+    };
+
+    /// <summary>
+    /// Значки-фигуры — у пунктов меню, где значок не знак шрифта, а фигура
+    /// (<see cref="MenuIcon"/>.Shape): ключ ресурса. Самолётик Telegram у «TG Proxy»
+    /// (владелец 22.10: «везде»).
+    /// </summary>
+    internal static IReadOnlyDictionary<string, string> Shapes { get; } = new Dictionary<string, string>
+    {
+        ["tgproxy"] = "TelegramPlane",
     };
 
     /// <summary>
@@ -235,11 +244,29 @@ public partial class UpdateWindow : Window
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
 
-        var glyph = new TextBlock { Text = Glyphs.TryGetValue(category.Key, out var known) ? known : Glyphs["general"] };
-        glyph.SetResourceReference(StyleProperty, "TileGlyph");
-        glyph.SetResourceReference(TextBlock.ForegroundProperty, "Accent");
+        FrameworkElement mark;
 
-        var tile = new Border { Child = glyph, Margin = new Thickness(0, 0, 14, 0) };
+        if (Shapes.TryGetValue(category.Key, out var shape))
+        {
+            var figure = new System.Windows.Shapes.Path
+            {
+                Width = 18, Height = 18, Stretch = Stretch.Uniform,
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            };
+
+            figure.SetResourceReference(System.Windows.Shapes.Path.DataProperty, shape);
+            figure.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "Accent");
+            mark = figure;
+        }
+        else
+        {
+            var glyph = new TextBlock { Text = Glyphs.TryGetValue(category.Key, out var known) ? known : Glyphs["general"] };
+            glyph.SetResourceReference(StyleProperty, "TileGlyph");
+            glyph.SetResourceReference(TextBlock.ForegroundProperty, "Accent");
+            mark = glyph;
+        }
+
+        var tile = new Border { Child = mark, Margin = new Thickness(0, 0, 14, 0) };
         tile.SetResourceReference(StyleProperty, "IconTile");
         grid.Children.Add(tile);
 
@@ -267,7 +294,7 @@ public partial class UpdateWindow : Window
             CornerRadius = new CornerRadius(12),
             Padding = new Thickness(14, 14, 16, 4),
             Margin = new Thickness(0, 6, 0, 8),
-            BorderThickness = new Thickness(1),
+            BorderThickness = new Thickness(1.5),
             Background = Brushes.Transparent,
         };
         card.SetResourceReference(Border.BorderBrushProperty, "Border");
@@ -424,7 +451,7 @@ public partial class UpdateWindow : Window
                 Padding = new Thickness(6, 0, 0, 0),
                 Background = Brushes.Transparent,
                 BorderBrush = Brushes.Transparent,
-                BorderThickness = new Thickness(1),
+                BorderThickness = new Thickness(1.5),
                 Cursor = System.Windows.Input.Cursors.Hand,
                 ToolTip = "Читать чейнджлог этой версии",
             };
@@ -635,7 +662,7 @@ public partial class UpdateWindow : Window
                     CornerRadius = new CornerRadius(8),
                     Padding = new Thickness(12, 8, 12, 8),
                     Margin = new Thickness(0, 2, 0, 10),
-                    BorderThickness = new Thickness(1),
+                    BorderThickness = new Thickness(1.5),
                 };
                 frame.SetResourceReference(Border.BackgroundProperty, "Raised");
                 frame.SetResourceReference(Border.BorderBrushProperty, "Border");

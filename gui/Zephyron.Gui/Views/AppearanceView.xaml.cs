@@ -54,6 +54,12 @@ public partial class AppearanceView : UserControl
 
         // У встроенной «Изменить» создаёт новую — подпись говорит это заранее.
         EditThemeButton.Content = ThemeLoader.Shipped.Contains(current) ? "Изменить копию" : "Изменить";
+
+        // Удалить — только свою: встроенные едут с программой, и обновление вернуло бы их.
+        DeleteThemeButton.IsEnabled = !ThemeLoader.Shipped.Contains(current);
+        DeleteThemeButton.ToolTip = DeleteThemeButton.IsEnabled
+            ? "Папка темы уйдёт в корзину Windows — оттуда её можно вернуть"
+            : "Встроенные темы едут с программой и не удаляются";
         ShowFonts(settings);
         ShowTray(settings);
         ShowAnimations(settings);
@@ -372,6 +378,58 @@ public partial class AppearanceView : UserControl
                 : editing && shipped
                     ? $"Встроенная тема не меняется — правка сохранена новой: themes\\{id}."
                     : $"Сохранено в themes\\{id} и применено.";
+        }
+
+        ShowTheme(AppSettings.Load(AppSettings.DefaultPath));
+    }
+
+    /// <summary>
+    /// Удаляет тему, что стоит сейчас, — свою, не встроенную.
+    /// </summary>
+    /// <remarks>
+    /// Сперва ставится тёмная: тема с живым фоном держит свой ролик открытым,
+    /// и папку с ним Windows удалить не дала бы. Папка — в корзину
+    /// (<see cref="ThemeWriter.Delete"/>), спросив перед этим.
+    /// </remarks>
+    private void OnDeleteTheme(object sender, RoutedEventArgs e)
+    {
+        var id = Themes.Current;
+
+        if (ThemeLoader.Shipped.Contains(id))
+        {
+            Status.Text = "Встроенные темы едут с программой и не удаляются.";
+            return;
+        }
+
+        var name = CurrentTheme()?.Name ?? id;
+
+        var answer = MessageBox.Show(
+            Window.GetWindow(this)!,
+            $"Удалить тему «{name}»?\n\nПапка themes\\{id} уйдёт в корзину Windows — оттуда её можно вернуть. Вместо неё встанет «Полночь».",
+            "Удалить тему",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question,
+            MessageBoxResult.No);
+
+        if (answer != MessageBoxResult.Yes)
+            return;
+
+        try
+        {
+            Themes.Apply(Themes.DefaultId);
+
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
+
+            if (string.Equals(settings.Theme, id, StringComparison.OrdinalIgnoreCase))
+                (settings with { Theme = null }).Save(AppSettings.DefaultPath);
+
+            ThemeWriter.Delete(id);
+
+            Status.Text = $"Тема «{name}» удалена — папка в корзине. Стоит «Полночь».";
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Удалить не вышло: " + ex.GetBaseException().Message;
         }
 
         ShowTheme(AppSettings.Load(AppSettings.DefaultPath));

@@ -45,6 +45,7 @@
             <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
             <Setter Property="BorderBrush" Value="{DynamicResource AccentLine}" />
             <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="Padding" Value="28,13" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -54,7 +55,7 @@
                         -->
                         <Border x:Name="Shape" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{StaticResource Stroke}" CornerRadius="{StaticResource RSm}"
-                                Padding="28,13">
+                                Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -239,17 +240,37 @@
                                            Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                             </StackPanel>
                         </Button>
-                        <Button x:Name="StopButton" Style="{StaticResource Power}" MinWidth="200"
-                                Foreground="{DynamicResource Danger}" Background="{DynamicResource DangerSoft}"
-                                BorderBrush="{DynamicResource DangerLine}" Click="OnStop" Visibility="Collapsed">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE71A;" Margin="0,0,12,0" FontSize="15"
-                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                <TextBlock Text="Остановить" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"
-                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                            </StackPanel>
-                        </Button>
+                        <!--
+                            «Остановить ▾»: рядом с кнопкой — меню
+                            с перезапуском и двумя выходами, как в трее.
+                        -->
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding Visibility, ElementName=StopButton}">
+                            <Button x:Name="StopButton" Style="{StaticResource Power}" MinWidth="200"
+                                    Foreground="{DynamicResource Danger}" Background="{DynamicResource DangerSoft}"
+                                    BorderBrush="{DynamicResource DangerLine}" Click="OnStop" Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE71A;" Margin="0,0,12,0" FontSize="15"
+                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                    <TextBlock Text="Остановить" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"
+                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="EngineMenuButton" Style="{StaticResource Power}" Margin="6,0,0,0" Click="OnEngineMenu"
+                                    Foreground="{DynamicResource Danger}" Background="{DynamicResource DangerSoft}"
+                                    BorderBrush="{DynamicResource DangerLine}" Padding="14,13" MinWidth="0"
+                                    ToolTip="Перезапустить движки или выйти из программы">
+                                <Path Data="M 0 0 L 5 5 L 10 0" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1.6" Margin="0,2,0,0" VerticalAlignment="Center" />
+                            </Button>
+                        </StackPanel>
                     </Grid>
+
+                    <!--
+                        Счётчики движков: процессор в долях ядра,
+                        память и трафик туннеля с запуска. Только пока обход идёт.
+                    -->
+                    <TextBlock x:Name="EngineMeters" Style="{StaticResource MonoTag}" HorizontalAlignment="Center"
+                               Margin="0,12,0,0" Visibility="Collapsed" />
                 </StackPanel>
 
                 <!--

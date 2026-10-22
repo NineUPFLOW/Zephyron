@@ -177,6 +177,7 @@ public abstract class SupervisedService
         // выбора свежий движок берёт из своего кэша, а не из конфига, —
         // её на место ставит OnReadyAsync.
         ForgetRunState();
+        _fatal = null;
 
         try
         {
@@ -201,8 +202,11 @@ public abstract class SupervisedService
         // Вывод обязан вычитываться. Перенаправленный и никем не читаемый
         // конвейер заполняется и намертво блокирует дочерний процесс на записи
         // в stdout — служба при этом выглядит живой и проходит проверку порта.
-        StartOutputPump(Process.StandardOutput);
-        StartOutputPump(Process.StandardError);
+        var pumps = new[]
+        {
+            StartOutputPump(Process.StandardOutput),
+            StartOutputPump(Process.StandardError),
+        };
 
         StartedAt = DateTimeOffset.Now;
 
@@ -212,7 +216,18 @@ public abstract class SupervisedService
         {
             if (!IsProcessAlive)
             {
-                LastError = $"процесс завершился с кодом {Process.ExitCode}";
+                // Последнюю строку процесс пишет перед самым выходом, а насос
+                // читает её своим чередом — без ожидания причина терялась бы
+                // ровно тогда, когда она есть.
+                try
+                {
+                    await Task.WhenAll(pumps).WaitAsync(TimeSpan.FromSeconds(1), cancellationToken);
+                }
+                catch (TimeoutException)
+                {
+                }
+
+                LastError = ExitReason(Process.ExitCode, _fatal);
                 return false;
             }
 
@@ -265,14 +280,16 @@ public abstract class SupervisedService
     /// <summary>Служба снова здорова: прежняя причина больше не действует.</summary>
     internal void Recovered() => LastError = null;
 
-    private void StartOutputPump(StreamReader reader)
-    {
-        _ = Task.Run(async () =>
+    private Task StartOutputPump(StreamReader reader) =>
+        Task.Run(async () =>
         {
             try
             {
                 while (await reader.ReadLineAsync() is { } line)
                 {
+                    if (line.Contains("FATAL", StringComparison.Ordinal))
+                        _fatal = line;
+
                     Observe(line);
                     RecordOutput(line);
                 }
@@ -282,6 +299,42 @@ public abstract class SupervisedService
                 // Поток закрывается вместе с процессом — это штатное завершение насоса.
             }
         });
+
+    /// <summary>Последняя строка FATAL от движка в этом запуске; пишет насос, читает старт.</summary>
+    private volatile string? _fatal;
+
+    /// <summary>
+    /// Почему процесс вышел на старте — словами движка, а не одним кодом.
+    /// </summary>
+    /// <remarks>
+    /// Код 1 у sing-box значит лишь «не поднялся»: конфиг, занятый порт,
+    /// оставшийся адаптер TUN — всё выходит одним кодом, а причина — строкой
+    /// FATAL в его выводе. До 19.10 окно показывало только код, и человек
+    /// из обсуждения №29 спрашивал, «чем может быть вызвана данная проблема»,
+    /// со снимком, на котором причины не было. У владельца так же 13–17.10:
+    /// пятнадцать раз «код 1», и журнал, где строку уже вытеснили.
+    /// Строка проходит ту же чистку, что отчёт: снимок окна выкладывают
+    /// в обсуждения, а движок называет в ошибках поля конфига.
+    /// </remarks>
+    public static string ExitReason(int code, string? fatal)
+    {
+        var reason = $"процесс завершился с кодом {code}";
+
+        if (fatal is null)
+            return reason;
+
+        var said = SupportReport.Redact(fatal, []).Trim();
+
+        // «FATAL[0000] » — уровень и секунды от запуска; смысла в них нет.
+        said = System.Text.RegularExpressions.Regex.Replace(said, @"^.*?FATAL\s*(\[\d+\])?\s*", string.Empty);
+
+        if (said.Length == 0)
+            return reason;
+
+        if (said.Length > 300)
+            said = said[..300] + "…";
+
+        return $"{reason}: {said}";
     }
 
     /// <summary>
@@ -368,7 +421,7 @@ public sealed class SingBoxService : SupervisedService
     /// </param>
     /// <param name="dnsViaAuto">
     /// DNS «авто» (AppSettings.DnsVia): переключатель пути DNS в конфиге ставится
-    /// по проходу трафика через туннель — см. <see cref="ApplyDnsPathAsync"/>.
+    /// по прямому пути к резолверу и проходу трафика — см. <see cref="ApplyDnsPathAsync"/>.
     /// </param>
     public SingBoxService(
         string executablePath,
@@ -382,8 +435,12 @@ public sealed class SingBoxService : SupervisedService
         bool replacePinned = false,
         bool dnsOnly = false,
         bool dnsViaAuto = false,
-        string? watchUrl = null)
+        string? watchUrl = null,
+        IReadOnlyList<ServerPool>? pools = null,
+        bool deadPoolToDefault = true)
     {
+        _pools = [.. (pools ?? []).Select(p => new PoolState(p, replacePinned))];
+        _deadPoolToDefault = deadPoolToDefault;
         _watchUrl = string.IsNullOrWhiteSpace(watchUrl) ? Ping.Cloudflare : watchUrl;
         _dnsOnly = dnsOnly;
         _dnsViaAuto = dnsViaAuto;
@@ -415,45 +472,131 @@ public sealed class SingBoxService : SupervisedService
     /// <summary>Итог своей проверки «авто».</summary>
     private bool _dnsLastOk;
 
+    /// <summary>Резолвер движка из конфига — для проверки прямого пути; читается раз на запуск.</summary>
+    private DnsUpstream? _directDns;
+
+    /// <summary>Годится ли прямой путь к резолверу — по последним проверкам (<see cref="MeasureDirectDnsAsync"/>).</summary>
+    private bool _directDnsOk = true;
+
+    /// <summary>Удачных проверок прямого пути подряд — для возврата из туннеля.</summary>
+    private int _directDnsAnswers;
+
+    /// <summary>Отвечает ли тот же резолвер по TCP, пока DoH напрямую лежит (<see cref="MeasureDirectDnsAsync"/>).</summary>
+    private bool _directTcpOk;
+
+    /// <summary>Стоит ли режим «по TCP» в движке; <c>null</c> — не ставили, в конфиге режим по умолчанию.</summary>
+    private bool? _dnsViaTcp;
+
+    /// <summary>Нужна ли ступень TCP в туннель вместо: DoH лежит, а TCP отвечает.</summary>
+    private bool DnsWantsTcp => !_directDnsOk && _directTcpOk;
+
+    /// <summary>Прямого пути к резолверу нет ни по DoH, ни по TCP — остаётся туннель.</summary>
+    private bool DnsWantsTunnel => !_directDnsOk && !_directTcpOk;
+
     /// <summary>
-    /// Ставит путь DNS: через туннель, пока он пропускает трафик, иначе напрямую.
+    /// Проверяет, отвечает ли резолвер движка напрямую, мимо туннеля, и, если
+    /// нет, отвечает ли он по TCP.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Владелец 05.10: «апстрим туннеля — режим авто, который ведёт напрямую,
-    /// если туннель не работает или мёртв, и через туннель, если с ним всё
-    /// в порядке». 30.09 при «через туннель» заминка выхода клала DNS всей
-    /// машины, а при «напрямую» оператор может перекрыть DoH.
+    /// Уход с прямого DoH — с первого отказа: пока прямой путь лежит, у всей
+    /// машины нет имён мимо VPN. Возврат — после двух ответов подряд: один
+    /// ответ посреди мигающей блокировки увёл бы DNS обратно под неё. Пока
+    /// возврат не подтверждён, ступень остаётся прежней: TCP или туннель.
     /// </para>
     /// <para>
-    /// При запуске переключатель стоит «напрямую» (так собран конфиг), и
-    /// туннель получает DNS только после настоящей проверки прохода — пока
-    /// он прогревается, имена разрешаются. Неудача переключения не беда:
-    /// попробуем на следующем опросе, состояние не запоминается.
+    /// TCP меряется на каждой проверке, пока DoH лежит: умрёт и он — следующая
+    /// ступень туннель (20.10, см. SingBoxOptions.DnsViaAuto).
     /// </para>
     /// </remarks>
-    private async Task ApplyDnsPathAsync(bool tunnelWorks, CancellationToken cancellationToken)
+    private async Task MeasureDirectDnsAsync(CancellationToken cancellationToken)
     {
-        // Ещё не ставили и туннель молчит — переключатель и так «напрямую».
-        if (_dnsViaTunnel is null && !tunnelWorks)
+        _directDns ??= DnsUpstream.FromConfig(_configPath);
+
+        bool answers = _directDns is null || await _directDns.AnswersDirectlyAsync(cancellationToken);
+
+        if (!answers)
         {
-            _dnsViaTunnel = false;
+            _directDnsAnswers = 0;
+            _directDnsOk = false;
+            _directTcpOk = _directDns is not null && await _directDns.AnswersByTcpAsync(cancellationToken);
             return;
         }
 
-        if (_dnsViaTunnel == tunnelWorks)
+        if (!_directDnsOk && ++_directDnsAnswers >= 2)
+        {
+            _directDnsOk = true;
+            _directTcpOk = false;
+        }
+    }
+
+    /// <summary>
+    /// Ставит путь DNS: по TCP — когда DoH напрямую не отвечает, а TCP к тому же
+    /// резолверу отвечает; через туннель — когда не отвечает ни то, ни другое,
+    /// а туннель пропускает трафик; иначе напрямую.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// С 19.10 (владелец: «„авто“ напрямую с уходом в туннель только при отказе
+    /// прямого DoH»). До того «авто» уводило DNS в туннель, как только тот
+    /// пропускал трафик (владелец 05.10), и сайты мимо VPN получали адреса рядом
+    /// с выходом: замер 06.10 — TLS 141–151 мс против 65–73 от прямого DoH.
+    /// Туннель здесь — запасной путь на случай, когда оператор перекрыл DoH.
+    /// 30.09 при «через туннель» заминка выхода клала DNS всей машины.
+    /// </para>
+    /// <para>
+    /// Ступень TCP с 20.10: путь остаётся прямым, адреса — настоящие, а не
+    /// у выхода туннеля. Ставится режимом Clash API
+    /// (<see cref="ClashApi.SetModeAsync"/>), путь — переключателем; оба
+    /// независимы, и в туннель DoH уходит в режиме по умолчанию.
+    /// </para>
+    /// <para>
+    /// При запуске переключатель стоит «напрямую», режим — по умолчанию
+    /// (так собран конфиг). Неудача переключения не беда: попробуем
+    /// на следующем опросе, состояние не запоминается.
+    /// </para>
+    /// </remarks>
+    private async Task ApplyDnsPathAsync(bool viaTunnel, bool viaTcp, CancellationToken cancellationToken)
+    {
+        // Ещё не ставили и менять не надо — переключатель и так «напрямую»,
+        // режим — по умолчанию.
+        if (_dnsViaTunnel is null && !viaTunnel)
+            _dnsViaTunnel = false;
+
+        if (_dnsViaTcp is null && !viaTcp)
+            _dnsViaTcp = false;
+
+        bool pathChanges = _dnsViaTunnel != viaTunnel;
+        bool modeChanges = _dnsViaTcp != viaTcp;
+
+        if (!pathChanges && !modeChanges)
             return;
 
         using var api = new ClashApi($"127.0.0.1:{_healthPort}", Talk, EngineKeys.Current(_configPath));
 
-        if (!await api.SelectAsync(SingBoxOptions.DnsPathTag, tunnelWorks ? SelectorGroup : "direct", cancellationToken))
-            return;
+        if (pathChanges)
+        {
+            if (!await api.SelectAsync(SingBoxOptions.DnsPathTag, viaTunnel ? SelectorGroup : "direct", cancellationToken))
+                return;
 
-        _dnsViaTunnel = tunnelWorks;
+            _dnsViaTunnel = viaTunnel;
+        }
 
-        Note(tunnelWorks
-            ? "DNS (авто): туннель пропускает трафик — имена спрашиваются через него."
-            : "DNS (авто): туннель не пропускает трафик — имена спрашиваются напрямую, пока он не оживёт.");
+        if (modeChanges)
+        {
+            if (!await api.SetModeAsync(viaTcp ? SingBoxOptions.DnsTcpMode : SingBoxOptions.DnsRuleMode, cancellationToken))
+                return;
+
+            _dnsViaTcp = viaTcp;
+        }
+
+        Note(viaTcp
+            ? "DNS (авто): DoH напрямую не отвечает — имена спрашиваются у того же резолвера по TCP."
+            : viaTunnel
+                ? "DNS (авто): резолвер напрямую не отвечает ни по DoH, ни по TCP — имена спрашиваются через туннель."
+                : _directDnsOk
+                    ? "DNS (авто): резолвер снова отвечает напрямую — имена спрашиваются напрямую."
+                    : "DNS (авто): туннель не пропускает трафик — имена спрашиваются напрямую, хотя и там резолвер не отвечал.");
     }
 
     /// <summary>Решения сторожа: когда искать замену и когда возвращать закреплённый выход.</summary>
@@ -603,6 +746,12 @@ public sealed class SingBoxService : SupervisedService
         {
             _warm = true;
         }
+
+        if (_pools.Count > 0)
+        {
+            int run = _run;
+            _ = Task.Run(() => WarmPoolsAsync(run, cancellationToken), CancellationToken.None);
+        }
     }
 
     /// <summary>
@@ -657,9 +806,12 @@ public sealed class SingBoxService : SupervisedService
     /// Именам, уведённым в VPN, движок раздаёт подменные адреса по порядку —
     /// 198.18.0.2, .3 и дальше, fc00::2 и дальше, — и после перезапуска
     /// раздаёт заново: своего кэша у него нет (его файл хранит и выбор
-    /// в селекторе, из-за чего 23.09 залипал WARP, и заводится только
-    /// ради MASQUE). А Windows держит ответ десять минут: замер 26.09 —
-    /// www.cometapi.com → 198.18.0.3, TTL 600.
+    /// в селекторе, из-за чего 23.09 залипал WARP, и заводился только
+    /// ради MASQUE; с 20.10 таблицу fakeip в нём хранит настройка
+    /// <c>AppSettings.FakeIpMemory</c>, по умолчанию включённая, — тогда
+    /// адреса после перезапуска те же, а селектор на место ставит
+    /// <see cref="OnReadyAsync"/>). А Windows держит ответ десять минут:
+    /// замер 26.09 — www.cometapi.com → 198.18.0.3, TTL 600.
     /// </para>
     /// <para>
     /// Вот и выходило: после перезапуска браузер ещё до десяти минут ходил
@@ -707,7 +859,13 @@ public sealed class SingBoxService : SupervisedService
         _trafficPortMissingNoted = false;
         _dnsViaTunnel = null;
         _dnsCheckCounter = 0;
+        _directDns = null;
+        _directDnsOk = true;
+        _directDnsAnswers = 0;
         Volatile.Write(ref _realityRefusedTicks, 0);
+
+        foreach (var pool in _pools)
+            pool.Forget();
     }
 
     /// <summary>
@@ -785,6 +943,7 @@ public sealed class SingBoxService : SupervisedService
             return ServiceCheck.Healthy;
 
         await WatchExitAsync(cancellationToken);
+        await WatchPoolsAsync(cancellationToken);
 
         if (_trafficPort is null)
         {
@@ -794,9 +953,17 @@ public sealed class SingBoxService : SupervisedService
             if (_dnsViaAuto)
             {
                 if (_dnsCheckCounter++ % _trafficCheckEvery == 0)
-                    _dnsLastOk = await CheckTrafficAsync(SingBoxOptions.DefaultHealthPort, cancellationToken);
+                {
+                    await MeasureDirectDnsAsync(cancellationToken);
 
-                await ApplyDnsPathAsync(_dnsLastOk, cancellationToken);
+                    // Туннель спрашиваем, только когда прямой путь отказал
+                    // и по DoH, и по TCP: его проверка — запрос через сервер
+                    // подписки.
+                    if (DnsWantsTunnel)
+                        _dnsLastOk = await CheckTrafficAsync(SingBoxOptions.DefaultHealthPort, cancellationToken);
+                }
+
+                await ApplyDnsPathAsync(DnsWantsTunnel && _dnsLastOk, DnsWantsTcp, cancellationToken);
             }
 
             return ServiceCheck.Healthy;
@@ -834,7 +1001,7 @@ public sealed class SingBoxService : SupervisedService
         if (_checkCounter++ % _trafficCheckEvery != 0)
         {
             if (_dnsViaAuto)
-                await ApplyDnsPathAsync(_lastTrafficOk && !_bypass.Engaged, cancellationToken);
+                await ApplyDnsPathAsync(DnsWantsTunnel && _lastTrafficOk && !_bypass.Engaged, DnsWantsTcp, cancellationToken);
 
             return _lastTrafficOk ? ServiceCheck.Healthy : ServiceCheck.UpstreamDown;
         }
@@ -850,7 +1017,10 @@ public sealed class SingBoxService : SupervisedService
         await ApplyBypassAsync(_lastTrafficOk, cancellationToken);
 
         if (_dnsViaAuto)
-            await ApplyDnsPathAsync(_lastTrafficOk && !_bypass.Engaged, cancellationToken);
+        {
+            await MeasureDirectDnsAsync(cancellationToken);
+            await ApplyDnsPathAsync(DnsWantsTunnel && _lastTrafficOk && !_bypass.Engaged, DnsWantsTcp, cancellationToken);
+        }
 
         if (_lastTrafficOk)
             return ServiceCheck.Healthy;
@@ -1019,12 +1189,14 @@ public sealed class SingBoxService : SupervisedService
     /// </para>
     /// </remarks>
     /// <param name="except">Кого не проверять: закреплённый сервер, которому ищем замену.</param>
+    /// <param name="group">Чей автоподбор перебирать: пула по умолчанию или пула серверов.</param>
     /// <returns>Поставленный сервер; <c>null</c> — живых нет.</returns>
     private async Task<string?> PickOneByOneAsync(
-        ClashApi api, CancellationToken cancellationToken, string? except = null, bool notifyNoLive = false)
+        ClashApi api, CancellationToken cancellationToken, string? except = null, bool notifyNoLive = false,
+        string group = LatencyGroup)
     {
         int run = _run;
-        var members = await api.MembersAsync(LatencyGroup, cancellationToken);
+        var members = await api.MembersAsync(group, cancellationToken);
 
         if (members is null) return null;
         if (members.Count == 0)
@@ -1257,6 +1429,309 @@ public sealed class SingBoxService : SupervisedService
 
     /// <summary>Группа автоподбора — куда возвращаемся.</summary>
     private const string LatencyGroup = "auto-latency";
+
+    /// <summary>Пулы серверов с маршрутами — у каждого своя группа выбора и свой сторож.</summary>
+    private readonly IReadOnlyList<PoolState> _pools;
+
+    /// <summary>Молчащий пул уводит маршруты в пул по умолчанию (AppSettings.DeadPoolToDefault).</summary>
+    private readonly bool _deadPoolToDefault;
+
+    /// <summary>
+    /// Сторож пула: то же, что у пула по умолчанию, только над группой пула.
+    /// </summary>
+    /// <remarks>
+    /// Владелец 19.10 (идеи №6): «внутри пула — как сейчас: автоподбор с заменой
+    /// мёртвого или закреплённый сервер; у каждого пула свой сторож и своё
+    /// закрепление». Решения о замене и возврате закреплённого — та же
+    /// <see cref="ExitWatch"/>, что у <c>auto</c>.
+    /// </remarks>
+    private sealed class PoolState(ServerPool pool, bool replacePinned)
+    {
+        public ServerPool Pool { get; } = pool;
+
+        public string Selector { get; } = ServerPools.SelectorTag(pool.Id);
+
+        public string Latency { get; } = ServerPools.LatencyTag(pool.Id);
+
+        public string? Pinned { get; } = string.IsNullOrWhiteSpace(pool.Preferred) ? null : pool.Preferred;
+
+        public ExitWatch Watch { get; } = new(pool.Preferred, replacePinned);
+
+        /// <summary>Группа пула есть в конфиге и поставлена на место.</summary>
+        public volatile bool Present;
+
+        /// <summary>Прогрев пула закончен — можно сторожить.</summary>
+        public volatile bool Warm;
+
+        /// <summary>Закреплённый в пуле сервер встал на старте.</summary>
+        public volatile bool PinnedPlaced;
+
+        /// <summary>Маршруты пула уведены в пул по умолчанию — живых в пуле не было.</summary>
+        public volatile bool Fallen;
+
+        /// <summary>О молчании пула уже сказано в журнале — до первого ответа не повторять.</summary>
+        public volatile bool SilenceNoted;
+
+        public int Counter;
+
+        /// <summary>Идёт подбор в пуле — второй не начинаем.</summary>
+        public int Picking;
+
+        public void Forget()
+        {
+            Present = false;
+            Warm = false;
+            PinnedPlaced = false;
+            Fallen = false;
+            SilenceNoted = false;
+            Counter = 0;
+            Interlocked.Exchange(ref Picking, 0);
+            Watch.Forget();
+        }
+    }
+
+    /// <summary>
+    /// Ставит группы пулов на место и прогревает их — после пула по умолчанию,
+    /// по одному пулу и по одному серверу.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Тот же довод, что у прогрева <c>auto</c>: автоподбор пула при запуске
+    /// ещё никого не мерил, и судить о нём рано. Пулы прогреваются по очереди,
+    /// а не разом, — серверы одного продавца в разных пулах сидят на одном
+    /// входе, и залп по нему закрывал вход Trust (28.09).
+    /// </para>
+    /// <para>
+    /// Заодно это и опознание: группа пула есть в конфиге, только если в пул
+    /// ведёт маршрут (<c>SingBoxConfigCompiler.PoolsInUse</c>). Не встала —
+    /// пула в конфиге нет, и сторожить нечего.
+    /// </para>
+    /// </remarks>
+    private async Task WarmPoolsAsync(int run, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Сперва пусть прогреется пул по умолчанию: через него идёт всё прочее.
+            for (int i = 0; i < 60 && !_warm && run == _run; i++)
+                await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        using var api = new ClashApi($"127.0.0.1:{_healthPort}", Talk, EngineKeys.Current(_configPath));
+
+        foreach (var pool in _pools)
+        {
+            if (run != _run)
+                return;
+
+            try
+            {
+                foreach (var exit in StartExits(pool.Pinned).Select(e => e == LatencyGroup ? pool.Latency : e))
+                {
+                    if (await api.SelectAsync(pool.Selector, exit, cancellationToken))
+                    {
+                        pool.Present = true;
+                        pool.PinnedPlaced = exit == pool.Pinned;
+                        break;
+                    }
+                }
+
+                if (!pool.Present || pool.PinnedPlaced)
+                    continue;
+
+                if (await PickOneByOneAsync(api, cancellationToken, group: pool.Latency) is { } best && run == _run)
+                    await api.SelectAsync(pool.Selector, best, cancellationToken);
+            }
+            catch (Exception)
+            {
+                // Не вышло — пул останется на своём автоподборе.
+            }
+            finally
+            {
+                if (run == _run)
+                    pool.Warm = pool.Present;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Следит за выходом каждого пула — как <see cref="WatchExitAsync"/> за пулом по умолчанию.
+    /// </summary>
+    /// <remarks>
+    /// Обход туннеля пулы не останавливает: он про пул по умолчанию, а у пула
+    /// свои серверы. Сервер, стоящий сразу в нескольких пулах, мерится за опрос
+    /// один раз (идеи №6) — общий замер у сервера и так один.
+    /// </remarks>
+    private async Task WatchPoolsAsync(CancellationToken cancellationToken)
+    {
+        if (_exitCheckSeconds <= 0 || _pools.Count == 0)
+            return;
+
+        var measured = new Dictionary<string, TimeSpan?>(StringComparer.Ordinal);
+        ClashApi? api = null;
+
+        try
+        {
+            foreach (var pool in _pools)
+            {
+                if (!pool.Present || !pool.Warm || Volatile.Read(ref pool.Picking) != 0)
+                    continue;
+
+                bool planned = !pool.Watch.Rechecking;
+
+                if (planned && pool.Counter++ % ExitWatchEvery != 0)
+                    continue;
+
+                api ??= new ClashApi($"127.0.0.1:{_healthPort}", Talk, EngineKeys.Current(_configPath));
+
+                await WatchPoolAsync(api, pool, planned, measured, cancellationToken);
+            }
+        }
+        finally
+        {
+            api?.Dispose();
+        }
+    }
+
+    /// <summary>Замер сервера, не больше одного за опрос; итог — в общий файл замеров.</summary>
+    private async Task<TimeSpan?> MeasureOnceAsync(
+        ClashApi api, string tag, Dictionary<string, TimeSpan?> measured, CancellationToken cancellationToken)
+    {
+        if (measured.TryGetValue(tag, out var known))
+            return known;
+
+        var delay = await api.MeasureAsync(tag, _watchUrl, CheckTimeout, cancellationToken);
+        measured[tag] = delay;
+        Record(tag, delay);
+
+        return delay;
+    }
+
+    private async Task WatchPoolAsync(
+        ClashApi api, PoolState pool, bool planned, Dictionary<string, TimeSpan?> measured,
+        CancellationToken cancellationToken)
+    {
+        var selected = await api.SelectedAsync(pool.Selector, cancellationToken);
+
+        if (selected is null)
+            return;
+
+        // Пул уведён в пул по умолчанию — на плановой проверке смотрим, не ожил ли он.
+        if (pool.Fallen || selected == SelectorGroup)
+        {
+            pool.Fallen = true;
+
+            if (planned)
+                StartPoolPick(pool, except: null, returning: true);
+
+            return;
+        }
+
+        var exit = selected == pool.Latency
+            ? await api.SelectedAsync(pool.Latency, cancellationToken)
+            : selected;
+
+        var delay = exit is null
+            ? await api.MeasureAsync(pool.Selector, _watchUrl, CheckTimeout, cancellationToken)
+            : await MeasureOnceAsync(api, exit, measured, cancellationToken);
+
+        bool replaced = pool.PinnedPlaced && pool.Watch.Replaced(exit);
+
+        if (planned && replaced)
+        {
+            var pinned = await MeasureOnceAsync(api, pool.Pinned!, measured, cancellationToken);
+
+            if (pool.Watch.OnPinned(pinned is not null) == ExitAction.Restore
+                && await api.SelectAsync(pool.Selector, pool.Pinned!, cancellationToken))
+            {
+                Note($"пул «{pool.Pool.Name}»: выбранный сервер «{pool.Pinned}» снова отвечает — пул возвращён на него.");
+                return;
+            }
+        }
+
+        if (pool.Watch.OnCurrent(delay is not null) != ExitAction.Replace)
+            return;
+
+        bool standIn = pool.PinnedPlaced && exit == pool.Pinned;
+
+        StartPoolPick(pool, except: standIn ? exit : null, returning: false, silent: exit);
+    }
+
+    /// <summary>
+    /// Подбор в пуле в фоне: первый ответивший ставится; никто не ответил —
+    /// пул уводится в пул по умолчанию или ждёт, как велит настройка.
+    /// </summary>
+    /// <param name="except">Закреплённый сервер, которому ищем замену.</param>
+    /// <param name="returning">Пул уведён и ищет, куда вернуться.</param>
+    /// <param name="silent">Выход, который не ответил, — для журнала.</param>
+    private void StartPoolPick(PoolState pool, string? except, bool returning, string? silent = null)
+    {
+        if (Interlocked.Exchange(ref pool.Picking, 1) != 0)
+            return;
+
+        int run = _run;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var api = new ClashApi($"127.0.0.1:{_healthPort}", Talk, EngineKeys.Current(_configPath));
+
+                // Закреплённый — первым: вернуть пул на выбор человека, а не на замену.
+                var best = returning && pool.PinnedPlaced && pool.Pinned is { } pinned
+                    && await api.MeasureAsync(pinned, _watchUrl, CheckTimeout, CancellationToken.None) is not null
+                        ? pinned
+                        : await PickOneByOneAsync(api, CancellationToken.None, except, group: pool.Latency);
+
+                if (run != _run)
+                    return;
+
+                if (best is not null)
+                {
+                    if (!await api.SelectAsync(pool.Selector, best, CancellationToken.None))
+                        return;
+
+                    bool wasSilent = pool.Fallen || pool.SilenceNoted;
+                    pool.Fallen = false;
+                    pool.SilenceNoted = false;
+                    pool.Watch.Forget();
+
+                    Note(wasSilent
+                        ? $"пул «{pool.Pool.Name}» ожил — его маршруты снова идут через «{best}»."
+                        : $"пул «{pool.Pool.Name}»: выход «{silent}» не ответил дважды подряд — поставлен «{best}», первый ответивший.");
+                    return;
+                }
+
+                if (returning || pool.SilenceNoted)
+                    return;
+
+                pool.SilenceNoted = true;
+
+                if (_deadPoolToDefault && await api.SelectAsync(pool.Selector, SelectorGroup, CancellationToken.None))
+                {
+                    pool.Fallen = true;
+                    Note($"пул «{pool.Pool.Name}»: ни один сервер не ответил — его маршруты уведены в пул "
+                        + "по умолчанию. Вернём, как только пул ответит.");
+                }
+                else
+                {
+                    Note($"пул «{pool.Pool.Name}»: ни один сервер не ответил — ждём, как велит настройка; "
+                        + "его маршруты пока не открываются.");
+                }
+            }
+            catch (Exception)
+            {
+                // Не вышло сейчас — выйдет на следующей проверке.
+            }
+            finally
+            {
+                Interlocked.Exchange(ref pool.Picking, 0);
+            }
+        }, CancellationToken.None);
+    }
 
     private async Task<bool> CheckTrafficAsync(int proxyPort, CancellationToken cancellationToken)
     {

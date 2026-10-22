@@ -31,11 +31,7 @@
 ## О программе
 
 Zephyron — самостоятельный проект: свой интерфейс, своё оформление и своя
-сборка. Возможностями он обязан [NetZapret](https://github.com/RixyPow/netzapret)
-и его автору [RixyPow](https://github.com/RixyPow): оттуда взята основа —
-маршрутизация трафика, десинк, туннель, подписки и супервизор движков.
-Лицензия MIT это позволяет, а условия её соблюдены: см. раздел
-«Благодарности и лицензии» ниже. Новости — в
+сборка. Новости — в
 [телеграм-канале](https://t.me/zephyron0). Вопросы и отчёты об ошибках — в
 [issues](https://github.com/NineUPFLOW/Zephyron/issues) этого репозитория.
 
@@ -778,7 +774,7 @@ winget install Microsoft.DotNet.SDK.8
 [shtorm-7/sing-box-extended](https://github.com/shtorm-7/sing-box-extended/releases)
 и распаковать в `tools\` целиком, вместе с `wintun.dll` — без неё не поднимется
 TUN. Нужна именно extended: обычный sing-box не знает xhttp, выхода MASQUE
-для WARP и маскировки AmneziaWG. Проверялось на 1.14.1-extended-2.7.2.
+для WARP и маскировки AmneziaWG. В поставке — 1.14.3-extended-2.7.3 (с 0.17; до того 1.14.1-extended-2.7.2).
 
 **3. Zapret 2** — для десинка. Ставится отдельно, в `C:\Zapret` или
 `C:\Zapret\Dev`; `build.cmd` берёт из установки только то, что читает движок:
@@ -909,12 +905,8 @@ Object с `KILL_ON_JOB_CLOSE`: осиротевший sing-box удержива�
 
 ## Благодарности и лицензии
 
-Проект стоит на [NetZapret](https://github.com/RixyPow/netzapret) — программе
-**RixyPow** под лицензией MIT. Zephyron — не его форк в один коммит: взята
-рабочая основа (маршрутизация, десинк, туннель, подписки, супервизор), а окно
-и оформление переделаны. Условие MIT — сохранить уведомление об авторстве —
-выполнено: текст лицензии NetZapret и её автор названы в [LICENSE](LICENSE)
-и в [docs/THIRD-PARTY.md](docs/THIRD-PARTY.md).
+Спасибо [RixyPow](https://github.com/RixyPow) за NetZapret — с его
+исходников под MIT когда-то начинался Zephyron.
 
 Программа бесплатная и останется такой: лицензия MIT это и закрепляет.
 Помочь проекту можно звездой на [GitHub](https://github.com/NineUPFLOW/Zephyron)
@@ -926,10 +918,6 @@ Object с `KILL_ON_JOB_CLOSE`: осиротевший sing-box удержива�
 [MIT](LICENSE) — берите, меняйте, распространяйте, в том числе в составе
 коммерческих продуктов. Единственное требование: сохранить уведомление
 об авторстве.
-
-Zephyron — производная работа от [NetZapret](https://github.com/RixyPow/netzapret),
-**Copyright (c) 2026 RixyPow**, MIT License. Уведомление и текст лицензии
-сохранены в [LICENSE](LICENSE).
 
 Движки, входящие в сборку, остаются на своих условиях: sing-box — GPL v3,
 Zapret — MIT, tg-ws-proxy-rs — MIT, WinDivert — LGPL, `wintun.dll` —

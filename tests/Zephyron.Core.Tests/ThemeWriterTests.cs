@@ -41,6 +41,28 @@ public sealed class ThemeWriterTests : IDisposable
         ["warn-fill"] = ThemeColor.Parse("#D29922"),
     };
 
+    /// <summary>Своя тема удаляется целиком; встроенная и путь вместо имени — отказ.</summary>
+    [Fact]
+    public void OnlyAnOwnThemeFolderIsDeleted()
+    {
+        var mine = Path.Combine(_root, "mine");
+        Directory.CreateDirectory(mine);
+        File.WriteAllText(Path.Combine(mine, ThemeLoader.FileName), "{}");
+
+        ThemeWriter.Delete("mine", _root, recycle: false);
+        Assert.False(Directory.Exists(mine));
+
+        Directory.CreateDirectory(Path.Combine(_root, "dark"));
+        Assert.Throws<InvalidOperationException>(() => ThemeWriter.Delete("dark", _root, recycle: false));
+        Assert.True(Directory.Exists(Path.Combine(_root, "dark")));
+
+        Assert.Throws<ArgumentException>(() => ThemeWriter.Delete(@"..\config", _root, recycle: false));
+        Assert.Throws<ArgumentException>(() => ThemeWriter.Delete("..", _root, recycle: false));
+
+        // Нет папки — нечего удалять, и это не ошибка.
+        ThemeWriter.Delete("gone", _root, recycle: false);
+    }
+
     /// <summary>Записанная тема читается тем же загрузчиком — и такой же.</summary>
     [Fact]
     public void ASavedThemeLoadsBackTheSame()

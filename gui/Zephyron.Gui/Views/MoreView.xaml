@@ -73,7 +73,7 @@
                         <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
                             <TextBlock Text="Мастер первого запуска" FontWeight="SemiBold" />
                             <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,0" TextWrapping="Wrap"
-                                       Text="Знакомство, выбор темы, подписка, пробный запуск и проверка сети — показывается один раз при первом открытии. Ничего из настроенного он не сбрасывает." />
+                                       Text="Знакомство, выбор темы, режим работы и подписка на VPN — показывается один раз при первом открытии. Ничего из настроенного он не сбрасывает." />
                         </StackPanel>
 
                         <Button Grid.Column="1" Style="{StaticResource Ghost}"
@@ -150,14 +150,22 @@
                                    Margin="0,6,0,0" Visibility="Collapsed" />
 
                         <WrapPanel Margin="0,10,0,0">
-                            <Button x:Name="RepositoryLink" Style="{StaticResource Ghost}" Content="Репозиторий"
-                                    Click="OnLink" Margin="0,0,8,8" />
+                            <Button x:Name="RepositoryLink" Style="{StaticResource Ghost}" Click="OnLink" Margin="0,0,8,8">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Style="{StaticResource LineShape}" Data="{StaticResource GitHubMark}" />
+                                    <TextBlock Text="Репозиторий" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
                             <Button x:Name="IssuesLink" Style="{StaticResource Ghost}" Content="Сообщить о проблеме"
                                     Click="OnLink" Margin="0,0,8,8" />
                             <Button x:Name="DiscussionsLink" Style="{StaticResource Ghost}" Content="Обсуждения"
                                     Click="OnLink" Margin="0,0,8,8" />
-                            <Button x:Name="TelegramLink" Style="{StaticResource Ghost}" Content="Телеграм-канал"
-                                    Click="OnLink" Margin="0,0,8,8" />
+                            <Button x:Name="TelegramLink" Style="{StaticResource Ghost}" Click="OnLink" Margin="0,0,8,8">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Style="{StaticResource LineShape}" Data="{StaticResource TelegramPlane}" />
+                                    <TextBlock Text="Телеграм-канал" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
                             <Button x:Name="SupportLink" Style="{StaticResource Ghost}" Content="Поддержать"
                                     Click="OnLink" Margin="0,0,8,8" />
                         </WrapPanel>

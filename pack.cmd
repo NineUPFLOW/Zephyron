@@ -184,51 +184,43 @@ echo Bundling tg-ws-proxy
 robocopy "%TGWS_DIR%." "%ENGINES%\tg-ws-proxy" /E /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
 if errorlevel 8 exit /b 1
 
-set "ZAPRET="
-if exist "C:\Zapret\Dev\lists" set "ZAPRET=C:\Zapret\Dev"
-if not defined ZAPRET if exist "C:\Zapret\lists" set "ZAPRET=C:\Zapret"
+rem The Zapret GUI files come from our own copy in vendor\zapret-gui - the
+rem same as build.cmd, see the reasoning there. Taken only on the owner's word
+rem with "zy zapret-gui take"; what is left out of it and why (winws.exe,
+rem stop.bat, dnscrypt-proxy, the GUI's own user lists) is in ZapretGuiCopy.cs.
+set "ZAPRET=%ROOT%vendor\zapret-gui"
 
-if not defined ZAPRET (
+if not exist "%ZAPRET%\lists" (
     echo.
-    echo Zapret not found - the archive would ship without desync.
+    echo vendor\zapret-gui not found - the archive would ship without desync.
     exit /b 1
 )
 
-echo Bundling Zapret from %ZAPRET%
+echo Bundling Zapret GUI files from vendor\zapret-gui
 
-rem Five files from exe\ are left out.
-rem
-rem   winws.exe    the previous engine. Our presets drive it through
-rem                --lua-desync, which that binary has no notion of, so it
-rem                cannot run any of them.
-rem   aaaaaaaaa1   byte-for-byte identical to Monkey64.sys, and nothing refers
-rem                to it: WinDivert.dll names Monkey64.sys and only that.
-rem   stop.bat     belongs to the Zapret GUI. Running it kills the engines
-rem                behind the supervisor's back, which then restarts them -
-rem                a fight nobody wins.
-rem   dnscrypt-proxy.exe and its licence - the Zapret GUI's own DNS client,
-rem                in its exe\ since its 08.10 update. Nothing of ours runs it;
-rem                0.14.4 shipped it by accident, 12 MB of dead weight.
 for %%D in (exe lists lua bin windivert.filter) do (
-    if exist "%ZAPRET%\%%D" (
-        robocopy "%ZAPRET%\%%D" "%ENGINES%\zapret\%%D" /E /R:2 /W:1 /NJH /NJS /NP /NDL /NFL /XF winws.exe aaaaaaaaa1 stop.bat dnscrypt-proxy.exe dnscrypt-proxy.LICENSE.txt >nul
-        if errorlevel 8 exit /b 1
-    )
+    robocopy "%ZAPRET%\%%D" "%ENGINES%\zapret\%%D" /E /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
+    if errorlevel 8 exit /b 1
 )
 
-rem Our own winws2 from tools\ over the Zapret GUI copy - same as build.cmd,
-rem see the reasoning there (profile search cost, measured 03.10 and 07.10).
-rem The native build needs no cygwin1.dll, and then the archive does not
-rem carry it: an LGPL runtime nothing loads is 3 MB and a licence for nothing.
+rem Our own winws2 from tools\ - same as build.cmd, see the reasoning there
+rem (profile search cost, measured 03.10 and 07.10). The copy of the Zapret GUI
+rem files carries no winws2, so without one in tools\ the archive would have no
+rem desync engine at all. The native build needs no cygwin1.dll; bol-van's own
+rem does, and then it travels from the same tools\ folder.
 set "WINWS2="
 for /f "delims=" %%F in ('dir /s /b "%ROOT%tools\winws2.exe" 2^>nul') do set "WINWS2=%%F"
 
-if defined WINWS2 (
-    echo Bundling winws2 from %WINWS2%
-    copy /y "%WINWS2%" "%ENGINES%\zapret\exe\winws2.exe" >nul
-    if errorlevel 1 exit /b 1
-    findstr /m /i /c:"cygwin1.dll" "%WINWS2%" >nul || del /q "%ENGINES%\zapret\exe\cygwin1.dll" 2>nul
+if not defined WINWS2 (
+    echo.
+    echo winws2.exe not found under tools\ - the archive would ship without desync.
+    exit /b 1
 )
+
+echo Bundling winws2 from %WINWS2%
+copy /y "%WINWS2%" "%ENGINES%\zapret\exe\winws2.exe" >nul
+if errorlevel 1 exit /b 1
+for %%W in ("%WINWS2%") do if exist "%%~dpWcygwin1.dll" copy /y "%%~dpWcygwin1.dll" "%ENGINES%\zapret\exe\" >nul
 rem Our own lists, delivered where the engine looks for them. Preset sections
 rem name hostlists as "lists/<name>" relative to the Zapret root, and winws2
 rem resolves them there - not next to our config, so a section pointing at
@@ -239,6 +231,14 @@ rem it our discord.txt would quietly replace theirs, and the preset would match
 rem a different set of names than its author wrote.
 for %%F in ("%ROOT%config\lists\*.txt") do (
     copy /y "%%F" "%ENGINES%\zapret\lists\zy-%%~nxF" >nul
+)
+
+rem Our own blobs - packet samples a preset names with --blob=. Same rule and
+rem the same zy- prefix as the lists: winws2 looks for them in bin\ next to
+rem the engine, and a sample of ours must never shadow one from Zapret GUI.
+rem First ones (21.10): V3nilla's hellos from Flowseal 1.10.4, PR 17925.
+for %%F in ("%ROOT%config\blobs\*.bin") do (
+    copy /y "%%F" "%ENGINES%\zapret\bin\zy-%%~nxF" >nul
 )
 
 rem Presets are ours and come from presets\ in the repository. Nothing is taken
@@ -272,17 +272,8 @@ rem The service catalogue: seven sets of proxy addresses for services that
 rem shut Russia out themselves. Without it that whole section is missing for
 rem anyone who has no separate Zapret installation - and those are exactly
 rem the people who cannot fall back on its own hosts editor either.
-rem
-rem Taken from the installation when there is one, and from dist-template\
-rem otherwise - so a build without Zapret installed still ships the section,
-rem the same way the CI archive does.
-if exist "%ZAPRET%\system\hosts_catalog.sqlite3" (
-    mkdir "%ENGINES%\zapret\system" 2>nul
-    copy /y "%ZAPRET%\system\hosts_catalog.sqlite3" "%ENGINES%\zapret\system\" >nul
-) else if exist "%ROOT%dist-template\hosts_catalog.sqlite3" (
-    mkdir "%ENGINES%\zapret\system" 2>nul
-    copy /y "%ROOT%dist-template\hosts_catalog.sqlite3" "%ENGINES%\zapret\system\" >nul
-)
+robocopy "%ZAPRET%\system" "%ENGINES%\zapret\system" /E /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
+if errorlevel 8 exit /b 1
 
 rem Licences of what we redistribute, and the one obligation that actually
 rem needs an action from us: Zapret is MIT, and MIT requires the notice to
@@ -300,10 +291,16 @@ rem
 rem And a third: lists\ipset-all.txt is Flowseal's list from
 rem zapret-discord-youtube, entry for entry, and our game filter is his
 rem ALT11 sections carried over to Zapret 2. MIT as well.
+rem
+rem And WinDivert: exe\WinDivert.dll and its driver Monkey64.sys, LGPLv3 or
+rem GPLv2 at our choice, and both want the licence text with the copy. Until
+rem 22.10 the archive only pointed at reqrypt.org; the text is upstream's
+rem LICENSE file (basil00/WinDivert), which carries LGPLv3, GPLv3 and GPLv2.
 copy /y "%ROOT%docs\THIRD-PARTY.md" "%STAGE%\" >nul 2>&1
 copy /y "%ROOT%docs\licenses\zapret-MIT.txt" "%ENGINES%\zapret\LICENSE.txt" >nul 2>&1
 copy /y "%ROOT%docs\licenses\zapretgui-MIT.txt" "%ENGINES%\zapret\LICENSE-ZapretGUI.txt" >nul 2>&1
 copy /y "%ROOT%docs\licenses\flowseal-MIT.txt" "%ENGINES%\zapret\LICENSE-Flowseal.txt" >nul 2>&1
+copy /y "%ROOT%docs\licenses\windivert-LICENSE.txt" "%ENGINES%\zapret\LICENSE-WinDivert.txt" >nul 2>&1
 rem ZXing.Net reads QR codes with keys (01.10). Apache-2.0: the licence text
 rem must travel with the copy; the library sits beside Zephyron.exe.
 copy /y "%ROOT%docs\licenses\zxing-net-Apache-2.0.txt" "%STAGE%\LICENSE-ZXing.Net.txt" >nul 2>&1
@@ -335,6 +332,16 @@ if exist "%STAGE%\reports" (
     echo.
     echo Refusing to archive: reports\ holds block-check output describing
     echo this machine's network. Remove it and pack again.
+    exit /b 1
+)
+
+rem The Zapret GUI's own user lists - its autohostlist learns from browsing.
+rem Every release up to 1.0.0-pre.2 carried the owner's; the copy in
+rem vendor\zapret-gui leaves them out, and this keeps it that way.
+if exist "%STAGE%\engines\zapret\lists\user" (
+    echo.
+    echo Refusing to archive: engines\zapret\lists\user holds the Zapret GUI
+    echo user lists of this machine. Remove them from vendor\zapret-gui.
     exit /b 1
 )
 

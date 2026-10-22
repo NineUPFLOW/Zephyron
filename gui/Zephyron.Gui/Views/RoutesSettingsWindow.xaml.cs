@@ -143,6 +143,30 @@ public partial class RoutesSettingsWindow : Window
 
         Learn.IsChecked = settings.LearnDiscordVoice;
         LearnWord.Text = settings.LearnDiscordVoice ? "вкл." : "выкл.";
+
+        LearnRoblox.IsChecked = settings.LearnRobloxServers;
+        LearnRobloxWord.Text = settings.LearnRobloxServers ? "вкл." : "выкл.";
+
+        LearnArc.IsChecked = settings.LearnArcRaidersServers;
+        LearnArcWord.Text = settings.LearnArcRaidersServers ? "вкл." : "выкл.";
+    }
+
+    private void OnLearnRoblox(object sender, RoutedEventArgs e)
+    {
+        bool on = LearnRoblox.IsChecked == true;
+
+        Save(s => s with { LearnRobloxServers = on },
+            on ? "Адреса серверов Roblox дописываются, пока его серверы «через VPN»."
+               : "Список серверов Roblox больше не пополняется сам.");
+    }
+
+    private void OnLearnArc(object sender, RoutedEventArgs e)
+    {
+        bool on = LearnArc.IsChecked == true;
+
+        Save(s => s with { LearnArcRaidersServers = on },
+            on ? "Адреса серверов ARC Raiders дописываются, пока её серверы «через VPN» и игра запущена."
+               : "Список серверов ARC Raiders больше не пополняется сам.");
     }
 
     private void OnRestart(object sender, RoutedEventArgs e)

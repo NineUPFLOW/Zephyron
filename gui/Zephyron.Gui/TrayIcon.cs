@@ -183,8 +183,9 @@ internal sealed class TrayIcon : IDisposable
     /// <remarks>
     /// Берётся из самой программы, а не из файла рядом: поставка — один
     /// исполняемый файл, и класть возле него отдельный .ico значит вернуть
-    /// в папку лишнее. Пока своего значка нет, приезжает стандартный —
-    /// это некрасиво, но работает.
+    /// в папку лишнее. Значок вшивается при сборке (Assets\app.ico), так что
+    /// новый виден только после build.cmd. Не нашёлся — стандартный значок
+    /// приложений Windows: некрасиво, но работает.
     /// </remarks>
     private static Icon OwnIcon()
     {
@@ -492,6 +493,37 @@ internal sealed class TrayIcon : IDisposable
     /// закрывшаяся раньше, чем погасли движки, оставила бы супервизор
     /// без присмотра, и следующий запуск упёрся бы в занятый TUN.
     /// </remarks>
+    /// <summary>
+    /// Выход тем же путём, что в меню трея, — для меню у «Остановить» на «Главной».
+    /// </summary>
+    /// <remarks>
+    /// Значка может не быть (окно запущено без трея) — тогда выход тот же,
+    /// только без строки «Останавливаю…» в меню трея.
+    /// </remarks>
+    public static async void Exit(bool stopEngines)
+    {
+        if (Current is { } tray)
+        {
+            tray.Quit(stopEngines);
+            return;
+        }
+
+        if (stopEngines)
+        {
+            try
+            {
+                await EngineControl.StopAsync("меню у «Остановить»: выход с остановкой", CancellationToken.None);
+            }
+            catch (Exception)
+            {
+                // Как и в трее: выходим всё равно.
+            }
+        }
+
+        App.Exiting = true;
+        Application.Current.Shutdown();
+    }
+
     private async void Quit(bool stopEngines)
     {
         if (stopEngines)

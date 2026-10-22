@@ -302,6 +302,27 @@ public sealed record AppSettings
     /// </remarks>
     public bool LearnDiscordVoice { get; init; } = true;
 
+    /// <summary>
+    /// Дописывать адреса игровых серверов Roblox из его журнала в список части
+    /// «Игровые серверы (адреса)» (<see cref="Services.RobloxServerLearn"/>).
+    /// </summary>
+    /// <remarks>
+    /// Владелец 21.10: «по аналогии с дискордом сделаем автопополнение адресов
+    /// серверов роблокс». Включено по умолчанию, как у Discord: действует, только
+    /// пока часть стоит «через VPN», и выключают те, кто держит список руками.
+    /// </remarks>
+    public bool LearnRobloxServers { get; init; } = true;
+
+    /// <summary>
+    /// Дописывать сети серверов ARC Raiders из соединений игры в список части
+    /// «Игровые серверы (адреса)» (<see cref="Services.GameServerLearn"/>).
+    /// </summary>
+    /// <remarks>
+    /// Владелец 21.10, после обсуждения №32. Включено по умолчанию, как у Roblox:
+    /// действует, только пока часть стоит «через VPN» и игра запущена.
+    /// </remarks>
+    public bool LearnArcRaidersServers { get; init; } = true;
+
     /// <summary>Программы в «Маршрутах» — папки из двух списков (<see cref="Rules.ProgramRoutes"/>, 13.10).</summary>
     public IReadOnlyList<Rules.ProgramRoute> ProgramRoutes { get; init; } = [];
 
@@ -357,6 +378,24 @@ public sealed record AppSettings
     /// <summary>Прокси поднимает надзор движков — включён и не держится окном сам.</summary>
     [JsonIgnore]
     public bool TelegramProxyWithEngines => TelegramProxy && !TelegramProxyAlways;
+
+    /// <summary>Прокси Telegram ходит к DC2 и DC4 напрямую (<see cref="TgWsProxy.DirectMain"/>).</summary>
+    /// <remarks>
+    /// Без прямых адресов весь Telegram идёт через домены Cloudflare общего
+    /// списка, и 21.10 они почти все отвечали 503 (см. <see cref="TgWsProxy.Arguments"/>);
+    /// с ними — 149.154.167.220 у владельца отвечал за 101–112 мс. Но выключено
+    /// по умолчанию (владелец 21.10, в тот же день: «эту настройку по умолчанию
+    /// выкл»): у кого закрыт сам 149.154.167.220, первое соединение ждало бы
+    /// таймаут, а не уходило сразу в Cloudflare. Включают на вкладке «TG Proxy».
+    /// </remarks>
+    public bool TelegramProxyDirect { get; init; }
+
+    /// <summary>Прокси Telegram ходит к DC1, DC3 и DC5 напрямую (<see cref="TgWsProxy.DirectOther"/>).</summary>
+    /// <remarks>Выключено по умолчанию: адреса отвечают по TLS, а настоящие соединения через них не проверены (21.10).</remarks>
+    public bool TelegramProxyDirectOther { get; init; }
+
+    /// <summary>Сколько прокси ждёт один домен Cloudflare, секунды; у самого прокси — 10.</summary>
+    public int TelegramProxyCfTimeout { get; init; } = TgWsProxy.DefaultCfConnectTimeout;
 
     /// <summary>
     /// Держать автоподбор сервера подальше от отечественных выходов.
@@ -510,6 +549,29 @@ public sealed record AppSettings
     /// <summary>Фрагментация рукопожатия TLS с сервером (<see cref="Core.TlsFragment"/>).</summary>
     public TlsFragment TlsFragment { get; init; }
 
+    /// <summary>
+    /// Помнить подставные адреса между перезапусками движка: таблица
+    /// «fakeip → имя» хранится в файле кэша sing-box.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Именам «через VPN» движок отдаёт подставные адреса из 198.18.0.0/15
+    /// по порядку обращения и с TTL 600 с, а при перезапуске раздаёт заново.
+    /// Замер 20.10: github.com до перезапуска — 198.18.0.7, после — 198.18.0.5,
+    /// а соединение на старый адрес получает отказ. Кэш DNS Windows надзор
+    /// сбрасывает сам, но у браузера кэш имён свой, и в минуты после
+    /// перезапуска часть сайтов «через VPN» у него не открывается.
+    /// </para>
+    /// <para>
+    /// Включено по умолчанию; выключатель — в настройках туннеля (владелец
+    /// 20.10: «сделай, только чтобы это можно было выключить в настройках
+    /// VPN, потом сравним работу»). Цена: файл кэша хранит и выбор
+    /// в селекторе — надзор при подъёме ставит его на место сам
+    /// (<c>SupervisedService.OnReadyAsync</c>).
+    /// </para>
+    /// </remarks>
+    public bool FakeIpMemory { get; init; } = true;
+
     /// <summary>Сколько серверов с одного входа (адрес:порт) берёт автоподбор; 0 — всех.</summary>
     public int AutoPickPerEntry { get; init; } = 2;
 
@@ -521,6 +583,58 @@ public sealed record AppSettings
     /// (замер: 2–3 из 5) и сбивают автоподбор, а на мобильной, вероятно, нужны.
     /// </remarks>
     public IReadOnlyList<string> AutoPickExcluded { get; init; } = Array.Empty<string>();
+
+    /// <summary>
+    /// Пулы серверов, заведённые человеком (<see cref="Core.ServerPools"/>, 19.10).
+    /// </summary>
+    /// <remarks>
+    /// Пула по умолчанию здесь нет: он — все серверы, и закрепление у него
+    /// прежнее (<see cref="PreferredServer"/>). Пусто — у человека один пул,
+    /// как до пулов.
+    /// </remarks>
+    public IReadOnlyList<ServerPool> Pools { get; init; } = [];
+
+    /// <summary>
+    /// «Включить Selective Routing» — пулы серверов действуют и видны на вкладке VPN;
+    /// <c>null</c> — настройки старше 21.10.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Владелец 21.10: «сделай поле пулов серверов отдельной настройкой
+    /// вкладки впн». Пулы нужны немногим, а блок их стоял над подписками
+    /// у всех. Выключено — блока нет, «В пул» из меню сервера пропадает,
+    /// окно пути маршрута пулов не предлагает, а движок их не берёт: маршруты
+    /// в пулы идут в пул по умолчанию. Сами пулы и ссылки маршрутов на них
+    /// не стираются и с включением возвращаются.
+    /// </para>
+    /// <para>
+    /// По умолчанию выключено. У кого пулы уже есть (с 1.0.0-pre.1), при
+    /// чтении — включено (<see cref="SelectiveRoutingOnce"/>): иначе
+    /// обновление молча увело бы их маршруты из пулов.
+    /// </para>
+    /// </remarks>
+    public bool? SelectiveRouting { get; init; }
+
+    /// <summary>
+    /// Пулы, которые берёт движок: без «Selective Routing» и при WARP — никаких.
+    /// </summary>
+    /// <remarks>
+    /// При WARP подписки на паузе, и пулам вести некуда — их маршруты идут
+    /// в пул по умолчанию, то есть в WARP.
+    /// </remarks>
+    [JsonIgnore]
+    public IReadOnlyList<ServerPool> EnginePools => SelectiveRouting == true && !WarpEnabled ? Pools : [];
+
+    /// <summary>
+    /// Пул без живых серверов уводит свои маршруты в пул по умолчанию; иначе — ждёт.
+    /// </summary>
+    /// <remarks>
+    /// Выбор владельца 19.10 — настройкой. По умолчанию уводить: пул заводят
+    /// ради страны или скорости, но молчащий пул — это сайты, которые
+    /// не открываются вовсе. Кому страна важнее, выключит. Уведённые
+    /// возвращаются, как только пул ответит.
+    /// </remarks>
+    public bool DeadPoolToDefault { get; init; } = true;
 
     /// <summary>
     /// Тема окна — имя папки в <c>themes\</c>: <c>dark</c>, <c>light</c> или чужая.
@@ -822,6 +936,16 @@ public sealed record AppSettings
             };
 
     /// <summary>
+    /// «Selective Routing» для настроек старше 21.10: включён, если пулы уже заведены.
+    /// </summary>
+    /// <remarks>
+    /// Отметки разового перевода не нужно: прочитанное значение пишется
+    /// первым же сохранением, и дальше выключатель значит то, что значит.
+    /// </remarks>
+    private static AppSettings SelectiveRoutingOnce(AppSettings read) =>
+        read.SelectiveRouting is null ? read with { SelectiveRouting = read.Pools.Count > 0 } : read;
+
+    /// <summary>
     /// Сняты ли правила по программе разовым переводом (04.10, <see cref="Rules.ProgramRulesOff"/>); <c>null</c> — ещё нет.
     /// </summary>
     public bool? ProgramRulesRemoved { get; init; }
@@ -910,11 +1034,11 @@ public sealed record AppSettings
             // Mullvad тоже: его убрали из списка 10.10, и выбравший его
             // остался бы с DoH на адрес без имени для сертификата — туннель
             // без имён.
-            return LiteToV12Once(PresetOnce(GameFilterOnce(WarpAsPath(read with
+            return SelectiveRoutingOnce(LiteToV12Once(PresetOnce(GameFilterOnce(WarpAsPath(read with
             {
                 Mode = read.Engines.Mode,
                 DnsServer = read.DnsServer is "8.8.8.8" or MullvadDns ? GoogleDns : read.DnsServer,
-            }))));
+            })))));
         }
         catch (Exception)
         {

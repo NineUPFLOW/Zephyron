@@ -15,7 +15,7 @@ Zephyron не работает сам по себе: он управляет д�
 | Zapret GUI (сценарии lua, списки, пресеты, каталог адресов) | MIT, © 2025–2026 censorliber; автор — loop-uh | `engines/zapret/LICENSE-ZapretGUI.txt` |
 | zapret-discord-youtube (game filter, список ipset-all) | MIT, © 2024–2026 Flowseal, © 2016–2026 bol-van | `engines/zapret/LICENSE-Flowseal.txt` |
 | tg-ws-proxy-rs (прокси вкладки «TG Proxy», с 07.10) — порт tg-ws-proxy Flowseal | MIT, © 2026 valnesfjord; MIT, © 2026 Flowseal | `engines/tg-ws-proxy/LICENSE`, `engines/tg-ws-proxy/LICENSE-Flowseal-tg-ws-proxy.txt` |
-| WinDivert | LGPL v3 либо GPL v3 | см. reqrypt.org |
+| WinDivert | LGPL v3 либо GPL v2 | `engines/zapret/LICENSE-WinDivert.txt` |
 | ZXing.Net (чтение QR-кодов с ключами, с 01.10) | Apache-2.0, Michael Jahn | `LICENSE-ZXing.Net.txt` |
 
 ## Как это соотносится с лицензией самого Zephyron
@@ -41,7 +41,7 @@ GPLv3 прямо оговаривает такой случай: объедин�
 ## sing-box
 
 `engines/sing-box/sing-box.exe` — **изменённая сборка**, называющая себя
-`1.14.1-extended-2.7.2`. Берётся готовым двоичным файлом из выпусков
+`1.14.3-extended-2.7.3`. Берётся готовым двоичным файлом из выпусков
 [github.com/shtorm-7/sing-box-extended](https://github.com/shtorm-7/sing-box-extended).
 Она, в свою очередь, основана на
 [github.com/SagerNet/sing-box](https://github.com/SagerNet/sing-box)
@@ -81,8 +81,11 @@ GPLv3 прямо оговаривает такой случай: объедин�
 [reqrypt.org/windivert.html](https://reqrypt.org/windivert.html), исходники —
 [github.com/basil00/WinDivert](https://github.com/basil00/WinDivert).
 
-**LGPL v3 или GPL v3 на выбор**, есть и коммерческая лицензия. Метаданных
-в файлах нет; версию следует уточнять по установке Zapret.
+**LGPL v3 или GPL v2 на выбор**, есть и коммерческая лицензия; текст — файл
+`LICENSE` проекта (в нём LGPL v3, GPL v3 и GPL v2), в архиве — рядом с движком.
+До 22.10 здесь значилось «GPL v3» и стояла только ссылка. Метаданных
+в файлах нет; они взяты из установки Zapret GUI той версии, что названа
+в `vendor/zapret-gui/VERSION.txt`.
 
 **О подписи драйвера.** `Monkey64.sys` — переименованный драйвер WinDivert,
 подписанный **成都密思听科技有限公司**, сторонней организацией, не имеющей
@@ -109,8 +112,9 @@ GPLv3 прямо оговаривает такой случай: объедин�
 пакетная отправка пакетов. Внутри статически собраны LuaJIT и zlib.
 Единственный файл лицензии форка — MIT bol-van (`docs/LICENSE.txt`, годы
 2016–2026); своего уведомления у прослойки нет. С 03.10 до 07.10 стоял выпуск
-bol-van 1.0.5.2 (коммит `6b6c63e3`), до того — копия из Zapret GUI, версия 1.0.3;
-сборка кладёт наш winws2 поверх неё.
+bol-van 1.0.5.2 (коммит `6b6c63e3`), до того — копия из Zapret GUI, версия 1.0.3.
+В нашей копии файлов Zapret GUI (`vendor/zapret-gui`) его winws2 нет вовсе:
+движок — только наш, из `tools\`.
 
 И шесть модулей его библиотеки в `engines/zapret/lua/`:
 `zapret-lib.lua`, `zapret-antidpi.lua`, `zapret-auto.lua`, `zapret-obfs.lua`,
@@ -149,8 +153,12 @@ MIT разрешает распространение в любом виде, в
 Программа **Zapret GUI**, автор — **loop-uh**:
 [wiki.zapret.moe](https://wiki.zapret.moe/), исходники —
 [git.zapret.moe/zapretdiscordyoutube/zapretgui](https://git.zapret.moe/zapretdiscordyoutube/zapretgui).
-Папка `engines/zapret/` в архиве — это копия её установки, и на ней Zephyron
-стоит не меньше, чем на самом winws2. Из Zapret GUI взято:
+Папка `engines/zapret/` в архиве собрана из нашей копии её файлов —
+[`vendor/zapret-gui`](../vendor/zapret-gui) в репозитории — плюс наш winws2
+и наши списки и образцы с приставкой `zy-`; на этих файлах Zephyron стоит
+не меньше, чем на самом winws2. Копия снята с установки Zapret GUI (какой
+версии и когда — в `vendor/zapret-gui/VERSION.txt`) и обновляется только
+решением владельца, а не сама вместе с Zapret GUI. Из Zapret GUI взято:
 
 * **сценарии десинка на lua** — пятнадцать модулей в `engines/zapret/lua/`:
   `combined-detector.lua`, `custom_diag.lua`, `custom_funcs.lua`,
@@ -172,10 +180,8 @@ MIT разрешает распространение в любом виде, в
   Universal V5, V5 (game filter), V5 my, V6, V6 voicefix, V7 и V8 diag;
 * **каталог адресов**. `config/catalog.zapret.yaml` — выборка из каталога
   установки (`system/hosts_catalog.sqlite3`): те записи «имя — адрес», что
-  ответили при проверке в день сборки. Сам каталог тоже едет в архив, в
-  `engines/zapret/system/hosts_catalog.sqlite3`: `pack.cmd` берёт его из
-  установки, а без неё — из `dist-template/`, откуда же его кладёт и CI,
-  так что раздел есть в любом архиве. Это адреса чужих публичных
+  ответили при проверке в день сборки. Сам каталог `pack.cmd` тоже кладёт
+  в архив — из той же копии. Это адреса чужих публичных
   DNS-сервисов (XBOX DNS, Comss DNS и других), то есть ответы, которые
   те раздают всем желающим; собрал их в каталог автор Zapret GUI;
 * **пины напрямую**. `config/pin-solutions.yaml` — раздел «Напрямую» того же
@@ -239,11 +245,17 @@ KVN эти имена блокирует, мы пускаем напрямую.
 * **список адресов** `engines/zapret/lists/ipset-all.txt` — облака, хостинги
   и Cloudflare, по которым game filter отбирает трафик. Сверка 30.09: все
   33 048 записей нашего файла совпадают с `lists/ipset-all.txt.backup`
-  в репозитории Flowseal. К нам он попадает из установки Zapret GUI;
+  в репозитории Flowseal. К нам он попадает с файлами Zapret GUI (`vendor/zapret-gui`);
 * **три образца пакетов**, которыми эти секции пользуются:
-  `bin/tls_clienthello_max_ru.bin`, `bin/stun2.bin` и `bin/ACTIVE_GAME_UDP.bin`.
+  `bin/tls_clienthello_www_sferum_ru.bin` (до 21.10 — `tls_clienthello_max_ru.bin`;
+  Flowseal сменил подделку в 1.10.4), `bin/stun2.bin` и `bin/ACTIVE_GAME_UDP.bin`.
   Сверка 30.09: побайтно те же файлы, что в `bin/` его репозитория. Тоже
-  едут из установки Zapret GUI.
+  едут с файлами Zapret GUI;
+* **семь приветствий V3nilla** из его 1.10.4 (PR 17925, 20.10): TLS с именами
+  awswaf.com, steam-chat.com, steamstatic.com, teamspeak.com и QUIC lemana.pro,
+  steam-chat.com, steamstatic.com. Лежат в `config/blobs/`, едут как
+  `engines/zapret/bin/zy-*.bin`; сверены хэшами с `bin/` его репозитория 21.10.
+  Ими пользуются рецепты каталога «Приветствие … (Flowseal)».
 
 **MIT License, Copyright (c) 2016–2026 bol-van, Copyright (c) 2024–2026
 Flowseal** — обе строки стоят в его
@@ -261,7 +273,7 @@ Flowseal** — обе строки стоят в его
 [github.com/valnesfjord/tg-ws-proxy-rs](https://github.com/valnesfjord/tg-ws-proxy-rs),
 порт на Rust программы **tg-ws-proxy** того же **Flowseal**:
 [github.com/Flowseal/tg-ws-proxy](https://github.com/Flowseal/tg-ws-proxy).
-Едет как есть, исполняемым файлом выпуска 2.5.4 (`engines/tg-ws-proxy/tg-ws-proxy.exe`,
+Едет как есть, исполняемым файлом выпуска 2.5.6 (`engines/tg-ws-proxy/tg-ws-proxy.exe`,
 архив сверен с их `SHA256SUMS`); запускает его наш надзор. Список доменов
 за Cloudflare, через которые прокси ведёт Telegram, ведёт проект Flowseal:
 прокси берёт его из `.github/cfproxy-domains.txt` репозитория tg-ws-proxy,
@@ -271,20 +283,14 @@ Flowseal** — обе строки стоят в его
 2026 Flowseal** — строки из их файлов LICENSE, приводятся как есть. Тексты
 целиком — `engines/tg-ws-proxy/LICENSE` и `engines/tg-ws-proxy/LICENSE-Flowseal-tg-ws-proxy.txt`.
 
+
 ## Сам Zephyron
 
 Всё, что вне `engines/`, написано в рамках этого проекта и распространяется
 под **MIT License** — текст в [LICENSE](../LICENSE) в корне репозитория.
 
-### Производная работа: NetZapret
-
-Zephyron собран из исходного кода [NetZapret](https://github.com/RixyPow/netzapret),
-**Copyright (c) 2026 RixyPow**, **MIT License**. Взята рабочая основа — правила
-и маршрутизация, десинк, туннель, подписки, супервизор движков; окно
-и оформление переделаны. Условие MIT соблюдено: уведомление об авторстве
-NetZapret и текст его лицензии сохранены в [LICENSE](../LICENSE) в корне
-репозитория. Сам NetZapret в поставку Zephyron не входит и отдельным
-компонентом не является — это основа исходников, а не файл в архиве.
+Уведомление об авторстве исходного кода, с которого начинался проект,
+сохранено в [LICENSE](../LICENSE), как того требует MIT.
 
 Совместимость с составом сомнений не вызывает: MIT ничему не противоречит,
 а движки остаются на своих условиях и запускаются отдельными процессами.

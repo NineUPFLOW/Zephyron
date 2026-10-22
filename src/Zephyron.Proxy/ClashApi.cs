@@ -244,6 +244,36 @@ public sealed class ClashApi : IDisposable
     }
 
     /// <summary>
+    /// Ставит режим Clash (<c>PATCH /configs</c>); <c>true</c> — движок принял.
+    /// </summary>
+    /// <remarks>
+    /// Режим у нас — рычаг для правил DNS (<see cref="SingBoxOptions.DnsTcpMode"/>):
+    /// маршруты его не смотрят, и смена режима трогает только их. Имя режима —
+    /// любое из названных в правилах: движок собирает список сам
+    /// (<c>mode-list</c>), опыт 20.10 — <c>204</c>, в журнале
+    /// «clash-mode: updated mode». Перезапуск движка возвращает режим по
+    /// умолчанию, как и переключатель пути.
+    /// </remarks>
+    public async Task<bool> SetModeAsync(string mode, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var body = new ByteArrayContent(Encoding.UTF8.GetBytes(
+                new JsonObject { ["mode"] = mode }.ToJsonString()));
+
+            body.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+
+            using var response = await SendAsync(HttpMethod.Patch, $"{Root}/configs", body, cancellationToken);
+
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Последний удачный замер каждого выхода, как его помнит движок;
     /// <c>null</c> — движок не ответил.
     /// </summary>
@@ -296,6 +326,36 @@ public sealed class ClashApi : IDisposable
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Сколько движок провёз с запуска: отдано и получено, байтами;
+    /// <c>null</c> — не ответил.
+    /// </summary>
+    /// <remarks>
+    /// Итоги <c>/connections</c> — счётчик движка, а не сумма живых соединений:
+    /// закрытые в нём остаются. Ответ несёт и сами соединения (замер 19.10:
+    /// 18 соединений — 8,7 КБ), их здесь не разбираем.
+    /// </remarks>
+    public async Task<(long Up, long Down)?> TotalsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await SendAsync(HttpMethod.Get, $"{Root}/connections", null, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var body = JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+
+            return body?["uploadTotal"]?.GetValue<long>() is { } up && body["downloadTotal"]?.GetValue<long>() is { } down
+                ? (up, down)
+                : null;
         }
         catch (Exception)
         {

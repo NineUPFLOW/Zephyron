@@ -99,10 +99,17 @@
         </Grid>
 
 
-        <Grid Grid.Row="0" Grid.RowSpan="2">
+        <Grid Grid.Row="0" Grid.RowSpan="2" x:Name="SectionArea">
             <ContentControl x:Name="Section">
                 <views:StatusView />
             </ContentControl>
+
+            <!--
+                «Маршруты» — своим местом: уход их прячет, а не отцепляет
+                (OnSection). Отцепленные при возврате раскладывали
+                сотню карточек заново — у владельца сторож писал 1,0–1,6 с.
+            -->
+            <ContentControl x:Name="RoutesHost" Visibility="Collapsed" />
 
             <!--
                 Всплывающие карточки — стопкой внизу справа, над кнопкой журнала,
@@ -222,7 +229,7 @@
                     <RadioButton Style="{StaticResource RailItem}" Content="VPN" Tag="vpn" local:MenuIcon.Glyph="&#xE774;" Checked="OnSection" />
                     <RadioButton Style="{StaticResource RailItem}" Content="Десинк" Tag="desync" local:MenuIcon.Glyph="&#xE9E9;" Checked="OnSection" />
                     <RadioButton Style="{StaticResource RailItem}" Content="Маршруты" Tag="routes" local:MenuIcon.Glyph="&#xE816;" Checked="OnSection" />
-                    <RadioButton Style="{StaticResource RailItem}" Content="TG Proxy" Tag="tgproxy" local:MenuIcon.Glyph="&#xE724;" Checked="OnSection" />
+                    <RadioButton Style="{StaticResource RailItem}" Content="TG Proxy" Tag="tgproxy" local:MenuIcon.Shape="{StaticResource TelegramPlane}" Checked="OnSection" />
                 </StackPanel>
 
                 <!--

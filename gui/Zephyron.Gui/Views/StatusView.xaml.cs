@@ -602,7 +602,9 @@ public partial class StatusView : UserControl
         SyncNet(running || _startingSince is not null);
         ShowWarnings(settings);
 
-        _ = ReadExitAsync(settings, running && state!.Services.Any(s => s.Name == "sing-box"));
+        bool tunnelUp = running && state!.Services.Any(s => s.Name == "sing-box");
+        _ = ReadExitAsync(settings, tunnelUp);
+        _ = ReadMetersAsync(state, running, tunnelUp);
     }
 
     /// <summary>Выход, который держит движок; <c>null</c> — не знаем или туннеля нет.</summary>

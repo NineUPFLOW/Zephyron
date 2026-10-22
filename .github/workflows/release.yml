@@ -40,9 +40,9 @@ env:
   # одинаково и через год, а «последний» выпуск sing-box однажды отвергнет
   # наши конфиги (1.14 строже прежних к незнакомым полям). Обновлять
   # осознанно, вместе с проверкой вживую.
-  SINGBOX_URL: https://github.com/shtorm-7/sing-box-extended/releases/download/v1.14.1-extended-2.7.2/sing-box-1.14.1-extended-2.7.2-windows-amd64.zip
-  SINGBOX_DIR: sing-box-1.14.1-extended-2.7.2-windows-amd64
-  TGWS_URL: https://github.com/valnesfjord/tg-ws-proxy-rs/releases/download/v2.5.4/tg-ws-proxy-x86_64-pc-windows-gnu.zip
+  SINGBOX_URL: https://github.com/shtorm-7/sing-box-extended/releases/download/v1.14.3-extended-2.7.3/sing-box-1.14.3-extended-2.7.3-windows-amd64.zip
+  SINGBOX_DIR: sing-box-1.14.3-extended-2.7.3-windows-amd64
+  TGWS_URL: https://github.com/valnesfjord/tg-ws-proxy-rs/releases/download/v2.5.6/tg-ws-proxy-x86_64-pc-windows-gnu.zip
   WINWS2_URL: https://git.zapret.moe/zapretdiscordyoutube/zapret2-fork/releases/download/v1.0.5.2-41-g204fd66-native-3-g9528c5b-native/winws2.exe
   # Набор Zapret (exe, lua, bin, lists, windivert.filter) одним зеркалом.
   ZAPRET_REPO: https://github.com/krambovic/Lumen.git
