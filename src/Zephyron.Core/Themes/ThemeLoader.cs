@@ -42,9 +42,10 @@ public static class ThemeLoader
     /// не зависела от темы, которую мы однажды поправим. С картинкой едут
     /// пять: «Аврора» с фирменным фоном (12.10), NyaView (живой фон
     /// владельца), HotGr и Peach Static — арт владельца (12.10).
-    /// «Слойка 1» и Blissfield убраны 12.10 по его же слову.
+    /// «Слойка 1» и Blissfield убраны 12.10 по его же слову. «Зефирная» была
+    /// основной тёмной до новой «Полночи» и осталась третьей в списке.
     /// </remarks>
-    public static IReadOnlyList<string> Shipped { get; } = ["dark", "light", "grey", "tinted", "violet", "ocean", "coffee", "rose", "cream", "aurora", "HotGr", "NyaView", "Peach Static"];
+    public static IReadOnlyList<string> Shipped { get; } = ["dark", "light", "zefir", "grey", "tinted", "violet", "ocean", "coffee", "rose", "cream", "aurora", "HotGr", "NyaView", "Peach Static"];
 
     public const long MaxImageBytes = 20 * 1024 * 1024;
     public const long MaxFontBytes = 8 * 1024 * 1024;

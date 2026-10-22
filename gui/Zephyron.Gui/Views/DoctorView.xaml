@@ -170,7 +170,7 @@
                                                         точка уехала бы
                                                         в середину абзаца.
                                                     -->
-                                                    <Ellipse Grid.Column="0" Width="8" Height="8"
+                                                    <Rectangle RadiusX="1" RadiusY="1" Grid.Column="0" Width="8" Height="8"
                                                              Margin="2,6,14,0" VerticalAlignment="Top"
                                                              Fill="{Binding Color}" />
 

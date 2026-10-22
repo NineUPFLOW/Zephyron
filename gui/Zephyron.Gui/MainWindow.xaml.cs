@@ -28,10 +28,21 @@ public partial class MainWindow : Window
         BackdropVideo.Attach(BackdropLayer);
         Closed += (_, _) => BackdropVideo.Detach(BackdropLayer);
 
-        VersionLabel.Text = "версия " + Version();
+        VersionLabel.Text = Version();
         Motion.Mark(Mark);
         ShowOnboardingIfNeeded();
         Loaded += (_, _) => ShowGreetingIfDue();
+
+        // Точка состояния в верхнем меню — видна из любого раздела.
+        _topDot.Tick += (_, _) => ShowTopDot();
+        Loaded += (_, _) =>
+        {
+            ShowTopDot();
+            _topDot.Start();
+        };
+        Closed += (_, _) => _topDot.Stop();
+
+        DrawerLog.CloseRequested += (_, _) => ShowLog(false);
 
         SourceInitialized += (_, _) =>
         {
@@ -307,10 +318,12 @@ public partial class MainWindow : Window
         {
             var status = new StatusView();
             Section.Content = status;
+            FitUnderNav();
             Motion.Page(status);
         };
 
         Section.Content = onboarding;
+        FitUnderNav();
     }
 
     /// <summary>
@@ -429,12 +442,24 @@ public partial class MainWindow : Window
     {
         // Отрабатывает и при разборе разметки, когда Section ещё не создан:
         // IsChecked="True" у первого пункта поднимает событие раньше времени.
-        if (Section is null || sender is not RadioButton { Tag: string name })
+        // С 0.16 меню стоит в разметке после раздела — значит, и «Ещё» к этому
+        // мгновению может быть ещё не разобрано: «Главная» показана разметкой.
+        if (Section is null || MoreRail is null || sender is not RadioButton { Tag: string name })
             return;
 
         // Для сторожа подвисаний: к разделу, который открывают, и привязывается
         // задержка — создание раздела и есть частая её причина.
         UiStallWatch.Section = (sender as RadioButton)?.Content as string ?? name;
+
+        // Пункты живут в двух местах — в полосе и во всплывающем «Ещё», а у
+        // всплывающего меню своё дерево: сами друг друга переключатели
+        // не снимут, снимаем здесь. Раздел из «Ещё» подсвечивает его кнопку.
+        foreach (var item in Items().Where(i => !ReferenceEquals(i, sender)))
+            item.IsChecked = false;
+
+        bool fromMore = MoreRail.Children.Contains((RadioButton)sender);
+        MoreToggle.Tag = fromMore ? "active" : null;
+        MorePopup.IsOpen = false;
 
         // Ушли из мастера в другой раздел — он закрыт, как «Пропустить».
         (Section.Content as OnboardingView)?.Leave();
@@ -456,6 +481,8 @@ public partial class MainWindow : Window
             _ => new StatusView(),
         };
 
+        FitUnderNav();
+
         // «Маршруты» — без анимации (владелец, 28.09): список из сотни строк,
         // и его появление по частям только мешает искать.
         if (name != "routes" && Section.Content is FrameworkElement page)
@@ -473,7 +500,7 @@ public partial class MainWindow : Window
     /// </remarks>
     public void Open(string section)
     {
-        foreach (var item in Rail.Children.OfType<RadioButton>())
+        foreach (var item in Items())
         {
             if (item.Tag as string == section)
             {
@@ -481,6 +508,163 @@ public partial class MainWindow : Window
                 return;
             }
         }
+    }
+
+    /// <summary>Все пункты меню: полоса и всплывающее «Ещё».</summary>
+    private IEnumerable<RadioButton> Items() =>
+        Rail.Children.OfType<RadioButton>().Concat(MoreRail.Children.OfType<RadioButton>());
+
+    /// <summary>Когда закрылось «Ещё» — щелчок мимо меню, пришедшийся на его же кнопку.</summary>
+    private DateTime _moreClosedAt;
+
+    /// <summary>
+    /// Открывает и закрывает «Ещё».
+    /// </summary>
+    /// <remarks>
+    /// Меню закрывается само при щелчке мимо (StaysOpen="False"), и щелчок
+    /// по его же кнопке сперва закрывает меню, а затем доходит до кнопки —
+    /// та открыла бы его снова. Закрытое только что — значит, закрыли этим
+    /// щелчком, и открывать не надо.
+    /// </remarks>
+    private void OnMoreToggle(object sender, RoutedEventArgs e)
+    {
+        if (DateTime.UtcNow - _moreClosedAt < TimeSpan.FromMilliseconds(250))
+        {
+            MoreToggle.IsChecked = false;
+            return;
+        }
+
+        MorePopup.IsOpen = MoreToggle.IsChecked == true;
+    }
+
+    private void OnMoreClosed(object? sender, EventArgs e)
+    {
+        _moreClosedAt = DateTime.UtcNow;
+        MoreToggle.IsChecked = false;
+    }
+
+    private void OnLogToggle(object sender, RoutedEventArgs e) => ShowLog(LogButton.IsChecked == true);
+
+    /// <summary>Разворачивает и сворачивает журнал снизу; открытый перечитывается — он рос и свёрнутым.</summary>
+    private void ShowLog(bool open)
+    {
+        LogDrawer.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+        LogButton.IsChecked = open;
+
+        if (!open)
+            return;
+
+        DrawerLog.Refresh();
+        Motion.Arrive(LogDrawer, dy: 24);
+    }
+
+    private readonly DispatcherTimer _topDot = new() { Interval = TimeSpan.FromSeconds(3) };
+
+    /// <summary>
+    /// Точка и знак в верхнем меню — тем же цветом, что состояние на «Главной».
+    /// </summary>
+    /// <remarks>
+    /// Серая — обход стоит, акцент — работает, жёлтая — с оговорками, красная —
+    /// движок умер. Читается файл состояния супервизора, как на «Главной»:
+    /// своего мнения о движках у меню нет.
+    /// </remarks>
+    private void ShowTopDot()
+    {
+        string key;
+
+        try
+        {
+            var state = SupervisorState.Load(SupervisorState.DefaultPath);
+
+            key = state is null || !state.IsSupervisorAlive() || state.Services.Count == 0 ? "Faint"
+                : state.Services.All(s => s.Health == ServiceHealth.Healthy) ? "Accent"
+                : state.Services.Any(s => s.Health is ServiceHealth.Dead or ServiceHealth.Faulted) ? "Danger"
+                : "Warn";
+        }
+        catch (Exception)
+        {
+            key = "Faint";
+        }
+
+        var brush = (System.Windows.Media.Brush)FindResource(key);
+        TopDot.Fill = brush;
+    }
+
+    private void OnNavSize(object sender, SizeChangedEventArgs e)
+    {
+        FitUnderNav();
+        FitNav();
+    }
+
+    private void OnRootSize(object sender, SizeChangedEventArgs e) => FitNav();
+
+    /// <summary>Меню сжато до значков.</summary>
+    private bool _navCompact;
+
+    /// <summary>Ширина меню с подписями — замерена, пока они были видны.</summary>
+    private double _navWide;
+
+    /// <summary>Сколько свободного места по бокам меню держать, прежде чем сжимать.</summary>
+    private const double NavRoom = 24;
+
+    /// <summary>
+    /// Сжимает верхнее меню до значков, когда с подписями оно не помещается в окно.
+    /// </summary>
+    /// <remarks>
+    /// Владелец, 22.10: «кнопка журнала не должна ничего перекрывать при изменении
+    /// размера окна». Полоса с подписями шире окна у нижнего предела ширины;
+    /// без подписей она вчетверо уже, а подпись остаётся подсказкой. Обратно —
+    /// с запасом, чтобы на самой границе меню не мигало туда-сюда.
+    /// </remarks>
+    private void FitNav()
+    {
+        if (Nav is null || Root.ActualWidth <= 0)
+            return;
+
+        double room = Root.ActualWidth - Nav.Margin.Left - Nav.Margin.Right - NavRoom;
+
+        if (!_navCompact)
+        {
+            _navWide = Nav.ActualWidth;
+
+            if (_navWide > room)
+                SetNavCompact(true);
+        }
+        else if (_navWide + 40 <= room)
+        {
+            SetNavCompact(false);
+        }
+    }
+
+    private void SetNavCompact(bool compact)
+    {
+        _navCompact = compact;
+
+        Resources["NavLabel"] = compact ? Visibility.Collapsed : Visibility.Visible;
+        Resources["NavGlyphGap"] = compact ? new Thickness(0) : new Thickness(0, 0, 7, 0);
+        VersionLabel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+
+        // Без подписи имя пункта — подсказкой. «Ещё» и «Журнал» подписи
+        // не теряют: их значки сами по себе ничего не называют.
+        foreach (var item in Rail.Children.OfType<RadioButton>())
+            item.ToolTip = compact ? item.Content : null;
+    }
+
+    /// <summary>
+    /// Отодвигает содержимое раздела из-под верхнего меню.
+    /// </summary>
+    /// <remarks>
+    /// Раздел лежит под меню во всю высоту окна, а не под ним строкой ниже:
+    /// так картинка темы на «Главной» (её свой слой, PlaceArt) доходит до
+    /// верхнего края и не встречается с картинкой окна швом над карточками
+    /// (владелец, 22.10: «при смещении обоев они отображаются не правильно»).
+    /// Отступ — полем самого раздела: фон раздела под меню остаётся,
+    /// а карточки начинаются ниже меню.
+    /// </remarks>
+    private void FitUnderNav()
+    {
+        if (Section?.Content is Control page)
+            page.Padding = new Thickness(0, Nav.ActualHeight + Nav.Margin.Top, 0, 0);
     }
 
     /// <summary>Сколько уведомление висит, прежде чем уйти само.</summary>

@@ -15,6 +15,6 @@
         рядом с разделом, где что-то не работает.
     -->
     <Grid LayoutTransform="{DynamicResource UiScaleTransform}">
-        <views:LogView x:Name="Log" />
+        <views:LogView x:Name="Log" Padding="24,20" />
     </Grid>
 </Window>

@@ -14,7 +14,7 @@
 
             <StackPanel Grid.Column="0">
                 <ContentControl Style="{StaticResource PageHead}"
-                                local:PageHead.Title="Ещё"
+                                local:PageHead.Title="Прочее"
                                 local:PageHead.Subtitle="Антивирус, выключатели, папки программы и обслуживание. Оформление — своим разделом, обновление — на «Главной», подписки — в «VPN»." />
 
                 <TextBlock x:Name="Status" Style="{StaticResource Caption}" Margin="4,16,0,0" TextWrapping="Wrap" />

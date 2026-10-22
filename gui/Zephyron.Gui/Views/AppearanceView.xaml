@@ -82,8 +82,8 @@
 
                                                     <Grid Width="18" Height="18" Margin="0,0,0,9"
                                                           HorizontalAlignment="Center" VerticalAlignment="Bottom">
-                                                        <Ellipse Stroke="{Binding Ring}" StrokeThickness="1.5" />
-                                                        <Ellipse Width="10" Height="10" Fill="{Binding Dot}"
+                                                        <Rectangle RadiusX="4" RadiusY="4" Stroke="{Binding Ring}" StrokeThickness="1.5" />
+                                                        <Rectangle RadiusX="2" RadiusY="2" Width="10" Height="10" Fill="{Binding Dot}"
                                                                  Visibility="{Binding DotShown}" />
                                                     </Grid>
                                                 </Grid>
@@ -154,7 +154,7 @@
                             </Button>
 
                             <Border x:Name="DimRow" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}"
-                                    BorderThickness="1.5" CornerRadius="14" Padding="16,11">
+                                    BorderThickness="1" CornerRadius="14" Padding="16,11">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />

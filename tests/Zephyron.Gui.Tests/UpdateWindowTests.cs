@@ -83,7 +83,7 @@ public sealed class UpdateWindowTests
 
         var xaml = File.ReadAllText(Path.Combine(root!.FullName, "gui", "Zephyron.Gui", "MainWindow.xaml"));
         var items = System.Text.RegularExpressions.Regex.Matches(
-            xaml, @"Style=""\{StaticResource RailItem\}"" Content=""([^""]+)"" Tag=""([^""]+)"" local:MenuIcon\.Glyph=""&#x([0-9A-Fa-f]+);""");
+            xaml, @"Style=""\{StaticResource (?:RailItem|MoreItem)\}"" Content=""([^""]+)"" Tag=""([^""]+)"" local:MenuIcon\.Glyph=""&#x([0-9A-Fa-f]+);""");
 
         Assert.True(items.Count >= 13, $"пунктов меню нашлось {items.Count}: разметка меню поменялась, тест её не узнаёт");
 

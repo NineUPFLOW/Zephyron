@@ -51,7 +51,7 @@
                                     </Grid.ColumnDefinitions>
                                     <Border Width="40" Height="26" CornerRadius="6" Margin="0,0,14,0"
                                             Background="{Binding Swatch}" BorderBrush="{DynamicResource Border}"
-                                            BorderThickness="1.5" />
+                                            BorderThickness="1" />
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding Label}" />
                                         <TextBlock Text="{Binding Note}" Style="{StaticResource Caption}" Margin="0,2,0,0" />
@@ -148,7 +148,7 @@
 
                             <Border x:Name="HomeMini" Width="480" Height="307" Margin="0,10,0,0"
                                     HorizontalAlignment="Left" CornerRadius="10" ClipToBounds="True"
-                                    BorderBrush="{DynamicResource Border}" BorderThickness="1.5"
+                                    BorderBrush="{DynamicResource Border}" BorderThickness="1"
                                     Background="{DynamicResource Backdrop}" Cursor="SizeAll"
                                     MouseLeftButtonDown="OnMiniDown" MouseMove="OnMiniMove"
                                     MouseLeftButtonUp="OnMiniUp" MouseWheel="OnMiniWheel">

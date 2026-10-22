@@ -5,10 +5,23 @@
   "name": "NyaView",
   "base": "dark",
   "homeFullWidth": true,
+  // Прочие цвета записаны явно — те, что были у основы до 0.16:
+  // основа с тех пор сменилась, а тема задумана под прежнюю.
   "colors": {
+    "backdrop": "#17131F",
     "surface": "#CC161B22",
+    "raised": "#2C2439",
+    "border": "#3E3350",
+    "text": "#F4EEFB",
     "muted": "#C9D1D9",
-    "faint": "#A3ACB6"
+    "faint": "#A3ACB6",
+    "accent": "#FF8FC0",
+    "accent-dim": "#7A3F63",
+    "danger": "#FF7A8A",
+    "warn": "#FFC978",
+    "accent-fill": "#FF8FC0",
+    "on-accent": "#2A0F1E",
+    "warn-fill": "#FFC978"
   },
   "background": {
     "image": "background.mp4",

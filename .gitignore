@@ -96,6 +96,7 @@ build/build-number.txt
 themes/*
 !themes/dark/
 !themes/light/
+!themes/zefir/
 !themes/README.md
 !themes/grey/
 !themes/tinted/

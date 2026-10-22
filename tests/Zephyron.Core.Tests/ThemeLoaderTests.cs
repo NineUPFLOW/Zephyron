@@ -92,7 +92,7 @@ public sealed class ThemeLoaderTests : IDisposable
 
         var all = ThemeLoader.LoadAll(_root);
 
-        Assert.Equal(["dark", "light", "grey", "tinted", "violet", "ocean", "coffee", "rose", "cream", "aurora", "HotGr", "NyaView", "Peach Static", "zzz"], all.Select(t => t.Id));
+        Assert.Equal(["dark", "light", "zefir", "grey", "tinted", "violet", "ocean", "coffee", "rose", "cream", "aurora", "HotGr", "NyaView", "Peach Static", "zzz"], all.Select(t => t.Id));
     }
 
     /// <summary>Основа даёт недостающее: три своих цвета, остальное — от тёмной.</summary>
@@ -112,9 +112,9 @@ public sealed class ThemeLoaderTests : IDisposable
 
         var theme = load.Theme!;
         Assert.Equal("#F2D335", theme[ThemeSlots.Accent].ToString());
-        Assert.Equal("#221C2E", theme[ThemeSlots.Surface].ToString());
+        Assert.Equal("#0F1219", theme[ThemeSlots.Surface].ToString());
         Assert.Equal("Bahnschrift Condensed", theme.Fonts.Display);
-        Assert.Equal("Comfortaa, Segoe UI", theme.Fonts.Ui);
+        Assert.Equal("Segoe UI Variable Text, Segoe UI", theme.Fonts.Ui);
     }
 
     /// <summary>Опечатка в имени слота — ошибка, а не молча пропущенный цвет.</summary>

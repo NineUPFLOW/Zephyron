@@ -28,10 +28,12 @@
          допустимым значением для свойства "CornerRadius"», — и это роняло
          разбор шаблона, как раньше дробная толщина (см. Stroke). -->
     <CornerRadius x:Key="RSm">8</CornerRadius>
-    <CornerRadius x:Key="RMd">12</CornerRadius>
+    <CornerRadius x:Key="RMd">10</CornerRadius>
     <CornerRadius x:Key="RLg">16</CornerRadius>
     <CornerRadius x:Key="RXL">20</CornerRadius>
-    <CornerRadius x:Key="RPill">999</CornerRadius>
+    <!-- С 0.16 «таблетка» — не овал, а метка с малым скруглением:
+         овальные плашки владелец 22.10 назвал «бредом». -->
+    <CornerRadius x:Key="RPill">4</CornerRadius>
 
     <!-- Шаг отступов: 4 → 32. Рядом стоящие значения берутся из одной шкалы,
          чтобы у соседних карточек и строк был один ритм. -->
@@ -42,19 +44,19 @@
     <sys:Double x:Key="S5">24</sys:Double>
     <sys:Double x:Key="S6">32</sys:Double>
 
-    <!-- Размеры оболочки окна. -->
-    <sys:Double x:Key="RailWidth">244</sys:Double>
-    <sys:Double x:Key="MarkSize">40</sys:Double>
+    <!-- Размеры оболочки окна: предел ширины содержимого «Главной»
+         и знак программы в верхнем меню. -->
+    <sys:Double x:Key="ContentMax">1080</sys:Double>
+    <sys:Double x:Key="MarkSize">28</sys:Double>
 
     <!-- Поля страницы раздела: шире горизонталь, чем вертикаль, — так
-         карточки стоят по центру взгляда, а не упираются в края. -->
+         карточки стоят по центру взгляда, а не упираются в края. Сверху
+         поле занимает верхнее меню, оно висит над разделом. -->
     <Thickness x:Key="PagePad">32,28,32,28</Thickness>
-    <Thickness x:Key="CardPad">20,18,20,18</Thickness>
-    <Thickness x:Key="RailPad">20,24,20,20</Thickness>
+    <Thickness x:Key="CardPad">24,20,24,20</Thickness>
 
-    <!-- Поля карточки меню от краёв окна: слева и сверху/снизу воздух,
-         справа нет — правый край и так отбит от поля раздела. -->
-    <Thickness x:Key="RailInset">12,12,0,12</Thickness>
+    <!-- Верхнее меню от верхнего края окна: висит, а не прилегает. -->
+    <Thickness x:Key="NavInset">16,14,16,0</Thickness>
 
     <!-- Толщина линий и рамок. Тонкая для разделителей, обычная для границ.
          Ровно Thickness, а не Double: WPF подставляет число в BorderThickness,
@@ -63,6 +65,8 @@
          XamlParseException при открытии меню (11.10). Объект Thickness
          разбору не подвергается вовсе. -->
     <Thickness x:Key="Line">1</Thickness>
-    <Thickness x:Key="Stroke">1.5</Thickness>
+    <!-- С 0.16 рамки волосяные, как разделители: карточку отделяет
+         от подложки цвет рамки, а не её толщина. -->
+    <Thickness x:Key="Stroke">1</Thickness>
 
 </ResourceDictionary>

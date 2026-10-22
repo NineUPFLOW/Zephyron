@@ -293,7 +293,7 @@
                                         <!-- Залитый кружок — известно точно, полый — ответ правил. -->
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
                                                     ToolTip="{Binding CertaintyHint}">
-                                            <Ellipse Width="9" Height="9" Stroke="{Binding Colour}" StrokeThickness="1.6"
+                                            <Rectangle RadiusX="1.5" RadiusY="1.5" Width="9" Height="9" Stroke="{Binding Colour}" StrokeThickness="1.6"
                                                      Fill="{Binding Dot}" Margin="0,0,7,0" VerticalAlignment="Center" />
                                             <TextBlock Text="{Binding Mode}" Foreground="{Binding Colour}" />
                                         </StackPanel>
@@ -387,7 +387,7 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="32" />
                                         </Grid.ColumnDefinitions>
-                                        <Ellipse Width="9" Height="9" Fill="{Binding Brush}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                        <Rectangle RadiusX="1" RadiusY="1" Width="9" Height="9" Fill="{Binding Brush}" Margin="0,0,8,0" VerticalAlignment="Center" />
                                         <TextBlock Grid.Column="1" Text="{Binding Word}" />
                                         <TextBlock Grid.Column="2" Text="{Binding Count}" FontWeight="SemiBold" Margin="8,0,0,0" />
                                         <TextBlock Grid.Column="3" Text="{Binding Share}" Style="{StaticResource Caption}"

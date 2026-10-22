@@ -283,7 +283,7 @@ public partial class UpdateWindow : Window
         bool fresh = change == NotesChange.Added;
 
         var label = new TextBlock { Text = text, FontSize = 12, FontWeight = FontWeights.SemiBold };
-        label.SetResourceReference(TextBlock.ForegroundProperty, fresh ? "OnAccent" : "Text");
+        label.SetResourceReference(TextBlock.ForegroundProperty, fresh ? "Accent" : "Text");
 
         var tag = new Border
         {
@@ -293,7 +293,7 @@ public partial class UpdateWindow : Window
             Margin = new Thickness(0, 4, 0, 8),
             HorizontalAlignment = HorizontalAlignment.Left,
         };
-        tag.SetResourceReference(Border.BackgroundProperty, fresh ? "AccentFill" : "Raised");
+        tag.SetResourceReference(Border.BackgroundProperty, fresh ? "AccentSoft" : "Raised");
         return tag;
     }
 
@@ -340,14 +340,16 @@ public partial class UpdateWindow : Window
             if (i < ordered.Count - 1)
                 rail.Children.Add(Line(top: false));
 
-            // Круглые версии (0.12.0, 0.13.0) — крупным кружком, вехами
+            // Круглые версии (0.12.0, 0.13.0) — крупной меткой, вехами
             // (владелец 06.10); новая и установленная — ещё и в обводке.
             bool round = IsRound(release.Version);
             bool marked = found || installed;
             double size = round ? 14 : 8;
 
-            var dot = new System.Windows.Shapes.Ellipse
+            var dot = new System.Windows.Shapes.Rectangle
             {
+                RadiusX = 2,
+                RadiusY = 2,
                 Width = size,
                 Height = size,
                 VerticalAlignment = VerticalAlignment.Top,
@@ -360,8 +362,10 @@ public partial class UpdateWindow : Window
             {
                 double ring = size + 10;
 
-                var halo = new System.Windows.Shapes.Ellipse
+                var halo = new System.Windows.Shapes.Rectangle
                 {
+                    RadiusX = 4,
+                    RadiusY = 4,
                     Width = ring,
                     Height = ring,
                     VerticalAlignment = VerticalAlignment.Top,
@@ -464,7 +468,7 @@ public partial class UpdateWindow : Window
     private static Border Pill(string text, bool accent)
     {
         var label = new TextBlock { Text = text, FontSize = 11 };
-        label.SetResourceReference(TextBlock.ForegroundProperty, accent ? "OnAccent" : "Text");
+        label.SetResourceReference(TextBlock.ForegroundProperty, accent ? "Accent" : "Text");
 
         var pill = new Border
         {
@@ -474,7 +478,7 @@ public partial class UpdateWindow : Window
             Margin = new Thickness(8, 1, 0, 0),
             VerticalAlignment = VerticalAlignment.Center,
         };
-        pill.SetResourceReference(Border.BackgroundProperty, accent ? "AccentFill" : "Raised");
+        pill.SetResourceReference(Border.BackgroundProperty, accent ? "AccentSoft" : "Raised");
         return pill;
     }
 
@@ -529,7 +533,7 @@ public partial class UpdateWindow : Window
     internal string? Selected => _shown;
 
     /// <summary>Точка каждой версии и её обычный цвет — чтобы погасить свечение при смене выбора.</summary>
-    private readonly Dictionary<string, (System.Windows.Shapes.Ellipse Dot, string Fill, double Size)> _dots =
+    private readonly Dictionary<string, (System.Windows.Shapes.Rectangle Dot, string Fill, double Size)> _dots =
         new(StringComparer.OrdinalIgnoreCase);
 
     private void Highlight(string version)
@@ -562,25 +566,18 @@ public partial class UpdateWindow : Window
             now.BringIntoView();
         }
 
-        // Точка выбранной версии светится цветом темы (владелец 06.10) и чуть
-        // крупнее своей: на мелкой точке в восемь пунктов свечение терялось.
+        // Точка выбранной версии — цветом темы (владелец 06.10) и чуть
+        // крупнее своей. Без свечения с 0.16: размытое пятно читалось овалом.
         if (_dots.TryGetValue(version, out var lit))
         {
             lit.Dot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "Accent");
             Size(lit.Dot, lit.Size + 4);
 
-            lit.Dot.Effect = new System.Windows.Media.Effects.DropShadowEffect
-            {
-                Color = TryFindResource("AccentColor") is Color accent ? accent : Colors.White,
-                BlurRadius = 22,
-                ShadowDepth = 0,
-                Opacity = 1,
-            };
         }
     }
 
     /// <summary>Размер точки — с тем же центром на линии.</summary>
-    private static void Size(System.Windows.Shapes.Ellipse dot, double size)
+    private static void Size(System.Windows.Shapes.Rectangle dot, double size)
     {
         dot.Width = size;
         dot.Height = size;

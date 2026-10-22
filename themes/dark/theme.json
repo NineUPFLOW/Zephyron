@@ -1,28 +1,28 @@
 {
-  // «Зефирная» — основная тёмная тема Zephyron и основа для чужих: "base": "dark".
+  // «Полночь» — основная тёмная тема Zephyron и основа для чужих: "base": "dark".
   // Значения — те же, что в gui/Zephyron.Gui/Theme/Palette.xaml;
   // расхождение ловит тест ThemeFilesMatchXamlPalettes.
-  "name": "Зефирная",
+  "name": "Полночь",
   "author": "Zephyron",
   "colors": {
-    "backdrop": "#17131F",
-    "surface": "#221C2E",
-    "raised": "#2C2439",
-    "border": "#3E3350",
-    "text": "#F4EEFB",
-    "muted": "#BCB0CE",
-    "faint": "#8F85A3",
-    "accent": "#FF8FC0",
-    "accent-dim": "#7A3F63",
-    "danger": "#FF7A8A",
-    "warn": "#FFC978",
-    "accent-fill": "#FF8FC0",
-    "on-accent": "#2A0F1E",
-    "warn-fill": "#FFC978"
+    "backdrop": "#08090F",
+    "surface": "#0F1219",
+    "raised": "#161A23",
+    "border": "#21252F",
+    "text": "#EEF1F7",
+    "muted": "#A8B0C2",
+    "faint": "#7B849B",
+    "accent": "#22D3EE",
+    "accent-dim": "#0B4651",
+    "danger": "#F43F5E",
+    "warn": "#FBBF24",
+    "accent-fill": "#22D3EE",
+    "on-accent": "#04181C",
+    "warn-fill": "#FBBF24"
   },
   "fonts": {
-    "ui": "Comfortaa, Segoe UI",
+    "ui": "Segoe UI Variable Text, Segoe UI",
     "mono": "Cascadia Mono, Consolas",
-    "display": "Comfortaa, Segoe UI"
+    "display": "Segoe UI Variable Display, Segoe UI"
   }
 }

@@ -2855,7 +2855,9 @@ public partial class VpnView : UserControl
         QuickServers.ItemsSource = tiles;
 
         Brush Edge(bool on) => (Brush)FindResource(on ? "Accent" : "Border");
-        Brush Fill(bool on) => (Brush)FindResource(on ? "AccentFill" : "Surface");
+        // Выбранная плитка светится акцентом (0.16), а не заливается им:
+        // подпись на ней остаётся цветом текста и читается в любой теме.
+        Brush Fill(bool on) => (Brush)FindResource(on ? "AccentSoft" : "Surface");
     }
 
     /// <summary>Короткое имя для плитки: «Эстония — TLS XHTTP» → «Эстония».</summary>

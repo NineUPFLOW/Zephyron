@@ -18,7 +18,8 @@ namespace Zephyron.Gui.Views;
 /// <summary>Строка про один движок.</summary>
 /// <param name="Word">Отметка в карточке одним-двумя словами (EngineHealth.Word).</param>
 /// <param name="Detail">Строка под ней: причина надзора, когда движок не в порядке.</param>
-public sealed record EngineRow(string Name, string Word, string Detail, Brush Color, int? ProcessId = null);
+/// <param name="Key">Ключ цвета состояния — Accent, Warn, Danger или Faint: им красится плашка движка.</param>
+public sealed record EngineRow(string Name, string Word, string Detail, Brush Color, int? ProcessId = null, string Key = "Faint");
 
 /// <summary>Предупреждение, которое стоит прочитать до запуска.</summary>
 public sealed record WarningRow(string Title, string Body);
@@ -87,6 +88,22 @@ public partial class StatusView : UserControl
     }
 
     private void OnArtSize(object sender, SizeChangedEventArgs e) => PlaceArt();
+
+    /// <summary>
+    /// Слой арта — во всю высоту, и под верхним меню тоже.
+    /// </summary>
+    /// <remarks>
+    /// Окно отодвигает раздел из-под меню полем сверху (MainWindow.FitUnderNav),
+    /// а картинка должна начинаться от края окна, как картинка окна под ней:
+    /// иначе над карточками стояли бы две картинки со сдвигом — шов.
+    /// </remarks>
+    protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+
+        if (e.Property == PaddingProperty && ArtLayer is not null)
+            ArtLayer.Margin = new Thickness(0, -Padding.Top, 0, 0);
+    }
 
     /// <summary>Уже этой колонки персонажа в ней не ставим — картинка ляжет по центру страницы.</summary>
     private const double ArtColumnMin = 220;
@@ -301,10 +318,12 @@ public partial class StatusView : UserControl
         // процесс и пишет своё состояние в файл. Две секунды достаточно,
         // чтобы нажатие «Запустить» отозвалось раньше, чем человек усомнится.
         _refresh.Tick += (_, _) => Update();
+        _clock.Tick += (_, _) => ShowUptime();
 
         Loaded += (_, _) =>
         {
             Update();
+            _clock.Start();
 
             // Не по времени, в отличие от прочего: режим меняется только
             // отсюда, а автозапуск спрашивается у планировщика запуском
@@ -334,6 +353,8 @@ public partial class StatusView : UserControl
         {
             UpdateNotice.Changed -= OnUpdateChanged;
             _refresh.Stop();
+            _clock.Stop();
+            StopNet();
 
             // Анимация на скрытом виде продолжала бы будить композитор
             // впустую. Само состояние запуска при этом сохраняется.
@@ -575,6 +596,10 @@ public partial class StatusView : UserControl
 
         ShowState(settings, state, running, seen.SingBoxUp, seen.Coming);
         ShowFooter(state, running, seen.ConfigBuilt);
+
+        // Строка сети меряет, пока обход идёт или поднимается (владелец, 22.10):
+        // запустили — пошла, остановили — встала.
+        SyncNet(running || _startingSince is not null);
         ShowWarnings(settings);
 
         _ = ReadExitAsync(settings, running && state!.Services.Any(s => s.Name == "sing-box"));
@@ -636,6 +661,8 @@ public partial class StatusView : UserControl
 
         StartButton.Visibility = running ? Visibility.Collapsed : Visibility.Visible;
         StopButton.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
+
+        _runningSince = running ? state!.StartedAt : null;
 
         if (!running)
         {
@@ -875,7 +902,79 @@ public partial class StatusView : UserControl
 
         Dot.Fill = brush;
         FooterDot.Fill = brush;
-        DotGlow.Color = colourKey != "Faint" && brush is SolidColorBrush solid ? solid.Color : Colors.Transparent;
+
+        // Плашка состояния и таймер — тем же цветом (макет 0.16): плашка
+        // светится подложкой и рамкой своего цвета, у серой — нейтральные.
+        _stateKey = colourKey;
+        StateLine.Foreground = brush;
+
+        if (colourKey == "Faint")
+        {
+            StatePill.SetResourceReference(Border.BackgroundProperty, "Wash");
+            StatePill.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
+        }
+        else
+        {
+            StatePill.SetResourceReference(Border.BackgroundProperty, colourKey + "Soft");
+            StatePill.SetResourceReference(Border.BorderBrushProperty, colourKey + "Line");
+        }
+
+        ShowUptime();
+    }
+
+    /// <summary>Цвет нынешнего состояния: Faint, Accent, Warn или Danger.</summary>
+    private string _stateKey = "Faint";
+
+    /// <summary>С какого момента обход работает; <c>null</c> — не работает.</summary>
+    private DateTimeOffset? _runningSince;
+
+    /// <summary>Часы таймера: секунды должны идти, а опрос состояния — раз в две.</summary>
+    private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(1) };
+
+    /// <summary>
+    /// Крупный таймер: сколько работает обход, а при запуске — сколько идёт запуск.
+    /// </summary>
+    /// <remarks>
+    /// Время начала — супервизора (SupervisorState.StartedAt), то есть то же,
+    /// что «Запущено N мин назад» и строка в подвале: окно, открытое через
+    /// час после запуска, покажет час, а не ноль.
+    /// </remarks>
+    private void ShowUptime()
+    {
+        var now = DateTimeOffset.Now;
+
+        if (_startingSince is { } starting)
+        {
+            Uptime.Text = Clock(now - starting);
+            Uptime.SetResourceReference(TextBlock.ForegroundProperty, "Warn");
+            UptimeCaption.Text = "ЗАПУСК · ДВИЖКИ ПОДНИМАЮТСЯ";
+            return;
+        }
+
+        if (_runningSince is { } since)
+        {
+            Uptime.Text = Clock(now - since);
+            Uptime.SetResourceReference(TextBlock.ForegroundProperty, _stateKey == "Accent" ? "Text" : _stateKey);
+            UptimeCaption.Text = "UPTIME · С " + since.ToString("HH:mm") + (since.Date != now.Date ? since.ToString(" dd.MM") : string.Empty);
+            return;
+        }
+
+        // Нули, а не прочерк: моноширинное тире в таком кегле читалось
+        // жирной чертой, а не «времени нет».
+        Uptime.Text = "00:00:00";
+        Uptime.SetResourceReference(TextBlock.ForegroundProperty, "LineStrong");
+        UptimeCaption.Text = "UPTIME · НЕ ЗАПУЩЕНО";
+    }
+
+    /// <summary>«04:12:09», а больше суток — «2д 04:12:09».</summary>
+    internal static string Clock(TimeSpan span)
+    {
+        if (span < TimeSpan.Zero)
+            span = TimeSpan.Zero;
+
+        var time = $"{span.Hours:00}:{span.Minutes:00}:{span.Seconds:00}";
+
+        return span.TotalDays >= 1 ? $"{(int)span.TotalDays}д {time}" : time;
     }
 
     /// <summary>
@@ -1070,10 +1169,10 @@ public partial class StatusView : UserControl
         var colour = (Brush)FindResource(colourKey);
 
         if (settings.NeedsProxy)
-            rows.Add(new EngineRow("sing-box", detail, string.Empty, colour));
+            rows.Add(new EngineRow("sing-box", detail, string.Empty, colour, Key: colourKey));
 
         if (settings.NeedsDesync)
-            rows.Add(new EngineRow("winws2", detail, string.Empty, colour));
+            rows.Add(new EngineRow("winws2", detail, string.Empty, colour, Key: colourKey));
 
         return rows;
     }
@@ -1100,7 +1199,7 @@ public partial class StatusView : UserControl
             ? service.Remark ?? string.Empty
             : EngineHealth.Status(service);
 
-        return new EngineRow(service.Name, EngineHealth.Word(service.Health), detail, (Brush)FindResource(key), service.ProcessId);
+        return new EngineRow(service.Name, EngineHealth.Word(service.Health), detail, (Brush)FindResource(key), service.ProcessId, key);
     }
 
     /// <summary>
@@ -1143,8 +1242,22 @@ public partial class StatusView : UserControl
         // Движки — в карточке «Режим» (04.10), оба при любом режиме (владелец:
         // «пусть эти движки будут и в десинке, и в туннеле»): не нужный режиму
         // скажет «выключен», как в трее, а высота карточки от режима не зависит.
-        ShowEngine(rows.FirstOrDefault(r => r.Name == "winws2"), DesyncDot, DesyncState, DesyncPid, _desyncIdle);
-        ShowEngine(rows.FirstOrDefault(r => r.Name == "sing-box"), TunnelDot, TunnelState, TunnelPid);
+        ShowEngine(rows.FirstOrDefault(r => r.Name == "winws2"), DesyncChip, DesyncDot, DesyncState, DesyncPid, _desyncIdle);
+        ShowEngine(rows.FirstOrDefault(r => r.Name == "sing-box"), TunnelChip, TunnelDot, TunnelState, TunnelPid);
+    }
+
+    /// <summary>Плашка движка светится цветом его состояния; у выключенного и остановленного — нейтральная.</summary>
+    private static void PaintPill(Border pill, string key)
+    {
+        if (key == "Faint")
+        {
+            pill.SetResourceReference(Border.BackgroundProperty, "Wash");
+            pill.SetResourceReference(Border.BorderBrushProperty, "Border");
+            return;
+        }
+
+        pill.SetResourceReference(Border.BackgroundProperty, key + "Soft");
+        pill.SetResourceReference(Border.BorderBrushProperty, key + "Line");
     }
 
     /// <summary>
@@ -1163,8 +1276,10 @@ public partial class StatusView : UserControl
     /// подписки. «Остановлен» здесь соврало бы, что он был.
     /// </remarks>
     /// <param name="idle">Почему не поднимали включённый; <c>null</c> — выключен.</param>
-    private void ShowEngine(EngineRow? row, System.Windows.Shapes.Ellipse dot, TextBlock state, TextBlock pid, string? idle = null)
+    private void ShowEngine(EngineRow? row, Border pill, System.Windows.Shapes.Shape dot, TextBlock state, TextBlock pid, string? idle = null)
     {
+        PaintPill(pill, row?.Key ?? "Faint");
+
         if (row is null)
         {
             dot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "Faint");
@@ -1320,6 +1435,16 @@ public partial class StatusView : UserControl
                         ? " Сейчас без исключений: в VPN идёт и «напрямую»."
                         : string.Empty);
         ModeText.ToolTip = ModeText.Text;
+
+        // Метка у заголовка: какие движки стоят за режимом — их имена,
+        // как в журнале и в диспетчере задач.
+        ModeTag.Text = mode switch
+        {
+            WorkMode.Desync => "desync · winws2",
+            WorkMode.Tunnel => engines.IgnoreExclusions ? "tunnel · sing-box · без исключений" : "tunnel · sing-box",
+            WorkMode.Route => engines.DesyncRuns ? "hybrid · winws2 + sing-box" : "hybrid · sing-box",
+            _ => "не выбран",
+        };
 
         _desyncIdle = engines.Desync && !engines.DesyncRuns
             ? "Включено «Игнорировать исключения» в настройках туннеля: всё идёт через VPN, "
@@ -1630,20 +1755,40 @@ public partial class StatusView : UserControl
         // в узкой колонке справа — размытое пятно (Theme.HomeFullWidth).
         if (settings.HomeFullWidth || Themes.WideHome)
         {
-            ContentColumn.MaxWidth = double.PositiveInfinity;
-            ArtColumn.Width = new GridLength(0);
-            ArtLayer.Visibility = Visibility.Collapsed;
+            Layout(column: double.PositiveInfinity, page: double.PositiveInfinity, art: false);
             SetResourceReference(BackgroundProperty, "Chrome");
         }
-        else
+        else if (HasSideArt())
         {
-            ContentColumn.MaxWidth = 940;
-            ArtColumn.Width = new GridLength(1, GridUnitType.Star);
-            ArtLayer.Visibility = Visibility.Visible;
+            Layout(column: 940, page: double.PositiveInfinity, art: true);
             SetResourceReference(BackgroundProperty, "Backdrop");
 
             // Слой мог прятаться — разложить заново, когда станет известен размер.
             Dispatcher.BeginInvoke(PlaceArt, System.Windows.Threading.DispatcherPriority.Loaded);
         }
+        else
+        {
+            // Без арта (с 0.16, встроенные темы) — по центру окна, как в макете:
+            // колонке справа нечего показывать, и страница не жмётся влево.
+            // Подложка прозрачная — под ней сетка и свечения окна.
+            Layout(column: double.PositiveInfinity, page: (double)FindResource("ContentMax"), art: false);
+            SetResourceReference(BackgroundProperty, "Chrome");
+        }
     }
+
+    /// <summary>Раскладка страницы: предел колонки содержимого, предел самой страницы и колонка под арт.</summary>
+    private void Layout(double column, double page, bool art)
+    {
+        ContentColumn.MaxWidth = column;
+        ArtColumn.Width = art ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        ArtLayer.Visibility = art ? Visibility.Visible : Visibility.Collapsed;
+        Grid.SetColumnSpan(PageScroller, art ? 1 : 2);
+
+        Page.MaxWidth = page;
+        Page.HorizontalAlignment = double.IsPositiveInfinity(page) ? HorizontalAlignment.Stretch : HorizontalAlignment.Center;
+    }
+
+    /// <summary>Есть ли у темы картинка или живой фон для колонки справа.</summary>
+    private bool HasSideArt() =>
+        TryFindResource("SideArt") is ImageBrush { ImageSource: not null } || BackdropVideo.Current is not null;
 }

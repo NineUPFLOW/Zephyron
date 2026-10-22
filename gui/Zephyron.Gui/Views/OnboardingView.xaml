@@ -14,7 +14,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
                         <Border x:Name="Shape" Background="{DynamicResource Surface}"
-                                BorderBrush="{DynamicResource Border}" BorderThickness="1.5"
+                                BorderBrush="{DynamicResource Border}" BorderThickness="1"
                                 CornerRadius="12" Padding="16,13">
                             <ContentPresenter />
                         </Border>
@@ -24,7 +24,7 @@
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource Accent}" />
-                                <Setter TargetName="Shape" Property="BorderThickness" Value="2" />
+                                <Setter TargetName="Shape" Property="BorderThickness" Value="1" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Shape" Property="Opacity" Value="0.5" />
@@ -160,8 +160,8 @@
 
                                                 <Grid Width="18" Height="18" Margin="0,0,0,9"
                                                       HorizontalAlignment="Center" VerticalAlignment="Bottom">
-                                                    <Ellipse Stroke="{Binding Ring}" StrokeThickness="1.5" />
-                                                    <Ellipse Width="10" Height="10" Fill="{Binding Dot}"
+                                                    <Rectangle RadiusX="4" RadiusY="4" Stroke="{Binding Ring}" StrokeThickness="1.5" />
+                                                    <Rectangle RadiusX="2" RadiusY="2" Width="10" Height="10" Fill="{Binding Dot}"
                                                              Visibility="{Binding DotShown}" />
                                                 </Grid>
                                             </Grid>
@@ -309,7 +309,7 @@
                         <TextBlock Grid.Row="1" Text="Прокси Telegram" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,10,12,0" />
                         <Border Grid.Row="1" Grid.Column="1" Width="260" Margin="0,10,0,0" Padding="12,4,8,4"
                                 Background="{DynamicResource Raised}" BorderBrush="{DynamicResource Border}"
-                                BorderThickness="1.5" CornerRadius="10"
+                                BorderThickness="1" CornerRadius="10"
                                 ToolTip="Telegram Desktop без VPN. Сменить можно на вкладке «TG Proxy».">
                             <Grid>
                                 <Grid.ColumnDefinitions>

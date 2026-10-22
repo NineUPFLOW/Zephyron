@@ -23,7 +23,8 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Shape" Background="Transparent" CornerRadius="8" Padding="14,0" MinHeight="30">
+                        <Border x:Name="Shape" Background="Transparent" CornerRadius="8" Padding="14,0" MinHeight="30"
+                                BorderThickness="1" BorderBrush="Transparent">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -32,8 +33,9 @@
                                 <Setter Property="Foreground" Value="{DynamicResource Text}" />
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentFill}" />
-                                <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentSoft}" />
+                                <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource AccentLine}" />
+                                <Setter Property="Foreground" Value="{DynamicResource Accent}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -68,8 +70,8 @@
 
             <!-- Плашка версии справа в шапке — по макету владельца 06.10; крупнее — его же просьба. -->
             <Border Grid.Column="2" VerticalAlignment="Center" Margin="16,0,0,0" CornerRadius="16"
-                    Padding="30,12,30,14" BorderThickness="2" MinWidth="190"
-                    Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Accent}">
+                    Padding="30,12,30,14" BorderThickness="1" MinWidth="190"
+                    Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentLine}">
                 <StackPanel>
                     <TextBlock x:Name="BadgeVersion" HorizontalAlignment="Center" FontSize="30" FontWeight="SemiBold"
                                Foreground="{DynamicResource Accent}" />

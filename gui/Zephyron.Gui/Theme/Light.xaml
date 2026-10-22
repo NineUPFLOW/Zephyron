@@ -81,6 +81,18 @@
     <SolidColorBrush x:Key="OnAccent" Color="{StaticResource OnAccentColor}" />
     <SolidColorBrush x:Key="WarnFill" Color="{StaticResource WarnFillColor}" />
 
+    <!-- Производные — те же доли, что в Palette.xaml (Themes.Derive). -->
+    <SolidColorBrush x:Key="AccentSoft" Color="#1FC2185B" />
+    <SolidColorBrush x:Key="AccentLine" Color="#61C2185B" />
+    <SolidColorBrush x:Key="DangerSoft" Color="#1AC62828" />
+    <SolidColorBrush x:Key="DangerLine" Color="#57C62828" />
+    <SolidColorBrush x:Key="WarnSoft" Color="#1A8A5200" />
+    <SolidColorBrush x:Key="WarnLine" Color="#4D8A5200" />
+    <SolidColorBrush x:Key="Wash" Color="#083A2E3F" />
+    <SolidColorBrush x:Key="WashHover" Color="#123A2E3F" />
+    <SolidColorBrush x:Key="LineStrong" Color="#243A2E3F" />
+    <sys:Double x:Key="Decor">1</sys:Double>
+
     <!-- Comfortaa — основной: округлый и мягкий, в тон милому оформлению.
          Segoe UI — запас, если её нет в системе. -->
     <FontFamily x:Key="UiFont">Comfortaa, Segoe UI</FontFamily>
@@ -93,7 +105,7 @@
     -->
     <SolidColorBrush x:Key="BackdropImage" Color="Transparent" />
     <sys:Double x:Key="BackdropDim">1</sys:Double>
-    <SolidColorBrush x:Key="Chrome" Color="{StaticResource BackdropColor}" />
+    <SolidColorBrush x:Key="Chrome" Color="Transparent" />
     <SolidColorBrush x:Key="RailFill" Color="{StaticResource BackdropColor}" />
     <!-- Арт сбоку на «Главной» (Themes.cs): у встроенных тем картинки нет, колонка пуста. -->
     <SolidColorBrush x:Key="SideArt" Color="Transparent" />

@@ -29,7 +29,8 @@ public sealed class TrayMenuTests
                 Desync: ServiceHealth.Healthy,
                 Busy: false));
 
-            var dot = (Ellipse)menu.FindName("Dot");
+            // Фигура, а не именно круг: с 0.16 точки состояния — квадратики.
+            var dot = (Shape)menu.FindName("Dot");
             var toggle = (Button)menu.FindName("Toggle");
             var accent = (SolidColorBrush)Application.Current.FindResource("Accent");
 

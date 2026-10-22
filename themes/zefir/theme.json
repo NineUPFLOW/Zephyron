@@ -1,0 +1,28 @@
+{
+  // «Зефирная» — прежняя основная тёмная тема Zephyron (до 0.16):
+  // мягкий сиреневый подтон и зефирно-розовый акцент.
+  "name": "Зефирная",
+  "author": "Zephyron",
+  "base": "dark",
+  "colors": {
+    "backdrop": "#17131F",
+    "surface": "#221C2E",
+    "raised": "#2C2439",
+    "border": "#3E3350",
+    "text": "#F4EEFB",
+    "muted": "#BCB0CE",
+    "faint": "#8F85A3",
+    "accent": "#FF8FC0",
+    "accent-dim": "#7A3F63",
+    "danger": "#FF7A8A",
+    "warn": "#FFC978",
+    "accent-fill": "#FF8FC0",
+    "on-accent": "#2A0F1E",
+    "warn-fill": "#FFC978"
+  },
+  "fonts": {
+    "ui": "Comfortaa, Segoe UI",
+    "mono": "Cascadia Mono, Consolas",
+    "display": "Comfortaa, Segoe UI"
+  }
+}

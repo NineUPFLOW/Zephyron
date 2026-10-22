@@ -3,12 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:Zephyron.Gui"
              xmlns:views="clr-namespace:Zephyron.Gui.Views"
-             Background="{DynamicResource Backdrop}">
+             Background="{DynamicResource Chrome}">
 
     <UserControl.Resources>
         <!--
-            Сегмент режима в карточке «Режим»: выбранный обведён цветом темы
-            и чуть подсвечен подложкой. Выбор — обводкой (см. Choice в Controls.xaml).
+            Сегмент режима: выбранный светится акцентом — подложка AccentSoft
+            и рамка AccentLine, как выбранный пункт меню.
         -->
         <Style x:Key="ModeSegment" TargetType="RadioButton">
             <Setter Property="Cursor" Value="Hand" />
@@ -16,65 +16,112 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Shape" Background="Transparent"
-                                BorderBrush="{DynamicResource Border}" BorderThickness="1.5"
-                                CornerRadius="11" Padding="12,9">
+                        <Border x:Name="Shape" Background="{DynamicResource Wash}"
+                                BorderBrush="{DynamicResource LineStrong}" BorderThickness="{StaticResource Stroke}"
+                                CornerRadius="{StaticResource RMd}" Padding="12,10">
                             <ContentPresenter HorizontalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Raised}" />
+                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource WashHover}" />
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource Accent}" />
-                                <Setter TargetName="Shape" Property="BorderThickness" Value="2" />
-                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Raised}" />
+                                <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource AccentLine}" />
+                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentSoft}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!--
+            Большая кнопка запуска под таймером — цветом своего действия:
+            акцентом «Запустить», красным «Остановить».
+        -->
+        <Style x:Key="Power" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+            <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentLine}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <!--
+                            Без размытого ореола (владелец, 22.10: он читался
+                            овалом). Отличие главной кнопки — цвет и размер.
+                        -->
+                        <Border x:Name="Shape" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{StaticResource Stroke}" CornerRadius="{StaticResource RSm}"
+                                Padding="28,13">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Shape" Property="Background" Value="{Binding BorderBrush, RelativeSource={RelativeSource TemplatedParent}}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Shape" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <TranslateTransform Y="1" />
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Плашка движка в карточке режима: цвет — его состояние (ShowEngine). -->
+        <Style x:Key="EnginePill" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Wash}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+            <Setter Property="BorderThickness" Value="{StaticResource Stroke}" />
+            <Setter Property="CornerRadius" Value="{StaticResource RSm}" />
+            <Setter Property="Padding" Value="11,4,4,4" />
+        </Style>
+
+        <!-- Строка метрики сети: значение моноширинным, подпись мелко. -->
+        <Style x:Key="NetValue" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="NetUnit" TargetType="TextBlock" BasedOn="{StaticResource MonoTag}">
+            <Setter Property="FontSize" Value="9.5" />
+            <Setter Property="Margin" Value="4,1,0,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
     </UserControl.Resources>
 
     <!--
-        Подложка сплошная, а не прозрачная, как у прочих разделов (Chrome):
-        окно кладёт картинку темы под всё, а здесь она своя, сдвинутая
-        вправо (ArtLayer), — без сплошной подложки под ней проступал бы
-        второй, оконный персонаж (снимок 30.09).
-    -->
+        Компоновка с 0.16 — по макету: сверху новость о версии, в середине
+        крупный таймер работы обхода с кнопкой запуска, под ним живая строка
+        сети, затем режим с движками, пресет и подключение, автозапуск
+        с обновлением, быстрые действия и подвал. Содержимое — по центру,
+        не шире ContentMax.
 
-    <!--
-        Компоновка — по макету владельца 30.09: шапка со ссылками, крупная
-        карточка состояния, под ней пресет и параметры подключения рядом,
-        движки, автозапуск с обновлением, быстрые действия и строка внизу.
-
-        Две колонки: содержимое слева, не шире 940, и арт темы справа
-        (SideArt, Themes.cs). Веса 100 к 1, а не две звёздочки поровну:
-        поровну они делили окно пополам независимо от MaxWidth, и на среднем
-        мониторе карточки сжимались. Так левая берёт всё до своего предела,
-        а правой достаётся остаток — на узком окне ноль, и арт просто уходит.
-
-        Отступы по вертикали ужаты 30.09 под окно владельца: 1920×1080
-        при масштабе Windows 125 % — это 1536×794 точки, и страница была
-        на 28 выше. Полоса прокрутки вставала у края карточек вертикальной
-        чертой. Добавляя сюда строку, проверьте, что эта высота держится.
+        Если у темы есть картинка, справа остаётся колонка под арт (SideArt,
+        Themes.cs), как прежде: веса 100 к 1, левая берёт всё до своего
+        предела, правой достаётся остаток — на узком окне ноль.
     -->
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="ContentColumn" Width="100*" MinWidth="560" MaxWidth="940" />
+            <ColumnDefinition x:Name="ContentColumn" Width="100*" MinWidth="560" />
             <ColumnDefinition x:Name="ArtColumn" Width="*" />
         </Grid.ColumnDefinitions>
 
         <!--
             Арт сбоку. Картинка одна на всю страницу, но сдвинута так, что её
-            середина стоит посередине правой колонки: персонаж справа, а под
-            карточками — край той же картинки. Под карточками затемнение
-            темы, к колонке оно сходит почти на нет (ArtShade). Так карточки
-            остаются полупрозрачными, как на прочих вкладках (владелец, 30.09:
-            «где стёклышки, почему всё непрозрачное»), и второго, тусклого
-            персонажа под ними нет. Раскладывается в коде (PlaceArt): место
-            зависит от ширины колонок. Не прокручивается — это фон.
+            середина стоит посередине правой колонки (PlaceArt). Не прокручивается —
+            это фон.
         -->
         <Grid x:Name="ArtLayer" Grid.ColumnSpan="2" IsHitTestVisible="False" SizeChanged="OnArtSize">
             <!-- Градиент под картинкой, уложенной руками (HomePlacement, 15.10). -->
@@ -83,389 +130,192 @@
             <Rectangle x:Name="ArtShade" />
         </Grid>
 
-        <ScrollViewer Grid.Column="0" Style="{StaticResource PageScroll}" Padding="32,16,32,10">
-            <!--
-                Сетка, а не стопка (владелец 04.10: «на весь экран это очень
-                странно выглядит»). Не ниже окна: нижняя строка состояния
-                стоит у края, как строка состояния. Зазоры между блоками
-                растут не больше чем на 16 — первым заходом они делили всю
-                лишнюю высоту, и на весь экран карточки расплывались по
-                странице с полосами пустоты; остаток теперь уходит под
-                быстрые действия. В окне пониже зазоры сжимаются в ноль,
-                и вид тот же, что стопкой.
-            -->
-            <Grid x:Name="Page" MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" MaxHeight="16" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" MaxHeight="16" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" MaxHeight="16" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" MaxHeight="16" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" MaxHeight="16" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-
-                <!-- Шапка раздела — общий элемент PageHead. -->
-                <ContentControl Grid.Row="0" Style="{StaticResource PageHead}"
-                                local:PageHead.Title="Главная"
-                                local:PageHead.Subtitle="Состояние защиты и быстрые действия">
-                    <!--
-                        Канал — кнопкой здесь, а не карточкой внизу страницы:
-                        в макете карточки нет, а быть на «Главной» ему велено
-                        (владелец, 28.09: в «Ещё» кнопку не находили).
-                    -->
-                    <StackPanel Orientation="Horizontal">
-                        <Button Style="{StaticResource Ghost}" Click="OnDocs" Margin="0,0,8,0"
-                                ToolTip="Описание программы на GitHub">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE82D;" Margin="0,0,8,0"
-                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                <TextBlock Text="Документация" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource Ghost}" Click="OnGitHub" Margin="0,0,8,0"
-                                ToolTip="Исходники, выпуски, вопросы и обсуждения">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE943;" Margin="0,0,8,0"
-                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                <TextBlock Text="GitHub" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource Ghost}" Click="OnTelegram"
-                                ToolTip="Новости в телеграм-канале: что вышло и зачем обновляться, коротко">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE724;" Margin="0,0,8,0"
-                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                <TextBlock Text="Telegram" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-                </ContentControl>
+        <ScrollViewer x:Name="PageScroller" Grid.Column="0" Style="{StaticResource PageScroll}" Padding="32,18,32,16">
+            <StackPanel x:Name="Page">
 
                 <!--
-                    Вышла новая версия (UpdateNotice). Над состоянием: её видно
-                    при первом взгляде на окно, а не только тем, кто дошёл вниз.
-                    «Не сейчас» прячет её до следующей версии. Решение владельца
-                    23.09: карточка и точка у пункта меню, без уведомлений Windows.
+                    Вышла новая версия (UpdateNotice). Над всем: её видно при
+                    первом взгляде на окно. «Не сейчас» прячет её до следующей
+                    версии. Решение владельца 23.09: карточка и точка у пункта
+                    меню, без уведомлений Windows.
                 -->
-                <Border Grid.Row="1" x:Name="UpdateCard" Style="{StaticResource Card}" Margin="0,18,0,0"
-                        BorderBrush="{DynamicResource Accent}" Visibility="Collapsed">
+                <Border x:Name="UpdateCard" Style="{StaticResource Card}" Margin="0,0,0,16" Padding="16,14"
+                        Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentLine}"
+                        Visibility="Collapsed">
                     <Grid>
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                            <TextBlock x:Name="UpdateTitle" FontWeight="SemiBold" FontSize="15" />
+                        <Border Grid.Column="0" Style="{StaticResource IconTile}" Width="32" Height="32"
+                                Margin="0,0,14,0" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE896;" FontSize="14" />
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock x:Name="UpdateTitle" FontWeight="SemiBold" FontSize="13" />
                             <TextBlock x:Name="UpdateWhat" Style="{StaticResource Caption}"
-                                       Margin="0,6,0,0" TextWrapping="Wrap" />
+                                       Margin="0,3,0,0" TextWrapping="Wrap" />
                         </StackPanel>
 
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                            <Button Style="{StaticResource Ghost}" Content="Что нового"
-                                    Click="OnUpdateNotes" Margin="0,0,8,0" />
-                            <Button Style="{StaticResource Ghost}" Content="Не сейчас"
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Style="{StaticResource Quiet}" Content="Что нового"
+                                    Click="OnUpdateNotes" Margin="0,0,4,0" />
+                            <Button Style="{StaticResource Quiet}" Content="Не сейчас"
                                     Click="OnUpdateLater" Margin="0,0,8,0" />
-                            <Button Style="{StaticResource Primary}" Content="Обновить"
+                            <Button Style="{StaticResource Primary}" Content="Обновить" Padding="16,8"
                                     Click="OnUpdateNow" />
                         </StackPanel>
                     </Grid>
                 </Border>
 
                 <!--
-                    Просьба о звезде и канале (владелец, 01.10). Одной строкой
-                    и прячется навсегда: «Скрыть» пишет SupportCardHidden.
-                    Показывается после мастера первого запуска — до него
-                    человеку не до звёзд.
+                    Сердце страницы: идёт ли обход и сколько. Плашка со словом
+                    состояния, крупный таймер работы, полоса и одна кнопка —
+                    «Запустить» или «Остановить». Цвет у плашки, таймера, полосы
+                    и точки один (ShowDot): разойдясь, они дали бы зелёную точку
+                    над красной полосой.
                 -->
-                <Border Grid.Row="2" x:Name="SupportCard" Style="{StaticResource Card}" Margin="0,18,0,0"
-                        Padding="18,12,12,12" Visibility="Collapsed">
+                <StackPanel HorizontalAlignment="Center" Margin="0,16,0,22">
+                    <Border x:Name="StatePill" HorizontalAlignment="Center" CornerRadius="{StaticResource RPill}"
+                            Padding="15,6" BorderThickness="{StaticResource Stroke}"
+                            Background="{DynamicResource Wash}" BorderBrush="{DynamicResource LineStrong}">
+                        <StackPanel Orientation="Horizontal">
+                            <Rectangle x:Name="Dot" Width="7" Height="7" RadiusX="1" RadiusY="1" VerticalAlignment="Center"
+                                       Fill="{DynamicResource Faint}" />
+                            <TextBlock x:Name="StateLine" Margin="9,0,0,0" FontFamily="{DynamicResource MonoFont}"
+                                       FontSize="11.5" Foreground="{DynamicResource Faint}" Text="Проверяю…"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Сколько работает обход: часы, минуты, секунды; при запуске — сколько он идёт. -->
+                    <TextBlock x:Name="Uptime" HorizontalAlignment="Center" Margin="0,18,0,0"
+                               FontFamily="{DynamicResource MonoFont}" FontSize="60" FontWeight="Medium"
+                               Foreground="{DynamicResource LineStrong}" Text="00:00:00" />
+
+                    <!--
+                        Полоса состояния: серый «стоит», жёлтый «поднимается»,
+                        акцент «работает», красный «беда». Бегущая засечка —
+                        только при подъёме, и неопределённая намеренно: сколько
+                        он займёт, заранее не известно.
+                    -->
+                    <Border x:Name="StateBar" Width="220" Height="4" CornerRadius="2" Margin="0,14,0,0"
+                            Background="{DynamicResource Wash}" ClipToBounds="True">
+                        <Grid>
+                            <Rectangle x:Name="StateBarFill" RadiusX="2" RadiusY="2"
+                                       Fill="{DynamicResource Faint}" />
+
+                            <Rectangle x:Name="StartProgressMark" Width="66" RadiusX="2" RadiusY="2"
+                                       HorizontalAlignment="Left" Visibility="Collapsed"
+                                       Fill="{DynamicResource WarnFill}">
+                                <Rectangle.RenderTransform>
+                                    <TranslateTransform x:Name="StartProgressShift" />
+                                </Rectangle.RenderTransform>
+                            </Rectangle>
+                        </Grid>
+                    </Border>
+
+                    <TextBlock x:Name="UptimeCaption" Style="{StaticResource MonoTag}" HorizontalAlignment="Center"
+                               Margin="0,12,0,0" Foreground="{DynamicResource Muted}" Text="UPTIME · НЕ ЗАПУЩЕНО" />
+
+                    <TextBlock x:Name="StateHint" Style="{StaticResource Caption}" HorizontalAlignment="Center"
+                               TextAlignment="Center" MaxWidth="520" Margin="0,8,0,0" TextWrapping="Wrap" />
+
+                    <!--
+                        Одна кнопка на месте: «Запустить» или «Остановить».
+                        «Остановить» — красным свечением, но не опасной рамкой:
+                        остановленный обход поднимается той же кнопкой через секунду.
+                    -->
+                    <Grid Margin="0,20,0,0" HorizontalAlignment="Center">
+                        <Button x:Name="StartButton" Style="{StaticResource Power}" MinWidth="200"
+                                Click="OnStart" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE768;" Margin="0,0,12,0" FontSize="15"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                <TextBlock Text="Запустить" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="StopButton" Style="{StaticResource Power}" MinWidth="200"
+                                Foreground="{DynamicResource Danger}" Background="{DynamicResource DangerSoft}"
+                                BorderBrush="{DynamicResource DangerLine}" Click="OnStop" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE71A;" Margin="0,0,12,0" FontSize="15"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                <TextBlock Text="Остановить" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </StackPanel>
+
+                <!--
+                    Живая строка сети (StatusView.Net.cs): скорость приёма
+                    и отдачи по всем сетевым адаптерам машины, задержка и потери
+                    до 1.1.1.1 по ICMP и полоска приёма за последнюю минуту.
+                    Меряется, только пока обход запущен (SyncNet): «Запустить»
+                    её включает, «Остановить» — гасит.
+                -->
+                <Border Background="{DynamicResource Wash}" BorderBrush="{DynamicResource Border}"
+                        BorderThickness="{StaticResource Stroke}" CornerRadius="{StaticResource RMd}"
+                        Padding="16,9" Margin="0,0,0,16">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Column="0" Style="{StaticResource LineGlyph}" Text="&#xE735;"
-                                   FontSize="18" Foreground="{DynamicResource Warn}"
-                                   VerticalAlignment="Center" Margin="0,0,14,0" />
-
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                            <TextBlock FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap"
-                                       Text="Нравится Zephyron? Поставьте звезду, подпишитесь на канал или поддержите донатом" />
-                            <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="Так о программе узнают другие, а вы — о новых версиях. Донат — на развитие проекта." />
+                        <StackPanel Grid.Column="0" x:Name="NetDownCell" Orientation="Horizontal" Margin="0,0,18,0"
+                                    ToolTip="Приём по всем сетевым адаптерам машины">
+                            <TextBlock Style="{StaticResource NetUnit}" Text="↓" Margin="0,0,5,0" />
+                            <TextBlock x:Name="NetDown" Style="{StaticResource NetValue}" Foreground="{DynamicResource Accent}" Text="0.0" />
+                            <TextBlock Style="{StaticResource NetUnit}" Text="Мбит/с" />
                         </StackPanel>
 
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                            <Button Style="{StaticResource Ghost}" Click="OnStar" Margin="0,0,8,0"
-                                    ToolTip="Страница Zephyron на GitHub — звезда справа вверху">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE734;" Margin="0,0,8,0"
-                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                    <TextBlock Text="Звезда на GitHub" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </Button>
-                            <Button Style="{StaticResource Ghost}" Click="OnTelegram" Margin="0,0,8,0"
-                                    ToolTip="Новости в телеграм-канале">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE724;" Margin="0,0,8,0"
-                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                    <TextBlock Text="Канал" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </Button>
-                            <Button Style="{StaticResource Ghost}" Click="OnSupport" Margin="0,0,8,0"
-                                    ToolTip="Поддержать разработку донатом">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Style="{StaticResource LineGlyph}" Text="&#xEB51;" Margin="0,0,8,0"
-                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                    <TextBlock Text="Поддержать" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </Button>
-                            <Button Style="{StaticResource Ghost}" Click="OnSupportHide" Content="Скрыть"
-                                    ToolTip="Больше не показывать" />
+                        <StackPanel Grid.Column="1" x:Name="NetUpCell" Orientation="Horizontal" Margin="0,0,18,0"
+                                    ToolTip="Отдача по всем сетевым адаптерам машины">
+                            <TextBlock Style="{StaticResource NetUnit}" Text="↑" Margin="0,0,5,0" />
+                            <TextBlock x:Name="NetUp" Style="{StaticResource NetValue}" Foreground="#A855F7" Text="0.0" />
+                            <TextBlock Style="{StaticResource NetUnit}" Text="Мбит/с" />
                         </StackPanel>
+
+                        <StackPanel Grid.Column="2" x:Name="NetPingCell" Orientation="Horizontal" Margin="0,0,18,0"
+                                    ToolTip="Задержка до 1.1.1.1 по ICMP, раз в пять секунд">
+                            <TextBlock Style="{StaticResource NetUnit}" Text="~" Margin="0,0,5,0" />
+                            <TextBlock x:Name="NetPing" Style="{StaticResource NetValue}" Foreground="{DynamicResource Text}" Text="—" />
+                            <TextBlock x:Name="NetPingUnit" Style="{StaticResource NetUnit}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="3" x:Name="NetLossCell" Orientation="Horizontal" Margin="0,0,18,0"
+                                    ToolTip="Доля потерянных проверок задержки за последние две минуты">
+                            <TextBlock Style="{StaticResource NetUnit}" Text="!" Margin="0,0,5,0" />
+                            <TextBlock x:Name="NetLoss" Style="{StaticResource NetValue}" Foreground="{DynamicResource Warn}" Text="—" />
+                            <TextBlock x:Name="NetLossUnit" Style="{StaticResource NetUnit}" />
+                        </StackPanel>
+
+                        <!-- Полоски приёма за минуту — рисуются в коде (ShowSpark). -->
+                        <Grid Grid.Column="4" x:Name="NetSpark" Height="18" MinWidth="60" VerticalAlignment="Center" />
                     </Grid>
                 </Border>
 
                 <!--
-                    Карточка состояния. Крупная точка и одна строка словами:
-                    первое, зачем окно открывают, — понять, идёт ли обход.
-                    Точка со свечением её же цвета (макет 30.09): свечение
-                    красится вместе с точкой, в ShowDot, и разойтись им нечем.
-                -->
-                <Border Grid.Row="4" Style="{StaticResource Card}" Margin="0,18,0,0" Padding="22,16,22,14">
-                    <StackPanel>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-
-                            <Ellipse x:Name="Dot" Grid.Column="0" Width="26" Height="26"
-                                     VerticalAlignment="Center" Margin="4,0,20,0"
-                                     Fill="{DynamicResource Faint}">
-                                <Ellipse.Effect>
-                                    <DropShadowEffect x:Name="DotGlow" ShadowDepth="0" BlurRadius="22"
-                                                      Opacity="0.7" Color="Transparent" />
-                                </Ellipse.Effect>
-                            </Ellipse>
-
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock x:Name="StateLine" FontSize="21" FontWeight="SemiBold" Text="Проверяю…"
-                                           FontFamily="{DynamicResource DisplayFont}" />
-                                <TextBlock x:Name="StateHint" Foreground="{DynamicResource Muted}" FontSize="13.5"
-                                           Margin="0,5,0,0" TextWrapping="Wrap" Text="" />
-                            </StackPanel>
-
-                            <!--
-                                Одна кнопка на месте: «Запустить» или «Остановить».
-                                Обе залиты цветом кнопки (макет), а не «Остановить»
-                                красной рамкой: это главное действие карточки,
-                                а не опасное — остановленный обход поднимается
-                                той же кнопкой через секунду.
-                            -->
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
-                                <Button x:Name="StartButton" Style="{StaticResource Primary}" Padding="34,14"
-                                        MinWidth="210" Click="OnStart" Visibility="Collapsed">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE768;" Margin="0,0,12,0" FontSize="16"
-                                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                        <TextBlock Text="Запустить" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"
-                                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                    </StackPanel>
-                                </Button>
-                                <Button x:Name="StopButton" Style="{StaticResource Primary}" Padding="34,14"
-                                        MinWidth="210" Click="OnStop" Visibility="Collapsed">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE71A;" Margin="0,0,12,0" FontSize="16"
-                                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                        <TextBlock Text="Остановить" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"
-                                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                    </StackPanel>
-                                </Button>
-                            </StackPanel>
-                        </Grid>
-
-                        <!--
-                            Полоса состояния — внизу карточки, во всю её ширину.
-                            Внутри, но под строкой с кнопкой и постоянной высоты:
-                            прежде появлявшаяся внутри полоса раздвигала карточку,
-                            и та прыгала при каждом запуске.
-
-                            Цвет несёт то же, что и точка, — серый «стоит», жёлтый
-                            «поднимается», зелёный «работает», красный «беда».
-                            Бегущая засечка только при подъёме, и она неопределённая
-                            намеренно: сколько он займёт, заранее не известно.
-                        -->
-                        <Border x:Name="StateBar" Height="4" CornerRadius="2" Margin="0,14,0,0"
-                                Background="{DynamicResource Border}" ClipToBounds="True"
-                                HorizontalAlignment="Stretch">
-                            <Grid>
-                                <Rectangle x:Name="StateBarFill" RadiusX="2" RadiusY="2"
-                                           Fill="{DynamicResource Faint}" />
-
-                                <Rectangle x:Name="StartProgressMark" Width="140" RadiusX="2" RadiusY="2"
-                                           HorizontalAlignment="Left" Visibility="Collapsed"
-                                           Fill="{DynamicResource WarnFill}">
-                                    <Rectangle.RenderTransform>
-                                        <TranslateTransform x:Name="StartProgressShift" />
-                                    </Rectangle.RenderTransform>
-                                </Rectangle>
-                            </Grid>
-                        </Border>
-                    </StackPanel>
-                </Border>
-
-                <!-- Пресет и параметры подключения — рядом, как в макете. -->
-                <Grid Grid.Row="6" Margin="0,10,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <Border Grid.Column="0" Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Текущий пресет" Style="{StaticResource Caption}" FontSize="12.5" />
-
-                            <Grid Margin="0,12,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <Border Grid.Column="0" Style="{StaticResource IconTile}" Margin="0,0,14,0">
-                                    <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE9E9;" Foreground="{DynamicResource Accent}" />
-                                </Border>
-
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock x:Name="PresetValue" FontSize="15" FontWeight="SemiBold" Text="—"
-                                               TextTrimming="CharacterEllipsis" />
-
-                                    <!--
-                                        Первая фраза описания из самого файла пресета
-                                        («# Description:»), в две строки. Своих описаний
-                                        не придумываем: пресеты меняются выпусками,
-                                        и придуманное разошлось бы с файлом.
-                                    -->
-                                    <TextBlock x:Name="PresetNote" Style="{StaticResource Caption}" Margin="0,4,0,0"
-                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="34" />
-                                </StackPanel>
-
-                                <!--
-                                    Смена пресета — тем же, чем в «Десинке»: запись
-                                    PresetName и предложение перезапустить. Список
-                                    в том же порядке, что там.
-                                -->
-                                <Button Grid.Column="2" x:Name="PresetMenu" Style="{StaticResource Ghost}"
-                                        Padding="12,7" Margin="10,0,0,0" VerticalAlignment="Top" Click="OnPresetMenu">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="Изменить" VerticalAlignment="Center" />
-                                        <Path Style="{StaticResource Chevron}" Margin="10,1,0,0">
-                                            <Path.RenderTransform>
-                                                <RotateTransform Angle="90" />
-                                            </Path.RenderTransform>
-                                        </Path>
-                                    </StackPanel>
-                                </Button>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Настройка. Только показ: правка — в своих разделах. -->
-                    <Border Grid.Column="2" Style="{StaticResource Card}">
-                        <StackPanel>
-                            <TextBlock Text="Параметры подключения" Style="{StaticResource Caption}" FontSize="12.5" />
-
-                            <Grid Margin="0,12,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="26" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-
-                                <TextBlock Grid.Row="0" Style="{StaticResource LineGlyph}" Text="&#xE8CE;" Margin="0,0,0,9" />
-                                <TextBlock Grid.Row="0" Grid.Column="1" Style="{StaticResource Caption}" Text="Сервер"
-                                           Margin="0,0,14,9" VerticalAlignment="Center" />
-                                <TextBlock Grid.Row="0" Grid.Column="2" x:Name="ServerValue" Text="—" Margin="0,0,0,9"
-                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-
-                                <TextBlock Grid.Row="1" Style="{StaticResource LineGlyph}" Text="&#xE774;" Margin="0,0,0,9" />
-                                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource Caption}" Text="DNS"
-                                           Margin="0,0,14,9" VerticalAlignment="Center" />
-                                <TextBlock Grid.Row="1" Grid.Column="2" x:Name="DnsValue" Text="—" Margin="0,0,0,9"
-                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-
-                                <TextBlock Grid.Row="2" Style="{StaticResource LineGlyph}" Text="&#xE7C3;" />
-                                <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource Caption}" Text="Подписки"
-                                           Margin="0,0,14,0" VerticalAlignment="Center" />
-                                <TextBlock Grid.Row="2" Grid.Column="2" x:Name="SubscriptionValue" Text="—"
-                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                </Grid>
-
-                <!-- Предупреждения: защитник в стеке, стёртый hosts. Пусто — не показываем. -->
-                <ItemsControl Grid.Row="7" x:Name="Warnings" Margin="0,10,0,0">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border Style="{StaticResource Card}" Margin="0,0,0,8"
-                                    BorderBrush="{DynamicResource Warn}">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="{DynamicResource Warn}" />
-                                    <TextBlock Text="{Binding Body}" Style="{StaticResource Caption}"
-                                               TextWrapping="Wrap" Margin="0,6,0,0" />
-                                </StackPanel>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-
-                <TextBlock Grid.Row="8" x:Name="Problem" Style="{StaticResource Caption}" Foreground="{DynamicResource Danger}"
-                           Margin="4,4,0,0" TextWrapping="Wrap" Visibility="Collapsed" />
-
-                <!--
                     Режим — выбором из трёх (владелец 04.10, docs/ideas.md №12):
-                    «Десинк», «Туннель», «Гибрид». С 21.09 до 04.10 здесь были
-                    два выключателя движков: осмысленных сочетаний у них три,
-                    но третье — ради которого программа и написана — из двух
-                    рычагов не читалось. Хранится по-прежнему выключателями
-                    (Rules.WorkModes): переносить настройки не нужно.
-
-                    Одной карточкой во всю ширину, а не тремя плитками (владелец
-                    04.10, снимок на весь экран: «ширина разная… странно
-                    выглядит»): три плитки делили ряд на трети, а все прочие
-                    ряды — пополам, и края не сходились; строки движков у
-                    выбранной плитки меняли её высоту, и страница прыгала при
-                    смене режима. Здесь сегменты наверху, а под ними одна строка —
-                    пояснение выбранного режима и его движки, всегда одной высоты.
+                    «Десинк», «Туннель», «Гибрид». Хранится выключателями движков
+                    (Rules.WorkModes): переносить настройки не нужно. Под
+                    сегментами — пояснение выбранного режима и его движки.
                 -->
-                <Border Grid.Row="10" Style="{StaticResource Card}" Margin="0,10,0,0" Padding="14,12,14,12">
+                <Border Style="{StaticResource Card}" Margin="0,0,0,16">
                     <StackPanel>
-                        <!-- Подпись — как «Текущий пресет» у соседних карточек и с тем же отступом слева. -->
-                        <TextBlock Text="Режим работы ZY" Style="{StaticResource Caption}" FontSize="12.5" Margin="4,0,0,8" />
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                            <TextBlock Text="РЕЖИМ РАБОТЫ ZY" Style="{StaticResource Eyebrow}" VerticalAlignment="Bottom" />
+                            <TextBlock x:Name="ModeTag" Style="{StaticResource MonoTag}" Margin="12,0,0,0" VerticalAlignment="Bottom" />
+                        </StackPanel>
 
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -479,9 +329,9 @@
                             <RadioButton x:Name="ModeDesync" Grid.Column="0" Style="{StaticResource ModeSegment}"
                                          GroupName="WorkMode" Tag="Desync" Click="OnMode">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <TextBlock Style="{StaticResource LineGlyph}" FontSize="16" Text="&#xE9E9;"
+                                    <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE9E9;"
                                                Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
-                                    <TextBlock x:Name="ModeDesyncName" FontWeight="SemiBold" FontSize="14.5" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="ModeDesyncName" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
                                     <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                                     Content="winws2: вмешивается в рукопожатие TLS так, что фильтр оператора не опознаёт имя. Трафик идёт напрямую, своим обычным путём, и адрес остаётся домашним.&#x0a;&#x0a;Лечит блокировки по имени и не лечит отказы по стране: сайт видит тот же адрес, что и без него." />
                                 </StackPanel>
@@ -490,9 +340,9 @@
                             <RadioButton x:Name="ModeTunnel" Grid.Column="2" Style="{StaticResource ModeSegment}"
                                          GroupName="WorkMode" Tag="Tunnel" Click="OnMode">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <TextBlock Style="{StaticResource LineGlyph}" FontSize="16" Text="&#xE774;"
+                                    <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE774;"
                                                Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
-                                    <TextBlock x:Name="ModeTunnelName" FontWeight="SemiBold" FontSize="14.5" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="ModeTunnelName" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
                                     <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                                     Content="sing-box: поднимает сетевой адаптер и уводит через него трафик. Адрес становится зарубежным, и это лечит отказы по стране.&#x0a;&#x0a;В этом режиме забирает всё, кроме поставленного «напрямую», — как обычный VPN. Без исключений (настройки туннеля) — вообще всё.&#x0a;&#x0a;Требует подписки или WARP: без них поднимать нечего." />
                                 </StackPanel>
@@ -501,9 +351,9 @@
                             <RadioButton x:Name="ModeRoute" Grid.Column="4" Style="{StaticResource ModeSegment}"
                                          GroupName="WorkMode" Tag="Route" Click="OnMode">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <TextBlock Style="{StaticResource LineGlyph}" FontSize="16" Text="&#xE8AB;"
+                                    <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE8AB;"
                                                Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
-                                    <TextBlock x:Name="ModeRouteName" FontWeight="SemiBold" FontSize="14.5" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="ModeRouteName" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
                                     <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                                     Content="Оба движка сразу. Что названо в маршрутах «через VPN», уходит в туннель; остальное идёт напрямую, и закрытое по имени чинит десинк.&#x0a;&#x0a;Адрес для сайтов из маршрутов — зарубежный, для прочих — домашний: российские сервисы не видят VPN." />
                                 </StackPanel>
@@ -512,55 +362,191 @@
 
                         <!--
                             Пояснение выбранного режима слева, его движки справа.
-                            Место — под две строки всегда: в окне по умолчанию
-                            пояснение «Гибрида» в одну не влезает, и обрезанное
-                            многоточием читалось хуже, а ряд, растущий только
-                            у одного режима, снова дёргал бы страницу.
+                            Место — под две строки всегда: ряд, растущий только
+                            у одного режима, дёргал бы страницу.
                         -->
-                        <Grid Margin="4,10,0,0" Height="34">
+                        <Grid Margin="2,16,0,0" MinHeight="36">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <TextBlock x:Name="ModeText" Style="{StaticResource Caption}" VerticalAlignment="Center"
-                                       TextWrapping="Wrap" TextTrimming="CharacterEllipsis" LineHeight="16"
-                                       LineStackingStrategy="BlockLineHeight" MaxHeight="32" Margin="0,0,14,0" />
+                            <TextBlock x:Name="ModeText" Style="{StaticResource Caption}" FontSize="12.5" VerticalAlignment="Center"
+                                       TextWrapping="Wrap" TextTrimming="CharacterEllipsis" LineHeight="19"
+                                       LineStackingStrategy="BlockLineHeight" MaxHeight="38" Margin="0,0,20,0" />
 
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <StackPanel x:Name="DesyncChip" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Ellipse x:Name="DesyncDot" Width="8" Height="8" VerticalAlignment="Center" Fill="{DynamicResource Faint}" />
-                                    <TextBlock Margin="7,0,0,0" FontSize="12" Foreground="{DynamicResource Text}" Text="Десинк" VerticalAlignment="Center" />
-                                    <TextBlock x:Name="DesyncState" Margin="6,0,0,0" FontSize="12" Foreground="{DynamicResource Muted}" Text="—" VerticalAlignment="Center" />
-                                    <TextBlock x:Name="DesyncPid" Margin="6,0,0,0" FontSize="11.5" Foreground="{DynamicResource Faint}" VerticalAlignment="Center" />
-                                    <Button Style="{StaticResource IconGhost}" Content="&#xE713;" Margin="6,0,0,0"
-                                            Padding="5,2" MinWidth="0" Click="OnDesyncSettings"
-                                            ToolTip="Пресеты и рецепты — раздел «Десинк»" />
-                                </StackPanel>
+                                <Border x:Name="DesyncChip" Style="{StaticResource EnginePill}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Rectangle RadiusX="1" RadiusY="1" x:Name="DesyncDot" Width="6" Height="6" VerticalAlignment="Center" Fill="{DynamicResource Faint}" />
+                                        <TextBlock Margin="8,0,0,0" FontSize="11.5" Foreground="{DynamicResource Text}" Text="Десинк" VerticalAlignment="Center" />
+                                        <TextBlock x:Name="DesyncState" Margin="6,0,0,0" FontSize="11.5" Foreground="{DynamicResource Muted}" Text="—" VerticalAlignment="Center" />
+                                        <TextBlock x:Name="DesyncPid" Margin="6,0,0,0" FontSize="10.5" FontFamily="{DynamicResource MonoFont}"
+                                                   Foreground="{DynamicResource Faint}" VerticalAlignment="Center"
+                                                   MaxWidth="160" TextTrimming="CharacterEllipsis" />
+                                        <Button Style="{StaticResource IconGhost}" Content="&#xE713;" Margin="4,0,0,0"
+                                                Padding="5,3" MinWidth="0" FontSize="11" Click="OnDesyncSettings"
+                                                Background="Transparent" BorderBrush="Transparent"
+                                                ToolTip="Пресеты и рецепты — раздел «Десинк»" />
+                                    </StackPanel>
+                                </Border>
 
-                                <StackPanel x:Name="TunnelChip" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
-                                    <Ellipse x:Name="TunnelDot" Width="8" Height="8" VerticalAlignment="Center" Fill="{DynamicResource Faint}" />
-                                    <TextBlock Margin="7,0,0,0" FontSize="12" Foreground="{DynamicResource Text}" Text="Туннель" VerticalAlignment="Center" />
-                                    <TextBlock x:Name="TunnelState" Margin="6,0,0,0" FontSize="12" Foreground="{DynamicResource Muted}" Text="—" VerticalAlignment="Center" />
-                                    <TextBlock x:Name="TunnelPid" Margin="6,0,0,0" FontSize="11.5" Foreground="{DynamicResource Faint}" VerticalAlignment="Center" />
-                                    <Button Style="{StaticResource IconGhost}" Content="&#xE713;" Margin="6,0,0,0"
-                                            Padding="5,2" MinWidth="0" Click="OnTunnelSettings"
-                                            ToolTip="Настройки туннеля" />
-                                </StackPanel>
+                                <Border x:Name="TunnelChip" Style="{StaticResource EnginePill}" Margin="8,0,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Rectangle RadiusX="1" RadiusY="1" x:Name="TunnelDot" Width="6" Height="6" VerticalAlignment="Center" Fill="{DynamicResource Faint}" />
+                                        <TextBlock Margin="8,0,0,0" FontSize="11.5" Foreground="{DynamicResource Text}" Text="Туннель" VerticalAlignment="Center" />
+                                        <TextBlock x:Name="TunnelState" Margin="6,0,0,0" FontSize="11.5" Foreground="{DynamicResource Muted}" Text="—" VerticalAlignment="Center" />
+                                        <TextBlock x:Name="TunnelPid" Margin="6,0,0,0" FontSize="10.5" FontFamily="{DynamicResource MonoFont}"
+                                                   Foreground="{DynamicResource Faint}" VerticalAlignment="Center"
+                                                   MaxWidth="160" TextTrimming="CharacterEllipsis" />
+                                        <Button Style="{StaticResource IconGhost}" Content="&#xE713;" Margin="4,0,0,0"
+                                                Padding="5,3" MinWidth="0" FontSize="11" Click="OnTunnelSettings"
+                                                Background="Transparent" BorderBrush="Transparent"
+                                                ToolTip="Настройки туннеля" />
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
                         </Grid>
+
+                        <!-- Жалоба на сочетание движков; пусто — полосы нет вовсе. -->
+                        <Border Margin="0,14,0,0" Padding="12,9" CornerRadius="{StaticResource RSm}"
+                                Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}"
+                                BorderThickness="{StaticResource Stroke}"
+                                Visibility="{Binding Visibility, ElementName=EnginesLine}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE7BA;" FontSize="13"
+                                           Foreground="{DynamicResource Warn}" Margin="0,0,10,0" VerticalAlignment="Top" />
+                                <TextBlock x:Name="EnginesLine" FontSize="11.5" Foreground="{DynamicResource Warn}"
+                                           TextWrapping="Wrap" Visibility="Collapsed" />
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </Border>
 
-                <!-- Жалоба на сочетание движков; пусто — строки нет вовсе, и отступа тоже. -->
-                <TextBlock Grid.Row="11" x:Name="EnginesLine" Style="{StaticResource Caption}"
-                           Margin="4,10,0,0" TextWrapping="Wrap" Visibility="Collapsed" />
+                <!-- Предупреждения: защитник в стеке, стёртый hosts. Пусто — не показываем. -->
+                <ItemsControl x:Name="Warnings">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,12" Padding="16,14"
+                                    Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="{DynamicResource Warn}" />
+                                    <TextBlock Text="{Binding Body}" Style="{StaticResource Caption}"
+                                               TextWrapping="Wrap" Margin="0,6,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
-                <!-- Автозапуск и обновление — рядом, как в макете. -->
-                <Grid Grid.Row="13" Margin="0,10,0,0">
+                <TextBlock x:Name="Problem" Style="{StaticResource Caption}" Foreground="{DynamicResource Danger}"
+                           Margin="4,0,0,12" TextWrapping="Wrap" Visibility="Collapsed" />
+
+                <!-- Пресет и параметры подключения — рядом. -->
+                <Grid Margin="0,0,0,16">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="14" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Style="{StaticResource Card}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Column="0" Style="{StaticResource IconTile}" Margin="0,0,14,0">
+                                <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE9E9;" />
+                            </Border>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="ТЕКУЩИЙ ПРЕСЕТ" Style="{StaticResource Eyebrow}" />
+                                <TextBlock x:Name="PresetValue" FontSize="13.5" FontWeight="Medium" Text="—" Margin="0,5,0,0"
+                                           TextTrimming="CharacterEllipsis" />
+
+                                <!--
+                                    Первая фраза описания из самого файла пресета
+                                    («# Description:»), в две строки. Своих описаний
+                                    не придумываем: пресеты меняются выпусками,
+                                    и придуманное разошлось бы с файлом.
+                                -->
+                                <TextBlock x:Name="PresetNote" Style="{StaticResource Caption}" Margin="0,5,0,0"
+                                           TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="34" />
+                            </StackPanel>
+
+                            <!--
+                                Смена пресета — тем же, чем в «Десинке»: запись
+                                PresetName и предложение перезапустить.
+                            -->
+                            <Button Grid.Row="1" Grid.Column="1" x:Name="PresetMenu" Style="{StaticResource Ghost}"
+                                    HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,14,0,0"
+                                    Content="Изменить" local:ButtonGlyph.Menu="True" Click="OnPresetMenu" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Настройка. Только показ: правка — в своих разделах. -->
+                    <Border Grid.Column="2" Style="{StaticResource Card}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Style="{StaticResource IconTile}" Margin="0,0,14,0">
+                                <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE8CE;" />
+                            </Border>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="ПАРАМЕТРЫ ПОДКЛЮЧЕНИЯ" Style="{StaticResource Eyebrow}" />
+
+                                <Grid Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Style="{StaticResource Caption}" Foreground="{DynamicResource Faint}" Text="Сервер"
+                                               Margin="0,0,20,8" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="0" Grid.Column="1" x:Name="ServerValue" Text="—" Margin="0,0,0,8"
+                                               FontFamily="{DynamicResource MonoFont}" FontSize="12"
+                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+
+                                    <TextBlock Grid.Row="1" Style="{StaticResource Caption}" Foreground="{DynamicResource Faint}" Text="DNS"
+                                               Margin="0,0,20,8" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="DnsValue" Text="—" Margin="0,0,0,8"
+                                               FontFamily="{DynamicResource MonoFont}" FontSize="12"
+                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+
+                                    <TextBlock Grid.Row="2" Style="{StaticResource Caption}" Foreground="{DynamicResource Faint}" Text="Подписки"
+                                               Margin="0,0,20,0" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="SubscriptionValue" Text="—"
+                                               FontFamily="{DynamicResource MonoFont}" FontSize="12"
+                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+                                </Grid>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- Автозапуск и обновление — рядом. -->
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="16" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
@@ -578,7 +564,7 @@
 
                             <StackPanel Grid.Column="1" Margin="0,0,12,0">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="Автозапуск" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" />
+                                    <TextBlock Text="Автозапуск" FontWeight="SemiBold" FontSize="13.5" VerticalAlignment="Center" />
                                     <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                                     Content="Задача планировщика, а не служба: правами администратора задача наделяется сразу, запрос UAC при входе не появляется. Запускается та же программа и с теми же ключами, что и кнопка «Запустить», — иначе автозапуск поднимал бы не то, что вы проверили руками." />
                                 </StackPanel>
@@ -595,17 +581,15 @@
                                 <!--
                                     Слова о задаче — только когда с ней не всё
                                     ясно: проверяется, не читается, устарела.
-                                    «Заведена» и так говорит выключатель.
                                 -->
                                 <TextBlock x:Name="AutostartValue" Style="{StaticResource Caption}"
                                            Margin="0,6,0,0" TextWrapping="Wrap" Visibility="Collapsed" />
                             </StackPanel>
 
                             <!--
-                                Выключатель, а не кнопка «Завести/Убрать» (макет
-                                30.09). Щелчок заводит или убирает задачу, а положение
-                                затем ставится по ответу планировщика, не по щелчку:
-                                отказал планировщик — выключатель вернётся.
+                                Выключатель, а не кнопка «Завести/Убрать». Щелчок
+                                заводит или убирает задачу, а положение затем ставится
+                                по ответу планировщика: отказал — выключатель вернётся.
                             -->
                             <ToggleButton Grid.Column="2" x:Name="AutostartSwitch" Style="{StaticResource Switch}"
                                           Click="OnAutostart" VerticalAlignment="Top" />
@@ -616,73 +600,98 @@
                 </Grid>
 
                 <!--
-                    Быстрые действия (макет 30.09): переходы в разделы разбора
-                    и папка настроек — то, за чем идут, когда что-то не так.
-                    По той же сетке, что ряды выше: две половины с зазором 14,
-                    каждая — пополам. Равные четверти от UniformGrid середину
-                    сдвигали, и край кнопки не сходился с краем карточки (04.10).
+                    Быстрые действия: переходы в разделы разбора, журнал и папка
+                    настроек — то, за чем идут, когда что-то не так.
                 -->
-                <Grid Grid.Row="15" Margin="0,10,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="8" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="14" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="8" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <Button Grid.Column="0" Style="{StaticResource Ghost}" Padding="10,8" Click="OnQuickCheck">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE721;" Margin="0,0,8,0" />
-                            <TextBlock Text="Проверить блокировки" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                    </Button>
-                    <Button Grid.Column="2" Style="{StaticResource Ghost}" Padding="10,8" Click="OnQuickLog">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE8FD;" Margin="0,0,8,0" />
-                            <TextBlock Text="Открыть журнал" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                    </Button>
-                    <Button Grid.Column="4" Style="{StaticResource Ghost}" Padding="10,8" Click="OnQuickDoctor">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE756;" Margin="0,0,8,0" />
-                            <TextBlock Text="Диагностика" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                    </Button>
-                    <Button Grid.Column="6" Style="{StaticResource Ghost}" Padding="10,8" Click="OnQuickConfig"
-                            ToolTip="Папка config в проводнике, файл настроек выделен">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE8B7;" Margin="0,0,8,0" />
-                            <TextBlock Text="Открыть конфиг" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                    </Button>
-                </Grid>
+                <UniformGrid Columns="4" Margin="0,0,0,16">
+                    <Button Style="{StaticResource Ghost}" Padding="10,11" Margin="0,0,8,0" Click="OnQuickCheck"
+                            Background="{DynamicResource Surface}" local:ButtonGlyph.Lead="&#xE721;" Content="Проверить блокировки" />
+                    <Button Style="{StaticResource Ghost}" Padding="10,11" Margin="0,0,8,0" Click="OnQuickLog"
+                            Background="{DynamicResource Surface}" local:ButtonGlyph.Lead="&#xE8FD;" Content="Открыть журнал"
+                            ToolTip="Журнал отдельным окном; панелью снизу — кнопка «Журнал» в углу" />
+                    <Button Style="{StaticResource Ghost}" Padding="10,11" Margin="0,0,8,0" Click="OnQuickDoctor"
+                            Background="{DynamicResource Surface}" local:ButtonGlyph.Lead="&#xE756;" Content="Диагностика" />
+                    <Button Style="{StaticResource Ghost}" Padding="10,11" Click="OnQuickConfig"
+                            Background="{DynamicResource Surface}" local:ButtonGlyph.Lead="&#xE8B7;" Content="Открыть конфиг"
+                            ToolTip="Папка config в проводнике, файл настроек выделен" />
+                </UniformGrid>
 
                 <!--
-                    Строка внизу: сколько работает обход и когда собран конфиг
-                    туннеля. В макете — «Подписки обновлены»; но списки серверов
-                    берутся при сборке конфига на запуске, и отдельного времени
-                    обновления подписок программа не хранит. Время файла конфига —
-                    то, что известно наверняка, им и названо.
+                    Просьба о звезде и канале (владелец, 01.10). Прячется навсегда:
+                    «Скрыть» пишет SupportCardHidden. Показывается после мастера
+                    первого запуска — до него человеку не до звёзд.
                 -->
-                <Grid Grid.Row="17" Margin="4,10,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+                <Border x:Name="SupportCard" Style="{StaticResource Card}" Margin="0,0,0,16" Padding="16,14"
+                        Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}"
+                        Visibility="Collapsed">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" Orientation="Horizontal">
-                        <Ellipse x:Name="FooterDot" Width="8" Height="8" VerticalAlignment="Center"
-                                 Fill="{DynamicResource Faint}" />
-                        <TextBlock x:Name="FooterState" Style="{StaticResource Caption}" Margin="8,0,0,0" />
-                    </StackPanel>
+                        <Border Grid.Column="0" Style="{StaticResource IconTile}" Width="32" Height="32" Margin="0,0,14,0"
+                                VerticalAlignment="Center" Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}">
+                            <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE735;" FontSize="14" Foreground="{DynamicResource Warn}" />
+                        </Border>
 
-                    <TextBlock Grid.Column="1" x:Name="FooterConfig" Style="{StaticResource Caption}" Margin="16,0,0,0" />
-                </Grid>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock FontWeight="SemiBold" FontSize="13" TextWrapping="Wrap" Text="Нравится Zephyron?" />
+                            <TextBlock Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap"
+                                       Text="Поставьте звезду на GitHub, подпишитесь на канал или поддержите донатом: так о программе узнают другие, а вы — о новых версиях." />
+                        </StackPanel>
 
-            </Grid>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Style="{StaticResource Quiet}" Click="OnStar" Margin="0,0,4,0" Content="Звезда"
+                                    local:ButtonGlyph.Lead="&#xE734;"
+                                    ToolTip="Страница Zephyron на GitHub — звезда справа вверху" />
+                            <Button Style="{StaticResource Quiet}" Click="OnTelegram" Margin="0,0,4,0" Content="Канал"
+                                    local:ButtonGlyph.Lead="&#xE724;" ToolTip="Новости в телеграм-канале" />
+                            <Button Style="{StaticResource Ghost}" Click="OnSupport" Margin="0,0,6,0" Content="Поддержать"
+                                    local:ButtonGlyph.Lead="&#xEB51;" ToolTip="Поддержать разработку донатом" />
+                            <Button Style="{StaticResource IconGhost}" Click="OnSupportHide" Content="&#xE711;" FontSize="11"
+                                    Padding="7,6" MinWidth="0" Background="Transparent" BorderBrush="Transparent"
+                                    ToolTip="Скрыть и больше не показывать" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!--
+                    Подвал: сколько работает обход и когда собран конфиг туннеля,
+                    справа — ссылки на описание, исходники и канал.
+                -->
+                <Border BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0" Padding="4,14,0,0" Margin="0,4,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Rectangle RadiusX="1" RadiusY="1" x:Name="FooterDot" Width="6" Height="6" VerticalAlignment="Center"
+                                     Fill="{DynamicResource Faint}" />
+                            <TextBlock x:Name="FooterState" Style="{StaticResource MonoTag}" FontSize="11"
+                                       Foreground="{DynamicResource Muted}" Margin="9,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+
+                        <TextBlock Grid.Column="1" x:Name="FooterConfig" Style="{StaticResource MonoTag}" FontSize="11"
+                                   Margin="18,0,12,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Style="{StaticResource Quiet}" Padding="9,5" FontSize="11.5" Click="OnDocs"
+                                    local:ButtonGlyph.Lead="&#xE82D;" Content="Документация" ToolTip="Описание программы на GitHub" />
+                            <Button Style="{StaticResource Quiet}" Padding="9,5" FontSize="11.5" Click="OnGitHub"
+                                    local:ButtonGlyph.Lead="&#xE943;" Content="GitHub" ToolTip="Исходники, выпуски, вопросы и обсуждения" />
+                            <Button Style="{StaticResource Quiet}" Padding="9,5" FontSize="11.5" Click="OnTelegram"
+                                    local:ButtonGlyph.Lead="&#xE724;" Content="Telegram"
+                                    ToolTip="Новости в телеграм-канале: что вышло и зачем обновляться, коротко" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+            </StackPanel>
         </ScrollViewer>
     </Grid>
 </UserControl>

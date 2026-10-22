@@ -108,7 +108,7 @@
 
                                                             <TextBlock Grid.Column="0" Text="{Binding Mark}" FontWeight="Bold"
                                                                        Foreground="{DynamicResource Accent}" VerticalAlignment="Center" />
-                                                            <Ellipse Grid.Column="1" Width="7" Height="7" Margin="0,0,10,0"
+                                                            <Rectangle RadiusX="1" RadiusY="1" Grid.Column="1" Width="7" Height="7" Margin="0,0,10,0"
                                                                      VerticalAlignment="Center" Fill="{Binding Brush}" />
                                                             <TextBlock Grid.Column="2" Text="{Binding Shown}"
                                                                        Style="{StaticResource Mono}" VerticalAlignment="Center" />

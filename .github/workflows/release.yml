@@ -124,7 +124,7 @@ jobs:
           mkdir -p "$STAGE/presets"
           cp "$ROOT"/presets/*.txt "$STAGE/presets/"
 
-          for t in dark light grey tinted violet ocean coffee rose cream; do
+          for t in dark light zefir grey tinted violet ocean coffee rose cream; do
             mkdir -p "$STAGE/themes/$t"
             cp "$ROOT/themes/$t/theme.json" "$STAGE/themes/$t/theme.json"
           done

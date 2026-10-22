@@ -34,6 +34,25 @@
         <Setter Property="FontSize" Value="12" />
     </Style>
 
+    <!--
+        Подпись над блоком: мелко, прописными, третьим планом — «РЕЖИМ РАБОТЫ»,
+        «ТЕКУЩИЙ ПРЕСЕТ». Называет блок, не споря с его содержимым.
+        Прописные — в самом тексте: у WPF нет преобразования регистра.
+    -->
+    <Style x:Key="Eyebrow" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
+        <Setter Property="Foreground" Value="{DynamicResource Faint}" />
+        <Setter Property="FontSize" Value="10.5" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- Служебная метка моноширинным: «desync · winws2», версия, время. -->
+    <Style x:Key="MonoTag" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+        <Setter Property="Foreground" Value="{DynamicResource Faint}" />
+        <Setter Property="FontSize" Value="10.5" />
+    </Style>
+
     <Style x:Key="PageHead" TargetType="ContentControl">
         <!--
             Шапка раздела. Кнопки — содержимым, имя и подпись —
@@ -43,15 +62,11 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ContentControl">
-                    <Border CornerRadius="{StaticResource RXL}" Padding="22,20,22,20"
+                    <Border CornerRadius="{StaticResource RLg}" Padding="24,20,24,20"
                             BorderThickness="{StaticResource Stroke}"
-                            BorderBrush="{DynamicResource Border}">
-                        <Border.Background>
-                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0.4">
-                                <GradientStop Color="{DynamicResource SurfaceColor}" Offset="0" />
-                                <GradientStop Color="{DynamicResource RaisedColor}" Offset="1" />
-                            </LinearGradientBrush>
-                        </Border.Background>
+                            BorderBrush="{DynamicResource Border}"
+                            Background="{DynamicResource Surface}"
+                            local:Glass.IsOn="True">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -59,16 +74,19 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <!-- Акцентная черта: тонкая, от верха до низа — знак раздела. -->
-                            <Border Grid.Column="0" Width="5" CornerRadius="{StaticResource RPill}"
-                                    Background="{DynamicResource Accent}" Margin="0,2,18,2" />
+                            <!--
+                                Акцентная черта — знак раздела. Чёткая, без свечения
+                                и без скругления (владелец, 22.10: размытое свечение
+                                читалось овалом, «нужно стильно»).
+                            -->
+                            <Border Grid.Column="0" Width="3" Margin="0,4,18,4" Background="{DynamicResource Accent}" />
 
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,16,0">
-                                <TextBlock Style="{StaticResource Title}" FontSize="26"
+                                <TextBlock Style="{StaticResource Title}" FontSize="22"
                                            TextWrapping="Wrap"
                                            Text="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=(local:PageHead.Title)}" />
-                                <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0"
-                                           TextWrapping="Wrap"
+                                <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,0"
+                                           TextWrapping="Wrap" FontSize="12.5"
                                            Text="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=(local:PageHead.Subtitle)}" />
                             </StackPanel>
 
@@ -141,13 +159,20 @@
         Кнопка. Шаблон переопределён целиком: у стандартной внутри своя
         подложка, которая на тёмном фоне остаётся светлой при наведении.
     -->
+    <!--
+        С 0.16 кнопка — едва заметная подложка (Wash) с волосяной рамкой
+        и подписью второго плана; при наведении подпись светлеет до текста,
+        а рамка — до LineStrong. Так десяток кнопок раздела не спорит
+        с главной, а главная (Primary) светится цветом акцента.
+    -->
     <Style x:Key="Ghost" TargetType="Button">
         <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
-        <Setter Property="FontSize" Value="13" />
-        <Setter Property="Foreground" Value="{DynamicResource Text}" />
-        <Setter Property="Background" Value="{DynamicResource Raised}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Foreground" Value="{DynamicResource Muted}" />
+        <Setter Property="Background" Value="{DynamicResource Wash}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
-        <Setter Property="Padding" Value="18,9" />
+        <Setter Property="Padding" Value="14,8" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
@@ -235,10 +260,16 @@
                             <Setter TargetName="MenuArrow" Property="Visibility" Value="Visible" />
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource Muted}" />
+                            <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource LineStrong}" />
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource WashHover}" />
+                            <Setter Property="Foreground" Value="{DynamicResource Text}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Surface}" />
+                            <Setter TargetName="Shape" Property="RenderTransform">
+                                <Setter.Value>
+                                    <TranslateTransform Y="1" />
+                                </Setter.Value>
+                            </Setter>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45" />
@@ -250,19 +281,45 @@
         </Setter>
     </Style>
 
-    <!-- Главное действие раздела: одно на экран, иначе перестаёт быть главным. -->
+    <!--
+        Главное действие раздела: одно на экран, иначе перестаёт быть главным.
+        С 0.16 не заливка акцентом, а его свечение: подложка AccentSoft,
+        рамка AccentLine и подпись цветом акцента — как включённый прибор.
+    -->
     <Style x:Key="Primary" TargetType="Button" BasedOn="{StaticResource Ghost}">
-        <Setter Property="Background" Value="{DynamicResource AccentFill}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource AccentFill}" />
-        <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+        <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentLine}" />
+        <Setter Property="Foreground" Value="{DynamicResource Accent}" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Padding" Value="26,11" />
+        <Setter Property="Padding" Value="22,10" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource AccentLine}" />
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <Style x:Key="Destructive" TargetType="Button" BasedOn="{StaticResource Ghost}">
-        <Setter Property="BorderBrush" Value="{DynamicResource Danger}" />
+        <Setter Property="Background" Value="{DynamicResource DangerSoft}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource DangerLine}" />
         <Setter Property="Foreground" Value="{DynamicResource Danger}" />
-        <Setter Property="Padding" Value="26,11" />
+        <Setter Property="Padding" Value="22,10" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource DangerLine}" />
+                <Setter Property="Foreground" Value="{DynamicResource Danger}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!--
+        Кнопка без рамки и подложки — «Не сейчас», «Скрыть», ссылки в подвале.
+        Рамка и подложка появляются под мышью.
+    -->
+    <Style x:Key="Quiet" TargetType="Button" BasedOn="{StaticResource Ghost}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource Faint}" />
     </Style>
 
     <!--
@@ -275,7 +332,7 @@
         <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="Foreground" Value="{DynamicResource Text}" />
-        <Setter Property="Background" Value="{DynamicResource Raised}" />
+        <Setter Property="Background" Value="{DynamicResource Wash}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
@@ -287,7 +344,7 @@
                             <ToggleButton.Template>
                                 <ControlTemplate TargetType="ToggleButton">
                                     <Border x:Name="Shape"
-                                            Background="{DynamicResource Raised}"
+                                            Background="{DynamicResource Wash}"
                                             BorderBrush="{DynamicResource Border}"
                                             BorderThickness="{StaticResource Stroke}" CornerRadius="{StaticResource RMd}">
                                         <Grid>
@@ -315,7 +372,11 @@
                                     </Border>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource Muted}" />
+                                            <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource LineStrong}" />
+                                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource WashHover}" />
+                                        </Trigger>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource AccentLine}" />
                                         </Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
@@ -333,9 +394,9 @@
                         -->
                         <Popup IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom"
                                AllowsTransparency="True" PopupAnimation="Fade" Focusable="False">
-                            <Border Background="{DynamicResource Surface}"
-                                    BorderBrush="{DynamicResource Border}" BorderThickness="{StaticResource Stroke}"
-                                    CornerRadius="{StaticResource RMd}" Margin="0,4,0,0"
+                            <Border Background="{DynamicResource Raised}"
+                                    BorderBrush="{DynamicResource LineStrong}" BorderThickness="{StaticResource Stroke}"
+                                    CornerRadius="{StaticResource RMd}" Margin="0,6,0,0"
                                     MinWidth="{TemplateBinding ActualWidth}"
                                     LayoutTransform="{DynamicResource UiScaleTransform}">
                                 <ScrollViewer MaxHeight="{TemplateBinding MaxDropDownHeight}"
@@ -369,10 +430,11 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Raised}" />
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentSoft}" />
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Raised}" />
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentSoft}" />
+                            <Setter Property="Foreground" Value="{DynamicResource Accent}" />
                             <Setter Property="FontWeight" Value="SemiBold" />
                         </Trigger>
                     </ControlTemplate.Triggers>
@@ -388,7 +450,7 @@
         <Setter Property="Foreground" Value="{DynamicResource Text}" />
         <Setter Property="CaretBrush" Value="{DynamicResource Text}" />
         <Setter Property="SelectionBrush" Value="{DynamicResource AccentDim}" />
-        <Setter Property="Background" Value="{DynamicResource Raised}" />
+        <Setter Property="Background" Value="{DynamicResource Wash}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
         <Setter Property="Padding" Value="11,7" />
         <Setter Property="Template">
@@ -442,7 +504,7 @@
         <Setter Property="Foreground" Value="{DynamicResource Text}" />
         <Setter Property="CaretBrush" Value="{DynamicResource Text}" />
         <Setter Property="SelectionBrush" Value="{DynamicResource AccentDim}" />
-        <Setter Property="Background" Value="{DynamicResource Raised}" />
+        <Setter Property="Background" Value="{DynamicResource Wash}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
         <Setter Property="Padding" Value="11,7" />
         <Setter Property="Template">
@@ -487,7 +549,7 @@
     <Style x:Key="Choice" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-        <Setter Property="Background" Value="{DynamicResource Surface}" />
+        <Setter Property="Background" Value="{DynamicResource Wash}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
         <Setter Property="Padding" Value="16,13" />
         <Setter Property="Margin" Value="0,0,0,7" />
@@ -498,13 +560,13 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{StaticResource Stroke}"
-                            CornerRadius="{StaticResource RXL}"
+                            CornerRadius="{StaticResource RMd}"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Raised}" />
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource WashHover}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45" />
@@ -531,14 +593,14 @@
                             Background="{DynamicResource Surface}"
                             BorderBrush="{DynamicResource Border}"
                             BorderThickness="{StaticResource Stroke}"
-                            CornerRadius="{StaticResource RXL}"
+                            CornerRadius="{StaticResource RLg}"
                             Padding="14,10"
                             MinHeight="64">
                         <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource Muted}" />
+                            <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource LineStrong}" />
                             <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Raised}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
@@ -548,45 +610,101 @@
     </Style>
 
     <!--
-        Пункт бокового меню. Выбранный — таблетка, залитая акцентом целиком:
-        в меню всегда выбран ровно один раздел, и заливка читается сразу,
-        без левой черты у края.
+        Пункт верхнего меню (с 0.16; прежде — боковой полосы, отсюда имя).
+        Значок и подпись мелко, третьим планом; выбранный светится акцентом —
+        подложка AccentSoft, рамка AccentLine и черта под пунктом, выступающая
+        за нижний край полосы. В меню всегда выбран ровно один раздел.
     -->
+    <!--
+        Подписи разделов верхнего меню и зазор до них. На узком окне разделы
+        сжимаются до значков (MainWindow.FitNav): окно подменяет эти два ресурса
+        у себя, и полоса не наезжает ни на края окна, ни на содержимое.
+        «Ещё» и «Журнал» (NavMore) подписей не теряют.
+    -->
+    <Visibility x:Key="NavLabel">Visible</Visibility>
+    <Thickness x:Key="NavGlyphGap">0,0,7,0</Thickness>
+
     <Style x:Key="RailItem" TargetType="RadioButton">
         <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="Margin" Value="10,3" />
+        <Setter Property="Margin" Value="1,0" />
+        <Setter Property="GroupName" Value="Sections" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <!--
-                        Пункт — таблетка. Выбранный залит акцентом целиком:
-                        в меню всегда выбран ровно один раздел, и залитая
-                        таблетка показывает это сразу, без левой черты у края.
-                    -->
-                    <Border x:Name="Shape" Background="Transparent"
-                            CornerRadius="{StaticResource RMd}"
-                            BorderThickness="{StaticResource Stroke}" BorderBrush="Transparent"
-                            Padding="12,9">
+                    <Grid>
+                        <Border x:Name="Shape" Background="Transparent"
+                                CornerRadius="{StaticResource RMd}"
+                                BorderThickness="{StaticResource Stroke}" BorderBrush="Transparent"
+                                Padding="12,7">
+                            <StackPanel Orientation="Horizontal">
+                                <!-- Значок (MenuIcon.cs). -->
+                                <TextBlock x:Name="Glyph"
+                                           Text="{Binding (local:MenuIcon.Glyph), RelativeSource={RelativeSource TemplatedParent}}"
+                                           FontFamily="{DynamicResource IconFont}" FontSize="14"
+                                           Margin="{DynamicResource NavGlyphGap}" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource Faint}" />
+
+                                <TextBlock x:Name="Label"
+                                           Text="{TemplateBinding Content}"
+                                           Foreground="{DynamicResource Faint}" Visibility="{DynamicResource NavLabel}"
+                                           FontSize="12" FontWeight="Medium" VerticalAlignment="Center" />
+
+                                <!-- Точка «есть новое» (RailBadge.cs). -->
+                                <Rectangle x:Name="Badge" Width="6" Height="6" Margin="7,1,0,0" RadiusX="1" RadiusY="1"
+                                           VerticalAlignment="Center" Fill="{DynamicResource Accent}"
+                                           Visibility="Collapsed" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Черта под выбранным пунктом: чёткая, без свечения. -->
+                        <Border x:Name="Underline" Width="16" Height="2" VerticalAlignment="Bottom"
+                                HorizontalAlignment="Center" Margin="0,0,0,-7" Visibility="Hidden"
+                                Background="{DynamicResource Accent}" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="local:RailBadge.Shown" Value="True">
+                            <Setter TargetName="Badge" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Muted}" />
+                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Muted}" />
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Wash}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentSoft}" />
+                            <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource AccentLine}" />
+                            <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Underline" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Пункт выпадающего «Ещё»: строка во всю ширину меню. Под мышью
+        подсвечивается акцентом и значок, и подложка; выбранный раздел —
+        подписью цвета акцента.
+    -->
+    <Style x:Key="MoreItem" TargetType="RadioButton">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="GroupName" Value="Sections" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Shape" Background="Transparent" CornerRadius="{StaticResource RSm}" Padding="12,9">
                         <StackPanel Orientation="Horizontal">
-                            <!--
-                                Значок (MenuIcon.cs). Колонка постоянной ширины:
-                                знаки разной ширины иначе сдвигали бы подписи,
-                                и столбец текста шёл бы лесенкой.
-                            -->
                             <TextBlock x:Name="Glyph"
                                        Text="{Binding (local:MenuIcon.Glyph), RelativeSource={RelativeSource TemplatedParent}}"
-                                       FontFamily="{DynamicResource IconFont}" FontSize="16"
-                                       Width="18" Margin="0,0,12,0" TextAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource Muted}" />
-
-                            <TextBlock x:Name="Label"
-                                       Text="{TemplateBinding Content}"
-                                       Foreground="{DynamicResource Muted}"
-                                       FontSize="13" VerticalAlignment="Center" />
-
-                            <!-- Точка «есть новое» (RailBadge.cs). -->
-                            <Ellipse x:Name="Badge" Width="7" Height="7" Margin="8,1,0,0"
+                                       FontFamily="{DynamicResource IconFont}" FontSize="14"
+                                       Width="16" Margin="0,0,11,0" TextAlignment="Center" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Faint}" />
+                            <TextBlock x:Name="Label" Text="{TemplateBinding Content}"
+                                       Foreground="{DynamicResource Muted}" FontSize="12.5" VerticalAlignment="Center" />
+                            <Rectangle x:Name="Badge" RadiusX="1" RadiusY="1" Width="6" Height="6" Margin="8,1,0,0"
                                      VerticalAlignment="Center" Fill="{DynamicResource Accent}"
                                      Visibility="Collapsed" />
                         </StackPanel>
@@ -596,16 +714,85 @@
                             <Setter TargetName="Badge" Property="Visibility" Value="Visible" />
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentSoft}" />
                             <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Text}" />
-                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Text}" />
-                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Surface}" />
+                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Accent}" />
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentFill}" />
-                            <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource OnAccent}" />
-                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource OnAccent}" />
+                            <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Accent}" />
                             <Setter TargetName="Label" Property="FontWeight" Value="SemiBold" />
-                            <Setter TargetName="Badge" Property="Fill" Value="{DynamicResource OnAccent}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        Кнопка-переключатель в верхнем меню: «Ещё» и «Журнал». Подпись —
+        содержимым, значок — MenuIcon.Glyph. Открытое меню или панель
+        и раздел из «Ещё» (Tag="active", MainWindow) светятся так же,
+        как выбранный пункт.
+    -->
+    <Style x:Key="NavMore" TargetType="ToggleButton">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Margin" Value="1,0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Shape" Background="Transparent" CornerRadius="{StaticResource RMd}"
+                            BorderThickness="{StaticResource Stroke}" BorderBrush="Transparent" Padding="12,7">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="Glyph" FontFamily="{DynamicResource IconFont}" FontSize="14"
+                                       Text="{Binding (local:MenuIcon.Glyph), RelativeSource={RelativeSource TemplatedParent}}"
+                                       Margin="0,0,7,0" VerticalAlignment="Center" Foreground="{DynamicResource Faint}" />
+                            <!--
+                                Подпись остаётся и в сжатом меню (владелец, 22.10):
+                                значки «⋯» и списка сами по себе не говорят, что
+                                за ними «Ещё» и «Журнал», в отличие от значков разделов.
+                            -->
+                            <TextBlock x:Name="Label" Text="{TemplateBinding Content}" Foreground="{DynamicResource Faint}"
+                                       FontSize="12" FontWeight="Medium" VerticalAlignment="Center" />
+                            <Rectangle x:Name="Badge" RadiusX="1" RadiusY="1" Width="6" Height="6" Margin="7,1,0,0"
+                                     VerticalAlignment="Center" Fill="{DynamicResource Accent}"
+                                     Visibility="Collapsed" />
+                            <Path x:Name="Arrow" Data="M 0 0 L 4 4 L 8 0" Stroke="{DynamicResource Faint}" StrokeThickness="1.4"
+                                  Margin="8,1,0,0" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                                <Path.RenderTransform>
+                                    <RotateTransform Angle="0" />
+                                </Path.RenderTransform>
+                            </Path>
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="local:RailBadge.Shown" Value="True">
+                            <Setter TargetName="Badge" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Wash}" />
+                            <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Muted}" />
+                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Muted}" />
+                        </Trigger>
+                        <Trigger Property="Tag" Value="active">
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentSoft}" />
+                            <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource AccentLine}" />
+                            <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Arrow" Property="Stroke" Value="{DynamicResource Accent}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentSoft}" />
+                            <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource AccentLine}" />
+                            <Setter TargetName="Label" Property="Foreground" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Arrow" Property="Stroke" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Arrow" Property="RenderTransform">
+                                <Setter.Value>
+                                    <RotateTransform Angle="180" />
+                                </Setter.Value>
+                            </Setter>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -641,8 +828,8 @@
     <Style TargetType="ToolTip">
         <Setter Property="Background" Value="{DynamicResource Raised}" />
         <Setter Property="Foreground" Value="{DynamicResource Text}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
-        <Setter Property="BorderThickness" Value="1.5" />
+        <Setter Property="BorderBrush" Value="{DynamicResource LineStrong}" />
+        <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="12,9" />
         <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
         <Setter Property="FontSize" Value="12" />
@@ -755,8 +942,8 @@
     <Style x:Key="SettingsGroup" TargetType="Border">
         <Setter Property="Background" Value="{DynamicResource Surface}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
-        <Setter Property="BorderThickness" Value="1.5" />
-        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="BorderThickness" Value="{StaticResource Stroke}" />
+        <Setter Property="CornerRadius" Value="{StaticResource RLg}" />
         <Setter Property="local:Glass.IsOn" Value="True" />
     </Style>
 
@@ -768,13 +955,19 @@
         слишком незаметен, стоит сделать подложку»).
     -->
     <Style x:Key="RailPanel" TargetType="Border">
-        <!-- Плавающая карточка, а не полоса от края до края: у меню свои
-             скруглённые углы со всех сторон и рамка на тон светлее фона. -->
+        <!-- С 0.16 — верхнее меню: плавающая плашка по центру окна,
+             со скруглёнными углами, рамкой и мягкой тенью под собой. -->
         <Setter Property="Background" Value="{DynamicResource RailFill}" />
         <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
         <Setter Property="BorderThickness" Value="{StaticResource Stroke}" />
         <Setter Property="CornerRadius" Value="{StaticResource RLg}" />
+        <Setter Property="Padding" Value="8,6" />
         <Setter Property="local:Glass.IsOn" Value="True" />
+        <Setter Property="Effect">
+            <Setter.Value>
+                <DropShadowEffect BlurRadius="40" ShadowDepth="10" Direction="270" Opacity="0.5" Color="#000000" />
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!--
@@ -799,27 +992,33 @@
     <Style x:Key="Switch" TargetType="ToggleButton">
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Focusable" Value="False" />
-        <Setter Property="Width" Value="42" />
-        <Setter Property="Height" Value="24" />
+        <Setter Property="Width" Value="38" />
+        <Setter Property="Height" Value="22" />
         <Setter Property="Template">
             <Setter.Value>
+                <!--
+                    С 0.16 включённый — не залитая дорожка, а бегунок цвета
+                    акцента на подложке AccentSoft. Не овал (владелец, 22.10:
+                    «тумблеры не должны выглядеть овально», «нужно стильно»):
+                    дорожка — прямоугольник со скруглением 4, бегунок — квадрат,
+                    без свечения.
+                -->
                 <ControlTemplate TargetType="ToggleButton">
-                    <Border x:Name="Track" CornerRadius="{StaticResource RPill}"
-                            Background="{DynamicResource Raised}"
-                            BorderBrush="{DynamicResource Border}"
+                    <Border x:Name="Track" CornerRadius="4"
+                            Background="{DynamicResource WashHover}"
+                            BorderBrush="{DynamicResource LineStrong}"
                             BorderThickness="{StaticResource Stroke}">
-                        <Ellipse x:Name="Knob" Width="18" Height="18"
-                                 HorizontalAlignment="Left" Margin="2,0,0,0"
-                                 Fill="{DynamicResource Muted}" />
+                        <Border x:Name="KnobBox" Width="16" Height="16" HorizontalAlignment="Left" Margin="2,0,0,0"
+                                Background="{DynamicResource Faint}" CornerRadius="2" />
                     </Border>
 
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Track" Property="Background" Value="{DynamicResource Accent}" />
-                            <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource Accent}" />
-                            <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
-                            <Setter TargetName="Knob" Property="Margin" Value="0,0,2,0" />
-                            <Setter TargetName="Knob" Property="Fill" Value="White" />
+                            <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentSoft}" />
+                            <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource AccentLine}" />
+                            <Setter TargetName="KnobBox" Property="HorizontalAlignment" Value="Right" />
+                            <Setter TargetName="KnobBox" Property="Margin" Value="0,0,2,0" />
+                            <Setter TargetName="KnobBox" Property="Background" Value="{DynamicResource Accent}" />
                         </Trigger>
 
                         <Trigger Property="IsMouseOver" Value="True">
@@ -873,7 +1072,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Thumb">
-                    <Border x:Name="Bar" Background="{DynamicResource Border}" CornerRadius="4" />
+                    <Border x:Name="Bar" Background="{DynamicResource LineStrong}" CornerRadius="4" />
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bar" Property="Background" Value="{DynamicResource Faint}" />
@@ -980,8 +1179,8 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ContextMenu">
-                    <Border Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}"
-                            BorderThickness="{StaticResource Stroke}" CornerRadius="{StaticResource RLg}" Padding="6" MinWidth="220">
+                    <Border Background="{DynamicResource Raised}" BorderBrush="{DynamicResource LineStrong}"
+                            BorderThickness="{StaticResource Stroke}" CornerRadius="{StaticResource RMd}" Padding="6" MinWidth="220">
                         <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
                     </Border>
                 </ControlTemplate>
@@ -1011,7 +1210,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsHighlighted" Value="True">
-                            <Setter TargetName="Row" Property="Background" Value="{DynamicResource Raised}" />
+                            <Setter TargetName="Row" Property="Background" Value="{DynamicResource AccentSoft}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Foreground" Value="{DynamicResource Faint}" />
@@ -1037,20 +1236,21 @@
         владельца (30.09). Плитка, а не голый знак: у карточек разная высота
         текста, и знак без подложки висел бы то выше, то ниже заголовка.
     -->
+    <!-- С 0.16 плитка светится акцентом: подложка AccentSoft и рамка AccentLine. -->
     <Style x:Key="IconTile" TargetType="Border">
-        <Setter Property="Width" Value="44" />
-        <Setter Property="Height" Value="44" />
-        <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Background" Value="{DynamicResource Raised}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
-        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Width" Value="36" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="CornerRadius" Value="{StaticResource RMd}" />
+        <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentLine}" />
+        <Setter Property="BorderThickness" Value="{StaticResource Line}" />
         <Setter Property="VerticalAlignment" Value="Top" />
     </Style>
 
     <Style x:Key="TileGlyph" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource IconFont}" />
-        <Setter Property="FontSize" Value="20" />
-        <Setter Property="Foreground" Value="{DynamicResource Text}" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="Foreground" Value="{DynamicResource Accent}" />
         <Setter Property="HorizontalAlignment" Value="Center" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>

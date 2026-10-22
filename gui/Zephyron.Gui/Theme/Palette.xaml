@@ -3,31 +3,32 @@
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
     <!--
-        Тёмная «Зефирная» — основная палитра Zephyron и запас, если папки тем
-        нет. Уютная, в мягком сиреневом подтоне, с зефирно-розовым акцентом:
-        так обход не выглядит угрозой, а выглядит заботой.
+        Тёмная «Полночь» — основная палитра Zephyron и запас, если папки тем
+        нет. Почти чёрная подложка, графитовые карточки с волосяной рамкой
+        и бирюзовый акцент, светящийся там, где что-то включено. Прежняя
+        «Зефирная» уехала в themes/zefir и осталась в выборе тем.
 
-        Смысл цветов состояния сохранён ровно тот же, что был: акцент значит
-        «работает», красный «закрыто», жёлтый «требует внимания», и в отчёте
-        они значат то же самое. Перекрашены оттенки, а не роли.
+        Смысл цветов состояния прежний: акцент значит «работает», красный
+        «закрыто», жёлтый «требует внимания», и в отчёте они значат то же
+        самое. Перекрашены оттенки, а не роли.
 
         Значения совпадают с themes/dark/theme.json — расхождение ловит тест
         ThemeFilesMatchXamlPalettes.
     -->
 
-    <Color x:Key="BackdropColor">#FF17131F</Color>
-    <Color x:Key="SurfaceColor">#FF221C2E</Color>
-    <Color x:Key="RaisedColor">#FF2C2439</Color>
-    <Color x:Key="BorderColor">#FF3E3350</Color>
+    <Color x:Key="BackdropColor">#FF08090F</Color>
+    <Color x:Key="SurfaceColor">#FF0F1219</Color>
+    <Color x:Key="RaisedColor">#FF161A23</Color>
+    <Color x:Key="BorderColor">#FF21252F</Color>
 
-    <Color x:Key="TextColor">#FFF4EEFB</Color>
-    <Color x:Key="MutedColor">#FFBCB0CE</Color>
-    <Color x:Key="FaintColor">#FF8F85A3</Color>
+    <Color x:Key="TextColor">#FFEEF1F7</Color>
+    <Color x:Key="MutedColor">#FFA8B0C2</Color>
+    <Color x:Key="FaintColor">#FF7B849B</Color>
 
-    <Color x:Key="AccentColor">#FFFF8FC0</Color>
-    <Color x:Key="AccentDimColor">#FF7A3F63</Color>
-    <Color x:Key="DangerColor">#FFFF7A8A</Color>
-    <Color x:Key="WarnColor">#FFFFC978</Color>
+    <Color x:Key="AccentColor">#FF22D3EE</Color>
+    <Color x:Key="AccentDimColor">#FF0B4651</Color>
+    <Color x:Key="DangerColor">#FFF43F5E</Color>
+    <Color x:Key="WarnColor">#FFFBBF24</Color>
 
     <!--
         Заливка кнопки и подпись на ней. На тёмном фоне они почти совпадают
@@ -36,9 +37,9 @@
         по-настоящему — там текстовый зелёный обязан быть тёмным, а заливка
         с тёмной подписью сливается в грязь.
     -->
-    <Color x:Key="AccentFillColor">#FFFF8FC0</Color>
-    <Color x:Key="OnAccentColor">#FF2A0F1E</Color>
-    <Color x:Key="WarnFillColor">#FFFFC978</Color>
+    <Color x:Key="AccentFillColor">#FF22D3EE</Color>
+    <Color x:Key="OnAccentColor">#FF04181C</Color>
+    <Color x:Key="WarnFillColor">#FFFBBF24</Color>
 
     <SolidColorBrush x:Key="Backdrop" Color="{StaticResource BackdropColor}" />
     <SolidColorBrush x:Key="Surface" Color="{StaticResource SurfaceColor}" />
@@ -59,15 +60,35 @@
     <SolidColorBrush x:Key="WarnFill" Color="{StaticResource WarnFillColor}" />
 
     <!--
-        Шрифт назван явно. По умолчанию WPF берёт Segoe UI в начертании,
-        которое на тёмном фоне выглядит тоньше, чем задумано, — а цифры
-        в таблице проверки должны читаться с одного взгляда.
+        Производные: те же цвета состояния, но полупрозрачными подложкой
+        и рамкой. Ими нарисованы кнопки, выбранные сегменты, плашки движков —
+        включённое светится своим цветом, а не заливается им целиком.
+        В теме из файла они считаются из её цветов (Themes.Derive), здесь —
+        те же доли, записанные числом: Soft ≈ 12 %, Line ≈ 38 %.
+        Wash — едва заметная подложка поверх карточки: у кнопок и полей.
     -->
-    <!-- Comfortaa — основной: округлый и мягкий, в тон милому оформлению.
-         Segoe UI — запас, если её нет в системе. -->
-    <FontFamily x:Key="UiFont">Comfortaa, Segoe UI</FontFamily>
+    <SolidColorBrush x:Key="AccentSoft" Color="#1F22D3EE" />
+    <SolidColorBrush x:Key="AccentLine" Color="#6122D3EE" />
+    <SolidColorBrush x:Key="DangerSoft" Color="#1AF43F5E" />
+    <SolidColorBrush x:Key="DangerLine" Color="#57F43F5E" />
+    <SolidColorBrush x:Key="WarnSoft" Color="#1AFBBF24" />
+    <SolidColorBrush x:Key="WarnLine" Color="#4DFBBF24" />
+    <SolidColorBrush x:Key="Wash" Color="#08EEF1F7" />
+    <SolidColorBrush x:Key="WashHover" Color="#12EEF1F7" />
+    <SolidColorBrush x:Key="LineStrong" Color="#24EEF1F7" />
+
+    <!-- Сетка, свечения и виньетка фона окна: видны, только пока у темы нет своей картинки. -->
+    <sys:Double x:Key="Decor">1</sys:Double>
+
+    <!--
+        Шрифт назван явно. Segoe UI Variable — системный в Windows 11,
+        ровный и плотный; в Windows 10 его нет, и тогда берётся Segoe UI.
+        Цифры таймера и метрик — моноширинным: они меняются каждую секунду
+        и не должны дрожать по ширине.
+    -->
+    <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI</FontFamily>
     <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas</FontFamily>
-    <FontFamily x:Key="DisplayFont">Comfortaa, Segoe UI</FontFamily>
+    <FontFamily x:Key="DisplayFont">Segoe UI Variable Display, Segoe UI</FontFamily>
 
     <!--
         Фон окна для тем с картинкой (Themes.cs). У встроенных картинки нет:
@@ -75,8 +96,8 @@
     -->
     <SolidColorBrush x:Key="BackdropImage" Color="Transparent" />
     <sys:Double x:Key="BackdropDim">1</sys:Double>
-    <SolidColorBrush x:Key="Chrome" Color="{StaticResource BackdropColor}" />
-    <SolidColorBrush x:Key="RailFill" Color="{StaticResource BackdropColor}" />
+    <SolidColorBrush x:Key="Chrome" Color="Transparent" />
+    <SolidColorBrush x:Key="RailFill" Color="#E60F1219" />
     <!-- Арт сбоку на «Главной» (Themes.cs): у встроенных тем картинки нет, колонка пуста. -->
     <SolidColorBrush x:Key="SideArt" Color="Transparent" />
     <ScaleTransform x:Key="UiScaleTransform" ScaleX="1" ScaleY="1" />

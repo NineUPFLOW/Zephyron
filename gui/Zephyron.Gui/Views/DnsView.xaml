@@ -362,10 +362,10 @@
                                                Margin="0,2,0,0" TextTrimming="CharacterEllipsis" MaxWidth="150" />
                                 </StackPanel>
 
-                                <!-- Выбранный — заполненный кружок, как у переключателя. -->
+                                <!-- Выбранный — заполненный квадратик, как у переключателя. -->
                                 <Grid Grid.Column="4" Width="20" Height="20" Margin="16,0,0,0" VerticalAlignment="Center">
-                                    <Ellipse Stroke="{Binding Edge}" StrokeThickness="1.6" />
-                                    <Ellipse Width="10" Height="10" Fill="{DynamicResource Accent}"
+                                    <Rectangle RadiusX="4" RadiusY="4" Stroke="{Binding Edge}" StrokeThickness="1.6" />
+                                    <Rectangle RadiusX="2" RadiusY="2" Width="10" Height="10" Fill="{DynamicResource Accent}"
                                              Visibility="{Binding MarkShown}" />
                                 </Grid>
 

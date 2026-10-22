@@ -87,7 +87,7 @@
         Подложку карточки (Card.Background) и оттенок (Plate.Background) ставит
         код при каждом показе — по настройкам «Меню в трее» в оформлении.
     -->
-    <Border x:Name="Card" Margin="14" CornerRadius="12" BorderThickness="1.5"
+    <Border x:Name="Card" Margin="14" CornerRadius="12" BorderThickness="1"
             BorderBrush="{DynamicResource Border}" Background="{DynamicResource Surface}"
             LayoutTransform="{DynamicResource UiScaleTransform}">
         <Border.Effect>
@@ -115,7 +115,7 @@
 
                 <!-- Главное — идёт ли обход; ради этого меню и открывают. -->
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <Ellipse x:Name="Dot" Width="8" Height="8" VerticalAlignment="Center"
+                    <Rectangle RadiusX="1" RadiusY="1" x:Name="Dot" Width="8" Height="8" VerticalAlignment="Center"
                              Fill="{DynamicResource Faint}" />
                     <TextBlock x:Name="State" Margin="7,0,0,0" FontWeight="SemiBold"
                                Foreground="{DynamicResource Text}" Text="Проверяю…" />

@@ -63,16 +63,22 @@ public sealed class ThemesTests
     }
 
     /// <summary>
-    /// Подпись главной кнопки — цвета OnAccent, а не общего цвета текста.
+    /// Подпись главной кнопки — цвета самой кнопки, а не общего цвета текста.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Стиль TextBlock без ключа красил весь текст в Text и перебивал цвет
     /// кнопки. В светлой теме SB с графитовой кнопкой подпись пропала вовсе
     /// (снимок владельца 24.09), а проверка читаемости сверяла OnAccent,
     /// которого окно не рисовало.
+    /// </para>
+    /// <para>
+    /// С 0.16 главная кнопка не залита акцентом, а светится им: подложка
+    /// AccentSoft, подпись — Accent. Сверяется то, что кнопка задаёт сама.
+    /// </para>
     /// </remarks>
     [Fact]
-    public void APrimaryButtonCaptionUsesOnAccent()
+    public void APrimaryButtonCaptionUsesTheButtonColour()
     {
         Sta.Run(() =>
         {
@@ -91,10 +97,10 @@ public sealed class ThemesTests
                 () => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
 
             var caption = Find<System.Windows.Controls.TextBlock>(button);
-            var onAccent = (SolidColorBrush)Application.Current.FindResource("OnAccent");
+            var accent = (SolidColorBrush)Application.Current.FindResource("Accent");
 
             Assert.NotNull(caption);
-            Assert.Equal(onAccent.Color, ((SolidColorBrush)caption!.Foreground).Color);
+            Assert.Equal(accent.Color, ((SolidColorBrush)caption!.Foreground).Color);
         });
     }
 

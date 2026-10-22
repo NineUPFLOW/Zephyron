@@ -183,6 +183,8 @@ public static class Themes
             dictionary[key] = Frozen(new SolidColorBrush(color));
         }
 
+        Derive(dictionary, theme);
+
         // Шрифт человека — один на всю программу (владелец, 24.09: «лучше
         // было бы, если бы на всю программу был один шрифт»): интерфейс,
         // заголовки и данные. «Как в теме» — шрифты темы, как задумано.
@@ -201,9 +203,11 @@ public static class Themes
         }
         dictionary["UiScaleTransform"] = Scale(look.Scale);
 
-        var backdrop = (Brush)dictionary["Backdrop"];
-
         dictionary["GlassImage"] = null;
+
+        // Сетка и свечения фона — только на сплошной подложке: поверх
+        // картинки темы они спорили бы с ней.
+        dictionary["Decor"] = theme.Background is not null && look.Background ? 0.0 : 1.0;
 
         if (theme.Background is { } background && look.Background)
         {
@@ -327,11 +331,45 @@ public static class Themes
             dictionary["BackdropImage"] = Frozen(new SolidColorBrush(Colors.Transparent));
             dictionary["SideArt"] = Frozen(new SolidColorBrush(Colors.Transparent));
             dictionary["BackdropDim"] = 1.0;
-            dictionary["Chrome"] = backdrop;
-            dictionary["RailFill"] = backdrop;
+
+            // Разделы прозрачные и на сплошной подложке: под ними сетка
+            // и свечения фона окна (Decor). Подложку рисует само окно.
+            dictionary["Chrome"] = Frozen(new SolidColorBrush(Colors.Transparent));
+
+            // Верхнее меню — плашка поверхности, почти непрозрачная: под ним
+            // прокручивается содержимое раздела.
+            var surface = theme[ThemeSlots.Surface];
+            dictionary["RailFill"] = Frozen(new SolidColorBrush(ToColor(surface with { A = Math.Min(surface.A, (byte)230) })));
         }
 
         return dictionary;
+    }
+
+    /// <summary>Доли прозрачности производных кистей — те же, что записаны в Palette.xaml.</summary>
+    private const byte SoftAlpha = 0x1F, LineAlpha = 0x61, StateSoftAlpha = 0x1A, DangerLineAlpha = 0x57, WarnLineAlpha = 0x4D, WashAlpha = 0x08, WashHoverAlpha = 0x12, LineStrongAlpha = 0x24;
+
+    /// <summary>
+    /// Полупрозрачные подложки и рамки из цветов состояния темы.
+    /// </summary>
+    /// <remarks>
+    /// Считаются, а не задаются в theme.json: тема художника о них не знает,
+    /// и требовать с неё ещё восемь цветов значило бы сломать все чужие темы.
+    /// Включённое светится своим цветом — у каждой темы своим.
+    /// </remarks>
+    private static void Derive(ResourceDictionary dictionary, Theme theme)
+    {
+        SolidColorBrush Tint(string slot, byte alpha) =>
+            Frozen(new SolidColorBrush(ToColor(theme[slot] with { A = alpha })));
+
+        dictionary["AccentSoft"] = Tint(ThemeSlots.Accent, SoftAlpha);
+        dictionary["AccentLine"] = Tint(ThemeSlots.Accent, LineAlpha);
+        dictionary["DangerSoft"] = Tint(ThemeSlots.Danger, StateSoftAlpha);
+        dictionary["DangerLine"] = Tint(ThemeSlots.Danger, DangerLineAlpha);
+        dictionary["WarnSoft"] = Tint(ThemeSlots.Warn, StateSoftAlpha);
+        dictionary["WarnLine"] = Tint(ThemeSlots.Warn, WarnLineAlpha);
+        dictionary["Wash"] = Tint(ThemeSlots.Text, WashAlpha);
+        dictionary["WashHover"] = Tint(ThemeSlots.Text, WashHoverAlpha);
+        dictionary["LineStrong"] = Tint(ThemeSlots.Text, LineStrongAlpha);
     }
 
     /// <summary>
