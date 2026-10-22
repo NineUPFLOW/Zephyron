@@ -240,17 +240,21 @@
                 <ToggleButton x:Name="MoreToggle" Style="{StaticResource NavMore}" VerticalAlignment="Center"
                               Content="Ещё" local:MenuIcon.Glyph="&#xE712;" Click="OnMoreToggle" />
 
-                <!--
-                    Журнал панелью снизу — кнопкой в меню, а не плавающей в углу
-                    окна (владелец, 22.10): в углу она закрывала кнопки мастера
-                    первого запуска и «Загрузить» в «Маршрутах». Открытая панель
-                    подсвечивает кнопку, как выбранный раздел.
-                -->
-                <Border Width="1" Height="18" Background="{DynamicResource Border}" Margin="6,0" VerticalAlignment="Center" />
-                <ToggleButton x:Name="LogButton" Style="{StaticResource NavMore}" VerticalAlignment="Center"
-                              Content="Журнал" local:MenuIcon.Glyph="&#xE8FD;"
-                              Click="OnLogToggle" ToolTip="Журналы движков — панелью снизу" />
             </StackPanel>
+        </Border>
+
+        <!--
+            Журнал — своей плашкой в правом верхнем углу, отдельно от меню
+            разделов (владелец, 22.10: в полосе рядом с «Ещё» его путали
+            с разделом, и мисскликов было бы много). Не в углу снизу: там
+            он закрывал кнопки мастера и «Загрузить» в «Маршрутах».
+            Открытая панель подсвечивает кнопку.
+        -->
+        <Border Grid.Row="0" x:Name="LogHost" Style="{StaticResource RailPanel}"
+                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,14,16,0">
+            <ToggleButton x:Name="LogButton" Style="{StaticResource NavMore}" VerticalAlignment="Center"
+                          Content="Журнал" local:MenuIcon.Glyph="&#xE8FD;"
+                          Click="OnLogToggle" ToolTip="Журналы движков — панелью снизу" />
         </Border>
 
         <Popup x:Name="MorePopup" PlacementTarget="{Binding ElementName=MoreToggle}" Placement="Bottom"

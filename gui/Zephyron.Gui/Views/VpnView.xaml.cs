@@ -75,7 +75,13 @@ public sealed record ServerRow(
     double Fade = 1,
 
     /// <summary>Метка «вне подбора» у имени: в колонке задержки она не помещалась.</summary>
-    Visibility ExcludedShown = Visibility.Collapsed)
+    Visibility ExcludedShown = Visibility.Collapsed,
+
+    /// <summary>Подпись метки: «вне подбора» и коротко почему.</summary>
+    string SkipLabel = "вне подбора",
+
+    /// <summary>Почему автоподбор не берёт этот сервер — подсказкой к метке.</summary>
+    string? SkipWhy = null)
 {
     /// <summary>Подпись под именем на узком окне: «Vless, адрес · замер …».</summary>
     public string Detail => $"{Protocol}, {Address}{Measured}";
@@ -1061,6 +1067,11 @@ public partial class VpnView : UserControl
         string owner,
         AppSettings settings)
     {
+        foreach (var server in servers)
+            _servers[server.Tag] = server;
+
+        NoteSkips(settings);
+
         var rows = servers.Select(server =>
         {
             var (country, name) = CountryTag.Split(server.Tag);
@@ -1117,6 +1128,9 @@ public partial class VpnView : UserControl
     {
         bool chosen = server.Tag == settings.PreferredServer;
         bool excluded = settings.AutoPickExcluded.Contains(server.Tag, StringComparer.Ordinal);
+        (string? Label, string? Why) skip = excluded
+            ? ("вне подбора", "Убран из автоподбора руками. Выбрать его можно; вернуть — в «⋯».")
+            : _skips.TryGetValue(server.Tag, out var why) ? why : default;
         bool known = server.Measurable || Seen(server.Tag) is not null;
 
         // Незамеряемого пробником меряет сам движок — и тогда у него обычный
@@ -1149,8 +1163,75 @@ public partial class VpnView : UserControl
             NowShown = running && live == server.Tag ? Visibility.Visible : Visibility.Collapsed,
             Edge = (Brush)FindResource(chosen ? "Accent" : "Border"),
             Fade = _paused ? 0.55 : 1,
-            ExcludedShown = excluded ? Visibility.Visible : Visibility.Collapsed,
+            ExcludedShown = skip.Label is null ? Visibility.Collapsed : Visibility.Visible,
+            SkipLabel = skip.Label ?? "вне подбора",
+            SkipWhy = skip.Why,
         };
+    }
+
+    /// <summary>Почему автоподбор не берёт сервер: тег — (метка, подсказка). Нет тега — берёт.</summary>
+    private readonly Dictionary<string, (string? Label, string? Why)> _skips = new(StringComparer.Ordinal);
+
+    /// <summary>Все серверы вкладки по тегу — отсев по входу, как у движка, идёт по всем подпискам разом.</summary>
+    private readonly Dictionary<string, ProxyServer> _servers = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Отмечает серверы, которых автоподбор не возьмёт, — и почему.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Жалоба 22.10: «почему он подключает сервер с 200 пингом, а не с 100».
+    /// Задержка в ленте — лишь одно из условий. Автоподбор движка
+    /// (SingBoxConfigCompiler.BuildOutbounds) сперва отсеивает отечественные
+    /// выходы при «Только зарубежные», молчавших и — при «Сначала
+    /// стабильные» — отвечающих через раз, а с одного входа берёт не больше
+    /// двух быстрейших. Сервер со 100 мс, выпавший по любому из этих правил,
+    /// в выборе не участвует, и без метки это выглядело ошибкой.
+    /// </para>
+    /// <para>
+    /// Правила — те же, что у движка (LooksDomestic, KeepPerEntry), чтобы
+    /// метка не разошлась с конфигом. Выключатели при этом действуют на
+    /// движок только с перезапуска: метки показывают выбор новой сборки.
+    /// </para>
+    /// </remarks>
+    private void NoteSkips(AppSettings settings)
+    {
+        var servers = _servers.Values.ToList();
+        _skips.Clear();
+
+        var left = new List<ProxyServer>();
+
+        foreach (var server in servers)
+        {
+            var seen = Seen(server.Tag);
+
+            (string, string)? why =
+                settings.ForeignExitsOnly && (server.IsSelfRegistering || SingBoxConfigCompiler.LooksDomestic(server.Tag))
+                    ? ("вне подбора · РФ", "Отечественный выход: при «Только зарубежные» автоподбор его не берёт — через него не открыть закрытое по стране. Выбрать руками можно.")
+                : seen is { Success: false }
+                    ? ("вне подбора · молчит", "Не ответил при последнем замере: автоподбор на молчащих не садится, пока они не ответят.")
+                : settings.StableFirst && seen is { Success: true, Flaky: true }
+                    ? ("вне подбора · мигает", "Отвечает через раз: при «Сначала стабильные» автоподбор его не берёт, даже если задержка ниже — соединения через него рвались бы.")
+                : null;
+
+            if (why is { } reason)
+                _skips[server.Tag] = reason;
+            else if (!server.IsSelfRegistering)
+                left.Add(server);
+        }
+
+        var keep = SingBoxConfigCompiler.KeepPerEntry(
+            left,
+            s => SingBoxConfigCompiler.EntryOf(s.Host, s.Port),
+            s => Seen(s.Tag)?.LatencyMs ?? double.MaxValue,
+            Math.Max(0, settings.AutoPickPerEntry));
+
+        foreach (var server in left.Where(s => !keep.Contains(s)))
+        {
+            _skips[server.Tag] = ("вне подбора · вход",
+                $"С одного входа ({server.Host}:{server.Port}) автоподбор берёт не больше {settings.AutoPickPerEntry} быстрейших, "
+                + "чтобы не бить продавца пачкой проверок. Этот сюда не попал; выбрать руками можно.");
+        }
     }
 
     /// <summary>
@@ -1393,6 +1474,9 @@ public partial class VpnView : UserControl
     {
         var settings = AppSettings.Load(AppSettings.DefaultPath);
         _stableFirst = settings.StableFirst;
+
+        // Замер или выключатель мог сменить, кого автоподбор возьмёт.
+        NoteSkips(settings);
 
         // Выходы WARP живут в карточке, а не в списке, и общий обход строк
         // их не касается — пересобираем отдельно, иначе замер по ним виден
@@ -1740,10 +1824,12 @@ public partial class VpnView : UserControl
             settings.Save(AppSettings.DefaultPath);
 
             ShowPick(settings);
+            Reshow();
 
-            Status.Text = settings.ForeignExitsOnly
+            Status.Text = (settings.ForeignExitsOnly
                 ? "Автоподбор берёт только зарубежные выходы."
-                : "Автоподбор берёт любые выходы, включая отечественные.";
+                : "Автоподбор берёт любые выходы, включая отечественные.")
+                + (EngineControl.IsRunning ? " Подействует после перезапуска движков." : string.Empty);
 
             this.Offer("Отбор серверов изменён");
         }
@@ -3116,9 +3202,13 @@ public partial class VpnView : UserControl
 
             Reshow();
 
-            Status.Text = settings.StableFirst
+            // Выключатель меняет конфиг движка: работающие движки узнают
+            // о нём только с перезапуска (жалоба 22.10: «что включено, что
+            // выключено» — разницы не было, пока не перезапустили).
+            Status.Text = (settings.StableFirst
                 ? "Сначала стабильные: мигающие серверы — мимо автоподбора и после стабильных в ленте."
-                : "Только по задержке: мигающие серверы — наравне со всеми.";
+                : "Только по задержке: мигающие серверы — наравне со всеми.")
+                + (EngineControl.IsRunning ? " Подействует после перезапуска движков." : string.Empty);
 
             this.Offer("Отбор серверов изменён");
         }

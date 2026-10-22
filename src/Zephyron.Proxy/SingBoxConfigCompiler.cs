@@ -1594,7 +1594,7 @@ public sealed class SingBoxConfigCompiler
     /// всё равно спрашивает отдельно и говорит, если та не та.
     /// </para>
     /// </remarks>
-    internal static bool LooksDomestic(string tag) =>
+    public static bool LooksDomestic(string tag) =>
         tag.Contains("🇷🇺", StringComparison.Ordinal)
         || tag.Contains("Россия", StringComparison.OrdinalIgnoreCase)
         || tag.Contains("Russia", StringComparison.OrdinalIgnoreCase);
@@ -2015,16 +2015,39 @@ public sealed class SingBoxConfigCompiler
         if (options.AutoPickPerEntry <= 0)
             return [.. servers];
 
-        double Rank(ProxyServer s) =>
-            options.KnownLatency.TryGetValue(s.Tag, out var ms) ? ms : double.MaxValue;
-
-        var keep = servers
-            .GroupBy(s => $"{s.Host.Trim().ToLowerInvariant()}:{s.Port}")
-            .SelectMany(g => g.OrderBy(Rank).Take(options.AutoPickPerEntry))
-            .ToHashSet();
+        var keep = KeepPerEntry(
+            servers,
+            s => EntryOf(s.Host, s.Port),
+            s => options.KnownLatency.TryGetValue(s.Tag, out var ms) ? ms : double.MaxValue,
+            options.AutoPickPerEntry);
 
         // Порядок подписки сохраняется: по нему идут и замер, и показ.
         return servers.Where(keep.Contains).ToList();
+    }
+
+    /// <summary>Вход сервера — адрес и порт: всё, что на одном, для продавца одно подключение.</summary>
+    public static string EntryOf(string host, int port) => $"{host.Trim().ToLowerInvariant()}:{port}";
+
+    /// <summary>
+    /// Кто остаётся в автоподборе после отсева по входу: не больше
+    /// <paramref name="perEntry"/> быстрейших с одного входа.
+    /// </summary>
+    /// <remarks>
+    /// Общее правило для конфига движка (<see cref="CapPerEntry"/>) и для окна:
+    /// вкладка VPN по нему же говорит, почему сервер не в автоподборе, —
+    /// своя копия условия разошлась бы с движком молча.
+    /// </remarks>
+    public static HashSet<T> KeepPerEntry<T>(IEnumerable<T> items, Func<T, string> entry, Func<T, double> latency, int perEntry)
+    {
+        var all = items.ToList();
+
+        if (perEntry <= 0)
+            return [.. all];
+
+        return all
+            .GroupBy(entry)
+            .SelectMany(g => g.OrderBy(latency).Take(perEntry))
+            .ToHashSet();
     }
 
     /// <summary>Пулы, в которые ведёт хоть одно действующее правило «через VPN».</summary>

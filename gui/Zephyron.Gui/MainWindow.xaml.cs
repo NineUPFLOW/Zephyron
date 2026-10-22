@@ -646,7 +646,11 @@ public partial class MainWindow : Window
         if (Nav is null || Root.ActualWidth <= 0)
             return;
 
-        double room = Root.ActualWidth - Nav.Margin.Left - Nav.Margin.Right - NavRoom;
+        // Меню стоит по центру, а журнал — плашкой справа: место меню —
+        // ширина окна без плашки журнала с обеих сторон, иначе центр
+        // наехал бы на неё.
+        double side = LogHost is null ? 0 : LogHost.ActualWidth + LogHost.Margin.Right + NavRoom;
+        double room = Root.ActualWidth - 2 * side - NavRoom;
 
         if (!_navCompact)
         {

@@ -315,8 +315,8 @@
                                         <Border CornerRadius="8" Padding="8,1" Margin="8,0,0,0" VerticalAlignment="Center"
                                                 BorderBrush="{DynamicResource Border}" BorderThickness="1"
                                                 Visibility="{Binding ExcludedShown}"
-                                                ToolTip="Автоподбор его не берёт; выбрать руками можно. Вернуть — в «⋯»">
-                                            <TextBlock Text="вне подбора" FontSize="12" Foreground="{DynamicResource Muted}" />
+                                                ToolTip="{Binding SkipWhy}">
+                                            <TextBlock Text="{Binding SkipLabel}" FontSize="12" Foreground="{DynamicResource Muted}" />
                                         </Border>
                                     </StackPanel>
                                 </Grid>

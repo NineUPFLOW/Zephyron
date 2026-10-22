@@ -13,9 +13,9 @@
 # Раннер ubuntu, а не windows, хотя программа для Windows. Сам exe собирается
 # кроссплатформенно: `dotnet publish -r win-x64 --self-contained` кладёт в
 # архив и .NET, и WPF-части, и результат не зависит от того, где шла сборка.
-# Движки (sing-box, tg-ws-proxy, winws2, набор Zapret) скачиваются из своих
-# выпусков — раньше это делал pack.cmd из локальной установки Zapret, и оттого
-# выпуск можно было собрать только на машине владельца.
+# Движки (sing-box, tg-ws-proxy, winws2) скачиваются из своих выпусков, а файлы
+# Zapret GUI (lua, списки, образцы пакетов, фильтры, каталог адресов) берутся
+# из своей копии в vendor/zapret-gui — той же, что у pack.cmd и build.cmd.
 #
 # pack.cmd остаётся: он собирает то же самое на Windows из локальных движков.
 # Этот файл — тот же путь, но без установки Zapret и без Windows.
@@ -44,9 +44,6 @@ env:
   SINGBOX_DIR: sing-box-1.14.3-extended-2.7.3-windows-amd64
   TGWS_URL: https://github.com/valnesfjord/tg-ws-proxy-rs/releases/download/v2.5.6/tg-ws-proxy-x86_64-pc-windows-gnu.zip
   WINWS2_URL: https://git.zapret.moe/zapretdiscordyoutube/zapret2-fork/releases/download/v1.0.5.2-41-g204fd66-native-3-g9528c5b-native/winws2.exe
-  # Набор Zapret (exe, lua, bin, lists, windivert.filter) одним зеркалом.
-  ZAPRET_REPO: https://github.com/krambovic/Lumen.git
-  ZAPRET_PATH: windows/zapret
 
 jobs:
   release:
@@ -92,9 +89,7 @@ jobs:
           curl -fsSL -o dl/winws2.exe "$WINWS2_URL"
           unzip -q dl/singbox.zip -d dl/singbox
           unzip -q dl/tgws.zip -d dl/tgws
-          git clone --depth 1 --filter=blob:none --sparse -q "$ZAPRET_REPO" dl/lumen
-          git -C dl/lumen sparse-checkout set "$ZAPRET_PATH"
-          echo "sing-box, tg-ws-proxy, winws2 и набор Zapret на месте."
+          echo "sing-box, tg-ws-proxy и winws2 на месте."
 
       - name: Собрать архив
         env:
@@ -104,7 +99,14 @@ jobs:
           ROOT="$PWD"
           STAGE="$ROOT/stage/Zephyron"
           Z="$STAGE/engines/zapret"
-          K="$ROOT/dl/lumen/$ZAPRET_PATH"
+          # Файлы Zapret GUI — своей копией в репозитории (ZapretGuiCopy):
+          # то, что в неё не взято (winws.exe, stop.bat, dnscrypt-proxy,
+          # пользовательские списки), в архив не едет.
+          K="$ROOT/vendor/zapret-gui"
+          if [ ! -d "$K/lists" ]; then
+            echo "Отказ: нет vendor/zapret-gui — архив вышел бы без десинка." >&2
+            exit 1
+          fi
 
           # Настройки: шаблоны, а не рабочий файл — в нём лежит ссылка подписки.
           mkdir -p "$STAGE/config/lists"
@@ -139,16 +141,20 @@ jobs:
           cp -r "$ROOT/dl/singbox/$SINGBOX_DIR/." "$STAGE/engines/sing-box/"
           cp "$ROOT/dl/tgws/tg-ws-proxy.exe" "$STAGE/engines/tg-ws-proxy/tg-ws-proxy.exe"
 
-          # Из exe\ Zapret не берём то, что не читается: прежний winws.exe,
-          # дубль Monkey64.sys, stop.bat чужой оболочки, её dnscrypt-proxy.
           mkdir -p "$Z/exe"
           cp -r "$K/exe/." "$Z/exe/"
-          rm -f "$Z/exe/winws.exe" "$Z/exe/aaaaaaaaa1" "$Z/exe/stop.bat" \
-                "$Z/exe/dnscrypt-proxy.exe" "$Z/exe/dnscrypt-proxy.LICENSE.txt"
           cp -r "$K/lua" "$Z/lua"
           cp -r "$K/bin" "$Z/bin"
           cp -r "$K/lists" "$Z/lists"
           cp -r "$K/windivert.filter" "$Z/windivert.filter"
+          cp -r "$K/system" "$Z/system"
+
+          # Пользовательские списки Zapret GUI учатся на просмотре сайтов
+          # одной машины — им в архиве не место.
+          if [ -e "$Z/lists/user" ]; then
+            echo "Отказ: engines/zapret/lists/user — личные списки, уберите их из vendor/zapret-gui." >&2
+            exit 1
+          fi
 
           # Родной winws2 вместо cygwin-сборки: тот же движок, но cygwin1.dll
           # не нужен, и в архив не едет 3 МБ LGPL-рантайма без потребителя.
@@ -160,17 +166,16 @@ jobs:
             cp "$f" "$Z/lists/zy-$(basename "$f")"
           done
 
+          # Свои образцы пакетов (--blob=) — рядом с движком, с той же
+          # приставкой zy-: рецепты-приветствия без них не поднимутся.
+          for f in "$ROOT"/config/blobs/*.bin; do
+            cp "$f" "$Z/bin/zy-$(basename "$f")"
+          done
+
           cp "$ROOT/docs/licenses/zapret-MIT.txt" "$Z/LICENSE.txt"
           cp "$ROOT/docs/licenses/zapretgui-MIT.txt" "$Z/LICENSE-ZapretGUI.txt"
           cp "$ROOT/docs/licenses/flowseal-MIT.txt" "$Z/LICENSE-Flowseal.txt"
-
-          # Каталог адресов из установки Zapret: имя — адреса, по которым
-          # сервис отвечал. Без него у окна пина нет раздела «сервисы
-          # каталога» — остаются только живой подбор и наш каталог. Файл
-          # собран на машине с установленным Zapret и положен в
-          # dist-template\; установщик его извлечь не даёт.
-          mkdir -p "$Z/system"
-          cp "$ROOT/dist-template/hosts_catalog.sqlite3" "$Z/system/hosts_catalog.sqlite3"
+          cp "$ROOT/docs/licenses/windivert-LICENSE.txt" "$Z/LICENSE-WinDivert.txt"
 
           # Личное не должно попасть в архив: подписка — это пароль,
           # отчёты и runtime описывают сеть этой машины.
