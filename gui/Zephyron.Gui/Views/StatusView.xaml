@@ -230,6 +230,7 @@
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
 
                                 <!-- Два знака друг над другом: при смене состояния один гаснет, другой проявляется (160 мс). -->
@@ -261,7 +262,9 @@
 
                                 <!--
                                     «Остановить ▾»: рядом с кнопкой — меню с перезапуском
-                                    и двумя выходами, как в трее. Счётчики движков — под кнопкой.
+                                    и двумя выходами, как в трее. В колонке — только кнопки:
+                                    её ширина берётся по содержимому и отнимается у слова
+                                    и пояснения слева.
                                 -->
                                 <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
                                     <Grid HorizontalAlignment="Right">
@@ -281,17 +284,22 @@
                                             </Button>
                                         </StackPanel>
                                     </Grid>
-
-                                    <!-- Процессор в долях ядра, память и трафик туннеля с запуска. Только пока обход идёт. -->
-                                    <TextBlock x:Name="EngineMeters" Style="{StaticResource MonoTag}" HorizontalAlignment="Right"
-                                               Margin="0,8,0,0" Visibility="Collapsed" />
                                 </StackPanel>
+
+                                <!--
+                                    Процессор в долях ядра, память и трафик туннеля с запуска. Только
+                                    пока обход идёт. Своей строкой на всю ширину, а не под кнопкой:
+                                    там строка в ~370 точек раздвигала колонку кнопок, и на средней
+                                    ширине окна слово «Работает» и пояснение сжимались в столбик (25.10).
+                                -->
+                                <TextBlock Grid.Row="1" Grid.ColumnSpan="3" x:Name="EngineMeters" Style="{StaticResource MonoTag}"
+                                           Margin="56,10,0,0" TextTrimming="CharacterEllipsis" Visibility="Collapsed" />
 
                                 <!--
                                     Трассы (FlowLanes): какие пути от компьютера к сети открыты
                                     сейчас и как бежит по ним трафик. Знак «Главной» Zephyron.
                                 -->
-                                <views:FlowLanes Grid.Row="1" Grid.ColumnSpan="3" x:Name="Lanes" Margin="0,16,0,0"
+                                <views:FlowLanes Grid.Row="2" Grid.ColumnSpan="3" x:Name="Lanes" Margin="0,16,0,0"
                                                  AutomationProperties.Name="Пути трафика: десинк, напрямую, туннель" />
                             </Grid>
                         </Grid>
@@ -483,12 +491,13 @@
                                     Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}"
                                     BorderThickness="{StaticResource Stroke}"
                                     Visibility="{Binding Visibility, ElementName=EnginesLine}">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE7BA;" FontSize="13"
+                                <!-- DockPanel, а не горизонтальная стопка: в ней ширина бесконечна и текст не переносится. -->
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Left" Style="{StaticResource LineGlyph}" Text="&#xE7BA;" FontSize="13"
                                                Foreground="{DynamicResource Warn}" Margin="0,0,10,0" VerticalAlignment="Top" />
                                     <TextBlock x:Name="EnginesLine" FontSize="11.5" Foreground="{DynamicResource Warn}"
                                                TextWrapping="Wrap" Visibility="Collapsed" />
-                                </StackPanel>
+                                </DockPanel>
                             </Border>
                         </StackPanel>
                     </Border>
