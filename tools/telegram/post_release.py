@@ -5,9 +5,10 @@
 и переводит его в HTML, который понимает Bot API: Telegram не читает
 Markdown GitHub (## заголовки, **жирный**).
 
-Пост короткий (владелец, 26.09): разделы и заголовки пунктов, без пояснений,
-и ссылка на выпуск, где полный текст, хэши и архив. Хвост «Чем это собрано
-и как сверить» в пост не идёт вовсе.
+Пост короткий (владелец, 26.09 и 25.10): шапка со сводкой и два списка,
+«Новое» и «Исправлено», в сворачиваемых цитатах; пункт — одной фразой
+с разделом впереди. Под постом кнопки «Скачать» и «Поддержать». Хвост
+«Чем это собрано и как сверить» в пост не идёт вовсе.
 
 Запуск руками, без отправки:
     RELEASE_BODY="$(cat notes.md)" RELEASE_TAG=v0.8.7 python post_release.py --dry-run
@@ -41,6 +42,27 @@ FOOTER = "## Чем это собрано"
 # донат — менять и здесь.
 DONATE_URL = "https://tips.tips/ru/000487908"
 
+# Вид изменений по заголовку «### Новое:» (или «## Новое:» до 0.14.0).
+KINDS = {
+    "новое": "new",
+    "исправления": "fixed",
+    "исправлено": "fixed",
+    "удаления": "removed",
+    "удалено": "removed",
+}
+
+TITLES = {
+    "new": "✨ <b>Новое</b>",
+    "fixed": "🛠 <b>Исправлено</b>",
+    "removed": "🗑 <b>Убрано</b>",
+}
+
+# Раздел, которому в посте имя не нужно: «Общее» читается и без него.
+NO_AREA = {"общее"}
+
+# Пункт длиннее — обрезается многоточием: пост — сводка, полный текст по кнопке.
+ITEM_MAX = 110
+
 
 def inline(text: str) -> str:
     """Экранирует HTML и переводит **жирный** и `код` в теги Telegram."""
@@ -50,54 +72,42 @@ def inline(text: str) -> str:
     return text
 
 
-def convert(body: str) -> list[str]:
+def item_text(block: str) -> str | None:
     """
-    Примечания выпуска — коротко: разделы и заголовки пунктов, без пояснений.
+    Пункт одной целой фразой, без разметки.
 
-    Владелец 26.09: пост с полным текстом в канале выглядел громадой. От
-    пункта «**Свои DNS.** В разделе «DNS» можно…» остаётся «• Свои DNS»,
-    а всё остальное — по ссылке на выпуск. Абзацы без жирного начала —
-    пояснения, в пост не идут.
+    «**Свои DNS.** В разделе…» — берётся жирное начало: оно и есть суть. Но
+    если фраза продолжается за жирным («**Прямые проверки** больше не уходят…»,
+    «**Выключенные анимации гаснут сразу,** без перезапуска»), одно начало
+    обрывалось на полуслове (владелец, 25.10) — тогда первое предложение целиком.
+    Абзац без жирного начала — пояснение, в пост не идёт.
     """
-    notes = body.split(FOOTER, 1)[0]
+    lead = re.match(r"\*\*(.+?)\*\*\s*(.*)", block, re.S)
 
-    # Абзац поста — раздел (## …) со всем, что под ним: заголовок сразу
-    # над списком. С 0.14.0 разделы — части программы («## Десинк»), а вид
-    # изменений под ними — «### Новое:», «### Исправления:», «### Удаления:»;
-    # он идёт строкой курсивом внутри абзаца раздела. В чейнджлогах до 0.14.0
-    # «## Новое:» — сам раздел, и пост выходит прежним.
-    groups: list[list[str]] = []
+    if not lead:
+        return None
 
-    def add(line: str, new_group: bool = False) -> None:
-        if new_group or not groups:
-            groups.append([])
-        groups[-1].append(line)
+    bold, rest = lead.group(1).strip(), lead.group(2).strip()
 
-    for raw in re.split(r"\n\s*\n", notes.replace("\r\n", "\n")):
-        block = raw.strip()
+    if bold.endswith(",") or (rest and rest[0].islower()):
+        plain = re.sub(r"\*\*|`", "", block).replace("\n", " ")
+        text = re.split(r"(?<=[.!?])\s", plain, maxsplit=1)[0]
+    else:
+        text = bold
 
-        if not block:
-            continue
+    text = text.strip().rstrip(".,:;").strip()
 
-        # «# Что нового» — заголовок самих примечаний; в посте его место
-        # занимает название выпуска.
-        if block.startswith("# "):
-            continue
+    if len(text) > ITEM_MAX:
+        text = text[: ITEM_MAX - 1].rstrip() + "…"
 
-        if block.startswith("### "):
-            add(f"<i>{inline(heading(block[4:]))}</i>")
-            continue
+    return text
 
-        if block.startswith("## "):
-            add(f"<b>{inline(heading(block[3:]))}</b>", new_group=True)
-            continue
 
-        lead = re.match(r"\*\*(.+?)\*\*", block)
-
-        if lead:
-            add("• " + inline(lead.group(1).strip().rstrip(".")))
-
-    return ["\n".join(group) for group in groups]
+def lowered(text: str) -> str:
+    """После имени раздела — со строчной: «VPN: компактнее». «Hysteria2», «IP» — как есть."""
+    if len(text) > 1 and ("А" <= text[0] <= "Я" or text[0] == "Ё") and text[1].islower():
+        return text[0].lower() + text[1:]
+    return text
 
 
 def heading(text: str) -> str:
@@ -105,31 +115,101 @@ def heading(text: str) -> str:
     return re.sub(r"^\d+(\.\d+)*\.?\s+", "", text.strip()).rstrip(":").strip()
 
 
+def convert(body: str) -> dict[str, list[str]]:
+    """
+    Примечания выпуска сводкой: пункты по виду изменений, раздел — в начале пункта.
+
+    С 0.14.0 разделы — части программы («## Десинк»), а вид — «### Новое:».
+    В посте наоборот: списки «Новое» и «Исправлено», а раздел — в пункте
+    («VPN: компактнее»). Раньше пост повторял «Новое/Исправления» под каждым
+    разделом и выходил лентой на экран (владелец, 25.10). Чейнджлоги до 0.14.0,
+    где «## Новое:» — сам раздел, читаются так же, без раздела в пункте.
+    """
+    notes = body.split(FOOTER, 1)[0]
+    lists: dict[str, list[str]] = {"new": [], "fixed": [], "removed": []}
+    area: str | None = None
+    kind = "new"
+
+    for raw in re.split(r"\n\s*\n", notes.replace("\r\n", "\n")):
+        block = raw.strip()
+
+        if not block or block.startswith("# "):
+            continue
+
+        if block.startswith("#"):
+            title = heading(block.lstrip("#"))
+            known = KINDS.get(title.lower())
+
+            if known:
+                kind = known
+                if block.startswith("## "):
+                    area = None
+            elif block.startswith("## "):
+                area = None if title.lower() in NO_AREA else title
+                kind = "new"
+            continue
+
+        text = item_text(block)
+
+        if text:
+            lists[kind].append(inline(f"{area}: {lowered(text)}" if area else text))
+
+    return lists
+
+
 def compose(body: str, tag: str, url: str) -> str:
+    """
+    Пост: шапка со сводкой и списки в сворачиваемых цитатах.
+
+    Сворачиваемая цитата (Bot API 7.4) в ленте показывает пару строк, весь
+    список — по нажатию: пост короткий, и ничего не теряется. Ссылка на выпуск —
+    кнопкой под постом (send), а не строкой в тексте.
+    """
     version = tag.lstrip("v")
-    head = f"<b>Zephyron {html.escape(version)}</b>"
+    lists = convert(body)
 
-    # Хэш архива — на странице выпуска, в канале он только добавлял длины.
-    tail = [f'<a href="{html.escape(url, quote=True)}">Полный список изменений и скачивание — на GitHub</a>']
+    counts = []
+    if lists["new"]:
+        counts.append(f"новое: {len(lists['new'])}")
+    if lists["fixed"]:
+        counts.append(f"исправлено: {len(lists['fixed'])}")
 
-    blocks = convert(body)
-    ending = "\n\n".join(tail)
+    head = f"🚀 <b>Zephyron {html.escape(version)}</b>"
+    if counts:
+        head += "\n" + " · ".join(counts)
 
-    # Не влезает — режем по абзацам, а не посреди тега: разорванный <b>
-    # Telegram отвергнет всё сообщение целиком.
-    while blocks:
-        text = "\n\n".join([head, *blocks, ending])
+    def build(limit: int | None) -> str:
+        parts = [head]
 
-        if len(text) <= LIMIT:
-            return text
+        for kind in ("new", "fixed", "removed"):
+            items = lists[kind]
 
-        blocks.pop()
-        ending = "…полностью — на GitHub.\n\n" + "\n\n".join(tail)
+            if not items:
+                continue
 
-    return "\n\n".join([head, ending])
+            shown = items if limit is None else items[:limit]
+            lines = "\n".join("• " + item for item in shown)
+
+            if len(shown) < len(items):
+                lines += f"\n…и ещё {len(items) - len(shown)} — по кнопке «Скачать»"
+
+            parts.append(f"{TITLES[kind]}\n<blockquote expandable>{lines}</blockquote>")
+
+        return "\n\n".join(parts)
+
+    # Не влезает — меньше пунктов в каждом списке, а не обрыв посреди тега:
+    # разорванный <b> Telegram отвергнет всё сообщение целиком.
+    text = build(None)
+    limit = max((len(items) for items in lists.values()), default=0)
+
+    while len(text) > LIMIT and limit > 1:
+        limit -= 1
+        text = build(limit)
+
+    return text
 
 
-def send(text: str) -> None:
+def send(text: str, url: str) -> None:
     token = os.environ["TELEGRAM_BOT_TOKEN"]
     chat = os.environ["TELEGRAM_CHAT_ID"]
     thread = os.environ.get("TELEGRAM_THREAD_ID", "").strip()
@@ -139,9 +219,12 @@ def send(text: str) -> None:
         "text": text,
         "parse_mode": "HTML",
         "disable_web_page_preview": "true",
-        # Кнопка под сообщением, а не ссылка в тексте: так её видно сразу,
+        # Кнопки под сообщением, а не ссылки в тексте: так их видно сразу,
         # и пост не удлиняется.
-        "reply_markup": json.dumps({"inline_keyboard": [[{"text": "💛 Поддержать", "url": DONATE_URL}]]}),
+        "reply_markup": json.dumps({"inline_keyboard": [[
+            {"text": "📥 Скачать", "url": url},
+            {"text": "💛 Поддержать", "url": DONATE_URL},
+        ]]}),
     }
 
     # Канал — форум: без номера темы пост уходит в общую ленту, а не
@@ -184,11 +267,11 @@ def main() -> None:
 
     if "--dry-run" in sys.argv:
         print(text)
-        print(f"\n[кнопка под постом: 💛 Поддержать → {DONATE_URL}]")
+        print(f"\n[кнопки под постом: 📥 Скачать → {url} · 💛 Поддержать → {DONATE_URL}]")
         print(f"[{len(text)} символов из {LIMIT}]")
         return
 
-    send(text)
+    send(text, url)
 
 
 if __name__ == "__main__":
