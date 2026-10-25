@@ -806,8 +806,8 @@ TUN. Нужна именно extended: обычный sing-box не знает x
 **4. tg-ws-proxy-rs** — для вкладки «TG Proxy». Сборку
 `tg-ws-proxy-x86_64-pc-windows-gnu.zip` с
 [valnesfjord/tg-ws-proxy-rs](https://github.com/valnesfjord/tg-ws-proxy-rs/releases)
-распаковать с файлом `LICENSE` в `tools\tg-ws-proxy-rs-<версия>\`; проверялось
-на 2.5.6. `build.cmd` соберёт и без него, `pack.cmd` — нет.
+распаковать с файлом `LICENSE` в `tools\tg-ws-proxy-rs-<версия>\`; в выпуске
+2.5.6. `build.cmd` соберёт и без него, `pack.cmd` — нет.
 
 Без sing-box работает всё, кроме VPN. Без Zapret — всё, кроме десинка. Без
 прокси — всё, кроме вкладки «TG Proxy». Что именно нашлось, показывает раздел
