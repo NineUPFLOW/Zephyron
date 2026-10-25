@@ -45,10 +45,11 @@ Zephyron — самостоятельный проект: свой интерф�
 
 <img width="1917" height="1034" alt="image" src="https://github.com/user-attachments/assets/b091489d-d824-4bbe-9458-62782e34d238" />
 
-## Благодарности
+## 💜 Благодарности
 
-Спасибо [RixyPow](https://github.com/RixyPow) за NetZapret — с его
-исходников под MIT когда-то начинался Zephyron.
+> [!NOTE]
+> **Спасибо [RixyPow](https://github.com/RixyPow)** — автору NetZapret.
+> С его открытых исходников под MIT когда-то начинался Zephyron.
 
 ## Установка
 
