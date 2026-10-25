@@ -27,10 +27,12 @@
          а голое число для него неподходящего вида — «"12" не является
          допустимым значением для свойства "CornerRadius"», — и это роняло
          разбор шаблона, как раньше дробная толщина (см. Stroke). -->
-    <CornerRadius x:Key="RSm">8</CornerRadius>
-    <CornerRadius x:Key="RMd">10</CornerRadius>
-    <CornerRadius x:Key="RLg">16</CornerRadius>
-    <CornerRadius x:Key="RXL">20</CornerRadius>
+    <!-- С 0.18 скругления вдвое мельче: 4/6/8 — мера Windows 11. Крупные
+         радиусы при плотном окне превращали каждую строку в «таблетку». -->
+    <CornerRadius x:Key="RSm">4</CornerRadius>
+    <CornerRadius x:Key="RMd">6</CornerRadius>
+    <CornerRadius x:Key="RLg">8</CornerRadius>
+    <CornerRadius x:Key="RXL">12</CornerRadius>
     <!-- С 0.16 «таблетка» — не овал, а метка с малым скруглением:
          овальные плашки владелец 22.10 назвал «бредом». -->
     <CornerRadius x:Key="RPill">4</CornerRadius>
@@ -45,18 +47,22 @@
     <sys:Double x:Key="S6">32</sys:Double>
 
     <!-- Размеры оболочки окна: предел ширины содержимого «Главной»
-         и знак программы в верхнем меню. -->
-    <sys:Double x:Key="ContentMax">1080</sys:Double>
-    <sys:Double x:Key="MarkSize">28</sys:Double>
+         и знак программы в командной полосе. -->
+    <sys:Double x:Key="ContentMax">1120</sys:Double>
+    <sys:Double x:Key="MarkSize">22</sys:Double>
 
-    <!-- Поля страницы раздела: шире горизонталь, чем вертикаль, — так
-         карточки стоят по центру взгляда, а не упираются в края. Сверху
-         поле занимает верхнее меню, оно висит над разделом. -->
-    <Thickness x:Key="PagePad">32,28,32,28</Thickness>
-    <Thickness x:Key="CardPad">24,20,24,20</Thickness>
+    <!-- Высоты: элемент управления (кнопки, поля, списки), мелкая строка
+         (таблицы, пункты меню; для касания не ниже 24) и командная полоса. -->
+    <sys:Double x:Key="HControl">32</sys:Double>
+    <sys:Double x:Key="HControlSm">28</sys:Double>
+    <sys:Double x:Key="NavHeight">52</sys:Double>
 
-    <!-- Верхнее меню от верхнего края окна: висит, а не прилегает. -->
-    <Thickness x:Key="NavInset">16,14,16,0</Thickness>
+    <!-- Поля страницы раздела. Плотнее прежних: окно рассчитано на 880 точек. -->
+    <Thickness x:Key="PagePad">24,20,24,24</Thickness>
+    <Thickness x:Key="CardPad">16,14,16,14</Thickness>
+
+    <!-- Поля командной полосы по краям окна. -->
+    <Thickness x:Key="NavInset">14,0,14,0</Thickness>
 
     <!-- Толщина линий и рамок. Тонкая для разделителей, обычная для границ.
          Ровно Thickness, а не Double: WPF подставляет число в BorderThickness,
@@ -68,5 +74,7 @@
     <!-- С 0.16 рамки волосяные, как разделители: карточку отделяет
          от подложки цвет рамки, а не её толщина. -->
     <Thickness x:Key="Stroke">1</Thickness>
+    <!-- Толщина рамки фокуса клавиатуры (FocusRing). -->
+    <Thickness x:Key="FocusWidth">2</Thickness>
 
 </ResourceDictionary>

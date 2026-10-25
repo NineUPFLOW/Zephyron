@@ -567,6 +567,7 @@ public partial class RoutesView : UserControl
     public RoutesView()
     {
         InitializeComponent();
+        StatusLook.Attach(StatusBox, Status, StatusMark);
 
         // Список, вставленный в поле поиска, — в окно «Добавить списком» (RoutesView.List).
         DataObject.AddPastingHandler(Search, OnSearchPaste);

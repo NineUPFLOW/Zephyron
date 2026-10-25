@@ -323,8 +323,19 @@ public partial class RecipeWindow : Window
     private void Say(string text, string colour = "Muted", string mark = "•")
     {
         Status.Text = text;
-        StatusMark.Text = mark;
-        StatusMark.Foreground = (Brush)FindResource(colour);
+
+        // Знак состояния вместо знака шрифта: «◐» — идёт проверка, остальное — по цвету сообщения.
+        StatusMark.Tag = mark == "◐" ? "Starting" : colour switch
+        {
+            "Success" => "Running",
+            "Warn" => "Degraded",
+            "Danger" => "Failed",
+            _ => "Off",
+        };
+
+        // Ошибка — на подложке DangerSoft, как ErrorState; остальное — нейтрально.
+        StatusCard.SetResourceReference(Border.BackgroundProperty, colour == "Danger" ? "DangerSoft" : "Raised");
+        StatusCard.SetResourceReference(Border.BorderBrushProperty, colour == "Danger" ? "DangerLine" : "Border");
         StatusCard.Visibility = Visibility.Visible;
     }
 
@@ -426,7 +437,7 @@ public partial class RecipeWindow : Window
             if (await OpensAsync(_domain, _work.Token) is { Passed: true } bare)
             {
                 Say($"{_domain} открывается и без десинка — {Verdict(bare, TimeSpan.Zero)}. "
-                    + "Рецепт ему не нужен, берите «решает пресет».", "Accent", "✓");
+                    + "Рецепт ему не нужен, берите «решает пресет».", "Success", "✓");
 
                 return;
             }
@@ -466,9 +477,9 @@ public partial class RecipeWindow : Window
                 // фильтр, но не пришедшая страница, и валить его в одну
                 // кучу с отказом так же неверно, как с успехом.
                 row.VerdictColour = (Brush)FindResource(
-                    flow.Page ? "Accent" : ok ? "Warn" : "Danger");
+                    flow.Page ? "Success" : ok ? "Warn" : "Danger");
 
-                row.Edge = (Brush)FindResource(ok ? "Accent" : "Border");
+                row.Edge = (Brush)FindResource(ok ? "AccentLine" : "Border");
 
                 if (ok)
                     worked++;
@@ -493,7 +504,7 @@ public partial class RecipeWindow : Window
                 if (best.Current)
                     sovet += " Его пресет и так применяет: менять нечего.";
 
-                Say(sovet, "Accent", "✓");
+                Say(sovet, "Success", "✓");
             }
         }
         catch (OperationCanceledException)

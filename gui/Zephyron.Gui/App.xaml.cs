@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Threading;
 using Zephyron.Core;
 using Zephyron.Supervisor;
@@ -43,6 +44,12 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // «Сигнал»: подсказка через 400 мс (по умолчанию 1000), глобально; и
+        // выключатель движения для шаблонов (Motion.Still) — до первого окна.
+        ToolTipService.InitialShowDelayProperty.OverrideMetadata(
+            typeof(DependencyObject), new FrameworkPropertyMetadata(400));
+        Motion.Hook();
 
         // Ставится первым делом, до всего остального. Окно без консоли,
         // упавшее до появления, просто исчезает: спросили права — и тишина.

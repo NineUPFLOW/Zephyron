@@ -137,7 +137,8 @@ public partial class ColorPickerWindow : Window
         var color = Current;
 
         static bool Number(string s, out double v) =>
-            double.TryParse(s.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out v);
+            double.TryParse(s.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out v)
+            && double.IsFinite(v); // «NaN»/«Infinity» Float пропускает — дали бы мусорный цвет
 
         ThemeColor? next = null;
 

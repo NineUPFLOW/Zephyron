@@ -27,68 +27,30 @@
             <Setter Property="TextTrimming" Value="CharacterEllipsis" />
         </Style>
 
-        <!-- Флажок выбора строки: своего стиля у программы не было, флажков нигде нет. -->
-        <Style x:Key="Tick" TargetType="CheckBox">
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Focusable" Value="False" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="CheckBox">
-                        <Border x:Name="Box" Width="18" Height="18" CornerRadius="4"
-                                Background="Transparent" BorderThickness="1"
-                                BorderBrush="{DynamicResource Border}">
-                            <TextBlock x:Name="Mark" Text="&#xE73E;" FontFamily="{DynamicResource IconFont}"
-                                       FontSize="11" Foreground="White" Visibility="Collapsed"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource Accent}" />
-                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource Accent}" />
-                                <Setter TargetName="Mark" Property="Visibility" Value="Visible" />
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource Muted}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Кружок живости: полый — не проверен или выключен, залитый — ответ проверки. -->
-        <Style x:Key="HealthDot" TargetType="Rectangle">
-            <Setter Property="Width" Value="9" />
-            <Setter Property="Height" Value="9" />
-            <Setter Property="StrokeThickness" Value="1.6" />
-            <Setter Property="Stroke" Value="{DynamicResource Faint}" />
-            <Setter Property="Fill" Value="Transparent" />
+        <!--
+            Знак живости записи — StateMark (форма + цвет): диск — ответил, треугольник —
+            молчит, ромб — не проверен, кольцо — выключен или заглушка. Слово — в подсказке (StateHint).
+            Флажок выбора строки — неявный CheckBox из Controls.xaml: прежний «Tick» умел то же самое.
+        -->
+        <Style x:Key="HealthDot" TargetType="Control" BasedOn="{StaticResource StateMark}">
+            <Setter Property="Width" Value="12" />
+            <Setter Property="Height" Value="12" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding State}" Value="Alive">
-                    <Setter Property="Stroke" Value="{DynamicResource Accent}" />
-                    <Setter Property="Fill" Value="{DynamicResource Accent}" />
+                    <Setter Property="Tag" Value="Running" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding State}" Value="Dead">
-                    <Setter Property="Stroke" Value="{DynamicResource Danger}" />
-                    <Setter Property="Fill" Value="{DynamicResource Danger}" />
+                    <Setter Property="Tag" Value="Failed" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding State}" Value="Untested">
-                    <Setter Property="Stroke" Value="{DynamicResource Warn}" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding State}" Value="Stub">
-                    <Setter Property="Stroke" Value="{DynamicResource Muted}" />
-                    <Setter Property="Fill" Value="{DynamicResource Muted}" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding State}" Value="Off">
-                    <Setter Property="Stroke" Value="{DynamicResource Muted}" />
+                    <Setter Property="Tag" Value="Degraded" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
     </UserControl.Resources>
 
-    <Grid Margin="32,28,32,24">
+    <Grid Margin="{StaticResource PagePad}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -115,12 +77,20 @@
         <StackPanel Grid.Row="1">
             <!-- Стёртый защитником файл: сказать до того, как человек решит, что ничего не прибивал. -->
             <Border x:Name="ReplacedCard" Style="{StaticResource Card}" Margin="0,16,0,0"
-                    BorderBrush="{DynamicResource Danger}" Visibility="Collapsed">
-                <StackPanel>
-                    <TextBlock x:Name="ReplacedTitle" FontWeight="SemiBold" Foreground="{DynamicResource Danger}" />
-                    <TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,6,0,0"
-                               Text="Изменённый hosts он считает признаком заражения и вернул файл к своему умолчанию — вместе со всеми пинами. Пин на этой машине не живёт, пока файл не внесён в доверенные в настройках защитника." />
-                </StackPanel>
+                    Background="{DynamicResource DangerSoft}" BorderBrush="{DynamicResource DangerLine}"
+                    Visibility="Collapsed">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Control Style="{StaticResource StateMark}" Tag="Failed" Margin="0,1,12,0" VerticalAlignment="Top" />
+                    <StackPanel Grid.Column="1">
+                        <TextBlock x:Name="ReplacedTitle" FontWeight="SemiBold" Foreground="{DynamicResource Text}" />
+                        <TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                   Text="Изменённый hosts он считает признаком заражения и вернул файл к своему умолчанию — вместе со всеми пинами. Пин на этой машине не живёт, пока файл не внесён в доверенные в настройках защитника." />
+                    </StackPanel>
+                </Grid>
             </Border>
 
             <!--
@@ -129,8 +99,8 @@
                 Замер 23.09: 68 повторов, из них 29 — тот же адрес в блоке
                 ZapretGUI, 39 — ChatGPT на старом адресе под нашим пином.
             -->
-            <Border x:Name="RepeatsCard" Style="{StaticResource Card}" Margin="0,16,0,0" Padding="14,10"
-                    Visibility="Collapsed">
+            <Border x:Name="RepeatsCard" Style="{StaticResource Card}" Margin="0,16,0,0"
+                    BorderBrush="{DynamicResource WarnLine}" Visibility="Collapsed">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -151,8 +121,19 @@
                 </Grid>
             </Border>
 
-            <TextBlock x:Name="Status" Style="{StaticResource Caption}" Margin="2,12,0,0"
-                       TextWrapping="Wrap" Visibility="Collapsed" />
+            <!-- Строка состояния: ошибка — панелью ErrorState (StatusLook); Text и Visibility пишет код. -->
+            <Border x:Name="StatusBox" Margin="0,12,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Control x:Name="StatusMark" Style="{StaticResource StateMark}" Visibility="Collapsed"
+                             VerticalAlignment="Top" Margin="0,1,10,0" />
+                    <TextBlock x:Name="Status" Grid.Column="1" Style="{StaticResource Caption}"
+                               TextWrapping="Wrap" Visibility="Collapsed" />
+                </Grid>
+            </Border>
         </StackPanel>
 
         <Grid Grid.Row="2" x:Name="Body" Margin="0,16,0,0" SizeChanged="OnBodySize">
@@ -174,7 +155,7 @@
                 </Grid.RowDefinitions>
 
                 <UniformGrid Grid.Row="0" Rows="1">
-                    <Border Style="{StaticResource Card}" Padding="14,10" Margin="0,0,8,0">
+                    <Border Style="{StaticResource Card}" Margin="0,0,8,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -187,7 +168,7 @@
                             </StackPanel>
                         </Grid>
                     </Border>
-                    <Border Style="{StaticResource Card}" Padding="14,10" Margin="0,0,8,0">
+                    <Border Style="{StaticResource Card}" Margin="0,0,8,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -200,7 +181,7 @@
                             </StackPanel>
                         </Grid>
                     </Border>
-                    <Border Style="{StaticResource Card}" Padding="14,10" Margin="0,0,8,0">
+                    <Border Style="{StaticResource Card}" Margin="0,0,8,0">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -213,7 +194,7 @@
                             </StackPanel>
                         </Grid>
                     </Border>
-                    <Border Style="{StaticResource Card}" Padding="14,10">
+                    <Border Style="{StaticResource Card}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -229,14 +210,14 @@
                     </Border>
                 </UniformGrid>
 
-                <!-- Лупа поверх поля: отступ 17, шаблон складывает Padding дважды (см. Hint.cs). -->
+                <!-- Лупа поверх поля: отступ поля слева 34 оставляет ей место. -->
                 <Grid Grid.Row="1" Margin="0,12,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <TextBox x:Name="Search" TextChanged="OnSearch" Padding="17,7,11,7"
+                    <TextBox x:Name="Search" TextChanged="OnSearch" Padding="34,7,11,7"
                              gui:Hint.Text="Поиск по имени, адресу, источнику или подписи" />
                     <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE721;" FontSize="14"
                                HorizontalAlignment="Left" Margin="14,0,0,0" IsHitTestVisible="False" />
@@ -270,17 +251,18 @@
                                 <ColumnDefinition Width="32" />
                             </Grid.ColumnDefinitions>
 
-                            <CheckBox x:Name="AllBox" Style="{StaticResource Tick}" Click="OnSelectAll"
+                            <CheckBox x:Name="AllBox" Click="OnSelectAll" VerticalAlignment="Center"
+                                      AutomationProperties.Name="Выбрать всё, что показано сейчас"
                                       ToolTip="Выбрать всё, что показано сейчас" />
-                            <TextBlock Grid.Column="2" Text="ИМЯ" Style="{StaticResource Caption}" />
-                            <TextBlock Grid.Column="3" Text="АДРЕС" Style="{StaticResource Caption}" />
-                            <TextBlock Grid.Column="4" Text="ИСТОЧНИК" Style="{StaticResource Caption}" />
+                            <TextBlock Grid.Column="2" Text="Имя" Style="{StaticResource Caption}" />
+                            <TextBlock Grid.Column="3" Text="Адрес" Style="{StaticResource Caption}" />
+                            <TextBlock Grid.Column="4" Text="Источник" Style="{StaticResource Caption}" />
                             <StackPanel Grid.Column="5" Orientation="Horizontal">
-                                <TextBlock Text="ВИД" Style="{StaticResource Caption}" VerticalAlignment="Center" />
+                                <TextBlock Text="Вид" Style="{StaticResource Caption}" VerticalAlignment="Center" />
                                 <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                                 Content="Посредник — чужой узел, через который ходит имя (XBOX DNS, Comss, GeoHide): щит десинка пропускает его без обработки.&#x0a;&#x0a;Адрес сервиса — сам сервис, пин только выбирает незакрытый адрес: щит такое имя не берёт, и его обрабатывает рецепт.&#x0a;&#x0a;Заглушка — петля или нули, имя закрыто намеренно." />
                             </StackPanel>
-                            <TextBlock Grid.Column="6" Text="ВКЛ." Style="{StaticResource Caption}" />
+                            <TextBlock Grid.Column="6" Text="Вкл." Style="{StaticResource Caption}" />
                         </Grid>
 
                         <ItemsControl x:Name="Rows" Grid.Row="1"
@@ -316,10 +298,10 @@
                                                 <ColumnDefinition Width="32" />
                                             </Grid.ColumnDefinitions>
 
-                                            <CheckBox Style="{StaticResource Tick}" IsChecked="{Binding Selected, Mode=TwoWay}"
-                                                      Click="OnRowTick" />
+                                            <CheckBox IsChecked="{Binding Selected, Mode=TwoWay}" VerticalAlignment="Center"
+                                                      AutomationProperties.Name="Выбрать запись" Click="OnRowTick" />
 
-                                            <Rectangle Grid.Column="1" RadiusX="1.5" RadiusY="1.5" Style="{StaticResource HealthDot}" ToolTip="{Binding StateHint}" />
+                                            <Control Grid.Column="1" Style="{StaticResource HealthDot}" ToolTip="{Binding StateHint}" />
 
                                             <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,10,0">
                                                 <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" />
@@ -356,6 +338,7 @@
                                             <Button Grid.Column="7" Style="{StaticResource Ghost}" Content="⋮"
                                                     Padding="0,2" MinWidth="28" HorizontalAlignment="Right"
                                                     VerticalAlignment="Center" Click="OnRowMenu"
+                                                    AutomationProperties.Name="Что сделать с этой записью"
                                                     ToolTip="Что сделать с этой записью" />
                                         </Grid>
                                     </Border>
@@ -363,12 +346,19 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <TextBlock x:Name="EmptyText" Grid.Row="1" Style="{StaticResource Caption}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+                        <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Visibility="{Binding Visibility, ElementName=EmptyText}">
+                            <Path Width="28" Height="28" Stretch="Uniform" HorizontalAlignment="Center"
+                                  Stroke="{DynamicResource Faint}" StrokeThickness="1.5" StrokeLineJoin="Round"
+                                  Data="M 3,22 A 3,3 0 1 1 9,22 A 3,3 0 1 1 3,22 Z M 21,8 A 3,3 0 1 1 27,8 A 3,3 0 1 1 21,8 Z M 21,24 A 3,3 0 1 1 27,24 A 3,3 0 1 1 21,24 Z M 8.1,20.2 L 21.9,9.8 M 9,22.3 L 21,23.7" />
+                            <TextBlock x:Name="EmptyText" Style="{StaticResource Caption}" Margin="0,10,0,0"
+                                       HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                                       Visibility="Collapsed" />
+                        </StackPanel>
                     </Grid>
                 </Border>
 
-                <Border Grid.Row="3" Style="{StaticResource Card}" Padding="14,8" Margin="0,12,0,0">
+                <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0">
                     <WrapPanel>
                         <TextBlock x:Name="SelectedText" Text="Выбрано: 0" VerticalAlignment="Center"
                                    Margin="0,0,14,0" MinWidth="90" />
@@ -394,8 +384,14 @@
                             <TextBlock Text="Добавить запись" FontWeight="SemiBold" FontSize="15" />
 
                             <UniformGrid Rows="1" Margin="0,12,0,0">
-                                <Button x:Name="OneTab" Content="Одна запись" Click="OnOneTab" Margin="0,0,4,0" />
-                                <Button x:Name="ListTab" Content="Список" Click="OnListTab" Margin="4,0,0,0" />
+                                <Button x:Name="OneTab" Style="{StaticResource Choice}" Click="OnOneTab"
+                                        Padding="14,6" Margin="0,0,4,0">
+                                    <TextBlock Text="Одна запись" HorizontalAlignment="Center" />
+                                </Button>
+                                <Button x:Name="ListTab" Style="{StaticResource Choice}" Click="OnListTab"
+                                        Padding="14,6" Margin="4,0,0,0">
+                                    <TextBlock Text="Список" HorizontalAlignment="Center" />
+                                </Button>
                             </UniformGrid>
 
                             <StackPanel x:Name="OnePanel" Margin="0,12,0,0">
@@ -441,15 +437,22 @@
                             <ItemsControl x:Name="Sources">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Padding="6,4" CornerRadius="6" Cursor="Hand" Background="{Binding Back}"
+                                        <Border Padding="6,4" MinHeight="{StaticResource HControlSm}" CornerRadius="{StaticResource RMd}" Cursor="Hand"
+                                                Background="{Binding Back}" BorderBrush="{Binding Edge}"
+                                                BorderThickness="{StaticResource Stroke}"
                                                 MouseLeftButtonUp="OnSourceClick" ToolTip="Показать только эти записи">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Grid.Column="1" Text="{Binding Count}" FontWeight="SemiBold" Margin="8,0,0,0" />
+                                                <Ellipse Width="6" Height="6" Margin="2,0,8,0" VerticalAlignment="Center"
+                                                         Fill="{DynamicResource Accent}" Visibility="{Binding Mark}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis"
+                                                           VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="2" Text="{Binding Count}" FontWeight="SemiBold" Margin="8,0,0,0"
+                                                           VerticalAlignment="Center" />
                                             </Grid>
                                         </Border>
                                     </DataTemplate>

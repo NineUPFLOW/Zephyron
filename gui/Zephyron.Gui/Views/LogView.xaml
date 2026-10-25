@@ -1,6 +1,7 @@
 <UserControl x:Class="Zephyron.Gui.Views.LogView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Zephyron.Gui"
              Background="{DynamicResource Chrome}">
 
     <!--
@@ -24,10 +25,6 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <!-- Акцентная черта — тот же знак, что у шапок разделов: чёткая, без свечения. -->
-            <Border Grid.Column="0" Width="3" Height="16" Margin="0,0,12,0" VerticalAlignment="Center"
-                    Background="{DynamicResource Accent}" />
-
             <TextBlock Grid.Column="1" Text="Журнал" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" />
 
             <TextBlock Grid.Column="2" x:Name="Status" Style="{StaticResource MonoTag}"
@@ -42,11 +39,11 @@
                 -->
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0"
                             ToolTip="Без журнала разбор сбоя сводится к догадкам. Выключают те, кого смущает рост файла: winws2 пишет строку на соединение. Применится при следующем запуске движков.">
-                    <ToggleButton x:Name="LogsSwitch" Style="{StaticResource Switch}" Click="OnLogsSwitch" VerticalAlignment="Center" />
+                    <ToggleButton x:Name="LogsSwitch" Style="{StaticResource Switch}" AutomationProperties.Name="Вести журнал" Click="OnLogsSwitch" VerticalAlignment="Center" />
                     <TextBlock Text="Вести журнал" Style="{StaticResource Caption}" VerticalAlignment="Center" Margin="8,0,0,0" />
                 </StackPanel>
 
-                <ComboBox x:Name="Source" Width="140" SelectedIndex="0"
+                <ComboBox x:Name="Source" AutomationProperties.Name="Чей журнал" Width="140" SelectedIndex="0"
                           SelectionChanged="OnSource" Margin="0,0,8,0">
                     <ComboBoxItem Content="sing-box" />
                     <ComboBoxItem Content="winws2" />
@@ -61,12 +58,28 @@
                 <!-- Только в панели главного окна (ShowClose): у окна журнала есть свой крестик. -->
                 <Button x:Name="CloseButton" Style="{StaticResource IconGhost}" Content="&#xE711;"
                         Margin="8,0,0,0" Padding="8,6" Visibility="Collapsed" Click="OnClose"
-                        ToolTip="Свернуть журнал" />
+                        ToolTip="Свернуть журнал" AutomationProperties.Name="Свернуть журнал" />
             </StackPanel>
         </Grid>
 
-        <Border Grid.Row="1" Background="{DynamicResource Wash}" BorderBrush="{DynamicResource Border}"
-                BorderThickness="{StaticResource Stroke}" CornerRadius="{StaticResource RMd}">
+        <!-- Лист журнала — карточкой. -->
+        <Border Grid.Row="1" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource CardRim}"
+                BorderThickness="{StaticResource Stroke}" CornerRadius="{StaticResource RLg}">
+            <Grid>
+            <!-- Пусто: пока в листе нет текста (журнала ещё нет или он пуст). -->
+            <ContentControl local:PageHead.Title="Журнала пока нет"
+                            local:PageHead.Subtitle="Он появится, когда движок запустится. Подробности — в строке состояния выше.">
+                <ContentControl.Style>
+                    <Style TargetType="ContentControl" BasedOn="{StaticResource EmptyState}">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Text, ElementName=Text}" Value="">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ContentControl.Style>
+            </ContentControl>
             <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Auto" Padding="14,10">
                 <TextBox x:Name="Text" Style="{x:Null}"
@@ -77,6 +90,7 @@
                          VerticalScrollBarVisibility="Disabled"
                          HorizontalScrollBarVisibility="Disabled" />
             </ScrollViewer>
+            </Grid>
         </Border>
     </Grid>
 </UserControl>

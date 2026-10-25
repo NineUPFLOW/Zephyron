@@ -3,43 +3,44 @@
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
     <!--
-        Тёмная «Полночь» — основная палитра Zephyron и запас, если папки тем
-        нет. Почти чёрная подложка, графитовые карточки с волосяной рамкой
-        и бирюзовый акцент, светящийся там, где что-то включено. Прежняя
-        «Зефирная» уехала в themes/zefir и осталась в выборе тем.
+        «Сигнал» — основная палитра Zephyron и запас, если папки тем нет.
+        Заменила NEXUS (0.18): тот был сине-фиолетовым со срезами и градиентами.
 
-        Смысл цветов состояния прежний: акцент значит «работает», красный
-        «закрыто», жёлтый «требует внимания», и в отчёте они значат то же
-        самое. Перекрашены оттенки, а не роли.
+        Нейтральный графит почти без оттенка и одно холодное синее — только
+        для выбранного, главного действия и фокуса. Цвет несут данные:
+        сетевой трафик — лавандовый второй акцент, «работает» — зелёный,
+        «частично» — янтарный, «сбой» — красный; ни один не равен акценту.
 
         Значения совпадают с themes/dark/theme.json — расхождение ловит тест
-        ThemeFilesMatchXamlPalettes.
+        ThemeFilesMatchXamlPalettes. Пары «текст на фоне» проверены порогом
+        WCAG (ThemeContrast): текст 4,5:1, третий план 3:1.
     -->
 
-    <Color x:Key="BackdropColor">#FF08090F</Color>
-    <Color x:Key="SurfaceColor">#FF0F1219</Color>
-    <Color x:Key="RaisedColor">#FF161A23</Color>
-    <Color x:Key="BorderColor">#FF21252F</Color>
+    <Color x:Key="BackdropColor">#FF0B0C0E</Color>
+    <Color x:Key="SurfaceColor">#FF14161A</Color>
+    <Color x:Key="RaisedColor">#FF1C1F24</Color>
+    <Color x:Key="BorderColor">#FF2A2D33</Color>
 
-    <Color x:Key="TextColor">#FFEEF1F7</Color>
-    <Color x:Key="MutedColor">#FFA8B0C2</Color>
-    <Color x:Key="FaintColor">#FF7B849B</Color>
+    <Color x:Key="TextColor">#FFECEEF2</Color>
+    <Color x:Key="MutedColor">#FFA0A6B1</Color>
+    <Color x:Key="FaintColor">#FF858C99</Color>
 
-    <Color x:Key="AccentColor">#FF22D3EE</Color>
-    <Color x:Key="AccentDimColor">#FF0B4651</Color>
-    <Color x:Key="DangerColor">#FFF43F5E</Color>
-    <Color x:Key="WarnColor">#FFFBBF24</Color>
+    <Color x:Key="AccentColor">#FF4CB8FF</Color>
+    <Color x:Key="AccentDimColor">#FF12324A</Color>
+    <Color x:Key="DangerColor">#FFFF6B6B</Color>
+    <Color x:Key="WarnColor">#FFF5B14A</Color>
 
     <!--
-        Заливка кнопки и подпись на ней. На тёмном фоне они почти совпадают
-        с обычными, но ключи заведены и здесь: стиль кнопки один на обе темы,
-        и без них его пришлось бы писать дважды. На светлом они расходятся
-        по-настоящему — там текстовый зелёный обязан быть тёмным, а заливка
-        с тёмной подписью сливается в грязь.
+        Заливка главной кнопки светлая, поэтому подпись на ней — тёмные чернила
+        (7,3:1), а не белая. Тёмная подпись нужна и чужим темам на основе этой:
+        у них заливки яркие (жёлтая у «Nirvana»), и белая на них не читалась бы.
     -->
-    <Color x:Key="AccentFillColor">#FF22D3EE</Color>
-    <Color x:Key="OnAccentColor">#FF04181C</Color>
-    <Color x:Key="WarnFillColor">#FFFBBF24</Color>
+    <Color x:Key="AccentFillColor">#FF3AA8F5</Color>
+    <Color x:Key="OnAccentColor">#FF04131F</Color>
+    <Color x:Key="WarnFillColor">#FFF5B14A</Color>
+
+    <!-- Второй акцент — тон акцента +60° с зажимом (Themes.Derive). Сетевые данные. -->
+    <Color x:Key="Accent2Color">#FFB184F5</Color>
 
     <SolidColorBrush x:Key="Backdrop" Color="{StaticResource BackdropColor}" />
     <SolidColorBrush x:Key="Surface" Color="{StaticResource SurfaceColor}" />
@@ -58,33 +59,66 @@
     <SolidColorBrush x:Key="AccentFill" Color="{StaticResource AccentFillColor}" />
     <SolidColorBrush x:Key="OnAccent" Color="{StaticResource OnAccentColor}" />
     <SolidColorBrush x:Key="WarnFill" Color="{StaticResource WarnFillColor}" />
+    <SolidColorBrush x:Key="Accent2" Color="{StaticResource Accent2Color}" />
+
+    <!--
+        «Работает» — зелёным, отдельно от акцента: синий значит «выбрано»
+        и «главное». В theme.json слота нет: Themes.Derive ставит зелёный,
+        читаемый на подложке темы.
+    -->
+    <Color x:Key="SuccessColor">#FF35E6A0</Color>
+    <SolidColorBrush x:Key="Success" Color="{StaticResource SuccessColor}" />
+    <SolidColorBrush x:Key="SuccessSoft" Color="#1A35E6A0" />
+    <SolidColorBrush x:Key="SuccessLine" Color="#5735E6A0" />
+
+    <!--
+        Градиенты (Themes.Derive считает их так же): AccentGradient — заливка
+        главной кнопки, вертикаль «от подписи»: тёмная подпись — верх светлее;
+        AccentFlow — от акцента ко второму, только для пакетов трасс и знака.
+    -->
+    <LinearGradientBrush x:Key="AccentGradient" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#FF52B3F6" Offset="0" />
+        <GradientStop Color="#FF3AA8F5" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="AccentFlow" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FF4CB8FF" Offset="0" />
+        <GradientStop Color="#FFB184F5" Offset="1" />
+    </LinearGradientBrush>
 
     <!--
         Производные: те же цвета состояния, но полупрозрачными подложкой
-        и рамкой. Ими нарисованы кнопки, выбранные сегменты, плашки движков —
-        включённое светится своим цветом, а не заливается им целиком.
-        В теме из файла они считаются из её цветов (Themes.Derive), здесь —
-        те же доли, записанные числом: Soft ≈ 12 %, Line ≈ 38 %.
-        Wash — едва заметная подложка поверх карточки: у кнопок и полей.
+        и рамкой. В теме из файла они считаются из её цветов (Themes.Derive),
+        здесь — те же доли, записанные числом. Wash — едва заметная подложка
+        поверх карточки: у кнопок и полей. FieldLine — рамка полей ввода
+        (muted при 55 %, 3,1:1 к карточке); Scrim — затемнение под модальным слоем.
     -->
-    <SolidColorBrush x:Key="AccentSoft" Color="#1F22D3EE" />
-    <SolidColorBrush x:Key="AccentLine" Color="#6122D3EE" />
-    <SolidColorBrush x:Key="DangerSoft" Color="#1AF43F5E" />
-    <SolidColorBrush x:Key="DangerLine" Color="#57F43F5E" />
-    <SolidColorBrush x:Key="WarnSoft" Color="#1AFBBF24" />
-    <SolidColorBrush x:Key="WarnLine" Color="#4DFBBF24" />
-    <SolidColorBrush x:Key="Wash" Color="#08EEF1F7" />
-    <SolidColorBrush x:Key="WashHover" Color="#12EEF1F7" />
-    <SolidColorBrush x:Key="LineStrong" Color="#24EEF1F7" />
+    <SolidColorBrush x:Key="AccentSoft" Color="#1F4CB8FF" />
+    <SolidColorBrush x:Key="AccentLine" Color="#594CB8FF" />
+    <SolidColorBrush x:Key="DangerSoft" Color="#1AFF6B6B" />
+    <SolidColorBrush x:Key="DangerLine" Color="#57FF6B6B" />
+    <SolidColorBrush x:Key="WarnSoft" Color="#1AF5B14A" />
+    <SolidColorBrush x:Key="WarnLine" Color="#4DF5B14A" />
+    <SolidColorBrush x:Key="Wash" Color="#06ECEEF2" />
+    <SolidColorBrush x:Key="WashHover" Color="#0FECEEF2" />
+    <SolidColorBrush x:Key="LineStrong" Color="#2EECEEF2" />
+    <SolidColorBrush x:Key="FieldLine" Color="#8CA0A6B1" />
+    <SolidColorBrush x:Key="Scrim" Color="#B30B0C0E" />
 
-    <!-- Сетка, свечения и виньетка фона окна: видны, только пока у темы нет своей картинки. -->
+    <!--
+        Рамка карточки (Themes.Rim): волосяная кромка цвета текста, ярче
+        сверху и гаснет вниз. Ни акцента, ни диагонали.
+    -->
+    <LinearGradientBrush x:Key="CardRim" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#26ECEEF2" Offset="0" />
+        <GradientStop Color="#0DECEEF2" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- Сияние фона окна: видно, только пока у темы нет своей картинки. -->
     <sys:Double x:Key="Decor">1</sys:Double>
 
     <!--
-        Шрифт назван явно. Segoe UI Variable — системный в Windows 11,
-        ровный и плотный; в Windows 10 его нет, и тогда берётся Segoe UI.
-        Цифры таймера и метрик — моноширинным: они меняются каждую секунду
-        и не должны дрожать по ширине.
+        Шрифт назван явно. Segoe UI Variable — системный в Windows 11; в Windows 10
+        его нет, и тогда берётся Segoe UI. Цифры — табличные (Typography на метриках).
     -->
     <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI</FontFamily>
     <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas</FontFamily>
@@ -92,12 +126,12 @@
 
     <!--
         Фон окна для тем с картинкой (Themes.cs). У встроенных картинки нет:
-        слой прозрачен, затемнение сплошное, меню — цвета подложки.
+        слой прозрачен, затемнение сплошное, полоса — цвета подложки.
     -->
     <SolidColorBrush x:Key="BackdropImage" Color="Transparent" />
     <sys:Double x:Key="BackdropDim">1</sys:Double>
     <SolidColorBrush x:Key="Chrome" Color="Transparent" />
-    <SolidColorBrush x:Key="RailFill" Color="#E60F1219" />
+    <SolidColorBrush x:Key="RailFill" Color="#E614161A" />
     <!-- Арт сбоку на «Главной» (Themes.cs): у встроенных тем картинки нет, колонка пуста. -->
     <SolidColorBrush x:Key="SideArt" Color="Transparent" />
     <ScaleTransform x:Key="UiScaleTransform" ScaleX="1" ScaleY="1" />

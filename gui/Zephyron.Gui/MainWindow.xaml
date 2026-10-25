@@ -12,11 +12,19 @@
         TextOptions.TextFormattingMode="Ideal">
 
     <!--
-        Оболочка с 0.16: плавающая полоса меню сверху по центру и раздел под
-        ней во всю ширину. Прежде меню было колонкой слева; пять ежедневных
-        разделов теперь в полосе, инструменты разбора и настройки программы —
-        в выпадающем «Ещё». Имена пунктов, их Tag и обработчик те же:
-        менялась форма, а не поведение.
+        Оболочка с 0.18: командная полоса сверху во всю ширину и раздел под ней.
+
+        В полосе видны все тринадцать разделов: пять ежедневных — текстовыми
+        вкладками, инструменты разбора и настройки — значками, выбранный из
+        них раскрывается своим именем. Выбранное отмечает одна черта под
+        полосой, переезжающая от пункта к пункту (MoveIndicator). Справа —
+        журнал и состояние движков, видные из любого раздела.
+
+        Не боковая колонка: та же колонка с теми же пунктами в том же порядке —
+        чужая композиция, от которой Zephyron ушёл. И не
+        всплывающее «Ещё», как в 0.16–0.17: открытый оттуда раздел подсвечивал
+        только «Ещё», и по окну было не понять, где вы. Имена пунктов, их Tag
+        и обработчик прежние: менялась форма, а не поведение.
     -->
     <Grid x:Name="Root" LayoutTransform="{DynamicResource UiScaleTransform}" SizeChanged="OnRootSize">
         <Grid.RowDefinitions>
@@ -35,72 +43,137 @@
                    Opacity="{DynamicResource BackdropDim}" />
 
         <!--
-            Убранство сплошной подложки: сетка, тающая к краям, два мягких
-            свечения по углам и виньетка. Прозрачность — Decor из темы: у тем
-            с картинкой оно ноль, и убранство не спорит с картинкой.
+            Сияние («Сигнал»): одно неподвижное пятно акцента слева сверху,
+            0.07 от Decor (у тем с картинкой Decor = 0 — пятна нет). Прежние
+            облака, точечная сетка и дрейф сняты: бюджет кадра отдан слою частиц.
         -->
-        <Grid Grid.RowSpan="3" IsHitTestVisible="False" ClipToBounds="True" Opacity="{DynamicResource Decor}">
-            <Rectangle>
-                <Rectangle.Fill>
-                    <DrawingBrush TileMode="Tile" Viewport="0,0,44,44" ViewportUnits="Absolute"
-                                  Viewbox="0,0,44,44" ViewboxUnits="Absolute">
-                        <DrawingBrush.Drawing>
-                            <GeometryDrawing>
-                                <GeometryDrawing.Pen>
-                                    <Pen Brush="{DynamicResource Wash}" Thickness="1" />
-                                </GeometryDrawing.Pen>
-                                <GeometryDrawing.Geometry>
-                                    <GeometryGroup>
-                                        <LineGeometry StartPoint="0,0.5" EndPoint="44,0.5" />
-                                        <LineGeometry StartPoint="0.5,0" EndPoint="0.5,44" />
-                                    </GeometryGroup>
-                                </GeometryDrawing.Geometry>
-                            </GeometryDrawing>
-                        </DrawingBrush.Drawing>
-                    </DrawingBrush>
-                </Rectangle.Fill>
-                <Rectangle.OpacityMask>
-                    <RadialGradientBrush Center="0.5,0.4" GradientOrigin="0.5,0.4" RadiusX="0.7" RadiusY="0.6">
-                        <GradientStop Color="#FF000000" Offset="0.2" />
-                        <GradientStop Color="#00000000" Offset="1" />
-                    </RadialGradientBrush>
-                </Rectangle.OpacityMask>
+        <Rectangle x:Name="Aurora" Grid.RowSpan="3" IsHitTestVisible="False" Opacity="{DynamicResource Decor}">
+            <Rectangle.Fill>
+                <RadialGradientBrush Opacity="0.07" Center="0.1,0" GradientOrigin="0.1,0" RadiusX="0.7" RadiusY="0.7">
+                    <GradientStop Color="{DynamicResource AccentColor}" Offset="0" />
+                    <GradientStop Color="Transparent" Offset="1" />
+                </RadialGradientBrush>
+            </Rectangle.Fill>
+        </Rectangle>
+
+        <!--
+            Слой «сеть» (ParticleField): между фоном и полосой, не ловит мышь.
+            Курсор и клики сообщает ему само окно (Root, handledEventsToo).
+            Видео-фон темы прячет его целиком, картинка приглушает (ApplyBackdropKind).
+        -->
+        <local:ParticleField x:Name="Field" Grid.RowSpan="3" IsHitTestVisible="False" />
+
+        <!-- Командная полоса. -->
+        <Border Grid.Row="0" x:Name="Nav" Style="{StaticResource RailPanel}" SizeChanged="OnNavSize">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!--
+                    Знак программы — её же рисунок, что у значка в трее и у файла
+                    (Assets\logo.png, вынут из app.ico; владелец, 12.10 и 25.10: знак
+                    не перекрашивается под тему). Версия — рядом, пока полоса не сжата.
+                -->
+                <StackPanel x:Name="Brand" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,18,0">
+                    <Image x:Name="Mark" Width="{StaticResource MarkSize}" Height="{StaticResource MarkSize}"
+                           Source="pack://application:,,,/Zephyron;component/Assets/logo.png"
+                           RenderOptions.BitmapScalingMode="HighQuality" VerticalAlignment="Center" />
+                    <TextBlock x:Name="BrandName" Text="Zephyron" FontFamily="{DynamicResource UiFont}"
+                               FontWeight="SemiBold" FontSize="14" Margin="9,0,0,1" VerticalAlignment="Center"
+                               Foreground="{DynamicResource Text}" />
+                    <TextBlock x:Name="VersionLabel" Style="{StaticResource MonoTag}" Margin="7,3,0,0" VerticalAlignment="Center" />
+                </StackPanel>
+
+                <!-- Разделы на каждый день — вкладками. -->
+                <StackPanel x:Name="Rail" Grid.Column="1" Orientation="Horizontal">
+                    <RadioButton x:Name="RailStatus" Style="{StaticResource RailItem}" Content="Главная" Tag="status" local:MenuIcon.Glyph="&#xE80F;" IsChecked="True" Checked="OnSection" />
+                    <RadioButton Style="{StaticResource RailItem}" Content="VPN" Tag="vpn" local:MenuIcon.Glyph="&#xE774;" Checked="OnSection" />
+                    <RadioButton Style="{StaticResource RailItem}" Content="Десинк" Tag="desync" local:MenuIcon.Glyph="&#xE9E9;" Checked="OnSection" />
+                    <RadioButton Style="{StaticResource RailItem}" Content="Маршруты" Tag="routes" local:MenuIcon.Glyph="&#xE816;" Checked="OnSection" />
+                    <RadioButton Style="{StaticResource RailItem}" Content="TG Proxy" Tag="tgproxy" local:MenuIcon.Shape="{StaticResource TelegramPlane}" Checked="OnSection" />
+                </StackPanel>
+
+                <!--
+                    Инструменты разбора и настройки программы — значками. Имя MoreRail
+                    осталось от всплывающего «Ещё»: по нему окно перечисляет пункты (Items).
+                -->
+                <StackPanel x:Name="MoreRail" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                    <RadioButton Style="{StaticResource ToolItem}" Content="Проверка блокировок" Tag="check" local:MenuIcon.Glyph="&#xE721;" Checked="OnSection" />
+                    <RadioButton Style="{StaticResource ToolItem}" Content="Замер скорости" Tag="speed" local:MenuIcon.Glyph="&#xEC4A;" Checked="OnSection" />
+                    <RadioButton Style="{StaticResource ToolItem}" Content="DNS" Tag="dns" local:MenuIcon.Glyph="&#xE968;" Checked="OnSection" />
+                    <RadioButton Style="{StaticResource ToolItem}" Content="Файл hosts" Tag="hosts" local:MenuIcon.Glyph="&#xE8A5;" Checked="OnSection" />
+                    <RadioButton Style="{StaticResource ToolItem}" Content="Наблюдение" Tag="watch" local:MenuIcon.Glyph="&#xE9D2;" Checked="OnSection" />
+                    <RadioButton Style="{StaticResource ToolItem}" Content="Диагностика" Tag="doctor" local:MenuIcon.Glyph="&#xE9D9;" Checked="OnSection" />
+
+                    <Border Width="1" Height="18" Margin="7,0" Background="{DynamicResource Border}" />
+
+                    <RadioButton Style="{StaticResource ToolItem}" Content="Оформление" Tag="look" local:MenuIcon.Glyph="&#xE790;" Checked="OnSection" />
+                    <RadioButton x:Name="RailMore" Style="{StaticResource ToolItem}" Content="Прочее" Tag="more" local:MenuIcon.Glyph="&#xE713;" Checked="OnSection" />
+                </StackPanel>
+
+                <!-- Журнал и состояние движков — справа, на виду из любого раздела. -->
+                <StackPanel x:Name="BarEnd" Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                    <Border Width="1" Height="18" Margin="0,0,9,0" Background="{DynamicResource Border}" />
+
+                    <ToggleButton x:Name="LogButton" Style="{StaticResource NavMore}" local:MenuIcon.Glyph="&#xE8FD;"
+                                  Click="OnLogToggle" ToolTip="Журналы движков — панелью снизу"
+                                  AutomationProperties.Name="Журнал" />
+
+                    <!--
+                        Состояние движков (ShowTopDot): кольцо — выключен, дуга — запуск,
+                        диск — работает, ромб — частично, треугольник — сбой; слово рядом.
+                        Нажатие ведёт на «Главную», где их запускают.
+                    -->
+                    <Button x:Name="StatusRow" Style="{StaticResource NavStatus}" Margin="8,0,0,0" Click="OnStatusRow"
+                            AutomationProperties.Name="Состояние движков">
+                        <StackPanel Orientation="Horizontal">
+                            <Grid Width="10" Height="10" VerticalAlignment="Center">
+                                <!-- Ореол знака — только пока обход работает (Breathe). -->
+                                <Ellipse x:Name="TopHalo" Width="10" Height="10" Fill="{DynamicResource Success}"
+                                         Opacity="0" RenderTransformOrigin="0.5,0.5">
+                                    <Ellipse.RenderTransform>
+                                        <ScaleTransform />
+                                    </Ellipse.RenderTransform>
+                                </Ellipse>
+                                <Control x:Name="TopMark" Style="{StaticResource StateMark}" Width="10" Height="10" Tag="Off" />
+                            </Grid>
+                            <TextBlock x:Name="TopStatus" Margin="8,0,0,0" FontSize="12" FontWeight="Medium" Text="Выключен"
+                                       Foreground="{DynamicResource Muted}" VerticalAlignment="Center"
+                                       Visibility="{DynamicResource NavLabel}" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!--
+            Черта выбранного пункта — одна на всю полосу, на её нижней кромке.
+            Переезжает от пункта к пункту (MoveIndicator) и светится акцентом.
+            Ширина постоянная (= MainWindow.IndicatorBase), место и длина — RenderTransform;
+            ScaleX="0" — ещё не поставлена.
+        -->
+        <Canvas Grid.Row="0" IsHitTestVisible="False" VerticalAlignment="Bottom" Height="0" ClipToBounds="False">
+            <Rectangle x:Name="NavIndicator" Height="2" Width="64" RadiusX="1" RadiusY="1" Canvas.Top="-2"
+                       Fill="{DynamicResource Accent}">
+                <Rectangle.RenderTransform>
+                    <TransformGroup>
+                        <ScaleTransform x:Name="NavScale" ScaleX="0" />
+                        <TranslateTransform x:Name="NavShift" />
+                    </TransformGroup>
+                </Rectangle.RenderTransform>
+                <Rectangle.Effect>
+                    <DropShadowEffect BlurRadius="6" ShadowDepth="0" Opacity="0.45" Color="{DynamicResource AccentColor}" />
+                </Rectangle.Effect>
             </Rectangle>
+        </Canvas>
 
-            <Ellipse Width="640" Height="640" HorizontalAlignment="Left" VerticalAlignment="Top"
-                     Margin="-180,-240,0,0" Opacity="0.13">
-                <Ellipse.Fill>
-                    <RadialGradientBrush>
-                        <GradientStop Color="{DynamicResource AccentColor}" Offset="0" />
-                        <GradientStop Color="Transparent" Offset="1" />
-                    </RadialGradientBrush>
-                </Ellipse.Fill>
-            </Ellipse>
-
-            <!-- Второе свечение — фиолетовое, как в макете: противовес акценту в другом углу. -->
-            <Ellipse Width="640" Height="640" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                     Margin="0,0,-200,-260" Opacity="0.11">
-                <Ellipse.Fill>
-                    <RadialGradientBrush>
-                        <GradientStop Color="#A855F7" Offset="0" />
-                        <GradientStop Color="Transparent" Offset="1" />
-                    </RadialGradientBrush>
-                </Ellipse.Fill>
-            </Ellipse>
-
-            <Rectangle>
-                <Rectangle.Fill>
-                    <RadialGradientBrush RadiusX="0.75" RadiusY="0.75">
-                        <GradientStop Color="#00000000" Offset="0.55" />
-                        <GradientStop Color="#B3000000" Offset="1.05" />
-                    </RadialGradientBrush>
-                </Rectangle.Fill>
-            </Rectangle>
-        </Grid>
-
-
-        <Grid Grid.Row="0" Grid.RowSpan="2" x:Name="SectionArea">
-            <ContentControl x:Name="Section">
+        <Grid Grid.Row="1" x:Name="SectionArea">
+            <ContentControl x:Name="Section" Focusable="False">
                 <views:StatusView />
             </ContentControl>
 
@@ -109,7 +182,7 @@
                 (OnSection). Отцепленные при возврате раскладывали
                 сотню карточек заново — у владельца сторож писал 1,0–1,6 с.
             -->
-            <ContentControl x:Name="RoutesHost" Visibility="Collapsed" />
+            <ContentControl x:Name="RoutesHost" Visibility="Collapsed" Focusable="False" />
 
             <!--
                 Всплывающие карточки — стопкой внизу справа, над кнопкой журнала,
@@ -123,12 +196,13 @@
                 (UpdateGreeting). Сама не уходит — закрывается кнопкой:
                 кнопки в ней и есть смысл.
             -->
-            <Border x:Name="GreetingToast" Visibility="Collapsed" MaxWidth="500" Margin="0,0,0,12"
+            <Border x:Name="GreetingToast" Visibility="Collapsed" MaxWidth="440" Margin="0,0,0,12"
                     Background="{DynamicResource Raised}"
-                    BorderBrush="{DynamicResource WarnLine}" BorderThickness="{StaticResource Stroke}"
-                    CornerRadius="{StaticResource RLg}" Padding="18,15">
+                    BorderBrush="{DynamicResource LineStrong}" BorderThickness="{StaticResource Stroke}"
+                    CornerRadius="{StaticResource RLg}" Padding="12,10"
+                    AutomationProperties.LiveSetting="Polite">
                 <Border.Effect>
-                    <DropShadowEffect BlurRadius="36" ShadowDepth="10" Direction="270" Opacity="0.5" Color="#000000" />
+                    <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.45" Color="Black" RenderingBias="Performance" />
                 </Border.Effect>
                 <StackPanel>
                     <Grid>
@@ -137,26 +211,26 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <Border Style="{StaticResource IconTile}" Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}"
-                                Width="32" Height="32" Margin="0,0,12,0" VerticalAlignment="Center">
-                            <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE735;" FontSize="14" Foreground="{DynamicResource Warn}" />
-                        </Border>
-                        <TextBlock Grid.Column="1" x:Name="GreetingTitle" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        <Control Style="{StaticResource StateMark}" Width="14" Height="14" Tag="Running"
+                                 Margin="0,0,10,0" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" x:Name="GreetingTitle" FontSize="13" FontWeight="SemiBold"
+                                   TextWrapping="Wrap" VerticalAlignment="Center" />
                         <Button Grid.Column="2" Style="{StaticResource IconGhost}" Content="&#xE711;" Margin="10,-4,-6,0"
                                 Padding="6,4" MinWidth="0" VerticalAlignment="Top" Click="OnGreetingClose"
-                                Background="Transparent" BorderBrush="Transparent" ToolTip="Закрыть" />
+                                Background="Transparent" BorderBrush="Transparent" ToolTip="Закрыть"
+                                AutomationProperties.Name="Закрыть" />
                     </Grid>
-                    <TextBlock Style="{StaticResource Caption}" Margin="44,4,0,0" TextWrapping="Wrap"
+                    <TextBlock Style="{StaticResource Caption}" Margin="24,4,0,0" TextWrapping="Wrap"
                                Text="Если программа помогает — поставьте звезду на GitHub и подпишитесь на канал: так о ней узнают другие, а вы — о новых версиях. Поддержать разработку можно и донатом." />
 
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
                         <Button Style="{StaticResource Quiet}" Margin="0,0,6,0" Click="OnGreetingTelegram"
                                 local:ButtonGlyph.Lead="&#xE724;" Content="Канал"
                                 ToolTip="Новости в телеграм-канале" />
                         <Button Style="{StaticResource Ghost}" Margin="0,0,8,0" Click="OnGreetingDonate"
                                 local:ButtonGlyph.Lead="&#xEB51;" Content="Поддержать"
                                 ToolTip="Поддержать разработку донатом" />
-                        <Button Style="{StaticResource Primary}" Padding="16,8" Click="OnGreetingStar"
+                        <Button Style="{StaticResource Primary}" Click="OnGreetingStar"
                                 local:ButtonGlyph.Lead="&#xE734;" Content="Звезда на GitHub"
                                 ToolTip="Страница Zephyron на GitHub — звезда справа вверху" />
                     </StackPanel>
@@ -168,25 +242,37 @@
                 почти всё, что меняется в окне, применяется перезапуском,
                 и говорить об этом строкой в глубине раздела значит не сказать
                 вовсе. Но и держать перед глазами нельзя — правок за один
-                заход бывает десяток.
+                заход бывает десяток. Наведённая мышь останавливает отсчёт.
+                Знак — ToastMark: ромб — предложение, диск — готово, треугольник — не вышло.
             -->
-            <Border x:Name="Toast" Visibility="Collapsed" MaxWidth="460" Margin="0,0,0,12"
+            <Border x:Name="Toast" Visibility="Collapsed" MaxWidth="340" Margin="0,0,0,12"
                     Background="{DynamicResource Raised}"
-                    BorderBrush="{DynamicResource AccentLine}" BorderThickness="{StaticResource Stroke}"
-                    CornerRadius="{StaticResource RLg}" Padding="18,15">
+                    BorderBrush="{DynamicResource LineStrong}" BorderThickness="{StaticResource Stroke}"
+                    CornerRadius="{StaticResource RLg}" Padding="12,10"
+                    AutomationProperties.LiveSetting="Polite"
+                    MouseEnter="OnToastEnter" MouseLeave="OnToastLeave">
                 <Border.Effect>
-                    <DropShadowEffect BlurRadius="36" ShadowDepth="10" Direction="270" Opacity="0.5" Color="#000000" />
+                    <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.45" Color="Black" RenderingBias="Performance" />
                 </Border.Effect>
                 <StackPanel>
-                    <TextBlock x:Name="ToastTitle" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Control x:Name="ToastMark" Style="{StaticResource StateMark}" Width="14" Height="14" Tag="Degraded"
+                                 Margin="0,0,10,0" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" x:Name="ToastTitle" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"
+                                   VerticalAlignment="Center" />
+                    </Grid>
                     <TextBlock x:Name="ToastBody" Style="{StaticResource Caption}"
-                               Margin="0,6,0,0" TextWrapping="Wrap" />
+                               Margin="24,4,0,0" TextWrapping="Wrap" />
 
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
                         <Button x:Name="ToastLater" Style="{StaticResource Quiet}" Content="Позже"
                                 Margin="0,0,8,0" Click="OnToastLater" />
                         <Button x:Name="ToastAct" Style="{StaticResource Primary}"
-                                Content="Перезапустить" Padding="18,8" Click="OnToastRestart" />
+                                Content="Перезапустить" Click="OnToastRestart" />
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -195,101 +281,12 @@
         </Grid>
 
         <!--
-            Верхнее меню — плавающая плашка по центру. Знак, имя и версия
-            слева, точка состояния движков рядом (TopDot), за ними разделы.
-
-            Стоит в разметке после раздела, а не до: раздел лежит под ним во всю
-            высоту окна (с 0.16, MainWindow.FitUnderNav), и меню должно рисоваться
-            поверх. Иначе картинка темы на «Главной» начиналась бы под меню,
-            а над ней виднелась бы та же картинка окна, сдвинутая, — шов.
-        -->
-        <Border Grid.Row="0" x:Name="Nav" Style="{StaticResource RailPanel}" SizeChanged="OnNavSize"
-                HorizontalAlignment="Center" VerticalAlignment="Top" Margin="{StaticResource NavInset}">
-            <StackPanel Orientation="Horizontal">
-
-                <!--
-                    Знак программы — её же рисунок, что у значка в трее и у файла
-                    (Assets\logo.png, вынут из app.ico; владелец, 12.10).
-                -->
-                <StackPanel Orientation="Horizontal" Margin="4,0,14,0" VerticalAlignment="Center">
-                    <Image x:Name="Mark" Width="{StaticResource MarkSize}" Height="{StaticResource MarkSize}"
-                           Source="pack://application:,,,/Zephyron;component/Assets/logo.png"
-                           RenderOptions.BitmapScalingMode="HighQuality" />
-
-                    <TextBlock Text="Zephyron" FontWeight="SemiBold" FontSize="13" Margin="10,0,0,0" VerticalAlignment="Center" />
-                    <TextBlock x:Name="VersionLabel" Style="{StaticResource MonoTag}" FontSize="9.5" Margin="6,2,0,0" VerticalAlignment="Center" />
-
-                    <Rectangle x:Name="TopDot" Width="6" Height="6" RadiusX="1" RadiusY="1" Margin="10,0,0,0"
-                               VerticalAlignment="Center" Fill="{DynamicResource Faint}" />
-                </StackPanel>
-
-                <!-- Разделы на каждый день. -->
-                <StackPanel x:Name="Rail" Orientation="Horizontal" VerticalAlignment="Center">
-                    <RadioButton x:Name="RailStatus" Style="{StaticResource RailItem}" Content="Главная" Tag="status" local:MenuIcon.Glyph="&#xE80F;" IsChecked="True" Checked="OnSection" />
-                    <RadioButton Style="{StaticResource RailItem}" Content="VPN" Tag="vpn" local:MenuIcon.Glyph="&#xE774;" Checked="OnSection" />
-                    <RadioButton Style="{StaticResource RailItem}" Content="Десинк" Tag="desync" local:MenuIcon.Glyph="&#xE9E9;" Checked="OnSection" />
-                    <RadioButton Style="{StaticResource RailItem}" Content="Маршруты" Tag="routes" local:MenuIcon.Glyph="&#xE816;" Checked="OnSection" />
-                    <RadioButton Style="{StaticResource RailItem}" Content="TG Proxy" Tag="tgproxy" local:MenuIcon.Shape="{StaticResource TelegramPlane}" Checked="OnSection" />
-                </StackPanel>
-
-                <!--
-                    «Ещё» — инструменты разбора и настройки программы. Пункты те же
-                    переключатели разделов, что в полосе, только во всплывающем
-                    меню (MorePopup); раздел из меню подсвечивает саму кнопку.
-                -->
-                <ToggleButton x:Name="MoreToggle" Style="{StaticResource NavMore}" VerticalAlignment="Center"
-                              Content="Ещё" local:MenuIcon.Glyph="&#xE712;" Click="OnMoreToggle" />
-
-            </StackPanel>
-        </Border>
-
-        <!--
-            Журнал — своей плашкой в правом верхнем углу, отдельно от меню
-            разделов (владелец, 22.10: в полосе рядом с «Ещё» его путали
-            с разделом, и мисскликов было бы много). Не в углу снизу: там
-            он закрывал кнопки мастера и «Загрузить» в «Маршрутах».
-            Открытая панель подсвечивает кнопку.
-        -->
-        <Border Grid.Row="0" x:Name="LogHost" Style="{StaticResource RailPanel}"
-                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,14,16,0">
-            <ToggleButton x:Name="LogButton" Style="{StaticResource NavMore}" VerticalAlignment="Center"
-                          Content="Журнал" local:MenuIcon.Glyph="&#xE8FD;"
-                          Click="OnLogToggle" ToolTip="Журналы движков — панелью снизу" />
-        </Border>
-
-        <Popup x:Name="MorePopup" PlacementTarget="{Binding ElementName=MoreToggle}" Placement="Bottom"
-               HorizontalOffset="-150" VerticalOffset="12" StaysOpen="False" AllowsTransparency="True"
-               PopupAnimation="Fade" Closed="OnMoreClosed">
-            <Border Background="{DynamicResource Raised}" BorderBrush="{DynamicResource LineStrong}"
-                    BorderThickness="{StaticResource Stroke}" CornerRadius="{StaticResource RMd}"
-                    Padding="6" MinWidth="238" Margin="0,0,18,18"
-                    LayoutTransform="{DynamicResource UiScaleTransform}">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="30" ShadowDepth="8" Direction="270" Opacity="0.5" Color="#000000" />
-                </Border.Effect>
-                <StackPanel x:Name="MoreRail">
-                    <RadioButton Style="{StaticResource MoreItem}" Content="Проверка блокировок" Tag="check" local:MenuIcon.Glyph="&#xE721;" Checked="OnSection" />
-                    <RadioButton Style="{StaticResource MoreItem}" Content="Замер скорости" Tag="speed" local:MenuIcon.Glyph="&#xEC4A;" Checked="OnSection" />
-                    <RadioButton Style="{StaticResource MoreItem}" Content="DNS" Tag="dns" local:MenuIcon.Glyph="&#xE968;" Checked="OnSection" />
-                    <RadioButton Style="{StaticResource MoreItem}" Content="Файл hosts" Tag="hosts" local:MenuIcon.Glyph="&#xE8A5;" Checked="OnSection" />
-                    <RadioButton Style="{StaticResource MoreItem}" Content="Наблюдение" Tag="watch" local:MenuIcon.Glyph="&#xE9D2;" Checked="OnSection" />
-                    <!-- «Журнал» — окном из «Диагностики» и панелью снизу (кнопка «Журнал»). -->
-                    <RadioButton Style="{StaticResource MoreItem}" Content="Диагностика" Tag="doctor" local:MenuIcon.Glyph="&#xE9D9;" Checked="OnSection" />
-
-                    <Border Height="1" Background="{DynamicResource Border}" Margin="8,5" />
-                    <RadioButton Style="{StaticResource MoreItem}" Content="Оформление" Tag="look" local:MenuIcon.Glyph="&#xE790;" Checked="OnSection" />
-                    <RadioButton x:Name="RailMore" Style="{StaticResource MoreItem}" Content="Прочее" Tag="more" local:MenuIcon.Glyph="&#xE713;" Checked="OnSection" />
-                </StackPanel>
-            </Border>
-        </Popup>
-
-        <!--
             Журнал панелью снизу (с 0.16) — тот же, что окном из «Диагностики»
             (LogView). Свёрнутая панель не занимает места; содержимое раздела
             сжимается над ней, а не прячется под неё.
         -->
         <Border Grid.Row="2" x:Name="LogDrawer" Height="300" Visibility="Collapsed"
-                Background="{DynamicResource RailFill}" BorderBrush="{DynamicResource LineStrong}"
+                Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}"
                 BorderThickness="0,1,0,0">
             <views:LogView x:Name="DrawerLog" Padding="18,12,18,14" ShowClose="True" />
         </Border>

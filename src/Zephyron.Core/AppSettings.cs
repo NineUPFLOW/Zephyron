@@ -762,6 +762,54 @@ public sealed record AppSettings
     /// </remarks>
     public bool HomeFullWidth { get; init; }
 
+    /// <summary>Профиль эффектов окна: частицы, искры, сияние, ореолы.</summary>
+    /// <remarks>
+    /// <c>null</c> — выбирает окно по видеокарте: на программной отрисовке
+    /// (старые ПК) «Лёгкий», иначе «Сбалансированный». Выключенные «Анимации»
+    /// гасят все эффекты, что бы здесь ни стояло.
+    /// </remarks>
+    [JsonConverter(typeof(LenientEffectsConverter))]
+    public EffectsProfile? Effects { get; init; }
+
+    /// <summary>Прятать ли свой адрес на странице «Замер скорости» (владелец, 25.10).</summary>
+    /// <remarks>
+    /// В журналы и отчёты адрес не попадает никогда (<see cref="OwnAddress"/>); здесь —
+    /// только показ на экране, чтобы спрятать его, например, на трансляции.
+    /// </remarks>
+    public bool HideOwnAddress { get; init; }
+
+    /// <summary>
+    /// Неизвестный профиль («Ultra» из будущей версии, ручная правка) читается как «авто»:
+    /// иначе весь файл счёлся бы нечитаемым и следующее сохранение стёрло бы настройки.
+    /// </summary>
+    private sealed class LenientEffectsConverter : JsonConverter<EffectsProfile?>
+    {
+        public override bool HandleNull => true;
+
+        public override EffectsProfile? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.String
+                && Enum.TryParse<EffectsProfile>(reader.GetString(), ignoreCase: true, out var named)
+                && Enum.IsDefined(named))
+                return named;
+
+            if (reader.TokenType == JsonTokenType.Number && reader.TryGetInt32(out var number)
+                && Enum.IsDefined((EffectsProfile)number))
+                return (EffectsProfile)number;
+
+            reader.Skip(); // объект/массив — пропустить целиком, остальное уже прочитано
+            return null;
+        }
+
+        public override void Write(Utf8JsonWriter writer, EffectsProfile? value, JsonSerializerOptions options)
+        {
+            if (value is { } profile)
+                writer.WriteStringValue(profile.ToString());
+            else
+                writer.WriteNullValue();
+        }
+    }
+
     public static string DefaultPath => Path.Combine("config", "zephyron.json");
 
     private static readonly JsonSerializerOptions Options = new()
@@ -1233,4 +1281,17 @@ public sealed record AppSettings
     public string DescribeServer() => PreferredServer ?? "авто (по задержке)";
 
     public string DescribePreset() => PresetName ?? "не запускать";
+}
+
+/// <summary>Сколько эффектов рисует окно: от полного набора до минимума для старых ПК.</summary>
+public enum EffectsProfile
+{
+    /// <summary>Частицы погуще, 30 кадров/с, искры.</summary>
+    Full,
+
+    /// <summary>Частиц вдвое меньше, 20 кадров/с.</summary>
+    Balanced,
+
+    /// <summary>Без частиц, искр, дрейфа сияния и ореолов — неподвижный фон.</summary>
+    Lite,
 }

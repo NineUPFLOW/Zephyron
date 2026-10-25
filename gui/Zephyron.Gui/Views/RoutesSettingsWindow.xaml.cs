@@ -27,6 +27,7 @@ public partial class RoutesSettingsWindow : Window
     public RoutesSettingsWindow()
     {
         InitializeComponent();
+        StatusLook.Attach(StatusBox, Status, StatusMark);
 
         MaxHeight = Math.Min(MaxHeight, SystemParameters.WorkArea.Height - 40);
 

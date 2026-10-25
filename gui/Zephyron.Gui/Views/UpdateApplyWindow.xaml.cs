@@ -241,7 +241,7 @@ public partial class UpdateApplyWindow : Window
     {
         DoneTitle.Text = title;
         DoneText.Text = text;
-        DoneMark.SetResourceReference(Border.BackgroundProperty, success ? "Accent" : "Warn");
+        DoneMark.SetResourceReference(Border.BackgroundProperty, success ? "Success" : "Warn");
         DoneGlyph.Text = success ? "" : "";
 
         InfoPanel.Visibility = Visibility.Collapsed;
@@ -426,7 +426,7 @@ internal sealed class StepRow
     {
         _mark.Child = state switch
         {
-            StepState.Done => Circle("Accent", ""),
+            StepState.Done => Circle("Success", ""),
             StepState.Failed => Circle("Danger", ""),
             StepState.Running => Spinner(),
             _ => Circle("Border", null),
@@ -447,7 +447,7 @@ internal sealed class StepRow
         _bar.Visibility = Visibility.Visible;
         _bar.Maximum = Math.Max(1, total);
         _bar.Value = done;
-        _bar.SetResourceReference(Control.ForegroundProperty, failed ? "Danger" : done >= total ? "Accent" : "AccentFill");
+        _bar.SetResourceReference(Control.ForegroundProperty, failed ? "Danger" : done >= total ? "Success" : "AccentFill");
         _count.Text = $"{done} из {total}";
     }
 
@@ -462,10 +462,10 @@ internal sealed class StepRow
             {
                 Text = glyph,
                 FontSize = 12,
-                Foreground = Brushes.White,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
             };
+            mark.SetResourceReference(TextBlock.ForegroundProperty, "OnAccent");
             mark.SetResourceReference(TextBlock.FontFamilyProperty, "IconFont");
             circle.Child = mark;
         }

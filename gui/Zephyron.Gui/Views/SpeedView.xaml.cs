@@ -1,8 +1,10 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using Zephyron.Core;
 using Zephyron.Core.Updates;
 using Zephyron.Proxy;
 using Zephyron.Subscriptions;
@@ -36,7 +38,7 @@ namespace Zephyron.Gui.Views;
 /// </remarks>
 public partial class SpeedView : UserControl
 {
-    private static readonly Point Centre = new(150, 112);
+    private static readonly Point Centre = new(150, 124);
     private const double Radius = 100;
     private const double Thickness = 11;
 
@@ -56,7 +58,7 @@ public partial class SpeedView : UserControl
     private const double NarrowBelow = 356 + 150 + 56 + 312 + 6;
 
     /// <summary>Последний замер пути со всем, чего нет в истории.</summary>
-    private sealed record Shot(
+    internal sealed record Shot(
         SpeedEntry Entry, string? Address, List<double> Down, List<double> Up, List<double> Ping);
 
     private static Shot? _tunnelShot;
@@ -98,7 +100,10 @@ public partial class SpeedView : UserControl
     private static string _downNow = "—";
     private static string _upNow = "—";
     private static double _needleNow;
-    private static string _strokeNow = "Accent";
+    private static string _strokeNow = "SpeedArc";
+
+    /// <summary>Скорость, что стоит в середине дуги: последняя из скачивания и отдачи.</summary>
+    private static string _nowNow = "—";
 
     private bool _tunnel;
     private bool _tunnelUp;
@@ -207,8 +212,8 @@ public partial class SpeedView : UserControl
     {
         _tunnel = tunnel;
 
-        ViaTunnel.Style = (Style)FindResource(tunnel ? "SegmentOn" : "SegmentOff");
-        Direct.Style = (Style)FindResource(tunnel ? "SegmentOff" : "SegmentOn");
+        System.Windows.Controls.Primitives.Selector.SetIsSelected(ViaTunnel, tunnel);
+        System.Windows.Controls.Primitives.Selector.SetIsSelected(Direct, !tunnel);
 
         var shot = tunnel ? _tunnelShot : _directShot;
 
@@ -229,9 +234,8 @@ public partial class SpeedView : UserControl
 
         ServerText.Text = shot?.Entry.Node is { Length: > 0 } node ? $"Cloudflare, узел {node}" : "Cloudflare, ближайший узел";
 
-        SeenText.Text = shot?.Address is { Length: > 0 } address
-            ? address + (shot.Entry.Country is { Length: > 0 } country ? $" ({country})" : string.Empty)
-            : "покажет замер";
+        _seen = shot;
+        ShowSeen();
 
         SpentText.Text = (shot?.Entry.Bytes > 0
                 ? $"в прошлый раз {shot.Entry.Bytes / (1024 * 1024)} МБ"
@@ -344,7 +348,7 @@ public partial class SpeedView : UserControl
         _up = [];
         _ping = [];
         _phase = string.Empty;
-        _pingNow = _downNow = _upNow = "—";
+        _pingNow = _downNow = _upNow = _nowNow = "—";
         _needleNow = 0;
 
         ShowRunning(true);
@@ -368,6 +372,10 @@ public partial class SpeedView : UserControl
             var result = await Task.Run(() => new SpeedTest(options).RunAsync(progress, run.Token));
             var entry = SpeedEntry.From(result, tunnel, ExitName(exit), DateTimeOffset.Now);
             var shot = new Shot(entry, result.Address, _down, _up, _ping);
+
+            // Напрямую нас видят под своим адресом — его прячем во всём, что пишется в файл.
+            if (!tunnel)
+                OwnAddress.Learn(result.Address);
 
             if (tunnel)
                 _tunnelShot = shot;
@@ -411,11 +419,55 @@ public partial class SpeedView : UserControl
         }
     }
 
-    /// <summary>Замер кончился при открытом разделе: стрелка на ноль, итог и история.</summary>
+    /// <summary>Итог, чей адрес показан в «Виден как»: кнопка «скрыть» перерисовывает его же.</summary>
+    private Shot? _seen;
+
+    /// <summary>
+    /// «Виден как»: адрес и страна; при «скрыть» — звёздочки вместо адреса.
+    /// </summary>
+    /// <remarks>
+    /// Через туннель здесь адрес сервера, напрямую — самого человека; прячем
+    /// оба одинаково: какой из них сейчас на экране, видно не всем.
+    /// </remarks>
+    private void ShowSeen()
+    {
+        bool hide = AppSettings.Load(AppSettings.DefaultPath).HideOwnAddress;
+
+        if (_seen?.Address is not { Length: > 0 } address)
+        {
+            SeenText.Text = "покажет замер";
+            SeenToggle.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        SeenText.Text = (hide ? OwnAddress.Hidden : address)
+            + (_seen.Entry.Country is { Length: > 0 } country ? $" ({country})" : string.Empty);
+
+        // Глаз — показать, перечёркнутый глаз — скрыть.
+        SeenToggle.Content = hide ? "\uE7B3" : "\uED1A";
+        SeenToggle.ToolTip = hide ? "Показать адрес" : "Скрыть адрес";
+        AutomationProperties.SetName(SeenToggle, (string)SeenToggle.ToolTip);
+        SeenToggle.Visibility = Visibility.Visible;
+    }
+
+    private void OnSeenToggle(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
+            (settings with { HideOwnAddress = !settings.HideOwnAddress }).Save(AppSettings.DefaultPath);
+        }
+        catch (Exception)
+        {
+            // Не сохранилось — экран всё равно покажет то, что лежит в файле.
+        }
+
+        ShowSeen();
+    }
+
+    /// <summary>Замер кончился при открытом разделе: итог (стрелка встаёт на скачивание — ShowShot) и история.</summary>
     private void Finish(bool tunnel, string? note)
     {
-        Move(0);
-
         ShowRunning(false);
 
         // Тот же путь: справка подхватит свежий узел, адрес и расход,
@@ -431,6 +483,7 @@ public partial class SpeedView : UserControl
     private void ShowLive()
     {
         PhaseText.Text = _phase;
+        NowText.Text = _nowNow;
         PingText.Text = _pingNow;
         DownText.Text = _downNow;
         UpText.Text = _upNow;
@@ -445,7 +498,7 @@ public partial class SpeedView : UserControl
 
     private void ShowRunning(bool running)
     {
-        GoText.Text = running ? "Остановить" : "Начать замер";
+        GoText.Text = running ? "Стоп" : "Начать";
         GoGlyph.Text = running ? "" : "";
 
         ViaTunnel.IsEnabled = !running;
@@ -488,28 +541,28 @@ public partial class SpeedView : UserControl
                 break;
 
             case SpeedPhase.Download when reading.Done:
-                _downNow = SpeedVerdict.Number(reading.Mbps);
+                _nowNow = _downNow = SpeedVerdict.Number(reading.Mbps);
                 _needleNow = 0;
                 break;
 
             case SpeedPhase.Upload when reading.Done:
-                _upNow = SpeedVerdict.Number(reading.Mbps);
+                _nowNow = _upNow = SpeedVerdict.Number(reading.Mbps);
                 _needleNow = 0;
                 break;
 
             case SpeedPhase.Download:
                 _phase = "скачивание";
-                _downNow = SpeedVerdict.Number(reading.Mbps);
+                _nowNow = _downNow = SpeedVerdict.Number(reading.Mbps);
                 _needleNow = reading.Mbps;
-                _strokeNow = "Accent";
+                _strokeNow = "SpeedArc";
                 _down.Add(reading.Mbps);
                 break;
 
             case SpeedPhase.Upload:
                 _phase = "отдача";
-                _upNow = SpeedVerdict.Number(reading.Mbps);
+                _nowNow = _upNow = SpeedVerdict.Number(reading.Mbps);
                 _needleNow = reading.Mbps;
-                _strokeNow = "Warn";
+                _strokeNow = "Text";
                 _up.Add(reading.Mbps);
                 break;
         }
@@ -518,11 +571,12 @@ public partial class SpeedView : UserControl
     }
 
     /// <summary>Блоки с цифрами и кривыми — по замеру; <c>null</c> — пусто.</summary>
-    private void ShowShot(Shot? shot)
+    internal void ShowShot(Shot? shot)
     {
         var entry = shot?.Entry;
 
         DownText.Text = entry?.DownMbps is { } down ? SpeedVerdict.Number(down) : "—";
+        NowText.Text = DownText.Text;
         UpText.Text = entry?.UpMbps is { } up ? SpeedVerdict.Number(up) : "—";
         PingText.Text = entry?.PingMs is { } ping ? $"{ping:0}" : "—";
 
@@ -533,6 +587,14 @@ public partial class SpeedView : UserControl
         DownWord.Text = Steadiness(shot?.Down);
         UpWord.Text = Steadiness(shot?.Up);
         PingWord.Text = entry?.JitterMs is { } jitter ? $"разброс {jitter:0.#} мс" : " ";
+
+        // Вне замера стрелка и дуга показывают то же, что число в середине, — скачивание
+        // этого итога; нет итога (или замер только начался) — ноль. Иначе 187 в центре
+        // и стрелка на нуле противоречили бы друг другу.
+        if (_run is null)
+            _value.SetResourceReference(Shape.StrokeProperty, "SpeedArc");
+
+        Move(entry?.DownMbps ?? 0);
 
         Status.Text = entry?.Problem is { Length: > 0 } problem
             ? char.ToUpper(problem[0]) + problem[1..] + "."
@@ -606,7 +668,7 @@ public partial class SpeedView : UserControl
             Margin = new Thickness(0, 0, 8, 0),
         };
 
-        glyph.SetResourceReference(TextBlock.ForegroundProperty, entry.Tunnel ? "Accent" : "Muted");
+        glyph.SetResourceReference(TextBlock.ForegroundProperty, entry.Tunnel ? "Accent2" : "Muted");
         path.Children.Add(glyph);
 
         path.Children.Add(new TextBlock
@@ -740,13 +802,13 @@ public partial class SpeedView : UserControl
         _value.StrokeThickness = Thickness;
         _value.StrokeStartLineCap = PenLineCap.Round;
         _value.StrokeEndLineCap = PenLineCap.Round;
-        _value.SetResourceReference(Shape.StrokeProperty, "Accent");
+        _value.SetResourceReference(Shape.StrokeProperty, "SpeedArc");
         Dial.Children.Add(_value);
 
         for (int i = 0; i < SpeedGauge.Marks.Count; i++)
         {
             double angle = SpeedGauge.StartAngle + SpeedGauge.Sweep * i / (SpeedGauge.Marks.Count - 1);
-            var at = SpeedGauge.At(Centre, Radius - 27, angle);
+            var at = SpeedGauge.At(Centre, Radius + 19, angle);
 
             var label = new TextBlock
             {
@@ -761,27 +823,21 @@ public partial class SpeedView : UserControl
             Dial.Children.Add(label);
         }
 
+        // Стрелка — клин у внутренней кромки дуги остриём к ней: середину
+        // занимает крупная цифра, и длинная стрелка с осью лезла бы на неё.
         var needle = new Polygon
         {
             Points =
             [
-                new Point(Centre.X, Centre.Y - (Radius - 42)),
-                new Point(Centre.X - 3.5, Centre.Y),
-                new Point(Centre.X + 3.5, Centre.Y),
+                new Point(Centre.X, Centre.Y - (Radius - 11)),
+                new Point(Centre.X - 6, Centre.Y - (Radius - 27)),
+                new Point(Centre.X + 6, Centre.Y - (Radius - 27)),
             ],
             RenderTransform = _needle,
-            Opacity = 0.9,
         };
 
         needle.SetResourceReference(Shape.FillProperty, "Text");
         Dial.Children.Add(needle);
-
-        var hub = new Ellipse { Width = 13, Height = 13 };
-
-        hub.SetResourceReference(Shape.FillProperty, "Text");
-        Canvas.SetLeft(hub, Centre.X - 6.5);
-        Canvas.SetTop(hub, Centre.Y - 6.5);
-        Dial.Children.Add(hub);
     }
 
     /// <summary>Дуга шкалы от угла до угла; пустая — ничего.</summary>

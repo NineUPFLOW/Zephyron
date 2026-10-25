@@ -143,6 +143,12 @@ public static class ThemeLoader
             }
         }
 
+        // Своя заливка главной кнопки без своей подписи — подпись подбирается
+        // к заливке, а не наследуется от основы: белая подпись основы на яркой
+        // жёлтой заливке не читалась бы, и тема не применилась бы (0.18).
+        if (colors.TryGetValue(ThemeSlots.AccentFill, out var ownFill) && !colors.ContainsKey(ThemeSlots.OnAccent))
+            colors[ThemeSlots.OnAccent] = ColorMath.ReadableOn(ownFill);
+
         foreach (var slot in ThemeSlots.All)
         {
             if (colors.ContainsKey(slot))

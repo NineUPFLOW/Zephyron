@@ -7,7 +7,7 @@ using Zephyron.Proxy;
 namespace Zephyron.Gui.Views;
 
 /// <summary>Строка карточки «Источники записей».</summary>
-public sealed record HostsSourceLine(string Name, int Count, Brush Back);
+public sealed record HostsSourceLine(string Name, int Count, Brush Back, Brush Edge, Visibility Mark);
 
 /// <summary>
 /// Файл hosts: что прибито, кем, живо ли оно.
@@ -70,6 +70,7 @@ public partial class HostsView : UserControl
     public HostsView()
     {
         InitializeComponent();
+        StatusLook.Attach(StatusBox, Status, StatusMark);
 
         ShowTab(list: false);
         PathText.Text = HostsFile.DefaultPath;
@@ -137,7 +138,7 @@ public partial class HostsView : UserControl
 
         DeadText.Text = dead.ToString();
         DeadCaption.Text = "молчат";
-        DeadGlyph.SetResourceReference(TextBlock.ForegroundProperty, dead > 0 ? "Danger" : "Accent");
+        DeadGlyph.SetResourceReference(TextBlock.ForegroundProperty, dead > 0 ? "Danger" : "Success");
     }
 
     private void ShowSources()
@@ -149,7 +150,9 @@ public partial class HostsView : UserControl
             .Select(g => new HostsSourceLine(
                 g.Key,
                 g.Count(),
-                g.Key == _source ? (Brush)FindResource("Raised") : Brushes.Transparent))
+                g.Key == _source ? (Brush)FindResource("AccentSoft") : Brushes.Transparent,
+                g.Key == _source ? (Brush)FindResource("AccentLine") : Brushes.Transparent,
+                g.Key == _source ? Visibility.Visible : Visibility.Collapsed))
             .ToList();
 
         Sources.ItemsSource = lines;
@@ -482,8 +485,9 @@ public partial class HostsView : UserControl
         _listTab = list;
         OnePanel.Visibility = list ? Visibility.Collapsed : Visibility.Visible;
         ListPanel.Visibility = list ? Visibility.Visible : Visibility.Collapsed;
-        OneTab.Style = (Style)FindResource(list ? "Ghost" : "Primary");
-        ListTab.Style = (Style)FindResource(list ? "Primary" : "Ghost");
+        // Выбранный сегмент отмечает Selector.IsSelected (стиль Choice): подложка, рамка и точка.
+        System.Windows.Controls.Primitives.Selector.SetIsSelected(OneTab, !list);
+        System.Windows.Controls.Primitives.Selector.SetIsSelected(ListTab, list);
         AddButton.Content = list ? "Добавить списком" : "Добавить запись";
     }
 

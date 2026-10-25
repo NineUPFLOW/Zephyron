@@ -1,4 +1,5 @@
 <Window x:Class="Zephyron.Gui.Views.SubscriptionAddWindow"
+        Style="{StaticResource Dialog}"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:gui="clr-namespace:Zephyron.Gui"
@@ -48,7 +49,7 @@
         <TextBlock Text="Тип" FontWeight="SemiBold" Margin="0,18,0,6" />
         <ComboBox x:Name="KindBox" SelectedIndex="0" SelectionChanged="OnKind">
             <ComboBoxItem Content="Подписка — ссылка от продавца" />
-            <ComboBoxItem Content="Ключи — vless://, trojan://, wireguard:// и другие" />
+            <ComboBoxItem Content="Ключи — vless://, trojan://, socks5://, wireguard:// и другие" />
         </ComboBox>
 
         <StackPanel x:Name="SubscriptionFields">
@@ -96,8 +97,21 @@
         <TextBlock x:Name="Found" Style="{StaticResource Caption}" Margin="0,10,0,0"
                    TextWrapping="Wrap" Foreground="{DynamicResource Accent}" Visibility="Collapsed" />
 
-        <TextBlock x:Name="Problem" Style="{StaticResource Caption}" Margin="0,10,0,0"
-                   TextWrapping="Wrap" Foreground="{DynamicResource Danger}" Visibility="Collapsed" />
+        <!-- Ошибка: панель DangerSoft/DangerLine с треугольником; Text и Visibility пишет код у Problem. -->
+        <Border Margin="0,10,0,0" Padding="12,8" CornerRadius="{StaticResource RMd}"
+                Background="{DynamicResource DangerSoft}" BorderBrush="{DynamicResource DangerLine}"
+                BorderThickness="{StaticResource Stroke}"
+                Visibility="{Binding Visibility, ElementName=Problem}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Control Style="{StaticResource StateMark}" Tag="Failed" Margin="0,1,10,0" VerticalAlignment="Top" />
+                <TextBlock x:Name="Problem" Grid.Column="1" Style="{StaticResource Caption}"
+                           TextWrapping="Wrap" Foreground="{DynamicResource Text}" Visibility="Collapsed" />
+            </Grid>
+        </Border>
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,22,0,0">
             <Button Style="{StaticResource Ghost}" Content="Отмена" IsCancel="True"

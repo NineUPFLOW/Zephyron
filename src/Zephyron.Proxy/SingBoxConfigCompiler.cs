@@ -194,6 +194,39 @@ public sealed class SingBoxOptions
         && System.Net.IPAddress.TryParse(DnsServer, out _);
 
     /// <summary>
+    /// Запасной резолвер (<see cref="Proxy.DnsSpare"/>): сервер <see cref="DnsSpareTag"/>
+    /// и правило DNS по режиму <see cref="DnsSpareMode"/>, который надзор ставит,
+    /// когда выбранный резолвер не отвечает; <c>null</c> — без запасного.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Тем же рычагом, что ступень TCP: режим Clash API движок проверяет на каждый
+    /// запрос, а <c>fallback</c> форка платит за молчащий резолвер 5 с на каждое имя
+    /// (опыт 20.10). При любом пути — «напрямую» и «авто», — кроме «через туннель»:
+    /// там резолвер ходит через выход, и мерить его прямой путь бессмысленно.
+    /// Запасной идёт прямым путём, без detour.
+    /// </para>
+    /// <para>
+    /// Не покрывает <c>default_domain_resolver</c> — им движок разрешает имена
+    /// своих серверов: там сервер назван прямо, мимо правил. При «авто» это
+    /// <c>bootstrap</c>, при «напрямую» — выбранный резолвер, и сервер подписки,
+    /// заданный именем, при мёртвом резолвере не найдётся и с запасным.
+    /// </para>
+    /// </remarks>
+    public DnsProvider? DnsSpare { get; init; }
+
+    /// <summary>Тег запасного резолвера.</summary>
+    public const string DnsSpareTag = "remote-spare";
+
+    /// <summary>Режим Clash API, в котором имена спрашиваются у запасного (<see cref="DnsSpareTag"/>).</summary>
+    public const string DnsSpareMode = "dns-spare";
+
+    /// <summary>Есть ли в этом конфиге запасной резолвер (<see cref="DnsSpareTag"/>).</summary>
+    internal bool DnsSpareStep =>
+        DnsSpare is { TlsAddress: { } address, TlsName: not null } && !DnsThroughTunnel
+        && !string.Equals(address, DnsServer, StringComparison.Ordinal);
+
+    /// <summary>
     /// Имена панелей подписок: при <see cref="DnsThroughTunnel"/> они
     /// разрешаются через <c>bootstrap</c>, в обход туннеля.
     /// </summary>
@@ -913,6 +946,24 @@ public sealed class SingBoxConfigCompiler
             });
         }
 
+        // Запасной резолвер — прямым путём, без detour; включается правилом
+        // по режиму в конце списка (см. SingBoxOptions.DnsSpare).
+        if (options.DnsSpareStep)
+        {
+            var spare = new JsonObject
+            {
+                ["tag"] = SingBoxOptions.DnsSpareTag,
+                ["type"] = "https",
+                ["server"] = options.DnsSpare!.TlsAddress,
+                ["tls"] = new JsonObject { ["server_name"] = options.DnsSpare.TlsName },
+            };
+
+            if (options.DnsSpare.DohPath is { } path && path != "/dns-query")
+                spare["path"] = path;
+
+            servers.Add(spare);
+        }
+
         if (bootstrap)
         {
             // Имена самих серверов подписки разрешаются в обход туннеля,
@@ -1058,6 +1109,17 @@ public sealed class SingBoxConfigCompiler
             {
                 ["clash_mode"] = SingBoxOptions.DnsTcpMode,
                 ["server"] = SingBoxOptions.DnsTcpTag,
+            });
+        }
+
+        // Так же и запасной: режим один на движок, так что TCP и запасной
+        // друг другу не мешают — какой режим стоит, то правило и действует.
+        if (options.DnsSpareStep)
+        {
+            rules.Add(new JsonObject
+            {
+                ["clash_mode"] = SingBoxOptions.DnsSpareMode,
+                ["server"] = SingBoxOptions.DnsSpareTag,
             });
         }
 
@@ -1697,7 +1759,8 @@ public sealed class SingBoxConfigCompiler
 
             case ProxyProtocol.Shadowsocks:
                 outbound["type"] = "shadowsocks";
-                outbound["method"] = server.Method ?? "aes-256-gcm";
+                // Короткие имена Xray и Clash — полными: sing-box их не знает (№38).
+                outbound["method"] = ShadowsocksMethods.ForSingBox(server.Method) ?? ShadowsocksMethods.Default;
                 outbound["password"] = server.Credential;
                 break;
 
@@ -1715,6 +1778,18 @@ public sealed class SingBoxConfigCompiler
                         obfs["password"] = server.ObfsPassword;
 
                     outbound["obfs"] = obfs;
+                }
+
+                // Смена портов (PortHopping). server_port рядом движок терпит
+                // (check и запуск, 24.10) и при смене не берёт; интервал —
+                // его же 30 секунд, своего в ссылках не пишут.
+                if (server.HopPorts is { } hopPorts)
+                {
+                    var ports = new JsonArray();
+                    foreach (var range in PortHopping.Ranges(hopPorts))
+                        ports.Add(range);
+
+                    outbound["server_ports"] = ports;
                 }
 
                 break;
@@ -1757,6 +1832,19 @@ public sealed class SingBoxConfigCompiler
                 outbound["password"] = server.Credential;
                 break;
 
+            // Обсуждение №35 (22.10): обычные прокси. Имя и пароль — только
+            // если заданы: пустые sing-box отправил бы прокси как настоящие.
+            case ProxyProtocol.Socks:
+                outbound["type"] = "socks";
+                outbound["version"] = server.SocksVersion ?? "5";
+                AddLogin(outbound, server);
+                break;
+
+            case ProxyProtocol.Http:
+                outbound["type"] = "http";
+                AddLogin(outbound, server);
+                break;
+
             case ProxyProtocol.Wireguard:
                 throw new InvalidOperationException(
                     "WireGuard собирается в endpoints, а не в исходящие — см. BuildEndpoints.");
@@ -1774,6 +1862,16 @@ public sealed class SingBoxConfigCompiler
             outbound["transport"] = transport;
 
         return outbound;
+    }
+
+    /// <summary>Имя и пароль прокси SOCKS или HTTP, если они есть.</summary>
+    private static void AddLogin(JsonObject outbound, ProxyServer server)
+    {
+        if (!string.IsNullOrEmpty(server.Credential))
+            outbound["username"] = server.Credential;
+
+        if (!string.IsNullOrEmpty(server.Password))
+            outbound["password"] = server.Password;
     }
 
     /// <summary>

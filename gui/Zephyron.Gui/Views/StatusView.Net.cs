@@ -1,7 +1,6 @@
 using System.Net.NetworkInformation;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Shapes;
 using System.Windows.Threading;
 
 namespace Zephyron.Gui.Views;
@@ -30,8 +29,8 @@ public partial class StatusView
     /// <summary>Сколько проверок задержки помнить для потерь — две минуты.</summary>
     private const int PingWindow = 24;
 
-    /// <summary>Сколько секунд приёма в полоске.</summary>
-    private const int SparkBars = 48;
+    /// <summary>Сколько секунд скорости на графике — минута.</summary>
+    private const int SparkBars = 60;
 
     private const string PingTarget = "1.1.1.1";
 
@@ -41,6 +40,10 @@ public partial class StatusView
     private readonly DispatcherTimer _net = new() { Interval = NetInterval };
     private readonly Queue<bool> _pings = new();
     private readonly Queue<double> _down = new();
+    private readonly Queue<double> _up = new();
+
+    /// <summary>Задержка проверок за две минуты, мс; <c>NaN</c> — ответа не было.</summary>
+    private readonly Queue<double> _pingMs = new();
 
     private (long Received, long Sent, DateTime At)? _lastBytes;
     private DateTime _lastPing = DateTime.MinValue;
@@ -52,7 +55,7 @@ public partial class StatusView
     /// </summary>
     /// <remarks>
     /// Владелец 22.10: метрика — часть запуска, а не всегдашний прибор.
-    /// Остановленная строка показывает нули и прочерки, а не последнее
+    /// Остановленная строка показывает прочерки «—», а не нули и не последнее
     /// измеренное: застывшие цифры читались бы как ещё идущий замер.
     /// </remarks>
     private void SyncNet(bool on)
@@ -82,25 +85,41 @@ public partial class StatusView
         ResetNet();
     }
 
-    /// <summary>Строка без замеров: нули скорости, прочерки задержки и потерь, пустая полоска.</summary>
+    /// <summary>Строка без замеров: везде «—», пустые графики, частицам — «скорости нет».</summary>
     private void ResetNet()
     {
         _lastBytes = null;
         _lastPing = DateTime.MinValue;
         _pings.Clear();
         _down.Clear();
+        _up.Clear();
+        _pingMs.Clear();
 
-        NetDown.Text = "0.0";
-        NetUp.Text = "0.0";
-        NetPing.Text = "—";
-        NetPingUnit.Text = string.Empty;
-        NetLoss.Text = "—";
-        NetLossUnit.Text = string.Empty;
+        _mbps = null;
+        NetUp.Opacity = 1;
+
+        SetMetric(NetDown, NetDownUnit, null, "Accent2");
+        SetMetric(NetUp, NetUpUnit, null, "Text");
+        SetMetric(NetPing, NetPingUnit, null, "Accent2");
+        SetMetric(NetLoss, NetLossUnit, null, "Warn");
 
         foreach (var cell in new FrameworkElement[] { NetDownCell, NetUpCell, NetPingCell, NetLossCell })
-            cell.Opacity = 0.45;
+            cell.Opacity = 1;
 
         ShowSpark();
+        ShowLatency();
+        Pulse();
+    }
+
+    /// <summary>
+    /// Число метрики с единицей или «—» (Muted) — когда замера нет. Не «0.0»:
+    /// ноль — это замер, а прочерк — его отсутствие.
+    /// </summary>
+    private void SetMetric(TextBlock value, TextBlock unit, string? text, string colourKey)
+    {
+        value.Text = text ?? "—";
+        value.SetResourceReference(TextBlock.ForegroundProperty, text is null ? "Muted" : colourKey);
+        unit.Visibility = text is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private async void OnNet(object? sender, EventArgs e)
@@ -182,17 +201,28 @@ public partial class StatusView
         double down = Math.Max(0, bytes.Received - last.Received) * 8 / seconds / 1_000_000;
         double up = Math.Max(0, bytes.Sent - last.Sent) * 8 / seconds / 1_000_000;
 
-        NetDown.Text = Rate(down);
-        NetUp.Text = Rate(up);
+        SetMetric(NetDown, NetDownUnit, Rate(down), "Accent2");
+        SetMetric(NetUp, NetUpUnit, Rate(up), "Text");
+
+        // Отдача — Text вполсилы (.75), чтобы не спорить с приёмом цветом.
+        NetUp.Opacity = 0.75;
 
         // Тихая сеть — тише и строка: меньше 10 кбит/с читается как «ничего».
         NetDownCell.Opacity = down < 0.01 ? 0.45 : 1;
         NetUpCell.Opacity = up < 0.01 ? 0.45 : 1;
 
+        // Настоящая скорость приёма — слою частиц; выдуманного не шлём.
+        _mbps = down;
+        Pulse();
+
         _down.Enqueue(down);
+        _up.Enqueue(up);
 
         while (_down.Count > SparkBars)
             _down.Dequeue();
+
+        while (_up.Count > SparkBars)
+            _up.Dequeue();
 
         ShowSpark();
     }
@@ -202,46 +232,36 @@ public partial class StatusView
         mbps >= 100 ? mbps.ToString("0", System.Globalization.CultureInfo.InvariantCulture)
             : mbps.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
 
-    /// <summary>Полоски приёма: высота — доля от наибольшего за минуту.</summary>
+    /// <summary>
+    /// График скорости за минуту (приём — Accent2 сплошной с заливкой, отдача —
+    /// Text вполсилы пунктиром) и скорость потока по трассам — из того же замера.
+    /// </summary>
+    /// <remarks>
+    /// До 0.18 здесь было сорок восемь прямоугольников, и смена их высоты раз
+    /// в секунду заново раскладывала сетку. График рисуется одним проходом
+    /// (NetChart) и доезжает до новой точки за секунду до следующей.
+    /// </remarks>
     private void ShowSpark()
     {
-        if (NetSpark.Children.Count != SparkBars)
-        {
-            NetSpark.Children.Clear();
-            NetSpark.ColumnDefinitions.Clear();
+        var down = _down.ToArray();
 
-            for (int i = 0; i < SparkBars; i++)
-            {
-                NetSpark.ColumnDefinitions.Add(new ColumnDefinition());
+        ThroughputChart.Show(
+            [new(down, (System.Windows.Media.Brush)FindResource("Accent2"), true),
+             new(_up.ToArray(), (System.Windows.Media.Brush)FindResource("Text"), false, Dashed: true, Opacity: 0.75)],
+            step: NetInterval);
 
-                var bar = new Rectangle
-                {
-                    RadiusX = 1,
-                    RadiusY = 1,
-                    Margin = new Thickness(0.5, 0, 0.5, 0),
-                    VerticalAlignment = VerticalAlignment.Bottom,
-                    Opacity = 0.55,
-                    Height = 1,
-                };
-                bar.SetResourceReference(Shape.FillProperty, "Accent");
+        Lanes.Flow = down.Length > 0 ? down[^1] : 0;
+    }
 
-                Grid.SetColumn(bar, i);
-                NetSpark.Children.Add(bar);
-            }
-        }
+    /// <summary>График задержки за две минуты; потерянные проверки — ромбами Warn.</summary>
+    private void ShowLatency()
+    {
+        var values = _pingMs.ToArray();
+        var lost = Enumerable.Range(0, values.Length).Where(i => double.IsNaN(values[i])).ToArray();
 
-        var values = _down.ToArray();
-        double peak = Math.Max(0.05, values.DefaultIfEmpty(0).Max());
-        int offset = SparkBars - values.Length;
-
-        for (int i = 0; i < SparkBars; i++)
-        {
-            var bar = (Rectangle)NetSpark.Children[i];
-            double value = i >= offset ? values[i - offset] : 0;
-
-            bar.Height = Math.Max(1, Math.Round(value / peak * 18));
-            bar.SetResourceReference(Shape.FillProperty, value < 0.01 ? "Faint" : "Accent");
-        }
+        LatencyChart.Show(
+            [new(values, (System.Windows.Media.Brush)FindResource("Accent2"), true)],
+            marks: lost, step: PingInterval);
     }
 
     private async Task PingAsync()
@@ -272,17 +292,23 @@ public partial class StatusView
             return;
 
         _pings.Enqueue(ms is not null);
+        _pingMs.Enqueue(ms is { } answered ? answered : double.NaN);
 
         while (_pings.Count > PingWindow)
             _pings.Dequeue();
 
-        NetPing.Text = ms is { } value ? value.ToString() : "—";
-        NetPingUnit.Text = ms is null ? string.Empty : "мс";
+        while (_pingMs.Count > PingWindow)
+            _pingMs.Dequeue();
+
+        ShowLatency();
+
+        // Нет ответа — «—», а не нуль: задержки нет, а не нулевая.
+        SetMetric(NetPing, NetPingUnit, ms is { } value ? value.ToString() : null, "Accent2");
         NetPingCell.Opacity = ms is null ? 0.45 : 1;
 
+        // Ноль потерь — настоящий замер (Text); потери есть — Warn.
         int lost = _pings.Count(ok => !ok);
-        NetLoss.Text = $"{100.0 * lost / _pings.Count:0}";
-        NetLossUnit.Text = "%";
+        SetMetric(NetLoss, NetLossUnit, $"{100.0 * lost / _pings.Count:0}", lost == 0 ? "Text" : "Warn");
         NetLossCell.Opacity = lost == 0 ? 0.45 : 1;
     }
 }

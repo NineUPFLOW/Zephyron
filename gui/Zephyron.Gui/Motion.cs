@@ -25,27 +25,157 @@ namespace Zephyron.Gui;
 /// </remarks>
 public static class Motion
 {
-    private static bool? _setting;
+    private static AppSettings? _cfg;
+    private static EffectsProfile? _profile;
+
+    /// <summary>
+    /// «Движение выключено» для шаблонов: наследуемое свойство, которое Motion
+    /// выставляет каждому окну (оно же перевыставляется по <see cref="Changed"/>).
+    /// </summary>
+    /// <remarks>
+    /// Триггер шаблона не умеет ни DynamicResource в Value, ни x:Static с
+    /// обновлением; присоединённое свойство — умеет, и оно же перезапускает
+    /// сториборд сразу, а не при следующем показе. Значение по умолчанию —
+    /// «движение есть»: окно, которого Motion не видел, анимируется как прежде.
+    /// </remarks>
+    public static readonly DependencyProperty StillProperty = DependencyProperty.RegisterAttached(
+        "Still", typeof(bool), typeof(Motion),
+        new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.Inherits));
+
+    public static bool GetStill(DependencyObject element) => (bool)element.GetValue(StillProperty);
+
+    public static void SetStill(DependencyObject element, bool value) => element.SetValue(StillProperty, value);
+
+    // Окна живут в разных потоках (в проверках — не в потоке приложения), поэтому
+    // Application.Windows не годится: свой список со слабыми ссылками.
+    private static readonly List<WeakReference<Window>> Hosts = [];
+
+    private static bool IsStill => !Enabled || Profile == EffectsProfile.Lite;
+
+    private static void Track(object sender, RoutedEventArgs e)
+    {
+        var window = (Window)sender;
+
+        lock (Hosts)
+        {
+            Hosts.RemoveAll(h => !h.TryGetTarget(out _));
+            Hosts.Add(new WeakReference<Window>(window));
+        }
+
+        SetStill(window, IsStill);
+    }
+
+    private static void ApplyStill()
+    {
+        bool still = IsStill;
+        List<Window> alive;
+
+        lock (Hosts)
+            alive = Hosts.Select(h => h.TryGetTarget(out var w) ? w : null!).Where(w => w is not null).ToList();
+
+        foreach (var window in alive)
+            window.Dispatcher.BeginInvoke(() => SetStill(window, still));
+    }
+
+    /// <summary>Вызов из App.OnStartup: запускает статический конструктор до первого окна.</summary>
+    public static void Hook()
+    {
+    }
+
+    static Motion()
+    {
+        EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, new RoutedEventHandler(Track));
+        Changed += (_, _) => ApplyStill();
+
+        // Один раз и навсегда: статические источники живут весь процесс, а
+        // отписываться нашему статическому обработчику не от кого.
+        RenderCapability.TierChanged += (_, _) => Refresh(reload: false);
+
+        SystemParameters.StaticPropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(SystemParameters.HighContrast) or nameof(SystemParameters.ClientAreaAnimation))
+                Refresh(reload: false);
+        };
+    }
 
     /// <summary>Анимировать ли сейчас.</summary>
-    public static bool Enabled => (_setting ??= Read()) && SystemParameters.ClientAreaAnimation;
+    public static bool Enabled => (_cfg ??= Read()).Animations && SystemParameters.ClientAreaAnimation;
+
+    /// <summary>
+    /// Действующий профиль эффектов. Lite — когда анимации выключены (тумблером
+    /// или Windows), включён высокий контраст, или настройка «авто» на слабом
+    /// видео (программная отрисовка, Tier &lt; 2).
+    /// </summary>
+    public static EffectsProfile Profile => _profile ??= Resolve();
+
+    /// <summary>
+    /// Поднимается, когда изменилось то, что решает, движется ли окно:
+    /// выключатель, профиль, высокий контраст, уровень отрисовки.
+    /// </summary>
+    /// <remarks>
+    /// Событие статическое и держит подписчиков за обработчик: элемент,
+    /// подписавшийся на нём, обязан отписаться (Unloaded / закрытие окна),
+    /// иначе он не соберётся сборщиком — окно пересоздаётся из трея.
+    /// </remarks>
+    public static event EventHandler? Changed;
 
     /// <summary>Перечитать выключатель — после его смены в «Оформлении».</summary>
-    public static void Refresh() => _setting = Read();
+    public static void Refresh() => Refresh(reload: true);
 
-    private static bool Read()
+    private static void Refresh(bool reload)
+    {
+        if (reload)
+            _cfg = Read();
+
+        _profile = null;
+
+        // Прежде рассылки не было, и выключенные «Анимации» не останавливали
+        // уже запущенные бесконечные анимации до перезапуска окна.
+        Changed?.Invoke(null, EventArgs.Empty);
+    }
+
+    /// <summary>Подставить настройки без файла — для проверок.</summary>
+    internal static void Use(AppSettings settings)
+    {
+        _cfg = settings;
+        _profile = null;
+        Changed?.Invoke(null, EventArgs.Empty);
+    }
+
+    private static EffectsProfile Resolve()
+    {
+        var cfg = _cfg ??= Read();
+
+        if (!Enabled || SystemParameters.HighContrast)
+            return EffectsProfile.Lite;
+
+        if (cfg.Effects is { } chosen)
+            return chosen;
+
+        return RenderCapability.Tier >> 16 < 2 ? EffectsProfile.Lite : EffectsProfile.Balanced;
+    }
+
+    private static AppSettings Read()
     {
         try
         {
-            return AppSettings.Load(AppSettings.DefaultPath).Animations;
+            return AppSettings.Load(AppSettings.DefaultPath);
         }
         catch (Exception)
         {
-            return true;
+            return new AppSettings();
         }
     }
 
-    private static readonly IEasingFunction Ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+    // Замороженная: статический объект делят потоки (окна, тесты), а живой Freezable
+    // принадлежит потоку-создателю.
+    private static readonly IEasingFunction Ease = Frozen(new CubicEase { EasingMode = EasingMode.EaseOut });
+
+    private static T Frozen<T>(T f) where T : Freezable
+    {
+        f.Freeze();
+        return f;
+    }
 
     /// <summary>Знак программы проявляется и чуть наезжает — мягко, без рывка.</summary>
     /// <remarks>
@@ -59,22 +189,22 @@ public static class Motion
         if (!Enabled)
             return;
 
-        var time = TimeSpan.FromMilliseconds(520);
+        var time = TimeSpan.FromMilliseconds(400);
 
         element.BeginAnimation(UIElement.OpacityProperty,
             new DoubleAnimation(0, 1, time) { EasingFunction = Ease, FillBehavior = FillBehavior.Stop });
 
         element.RenderTransformOrigin = new Point(0.5, 0.5);
-        var grow = new ScaleTransform(0.86, 0.86);
+        var grow = new ScaleTransform(0.92, 0.92);
         element.RenderTransform = grow;
 
-        var scale = new DoubleAnimation(0.86, 1.0, time) { EasingFunction = Ease, FillBehavior = FillBehavior.Stop };
+        var scale = new DoubleAnimation(0.92, 1.0, time) { EasingFunction = Ease, FillBehavior = FillBehavior.Stop };
         grow.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
         grow.BeginAnimation(ScaleTransform.ScaleYProperty, scale);
     }
 
     /// <summary>Элемент проявляется и доезжает на место.</summary>
-    public static void Arrive(FrameworkElement element, double dx = 0, double dy = 10, int ms = 280, int delay = 0)
+    public static void Arrive(FrameworkElement element, double dx = 0, double dy = 6, int ms = 200, int delay = 0)
     {
         if (!Enabled)
             return;
@@ -162,13 +292,14 @@ public static class Motion
         page.BeginAnimation(UIElement.OpacityProperty,
             new DoubleAnimation(0, 0, TimeSpan.FromSeconds(5)) { FillBehavior = FillBehavior.Stop });
 
-        // Лёгкое «оседание»: раздел не только проявляется, но и чуть
-        // наезжает из чуть уменьшенного. Владелец 12.10: «нет плавных
-        // анимаций». Один процент — заметно по движению и незаметно как
-        // искажение; больше выглядело бы зумом.
-        var settle = new ScaleTransform(0.99, 0.99);
-        page.RenderTransform = settle;
-        page.RenderTransformOrigin = new Point(0.5, 0.5);
+        // Раздел проявляется и всплывает на 6 точек за 180 мс (шкала движения,
+        // раздел 7 спеки): виден как смена экрана, а не моргание. Без «оседания»
+        // масштабом — оно читалось как зум. Одним куском, без очереди карточек:
+        // ровно это владелец 28.09 назвал «дёргано». Под стеклом темы — без
+        // сдвига: стекло следует раскладке, а не отрисовке (см. Arrive).
+        double rise = Glass.Image is null ? 6 : 0;
+        var lift = new TranslateTransform(0, rise);
+        page.RenderTransform = lift;
 
         // Начало — на первом кадре после Loaded: к нему синхронная работа
         // раздела сделана. Отсчёт свой, по часам, а не анимацией WPF: её
@@ -177,7 +308,7 @@ public static class Motion
         // появлением. Здесь первый показанный кадр — ноль, дальше по
         // реальному времени, с мягким замедлением к концу.
         var clock = new Stopwatch();
-        const double Length = 240;
+        const double Length = 180;
 
         void Frame(object? sender, EventArgs e)
         {
@@ -199,12 +330,10 @@ public static class Motion
                 return;
             }
 
-            double eased = 1 - (1 - x) * (1 - x);
-            page.Opacity = eased;
-
-            double grow = 0.99 + 0.01 * eased;
-            settle.ScaleX = grow;
-            settle.ScaleY = grow;
+            // Кубическое замедление: быстрый старт и долгая мягкая посадка.
+            double eased = 1 - Math.Pow(1 - x, 3);
+            page.Opacity = Math.Min(1, eased * 1.4);
+            lift.Y = rise * (1 - eased);
         }
 
         void Start(object sender, RoutedEventArgs e)

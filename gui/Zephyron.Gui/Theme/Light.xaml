@@ -3,64 +3,46 @@
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
     <!--
-        Светлая пара к тёмной палитре. Ключи те же до последнего: стили
+        Светлая пара к тёмному «Сигналу». Ключи те же до последнего: стили
         в Controls.xaml опираются только на них и про тему не знают вовсе.
         Поэтому переключение — это подмена одного словаря, а не второй набор
         стилей, который пришлось бы править парами.
 
-        Светлая «Кремовая» — тёплая и мягкая, для тех, кому белый режет глаз.
-        Значения цветов состояния взяты не «посветлее тех же», а из палитры,
-        рассчитанной на светлый фон: нежный розовый акцент на белом теряет
-        контраст, поэтому текстовый «работает» — тёмный малиновый, а заливка
-        главной кнопки — насыщенная фуксия. Смысл сохранён ровно тот же:
-        «работает», «закрыто», «требует внимания», — иначе человек, сменивший
-        тему, начал бы читать таблицу заново.
+        Холодный светло-серый с белыми карточками и тем же синим акцентом,
+        только глубже: на белом светлый акцент теряет контраст. Смысл цветов
+        состояния тот же — «работает», «требует внимания», «сбой», — иначе
+        человек, сменивший тему, начал бы читать таблицу заново.
 
         Контраст проверяется ThemeContrast по тем же парам, что и тёмная:
-        текст, приглушённый и бледный проходят AA, бледный намеренно нет —
-        это подписи, которые должны уходить на второй план.
+        текст, приглушённый и бледный проходят AA.
 
         Значения совпадают с themes/light/theme.json — расхождение ловит тест
         ThemeFilesMatchXamlPalettes.
     -->
 
-    <Color x:Key="BackdropColor">#FFFFF5F8</Color>
+    <Color x:Key="BackdropColor">#FFEEF0F3</Color>
     <Color x:Key="SurfaceColor">#FFFFFFFF</Color>
-    <Color x:Key="RaisedColor">#FFFBEAF1</Color>
-    <Color x:Key="BorderColor">#FFF0D3E0</Color>
+    <Color x:Key="RaisedColor">#FFF5F6F8</Color>
+    <Color x:Key="BorderColor">#FFD5D9E0</Color>
 
-    <Color x:Key="TextColor">#FF3A2E3F</Color>
-    <Color x:Key="MutedColor">#FF6E5F76</Color>
-    <Color x:Key="FaintColor">#FF9C89A5</Color>
+    <Color x:Key="TextColor">#FF14171C</Color>
+    <Color x:Key="MutedColor">#FF4A5260</Color>
+    <Color x:Key="FaintColor">#FF646C7A</Color>
 
-    <Color x:Key="AccentColor">#FFC2185B</Color>
-    <Color x:Key="AccentDimColor">#FFF3C6DC</Color>
-    <Color x:Key="DangerColor">#FFC62828</Color>
+    <Color x:Key="AccentColor">#FF0B6BCB</Color>
+    <Color x:Key="AccentDimColor">#FFD6E8FA</Color>
+    <Color x:Key="DangerColor">#FFC0262D</Color>
     <Color x:Key="WarnColor">#FF8A5200</Color>
 
     <!--
         Заливки отдельно от текста, и это не украшательство. На светлом фоне
-        одно значение не может служить обоим: зелёный, читаемый как текст
-        на белом, должен быть тёмным, а тёмная заливка кнопки с тёмной же
-        подписью сливается в грязь. На тёмном фоне разницы нет, и там оба
-        ключа совпадают — но ключи есть в обеих палитрах, иначе стиль кнопки
+        одно значение не может служить обоим: жёлтый, читаемый как текст
+        на белом, должен быть тёмным, а тёмная заливка с тёмной подписью
+        сливается в грязь. Ключи есть в обеих палитрах, иначе стиль кнопки
         пришлось бы писать дважды.
     -->
-    <Color x:Key="AccentFillColor">#FFD6336C</Color>
+    <Color x:Key="AccentFillColor">#FF0E74D8</Color>
     <Color x:Key="OnAccentColor">#FFFFFFFF</Color>
-
-    <!--
-        Жёлтый для точек и полос — насыщенный. Текстовый на них выглядел
-        не предупреждением, а выцветшей серостью: у мелкой метки нет
-        площади, чтобы донести приглушённый оттенок.
-
-        23.09 три цвета светлой темы поправлены по проверке контраста
-        (ThemeContrast), которой потом проверяются и темы художников:
-        подпись на главной кнопке была 3.22:1 при пороге 4.5 — заливка
-        #2DA44E стала #1A7F37 (5.08); «внимание» на кнопке 4.37 — #9A6700
-        стал #8A5C00 (5.22); эти точки на карточке 2.38 при пороге 3 —
-        #D4A017 стал #B08800 (3.30).
-    -->
     <Color x:Key="WarnFillColor">#FFB26A00</Color>
 
     <SolidColorBrush x:Key="Backdrop" Color="{StaticResource BackdropColor}" />
@@ -81,23 +63,43 @@
     <SolidColorBrush x:Key="OnAccent" Color="{StaticResource OnAccentColor}" />
     <SolidColorBrush x:Key="WarnFill" Color="{StaticResource WarnFillColor}" />
 
-    <!-- Производные — те же доли, что в Palette.xaml (Themes.Derive). -->
-    <SolidColorBrush x:Key="AccentSoft" Color="#1FC2185B" />
-    <SolidColorBrush x:Key="AccentLine" Color="#61C2185B" />
-    <SolidColorBrush x:Key="DangerSoft" Color="#1AC62828" />
-    <SolidColorBrush x:Key="DangerLine" Color="#57C62828" />
-    <SolidColorBrush x:Key="WarnSoft" Color="#1A8A5200" />
-    <SolidColorBrush x:Key="WarnLine" Color="#4D8A5200" />
-    <SolidColorBrush x:Key="Wash" Color="#083A2E3F" />
-    <SolidColorBrush x:Key="WashHover" Color="#123A2E3F" />
-    <SolidColorBrush x:Key="LineStrong" Color="#243A2E3F" />
+    <!-- Производные — те же доли, что в Themes.Derive (светлая ветка плотнее тёмной). -->
+    <SolidColorBrush x:Key="AccentSoft" Color="#1A0B6BCB" />
+    <SolidColorBrush x:Key="AccentLine" Color="#590B6BCB" />
+    <SolidColorBrush x:Key="DangerSoft" Color="#14C0262D" />
+    <SolidColorBrush x:Key="DangerLine" Color="#66C0262D" />
+    <SolidColorBrush x:Key="WarnSoft" Color="#148A5200" />
+    <SolidColorBrush x:Key="WarnLine" Color="#668A5200" />
+    <SolidColorBrush x:Key="Wash" Color="#0814171C" />
+    <SolidColorBrush x:Key="WashHover" Color="#1014171C" />
+    <SolidColorBrush x:Key="LineStrong" Color="#3814171C" />
+    <SolidColorBrush x:Key="FieldLine" Color="#B34A5260" />
+    <SolidColorBrush x:Key="Scrim" Color="#B3EEF0F3" />
+    <LinearGradientBrush x:Key="CardRim" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#1F14171C" Offset="0" />
+        <GradientStop Color="#1414171C" Offset="1" />
+    </LinearGradientBrush>
+    <!-- «Работает» — тёмно-зелёным, читаемым на светлой подложке (Themes.Derive). -->
+    <Color x:Key="SuccessColor">#FF0A7A4F</Color>
+    <SolidColorBrush x:Key="Success" Color="#FF0A7A4F" />
+    <SolidColorBrush x:Key="SuccessSoft" Color="#140A7A4F" />
+    <SolidColorBrush x:Key="SuccessLine" Color="#660A7A4F" />
+    <!-- Второй акцент и градиенты (Themes.Derive): тон акцента +60° с зажимом. -->
+    <Color x:Key="Accent2Color">#FF6B10C6</Color>
+    <SolidColorBrush x:Key="Accent2" Color="#FF6B10C6" />
+    <LinearGradientBrush x:Key="AccentGradient" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#FF0E74D8" Offset="0" />
+        <GradientStop Color="#FF0C67C0" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="AccentFlow" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FF0B6BCB" Offset="0" />
+        <GradientStop Color="#FF6B10C6" Offset="1" />
+    </LinearGradientBrush>
     <sys:Double x:Key="Decor">1</sys:Double>
 
-    <!-- Comfortaa — основной: округлый и мягкий, в тон милому оформлению.
-         Segoe UI — запас, если её нет в системе. -->
-    <FontFamily x:Key="UiFont">Comfortaa, Segoe UI</FontFamily>
+    <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI</FontFamily>
     <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas</FontFamily>
-    <FontFamily x:Key="DisplayFont">Comfortaa, Segoe UI</FontFamily>
+    <FontFamily x:Key="DisplayFont">Segoe UI Variable Display, Segoe UI</FontFamily>
 
     <!--
         Фон окна для тем с картинкой (Themes.cs). У встроенных картинки нет:
@@ -106,7 +108,7 @@
     <SolidColorBrush x:Key="BackdropImage" Color="Transparent" />
     <sys:Double x:Key="BackdropDim">1</sys:Double>
     <SolidColorBrush x:Key="Chrome" Color="Transparent" />
-    <SolidColorBrush x:Key="RailFill" Color="{StaticResource BackdropColor}" />
+    <SolidColorBrush x:Key="RailFill" Color="#E6FFFFFF" />
     <!-- Арт сбоку на «Главной» (Themes.cs): у встроенных тем картинки нет, колонка пуста. -->
     <SolidColorBrush x:Key="SideArt" Color="Transparent" />
     <ScaleTransform x:Key="UiScaleTransform" ScaleX="1" ScaleY="1" />

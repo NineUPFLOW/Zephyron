@@ -29,13 +29,11 @@ public sealed class TrayMenuTests
                 Desync: ServiceHealth.Healthy,
                 Busy: false));
 
-            // Фигура, а не именно круг: с 0.16 точки состояния — квадратики.
-            var dot = (Shape)menu.FindName("Dot");
+            // Знак состояния (StateMark) — формой по Tag, цвет ему даёт тема.
+            var mark = (Control)menu.FindName("Mark");
             var toggle = (Button)menu.FindName("Toggle");
-            var accent = (SolidColorBrush)Application.Current.FindResource("Accent");
 
-            // Цвет — из темы, а не зашитый: в этом и была вся правка.
-            Assert.Equal(accent.Color, ((SolidColorBrush)dot.Fill).Color);
+            Assert.Equal("Running", mark.Tag);
             Assert.Equal("Остановить", toggle.Content);
             Assert.Equal("работает", ((TextBlock)menu.FindName("Tunnel")).Text);
 
@@ -47,9 +45,7 @@ public sealed class TrayMenuTests
                 Busy: true,
                 Stopping: true));
 
-            var warn = (SolidColorBrush)Application.Current.FindResource("Warn");
-
-            Assert.Equal(warn.Color, ((SolidColorBrush)dot.Fill).Color);
+            Assert.Equal("Starting", mark.Tag);
             Assert.Equal("Останавливаю…", toggle.Content);
             Assert.False(toggle.IsEnabled);
 

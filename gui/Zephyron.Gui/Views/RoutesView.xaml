@@ -5,27 +5,35 @@
              Background="{DynamicResource Chrome}">
 
     <UserControl.Resources>
-        <!-- Кнопка отбора по маршруту: выбранная залита цветом темы, прочие — голый текст. -->
+        <!-- Кнопка отбора по маршруту: выбранная — AccentSoft, AccentLine и точка слева (не только цвет), прочие — голый текст. -->
         <Style x:Key="RouteFilter" TargetType="RadioButton">
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Foreground" Value="{DynamicResource Muted}" />
             <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
             <Setter Property="FontSize" Value="13" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Shape" Background="Transparent" CornerRadius="8" Padding="12,0" MinHeight="30"
-                                BorderThickness="1" BorderBrush="Transparent">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Border x:Name="Shape" Background="Transparent" CornerRadius="{StaticResource RMd}" Padding="12,0"
+                                MinHeight="{StaticResource HControlSm}"
+                                BorderThickness="{StaticResource Stroke}" BorderBrush="Transparent">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Ellipse x:Name="Dot" Width="6" Height="6" Margin="0,0,8,0" VerticalAlignment="Center"
+                                         Fill="{DynamicResource Accent}" Visibility="Collapsed" />
+                                <ContentPresenter VerticalAlignment="Center" />
+                            </StackPanel>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Shape" Property="Background" Value="{DynamicResource WashHover}" />
+                                <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource LineStrong}" />
                                 <Setter Property="Foreground" Value="{DynamicResource Text}" />
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentSoft}" />
                                 <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource AccentLine}" />
+                                <Setter TargetName="Dot" Property="Visibility" Value="Visible" />
                                 <Setter Property="Foreground" Value="{DynamicResource Accent}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -41,12 +49,12 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Shape" Background="Transparent" CornerRadius="10" Padding="8,8" MinHeight="52">
+                        <Border x:Name="Shape" Background="Transparent" CornerRadius="{StaticResource RMd}" Padding="8" MinHeight="52">
                             <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Raised}" />
+                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource WashHover}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -57,12 +65,12 @@
         <!-- Строка маршрута внутри карточки папки. -->
         <Style x:Key="RouteRow" TargetType="Border">
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="CornerRadius" Value="{StaticResource RMd}" />
             <Setter Property="Padding" Value="8,7" />
             <Setter Property="MinHeight" Value="50" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource Raised}" />
+                    <Setter Property="Background" Value="{DynamicResource WashHover}" />
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -88,23 +96,25 @@
             <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="Foreground" Value="{DynamicResource Text}" />
-            <Setter Property="Background" Value="{DynamicResource Raised}" />
+            <Setter Property="Background" Value="{DynamicResource Wash}" />
             <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Shape" Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
-                                CornerRadius="10" Padding="{TemplateBinding Padding}">
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{StaticResource Stroke}"
+                                CornerRadius="{StaticResource RMd}" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource Muted}" />
+                                <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource LineStrong}" />
+                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource WashHover}" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Surface}" />
+                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource LineStrong}" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.45" />
@@ -122,17 +132,18 @@
             <Setter Property="Foreground" Value="{DynamicResource Muted}" />
             <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
             <Setter Property="FontSize" Value="13" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Grid MinHeight="38">
-                            <Rectangle x:Name="Frame" RadiusX="10" RadiusY="10" StrokeThickness="1.2"
+                        <Grid MinHeight="{StaticResource HControl}">
+                            <Rectangle x:Name="Frame" RadiusX="6" RadiusY="6" StrokeThickness="1"
                                        StrokeDashArray="4 3" Stroke="{DynamicResource Border}" Fill="Transparent" />
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Frame" Property="Stroke" Value="{DynamicResource Accent}" />
+                                <Setter TargetName="Frame" Property="Stroke" Value="{DynamicResource LineStrong}" />
                                 <Setter Property="Foreground" Value="{DynamicResource Text}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -173,7 +184,7 @@
             <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
 
-        <Grid Grid.Column="0" Margin="32,28,32,28">
+        <Grid Grid.Column="0" Margin="{StaticResource PagePad}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -197,7 +208,7 @@
                     -->
                     <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Маршруты" Style="{StaticResource Title}" />
+                            <TextBlock Text="Маршруты" Style="{StaticResource Title}" FontSize="28" />
 
                             <ContentControl Style="{StaticResource Info}" Margin="6,0,0,0"
                                             Content="Куда идёт каждый сервис: напрямую, через десинк или через туннель. Выбор пишется в config\rules.user.yaml и применяется при следующем запуске движков.&#x0a;&#x0a;Сервис вроде YouTube — папка, внутри — маршруты. Строки и папки перетаскиваются мышью: между строками — новый порядок, на папку — внутрь, на одиночный маршрут — новая папка из двух. Куда идёт маршрут, от этого не меняется.&#x0a;&#x0a;Имя означает зону: example.com покрывает и www.example.com, и cdn.example.com.&#x0a;&#x0a;Программа — папка из двух маршрутов: «Домены» и «Адреса». Сначала они пустые и выключены; пока программа запущена и включено автопополнение, идёт «Наблюдение», и туда дописывается всё, что она открывает. Путь каждому выберите сами.&#x0a;&#x0a;«Десинк» означает «мимо туннеля, чинит пресет»: рецепт не назначается, и если имя не попало ни в один список пресета, с ним не сделают ничего.&#x0a;&#x0a;«Напрямую» — мимо туннеля и мимо десинка: имя уходит в исключения, и winws2 его не трогает вовсе, как и прибитое в hosts.&#x0a;&#x0a;Проверить, что применится, можно в «Проверке блокировок»." />
@@ -264,7 +275,7 @@
                              gui:Hint.Text="Найти сайт, программу или маршрут — или добавить свой" />
 
                     <StackPanel x:Name="SearchTools" Grid.Column="1" Orientation="Horizontal" Margin="10,0,0,0">
-                        <Border x:Name="RouteFilters" CornerRadius="11" Padding="3" VerticalAlignment="Center"
+                        <Border x:Name="RouteFilters" CornerRadius="{StaticResource RLg}" Padding="3" VerticalAlignment="Center"
                                 Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="1">
                             <StackPanel Orientation="Horizontal">
                                 <RadioButton x:Name="FilterAll" Style="{StaticResource RouteFilter}" GroupName="RouteFilter" Tag="" IsChecked="True" Click="OnRouteFilter">
@@ -325,7 +336,7 @@
                 </Grid>
 
                 <Border x:Name="AddOffer" Style="{StaticResource Card}" Margin="0,10,0,0"
-                        Padding="16,11" Visibility="Collapsed">
+                        Visibility="Collapsed">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -339,7 +350,21 @@
                     </Grid>
                 </Border>
 
-                <TextBlock x:Name="Status" Style="{StaticResource Caption}" Margin="4,12,0,0" TextWrapping="Wrap" />
+                <!--
+                    Строка состояния. Ошибка («Правила не читаются: …») — панелью ErrorState,
+                    пусто — кольцом; код пишет в неё по-прежнему в Status.Text (StatusLook).
+                -->
+                <Border x:Name="StatusBox" Margin="0,12,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Control x:Name="StatusMark" Style="{StaticResource StateMark}" Visibility="Collapsed"
+                                 VerticalAlignment="Top" Margin="0,1,10,0" />
+                        <TextBlock x:Name="Status" Grid.Column="1" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+                    </Grid>
+                </Border>
             </StackPanel>
 
             <!--
@@ -403,7 +428,7 @@
                                         </Path>
 
                                         <Grid Grid.Column="1" Width="30" Height="30" Margin="0,0,12,0" VerticalAlignment="Center">
-                                            <Border Background="{DynamicResource Raised}" CornerRadius="7"
+                                            <Border Background="{DynamicResource Raised}" CornerRadius="{StaticResource RMd}"
                                                     Visibility="{Binding LetterShown}">
                                                 <TextBlock Text="{Binding Letter}" FontSize="12" FontWeight="SemiBold"
                                                            Foreground="{DynamicResource Muted}"
@@ -411,7 +436,7 @@
                                             </Border>
 
                                             <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE8B7;" FontSize="22"
-                                                       Foreground="{DynamicResource Warn}"
+                                                       Foreground="{DynamicResource Muted}"
                                                        HorizontalAlignment="Center" VerticalAlignment="Center"
                                                        Visibility="{Binding FolderGlyphShown}" />
 
@@ -447,6 +472,7 @@
 
                                         <Button Grid.Column="4" Style="{StaticResource IconGhost}" Content="&#xE712;"
                                                 Margin="10,0,0,0" Click="OnFolderMore"
+                                                AutomationProperties.Name="Действия с папкой"
                                                 ToolTip="Переименовать, распустить, добавить маршрут" />
                                     </Grid>
                                 </Button>
@@ -478,7 +504,7 @@
                                                                ToolTip="Перетащите: между строками — новый порядок, на папку — внутрь" />
 
                                                     <Grid Grid.Column="1" Width="22" Height="22" Margin="0,0,12,0" VerticalAlignment="Center">
-                                                        <Border Background="{DynamicResource Raised}" CornerRadius="5"
+                                                        <Border Background="{DynamicResource Raised}" CornerRadius="{StaticResource RMd}"
                                                                 Visibility="{Binding LetterShown}">
                                                             <TextBlock Text="{Binding Letter}" FontSize="11" FontWeight="SemiBold"
                                                                        Foreground="{DynamicResource Muted}"
@@ -538,6 +564,7 @@
                                                         <Button Style="{StaticResource RowGhost}"
                                                                 Padding="8,7" Margin="6,0,0,0"
                                                                 Click="OnOpenList"
+                                                                AutomationProperties.Name="Открыть список в Блокноте"
                                                                 Visibility="{Binding ListShown}"
                                                                 ToolTip="{Binding ListHint}">
                                                             <Path Data="{StaticResource NoteGlyph}" Stroke="{DynamicResource Text}"
@@ -554,6 +581,7 @@
                                                         <Button Style="{StaticResource RowGhost}"
                                                                 Padding="8,7" Margin="6,0,0,0"
                                                                 Tag="{Binding Key}" Click="OnPin"
+                                                                AutomationProperties.Name="Прибить имена в hosts"
                                                                 IsEnabled="{Binding CanPin}"
                                                                 ToolTip="{Binding PinHint}">
                                                             <Path Data="{StaticResource PinGlyph}"
@@ -564,6 +592,7 @@
                                                         <!-- Папки и «убрать» у своего — в «⋯» (OnRouteMore). -->
                                                         <Button Style="{StaticResource RowGhost}" Padding="9,8" MinWidth="36" Margin="6,0,0,0"
                                                                 Tag="{Binding Key}" Click="OnRouteMore"
+                                                                AutomationProperties.Name="Ещё: папки и удаление"
                                                                 Visibility="{Binding MoreShown}"
                                                                 ToolTip="В новую папку, вынуть из папки, вернуть на место; у своего — убрать">
                                                             <TextBlock FontFamily="{StaticResource IconFont}" FontSize="15" Text="&#xE712;" />
@@ -575,8 +604,14 @@
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
 
-                                <TextBlock Text="Пусто — перетащите сюда маршруты или добавьте свой." Style="{StaticResource Caption}"
-                                           Margin="12,4,12,8" Visibility="{Binding EmptyShown}" />
+                                <!-- Пусто: что пусто и что сделать — глиф «узел-связь» Faint и подпись. -->
+                                <StackPanel Orientation="Horizontal" Margin="12,6,12,10" Visibility="{Binding EmptyShown}">
+                                    <Path Width="18" Height="18" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,10,0"
+                                          Stroke="{DynamicResource Faint}" StrokeThickness="1.5" StrokeLineJoin="Round"
+                                          Data="M 3,22 A 3,3 0 1 1 9,22 A 3,3 0 1 1 3,22 Z M 21,8 A 3,3 0 1 1 27,8 A 3,3 0 1 1 21,8 Z M 21,24 A 3,3 0 1 1 27,24 A 3,3 0 1 1 21,24 Z M 8.1,20.2 L 21.9,9.8 M 9,22.3 L 21,23.7" />
+                                    <TextBlock Text="В папке пока нет маршрутов — перетащите их сюда или добавьте свой."
+                                               Style="{StaticResource Caption}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                </StackPanel>
 
                                 <!-- По макету 13.10: свой сайт, адрес или подсеть — сразу в эту папку. -->
                                 <Button Style="{StaticResource DashedAdd}" Margin="6,4,6,4"
@@ -668,14 +703,23 @@
                     <ItemsControl x:Name="Clashes">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="{DynamicResource Raised}" CornerRadius="6"
+                                <Border Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}"
+                                        BorderThickness="{StaticResource Stroke}" CornerRadius="{StaticResource RMd}"
                                         Padding="10,8" Margin="0,0,0,6">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource Warn}" />
-                                        <TextBlock Text="{Binding Outcome}" Style="{StaticResource Caption}"
-                                                   Margin="0,4,0,0" TextWrapping="Wrap" />
-                                    </StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <!-- Ромб «частично»: противоречие замечают не только по цвету. -->
+                                        <Control Style="{StaticResource StateMark}" Tag="Degraded" Margin="0,1,10,0"
+                                                 VerticalAlignment="Top" />
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Outcome}" Style="{StaticResource Caption}"
+                                                       Margin="0,4,0,0" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Grid>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -693,10 +737,10 @@
                         </Grid.ColumnDefinitions>
 
                         <TextBlock Grid.Column="0" Text="#" Style="{StaticResource Caption}" />
-                        <TextBlock Grid.Column="1" Text="ТИП" Style="{StaticResource Caption}" />
-                        <TextBlock Grid.Column="2" Text="ЗНАЧЕНИЕ" Style="{StaticResource Caption}" />
-                        <TextBlock Grid.Column="3" Text="РЕЖИМ" Style="{StaticResource Caption}" />
-                        <TextBlock Grid.Column="4" Text="СЕРВЕР" Style="{StaticResource Caption}" />
+                        <TextBlock Grid.Column="1" Text="Тип" Style="{StaticResource Caption}" />
+                        <TextBlock Grid.Column="2" Text="Значение" Style="{StaticResource Caption}" />
+                        <TextBlock Grid.Column="3" Text="Режим" Style="{StaticResource Caption}" />
+                        <TextBlock Grid.Column="4" Text="Сервер" Style="{StaticResource Caption}" />
                     </Grid>
 
                     <!--

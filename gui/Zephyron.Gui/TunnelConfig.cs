@@ -109,7 +109,8 @@ internal static class TunnelConfig
                 foreach (var part in pool.Parts.Where(p => p.FromReserve || p.Error is not null))
                 {
                     Journal.Write("подписка", part.FromReserve
-                        ? $"«{part.Source.Name}» не ответила — серверы из запаса от {part.ReserveAt:dd.MM HH:mm}"
+                        ? $"«{part.Source.Name}» не ответила{(PhysicalNetwork.Up() ? "" : $" ({PhysicalNetwork.Offline})")} — "
+                            + $"серверы из запаса от {part.ReserveAt:dd.MM HH:mm}"
                         : $"«{part.Source.Name}» не прочиталась и запаса нет: {part.Error}");
                 }
 
@@ -224,6 +225,10 @@ internal static class TunnelConfig
                 DnsThroughTunnel = !settings.UseRouterDns && settings.DnsVia == DnsRoute.Tunnel,
                 DnsViaAuto = !settings.UseRouterDns && settings.DnsVia == DnsRoute.Auto,
 
+                // Выбранный резолвер замолчит — надзор переведёт имена на запасной
+                // (25.10: умер Comss DNS, и при «напрямую» висело всё).
+                DnsSpare = DnsSpare.For(settings.DnsServer),
+
                 // Все подписки из книги, а не одна действующая: переключаются
                 // на другую как раз тогда, когда выход текущей лёг.
                 PanelHosts = SubscriptionHosts.From(
@@ -297,7 +302,7 @@ internal static class TunnelConfig
                     + (keyCount > 0 ? $" и {keyCount} ключей" : string.Empty);
 
             if (reserved > 0)
-                note += $", {reserved} из запаса — панель не ответила";
+                note += $", {reserved} из запаса — " + (PhysicalNetwork.Up() ? "панель не ответила" : "нет сети");
 
             // Про мёртвых говорим вслух. Молча выведенный из автоподбора
             // сервер — это сервер, который человек считает рабочим, а он

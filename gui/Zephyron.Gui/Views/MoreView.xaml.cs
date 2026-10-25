@@ -90,15 +90,22 @@ public partial class MoreView : UserControl
         DefenderButton.IsEnabled = false;
 
         var path = Path.GetFullPath(".");
+        var dispatcher = Dispatcher;
+
+        // Слабо: ушли из раздела раньше ответа PowerShell — вопрос не держит раздел в памяти.
+        var weak = new WeakReference<MoreView>(this);
 
         _ = Task.Run(() =>
         {
             bool excluded = IsExcluded(path);
 
-            Dispatcher.Invoke(() =>
+            dispatcher.Invoke(() =>
             {
-                DefenderValue.Text = excluded ? "есть" : "нет";
-                DefenderButton.IsEnabled = !excluded;
+                if (!weak.TryGetTarget(out var view))
+                    return;
+
+                view.DefenderValue.Text = excluded ? "есть" : "нет";
+                view.DefenderButton.IsEnabled = !excluded;
             });
         });
     }
@@ -477,19 +484,35 @@ public partial class MoreView : UserControl
 
         Components.ItemsSource = About.Components;
 
-        _ = ShowDownloadsAsync();
+        ShowDownloads();
     }
 
     /// <summary>Скачиваний на GitHub — спрашиваем один раз за запуск окна.</summary>
     private static long? _downloads;
 
-    private async Task ShowDownloadsAsync()
+    /// <remarks>Ответ ждём по слабой ссылке: GitHub думает до 10 с, и раздел, из которого ушли, не должен ждать его в памяти.</remarks>
+    private void ShowDownloads()
     {
-        _downloads ??= await DownloadStats.TotalAsync(CancellationToken.None);
-
-        if (_downloads is not { } total)
+        if (_downloads is { } known)
+        {
+            ShowDownloads(known);
             return;
+        }
 
+        var dispatcher = Dispatcher;
+        var weak = new WeakReference<MoreView>(this);
+
+        DownloadStats.TotalAsync(CancellationToken.None).ContinueWith(work => dispatcher.InvokeAsync(() =>
+        {
+            _downloads ??= work.Result;
+
+            if (_downloads is { } total && weak.TryGetTarget(out var view))
+                view.ShowDownloads(total);
+        }));
+    }
+
+    private void ShowDownloads(long total)
+    {
         DownloadsValue.Text = $"Скачано с GitHub: {total:N0} раз. Это скачивания, а не установки: "
             + "обновление из программы тоже засчитывается. Своего счётчика у программы нет — "
             + "она не сообщает о вас никуда.";

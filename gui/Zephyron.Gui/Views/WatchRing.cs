@@ -21,7 +21,7 @@ public sealed class WatchRing : FrameworkElement
     private const double Gap = 2.5;
 
     private IReadOnlyList<(double Value, Brush Brush)> _parts = [];
-    private Brush _empty = Brushes.Gray;
+    private Brush? _empty;
 
     /// <summary>Доли по порядку и кисть пустого кольца.</summary>
     public void Show(IReadOnlyList<(double Value, Brush Brush)> parts, Brush empty)
@@ -41,7 +41,8 @@ public sealed class WatchRing : FrameworkElement
         var centre = new Point(ActualWidth / 2, ActualHeight / 2);
         double radius = (size - Thickness) / 2;
 
-        var empty = new Pen(_empty, Thickness);
+        // Пока раздел не передал кисть — ключ палитры, а не зашитый цвет.
+        var empty = new Pen(_empty ?? TryFindResource("LineStrong") as Brush ?? Brushes.Transparent, Thickness);
         drawingContext.DrawEllipse(null, empty, centre, radius, radius);
 
         double total = _parts.Sum(p => p.Value);

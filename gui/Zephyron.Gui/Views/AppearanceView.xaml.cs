@@ -63,6 +63,7 @@ public partial class AppearanceView : UserControl
         ShowFonts(settings);
         ShowTray(settings);
         ShowAnimations(settings);
+        ShowEffects(settings);
         HomeWidthSwitch.IsChecked = settings.HomeFullWidth;
     }
 
@@ -75,6 +76,56 @@ public partial class AppearanceView : UserControl
         if (!SystemParameters.ClientAreaAnimation)
             AnimationsNote.Text = "Выключены в самой Windows (Параметры → Специальные возможности → "
                 + "Визуальные эффекты) — пока они там выключены, окно не анимирует ничего.";
+    }
+
+    /// <summary>Профили в порядке пунктов списка; «Авто» — null.</summary>
+    private static readonly EffectsProfile?[] Profiles = [null, EffectsProfile.Full, EffectsProfile.Balanced, EffectsProfile.Lite];
+
+    private void ShowEffects(AppSettings settings)
+    {
+        _showingLook = true;
+
+        try
+        {
+            EffectsChoice.SelectedIndex = Array.IndexOf(Profiles, settings.Effects);
+        }
+        finally
+        {
+            _showingLook = false;
+        }
+
+        // Эффекты гасит всё, что гасит движение: тумблер, Windows, высокий контраст, «Лёгкий».
+        bool still = !settings.Animations || !SystemParameters.ClientAreaAnimation || SystemParameters.HighContrast;
+
+        EffectsNote.Text = still
+            ? "Анимации выключены (в «Движении» или в Windows) — слой эффектов не рисуется, что бы ни было выбрано."
+            : "«Авто» выбирает «Лёгкий» на программной отрисовке (видео без ускорения), иначе «Сбалансированный». "
+              + "«Полный» — больше узлов и кадров; «Лёгкий» — без слоя частиц и свечения.";
+    }
+
+    private void OnEffects(object sender, SelectionChangedEventArgs e)
+    {
+        if (_showingLook || EffectsChoice.SelectedIndex is not (>= 0 and var i) || i >= Profiles.Length)
+            return;
+
+        SaveEffects(s => s with { Effects = Profiles[i] });
+    }
+
+    /// <summary>Тем же путём, что «Анимации»: сохранить, перечитать Motion — слой отзовётся сразу.</summary>
+    private void SaveEffects(Func<AppSettings, AppSettings> change)
+    {
+        try
+        {
+            var next = change(AppSettings.Load(AppSettings.DefaultPath));
+
+            next.Save(AppSettings.DefaultPath);
+            Motion.Refresh();
+            ShowEffects(next);
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Не удалось сохранить: " + ex.GetBaseException().Message;
+        }
     }
 
     private void OnHomeWidth(object sender, RoutedEventArgs e)
@@ -111,6 +162,7 @@ public partial class AppearanceView : UserControl
             // Живой фон темы — тоже движение: с выключенными анимациями стоит.
             BackdropVideo.Update();
             ShowAnimations(next);
+            ShowEffects(next);
         }
         catch (Exception ex)
         {
@@ -405,7 +457,7 @@ public partial class AppearanceView : UserControl
 
         var answer = MessageBox.Show(
             Window.GetWindow(this)!,
-            $"Удалить тему «{name}»?\n\nПапка themes\\{id} уйдёт в корзину Windows — оттуда её можно вернуть. Вместо неё встанет «Полночь».",
+            $"Удалить тему «{name}»?\n\nПапка themes\\{id} уйдёт в корзину Windows — оттуда её можно вернуть. Вместо неё встанет «Сигнал».",
             "Удалить тему",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question,
@@ -425,7 +477,7 @@ public partial class AppearanceView : UserControl
 
             ThemeWriter.Delete(id);
 
-            Status.Text = $"Тема «{name}» удалена — папка в корзине. Стоит «Полночь».";
+            Status.Text = $"Тема «{name}» удалена — папка в корзине. Стоит «Сигнал».";
         }
         catch (Exception ex)
         {

@@ -51,6 +51,27 @@ public enum ProxyProtocol
     /// </para>
     /// </remarks>
     Masque,
+
+    /// <summary>
+    /// Обычный прокси SOCKS (5, а по ссылке <c>socks4://</c> — 4 и 4a).
+    /// </summary>
+    /// <remarks>
+    /// Обсуждение №35 (22.10), владелец: «делай их поддержку». Нужен для
+    /// прокси, которые поднимает у себя другая программа (<c>127.0.0.1:порт</c>),
+    /// и для простых прокси продавцов. Шифрования у него нет: оператору виден
+    /// и адрес назначения, и сам трафик, если он не TLS. Имя пользователя —
+    /// в <see cref="ProxyServer.Credential"/> (бывает пустым), пароль —
+    /// в <see cref="ProxyServer.Password"/>.
+    /// </remarks>
+    Socks,
+
+    /// <summary>
+    /// Прокси HTTP (метод CONNECT); <c>https://</c> — тот же, но с TLS до прокси.
+    /// </summary>
+    /// <remarks>
+    /// Тогда же и так же, как <see cref="Socks"/>: учётные данные там же.
+    /// </remarks>
+    Http,
 }
 
 /// <summary>
@@ -150,8 +171,26 @@ public sealed record ProxyServer
     /// <summary>Пароль обфускации; отдельный от пароля подключения.</summary>
     public string? ObfsPassword { get; init; }
 
-    /// <summary>Пароль TUIC: ключ у него из двух частей, UUID лежит в <see cref="Credential"/>.</summary>
+    /// <summary>
+    /// Порты смены у Hysteria2 в записи движка: <c>20000:50000</c>, несколько —
+    /// через запятую; <c>null</c> — без смены. Откуда и зачем — <see cref="PortHopping"/>.
+    /// </summary>
+    /// <remarks>
+    /// Строкой, а не списком, по той же причине, что <see cref="XhttpOptions"/>.
+    /// При смене движок <see cref="Port"/> не берёт вовсе — и первый порт у него
+    /// случайный из этих (sing-quic, HopConn); <see cref="Port"/> остаётся
+    /// окну и узнаванию сервера.
+    /// </remarks>
+    public string? HopPorts { get; init; }
+
+    /// <summary>
+    /// Пароль TUIC: ключ у него из двух частей, UUID лежит в <see cref="Credential"/>.
+    /// У SOCKS и HTTP — пароль прокси, а имя пользователя — в <see cref="Credential"/>.
+    /// </summary>
     public string? Password { get; init; }
+
+    /// <summary>Версия SOCKS: <c>5</c>, <c>4</c> или <c>4a</c>; у прочих протоколов пусто.</summary>
+    public string? SocksVersion { get; init; }
 
     /// <summary>Управление перегрузкой TUIC: <c>bbr</c>, <c>cubic</c>, <c>new_reno</c>.</summary>
     public string? CongestionControl { get; init; }
@@ -249,8 +288,12 @@ public sealed record ProxyServer
     /// приходилось пропускать: подписка из семнадцати серверов показывала
     /// четырнадцать, а целиком построенная на xhttp — ноль. Замер 2026-09-11:
     /// extended разбирает такой конфиг, обычный 1.13.19 отказывается.
+    /// Остаётся шифр Shadowsocks: незнакомый sing-box ронял весь конфиг
+    /// (обсуждение №38, «unknown method: chacha20-poly1305»), поэтому сервер
+    /// с ним пропускается — <see cref="ShadowsocksMethods"/>.
     /// </remarks>
-    public bool IsSupportedBySingBox => true;
+    public bool IsSupportedBySingBox =>
+        Protocol != ProxyProtocol.Shadowsocks || ShadowsocksMethods.ForSingBox(Method) is not null;
 
     /// <summary>
     /// Адрес, в который вообще можно дозвониться.
@@ -320,6 +363,8 @@ public sealed record ProxyServer
         ProxyProtocol.Tuic => "TUIC",
         ProxyProtocol.AnyTls => "AnyTLS",
         ProxyProtocol.Wireguard => AmneziaOptions is null ? "WireGuard" : "AmneziaWG",
+        ProxyProtocol.Socks => SocksVersion is null or "5" ? "SOCKS5" : "SOCKS" + SocksVersion,
+        ProxyProtocol.Http => Security.Equals("tls", StringComparison.OrdinalIgnoreCase) ? "HTTPS" : "HTTP",
         _ => Protocol.ToString(),
     };
 

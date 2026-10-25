@@ -5,7 +5,7 @@
              xmlns:gui="clr-namespace:Zephyron.Gui"
              Background="{DynamicResource Chrome}">
 
-    <ScrollViewer Style="{StaticResource PageScroll}" Padding="32,28,32,28">
+    <ScrollViewer Style="{StaticResource PageScroll}" Padding="{StaticResource PagePad}">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" MinWidth="470" />
@@ -254,6 +254,7 @@
                                        VerticalAlignment="Center" Margin="0,0,10,0" />
 
                             <ToggleButton Grid.Column="2" x:Name="UpdatesSwitch" Style="{StaticResource Switch}"
+                                          AutomationProperties.Name="Искать обновления при запуске"
                                           Click="OnUpdatesSwitch" VerticalAlignment="Center" />
                         </Grid>
 

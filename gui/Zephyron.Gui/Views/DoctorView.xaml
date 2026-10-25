@@ -13,7 +13,7 @@
         -->
         <DataTemplate x:Key="TileTemplate">
             <Button Style="{StaticResource Choice}" Margin="0" Padding="12,8"
-                    Tag="{Binding}" Click="OnTile">
+                    Tag="{Binding}" Click="OnTile" Selector.IsSelected="{Binding Open, Mode=OneWay}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -22,7 +22,8 @@
                     </Grid.ColumnDefinitions>
 
                     <Border Grid.Column="0" Style="{StaticResource IconTile}" Width="34" Height="34"
-                            CornerRadius="10" VerticalAlignment="Center" Margin="0,0,12,0">
+                            Background="{DynamicResource Wash}" BorderBrush="{DynamicResource Border}"
+                            CornerRadius="{StaticResource RLg}" VerticalAlignment="Center" Margin="0,0,12,0">
                         <Grid>
                             <TextBlock Style="{StaticResource TileGlyph}" FontSize="17" Text="{Binding Glyph}"
                                        Foreground="{Binding GlyphColor}" />
@@ -35,8 +36,8 @@
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
-                            <Rectangle RadiusX="1" RadiusY="1" Width="7" Height="7" Margin="10,1,6,0" VerticalAlignment="Center"
-                                     Fill="{Binding Color}" />
+                            <Control Style="{StaticResource StateMark}" Tag="{Binding Mark}" Width="10" Height="10"
+                                     Margin="10,1,6,0" VerticalAlignment="Center" />
                             <TextBlock Text="{Binding State}" FontSize="12" VerticalAlignment="Center"
                                        Foreground="{Binding Color}" />
                         </StackPanel>
@@ -69,8 +70,8 @@
                     нельзя — у переносимого текста точка уехала бы в середину
                     абзаца.
                 -->
-                <Rectangle RadiusX="1" RadiusY="1" Grid.Column="0" Width="8" Height="8" Margin="2,6,12,0" VerticalAlignment="Top"
-                         Fill="{Binding Color}" />
+                <Control Style="{StaticResource StateMark}" Tag="{Binding Mark}" Grid.Column="0" Width="12" Height="12"
+                         Margin="0,4,10,0" VerticalAlignment="Top" />
 
                 <TextBlock Grid.Column="1" Text="{Binding Section}" Width="190" Margin="0,0,12,0"
                            FontWeight="SemiBold" TextWrapping="Wrap" Visibility="{Binding SectionShown}" />
@@ -78,7 +79,7 @@
                 <TextBlock Grid.Column="2" Text="{Binding Text}" TextWrapping="Wrap" />
 
                 <!-- Действие у строки — только там, где его можно сделать отсюда. -->
-                <Button Grid.Column="3" Margin="12,-3,0,0" Padding="12,5" VerticalAlignment="Top"
+                <Button Grid.Column="3" Margin="12,-3,0,0" Padding="12,0" VerticalAlignment="Top"
                         Content="{Binding ActionLabel}" Tag="{Binding}" Click="OnLineAction">
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource Ghost}">
@@ -103,7 +104,7 @@
 
                 <Border Grid.Column="0" Width="36" Height="36" CornerRadius="{StaticResource RMd}" Margin="0,0,10,0"
                         Background="{DynamicResource Surface}" BorderThickness="1"
-                        BorderBrush="{Binding Color}" VerticalAlignment="Top">
+                        BorderBrush="{DynamicResource LineStrong}" VerticalAlignment="Top">
                     <TextBlock Style="{StaticResource TileGlyph}" FontSize="15" Text="{Binding Glyph}"
                                Foreground="{Binding Color}" />
                 </Border>
@@ -122,7 +123,7 @@
 
     </UserControl.Resources>
 
-    <ScrollViewer Style="{StaticResource PageScroll}" Padding="32,28,32,28">
+    <ScrollViewer Style="{StaticResource PageScroll}" Padding="{StaticResource PagePad}">
         <StackPanel x:Name="Page" SizeChanged="OnPageSize">
 
             <!--
@@ -156,9 +157,9 @@
                 и только счёт: галочка на ней обещала бы порядок и при поломке.
             -->
             <UniformGrid x:Name="Summary" Rows="1" Margin="0,22,0,0">
-                <Button Style="{StaticResource Choice}" Margin="0,0,6,0" Click="OnShowAll">
+                <Button x:Name="SumAll" Style="{StaticResource Choice}" Margin="0,0,6,0" Click="OnShowAll">
                     <StackPanel Orientation="Horizontal">
-                        <Border Style="{StaticResource IconTile}" Width="40" Height="40" CornerRadius="20"
+                        <Border Style="{StaticResource IconTile}" Width="40" Height="40" CornerRadius="20" Background="{DynamicResource Wash}" BorderBrush="{DynamicResource Border}"
                                 VerticalAlignment="Center" Margin="0,0,14,0">
                             <TextBlock Style="{StaticResource TileGlyph}" FontSize="17" Text="&#xE9D9;"
                                        Foreground="{DynamicResource Muted}" />
@@ -170,7 +171,7 @@
                     </StackPanel>
                 </Button>
 
-                <Button Style="{StaticResource Choice}" Margin="6,0,6,0" Click="OnShowProblems">
+                <Button x:Name="SumWarn" Style="{StaticResource Choice}" Margin="6,0,6,0" Click="OnShowProblems">
                     <StackPanel Orientation="Horizontal">
                         <Border x:Name="WarnBadge" Style="{StaticResource IconTile}" Width="40" Height="40"
                                 CornerRadius="20" VerticalAlignment="Center" Margin="0,0,14,0">
@@ -184,7 +185,7 @@
                     </StackPanel>
                 </Button>
 
-                <Button Style="{StaticResource Choice}" Margin="6,0,0,0" Click="OnShowProblems">
+                <Button x:Name="SumBad" Style="{StaticResource Choice}" Margin="6,0,0,0" Click="OnShowProblems">
                     <StackPanel Orientation="Horizontal">
                         <Border x:Name="BadBadge" Style="{StaticResource IconTile}" Width="40" Height="40"
                                 CornerRadius="20" VerticalAlignment="Center" Margin="0,0,14,0">
@@ -211,7 +212,7 @@
                 <StackPanel>
                     <TextBlock Text="Куда пойдёт соединение" FontWeight="SemiBold" FontSize="15" />
 
-                    <TextBox x:Name="Host" Margin="0,12,0,0" KeyDown="OnHostKey"
+                    <TextBox x:Name="Host" AutomationProperties.Name="Сайт или домен" Margin="0,12,0,0" KeyDown="OnHostKey"
                              gui:Hint.Text="Сайт или домен, например web.whatsapp.com" />
 
                     <!--
@@ -241,7 +242,8 @@
                                 Click="OnAsk" Padding="22,9" />
                     </Grid>
 
-                    <Border x:Name="AnswerCard" Background="{DynamicResource Raised}" CornerRadius="10"
+                    <Border x:Name="AnswerCard" Background="{DynamicResource Raised}" BorderBrush="{DynamicResource Border}"
+                            BorderThickness="{StaticResource Stroke}" CornerRadius="{StaticResource RMd}"
                             Padding="14,12" Margin="0,12,0,0" Visibility="Collapsed">
                         <StackPanel>
                             <!--
@@ -323,19 +325,21 @@
 
                         <StackPanel Grid.Column="2" Orientation="Horizontal" x:Name="DetailsTools"
                                     Visibility="Collapsed">
-                            <TextBox x:Name="Search" Width="220" Margin="0,0,8,0" TextChanged="OnSearch"
+                            <TextBox x:Name="Search" AutomationProperties.Name="Найти проверку" Width="220" Margin="0,0,8,0" TextChanged="OnSearch"
                                      gui:Hint.Text="Найти проверку…" />
-                            <Button x:Name="AllFilter" Style="{StaticResource Ghost}" Padding="14,7"
-                                    Margin="0,0,6,0" Click="OnShowAll" />
-                            <Button x:Name="ProblemFilter" Style="{StaticResource Ghost}" Padding="14,7"
+                            <Button x:Name="AllFilter" Style="{StaticResource Choice}" Padding="18,0,14,0" Margin="0,0,6,0" MinHeight="{StaticResource HControl}"
+                                    Click="OnShowAll" />
+                            <Button x:Name="ProblemFilter" Style="{StaticResource Choice}" Padding="18,0,14,0" Margin="0" MinHeight="{StaticResource HControl}"
                                     Click="OnShowProblems" />
                         </StackPanel>
                     </Grid>
 
                     <StackPanel x:Name="DetailsBody" Visibility="Collapsed" Margin="0,14,0,0">
                         <ItemsControl x:Name="Details" ItemTemplate="{StaticResource LineTemplate}" />
-                        <TextBlock x:Name="DetailsEmpty" Style="{StaticResource Caption}" Visibility="Collapsed"
-                                   Text="Ничего не нашлось." Margin="4,0,0,8" />
+                        <!-- Код пишет только Visibility — элемент сам состояние «пусто». -->
+                        <ContentControl x:Name="DetailsEmpty" Style="{StaticResource EmptyState}" Visibility="Collapsed"
+                                        gui:PageHead.Title="Ничего не нашлось"
+                                        gui:PageHead.Subtitle="Сотрите запрос в поле поиска или выберите «Все»." />
                     </StackPanel>
                 </StackPanel>
             </Border>

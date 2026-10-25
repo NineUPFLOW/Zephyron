@@ -73,8 +73,9 @@ public sealed class ThemesTests
     /// которого окно не рисовало.
     /// </para>
     /// <para>
-    /// С 0.16 главная кнопка не залита акцентом, а светится им: подложка
-    /// AccentSoft, подпись — Accent. Сверяется то, что кнопка задаёт сама.
+    /// С 0.18 главная кнопка снова залита: подложка AccentFill, подпись —
+    /// OnAccent, та самая пара, что сверяет проверка читаемости. Сверяется
+    /// то, что кнопка задаёт сама.
     /// </para>
     /// </remarks>
     [Fact]
@@ -97,10 +98,10 @@ public sealed class ThemesTests
                 () => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
 
             var caption = Find<System.Windows.Controls.TextBlock>(button);
-            var accent = (SolidColorBrush)Application.Current.FindResource("Accent");
+            var onAccent = (SolidColorBrush)Application.Current.FindResource("OnAccent");
 
             Assert.NotNull(caption);
-            Assert.Equal(accent.Color, ((SolidColorBrush)caption!.Foreground).Color);
+            Assert.Equal(onAccent.Color, ((SolidColorBrush)caption!.Foreground).Color);
         });
     }
 

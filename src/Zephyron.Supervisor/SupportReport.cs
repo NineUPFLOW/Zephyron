@@ -624,6 +624,7 @@ public static class SupportReport
         result = KeyField.Replace(result, "$1\"<скрыто>\"");
         result = Uuid.Replace(result, "<uuid>");
         result = ExitAddress.Replace(result, "$1<адрес скрыт>");
+        result = OwnAddress.Mask(result);
 
         var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 

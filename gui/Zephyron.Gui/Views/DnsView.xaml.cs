@@ -34,7 +34,7 @@ public sealed class ResolverRow
 
     public Brush Color => (Brush)Application.Current.FindResource(Key);
 
-    public Brush Edge => (Brush)Application.Current.FindResource(Chosen ? "Accent" : "Border");
+    public Brush Edge => (Brush)Application.Current.FindResource(Chosen ? "AccentLine" : "Border");
 
     public Visibility MarkShown => Chosen ? Visibility.Visible : Visibility.Collapsed;
 
@@ -100,9 +100,9 @@ public sealed class SurveyRow
 
     public Brush UdpColor => Paint(Source.UdpMs, Source.UdpFailure);
 
-    public Brush RealColor => Brush(Source.RealResolver is null ? "Faint" : Source.Intercepted ? "Danger" : "Accent");
+    public Brush RealColor => Brush(Source.RealResolver is null ? "Faint" : Source.Intercepted ? "Danger" : "Success");
 
-    public Brush SpoofColor => Brush(Source.SpoofChecked == 0 ? "Faint" : Source.Spoofed > 0 ? "Danger" : "Accent");
+    public Brush SpoofColor => Brush(Source.SpoofChecked == 0 ? "Faint" : Source.Spoofed > 0 ? "Danger" : "Success");
 
     public static SurveyRow From(DnsSurveyRow row) => new(row);
 
@@ -110,7 +110,7 @@ public sealed class SurveyRow
         ms is { } value ? $"{value:0.0} мс" : failure.Length > 0 ? failure : "—";
 
     private static Brush Paint(double? ms, string failure) =>
-        Brush(ms is not null ? "Accent" : failure.Length > 0 ? "Danger" : "Faint");
+        Brush(ms is not null ? "Success" : failure.Length > 0 ? "Danger" : "Faint");
 
     private static Brush Brush(string key) => (Brush)Application.Current.FindResource(key);
 }
@@ -250,6 +250,8 @@ public partial class DnsView : UserControl
     public DnsView()
     {
         InitializeComponent();
+        StatusLook.Attach(StatusBox, Status, StatusMark);
+        StatusLook.Attach(OwnStatusBox, OwnStatus, OwnStatusMark);
 
         Loaded += (_, _) => Reload();
         Unloaded += (_, _) =>
@@ -515,7 +517,7 @@ public partial class DnsView : UserControl
             // Порог не про качество связи, а про ощущение: до полусекунды
             // задержка резолвера теряется в открытии страницы, дальше уже
             // заметна на каждом новом имени.
-            row.Key = ms < 500 ? "Accent" : "Warn";
+            row.Key = ms < 500 ? "Success" : "Warn";
 
             return;
         }

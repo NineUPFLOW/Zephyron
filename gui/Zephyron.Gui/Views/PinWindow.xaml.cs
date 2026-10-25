@@ -202,6 +202,7 @@ public partial class PinWindow : Window
     private PinWindow(PinTarget target)
     {
         InitializeComponent();
+        StatusLook.Attach(StatusBox, Status, StatusMark);
 
         _target = target;
 
@@ -794,7 +795,7 @@ public partial class PinWindow : Window
         $"{probe.Elapsed.TotalMilliseconds:0} мс",
         (Brush)FindResource(probe.Verdict switch
         {
-            PinVerdict.Works => "Accent",
+            PinVerdict.Works => "Success",
             PinVerdict.Challenge => "Warn",
             PinVerdict.Refused => "Danger",
             _ => "Muted",

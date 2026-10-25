@@ -108,12 +108,6 @@ public partial class WatchView : UserControl
     private static readonly WatchRoute[] Routes =
         [WatchRoute.Proxy, WatchRoute.Desync, WatchRoute.Direct, WatchRoute.Local, WatchRoute.Engine];
 
-    /// <summary>
-    /// Цвет движка: своего в палитре нет, а серый уже у «напрямую»
-    /// и «локально». Голубовато-серый, как на макете.
-    /// </summary>
-    private static readonly Brush EngineBrush = Frozen(Color.FromRgb(0x7D, 0x8F, 0xB0));
-
     // Сеанс и накопленное — статические, как у «Замера скорости»: раздел
     // создаётся заново при каждом заходе, и прежде уход с вкладки (Unloaded)
     // останавливал наблюдение. Владелец 10.10: «не останавливай наблюдение
@@ -227,8 +221,9 @@ public partial class WatchView : UserControl
         [WatchRoute.Proxy] = (Brush)FindResource("Accent"),
         [WatchRoute.Desync] = (Brush)FindResource("Warn"),
         [WatchRoute.Direct] = (Brush)FindResource("Muted"),
-        [WatchRoute.Local] = Brush("Faint", Brushes.DimGray),
-        [WatchRoute.Engine] = EngineBrush,
+        [WatchRoute.Local] = Brush("Faint", Brushes.Transparent),
+        // Движок — сетевые данные, как и трафик: Accent2, а не отдельный зашитый цвет.
+        [WatchRoute.Engine] = Brush("Accent2", Brushes.Transparent),
     };
 
     /// <summary>Та же палитра без раздела — для наблюдения, начатого при запуске окна.</summary>
@@ -238,23 +233,16 @@ public partial class WatchView : UserControl
 
         return new()
         {
-            [WatchRoute.Proxy] = Of("Accent", Brushes.SteelBlue),
-            [WatchRoute.Desync] = Of("Warn", Brushes.Goldenrod),
-            [WatchRoute.Direct] = Of("Muted", Brushes.Gray),
-            [WatchRoute.Local] = Of("Faint", Brushes.DimGray),
-            [WatchRoute.Engine] = EngineBrush,
+            [WatchRoute.Proxy] = Of("Accent", Brushes.Transparent),
+            [WatchRoute.Desync] = Of("Warn", Brushes.Transparent),
+            [WatchRoute.Direct] = Of("Muted", Brushes.Transparent),
+            [WatchRoute.Local] = Of("Faint", Brushes.Transparent),
+            [WatchRoute.Engine] = Of("Accent2", Brushes.Transparent),
         };
     }
 
     /// <summary>Кисть темы; у темы без неё — запасная, а не падение раздела.</summary>
     private Brush Brush(string key, Brush fallback) => TryFindResource(key) as Brush ?? fallback;
-
-    private static Brush Frozen(Color color)
-    {
-        var brush = new SolidColorBrush(color);
-        brush.Freeze();
-        return brush;
-    }
 
     private void Say(string? text)
     {
@@ -518,7 +506,7 @@ public partial class WatchView : UserControl
 
     private static WatchRow Row(WatchEntry entry)
     {
-        var colour = _brushes.TryGetValue(entry.Mode, out var brush) ? brush : Brushes.Gray;
+        var colour = _brushes.TryGetValue(entry.Mode, out var brush) ? brush : Brushes.Transparent;
         bool named = entry.Host is not null;
 
         return new WatchRow(
@@ -721,7 +709,7 @@ public partial class WatchView : UserControl
 
         int total = shown.Sum(r => routes.GetValueOrDefault(r));
 
-        Ring.Show([.. shown.Select(r => ((double)routes.GetValueOrDefault(r), _brushes[r]))], Brush("Raised", Brushes.DimGray));
+        Ring.Show([.. shown.Select(r => ((double)routes.GetValueOrDefault(r), _brushes[r]))], Brush("LineStrong", Brushes.Transparent));
         RingTotal.Text = total.ToString("N0");
 
         RingLegend.ItemsSource = shown

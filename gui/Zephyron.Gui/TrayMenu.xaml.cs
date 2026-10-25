@@ -121,11 +121,8 @@ public partial class TrayMenu : Window
     internal void Render(TrayStatus status)
     {
         State.Text = status.Headline;
-        Dot.SetResourceReference(
-            Shape.FillProperty,
-            status.Starting || status.Stopping || status.Busy ? "Warn"
-            : !status.Running ? "Faint"
-            : status.AllHealthy ? "Accent" : "Warn");
+        // Форма знака — состояние (StateMark): кольцо, дуга, диск, ромб, треугольник.
+        Mark.Tag = TrayIcon.StateOf(status).ToString();
 
         // До файла состояния движков в нём нет — пока надзор их поднимает,
         // так и говорится, а не «—», как у остановленных.
@@ -242,7 +239,7 @@ public partial class TrayMenu : Window
     /// </remarks>
     private Brush Tint(double density)
     {
-        var surface = TryFindResource("SurfaceColor") is Color c ? c : Colors.Black;
+        var surface = TryFindResource("RaisedColor") is Color c ? c : Colors.Black;
 
         return new SolidColorBrush(Color.FromRgb(surface.R, surface.G, surface.B)) { Opacity = density };
     }
