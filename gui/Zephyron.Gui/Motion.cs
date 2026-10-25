@@ -99,7 +99,14 @@ public static class Motion
     }
 
     /// <summary>Анимировать ли сейчас.</summary>
-    public static bool Enabled => (_cfg ??= Read()).Animations && SystemParameters.ClientAreaAnimation;
+    public static bool Enabled => (_cfg ??= Read()).Animations && (_windows ?? SystemParameters.ClientAreaAnimation);
+
+    /// <summary>Настройка анимаций Windows, подставленная проверкой; <c>null</c> — настоящая.</summary>
+    /// <remarks>
+    /// Раннер сборки на сервере без экрана держит анимации Windows выключенными,
+    /// и проверки движения там видели «Лёгкий» при любых настройках (25.10).
+    /// </remarks>
+    private static bool? _windows;
 
     /// <summary>
     /// Действующий профиль эффектов. Lite — когда анимации выключены (тумблером
@@ -134,10 +141,11 @@ public static class Motion
         Changed?.Invoke(null, EventArgs.Empty);
     }
 
-    /// <summary>Подставить настройки без файла — для проверок.</summary>
-    internal static void Use(AppSettings settings)
+    /// <summary>Подставить настройки без файла — для проверок; анимации Windows — включены, если не сказано иначе.</summary>
+    internal static void Use(AppSettings settings, bool windowsAnimations = true)
     {
         _cfg = settings;
+        _windows = windowsAnimations;
         _profile = null;
         Changed?.Invoke(null, EventArgs.Empty);
     }
