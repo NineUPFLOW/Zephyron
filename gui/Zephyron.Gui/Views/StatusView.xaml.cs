@@ -18,8 +18,8 @@ namespace Zephyron.Gui.Views;
 /// <summary>Строка про один движок.</summary>
 /// <param name="Word">Отметка в карточке одним-двумя словами (EngineHealth.Word).</param>
 /// <param name="Detail">Строка под ней: причина надзора, когда движок не в порядке.</param>
-/// <param name="Key">Ключ цвета состояния — Accent, Warn, Danger или Faint: им красится плашка движка.</param>
-public sealed record EngineRow(string Name, string Word, string Detail, Brush Color, int? ProcessId = null, string Key = "Faint");
+/// <param name="Mark">Состояние движка: знак в строке «Компоненты» и цвет его трассы.</param>
+public sealed record EngineRow(string Name, string Word, string Detail, HomeState Mark, int? ProcessId = null);
 
 /// <summary>Предупреждение, которое стоит прочитать до запуска.</summary>
 public sealed record WarningRow(string Title, string Body);
@@ -88,22 +88,6 @@ public partial class StatusView : UserControl
     }
 
     private void OnArtSize(object sender, SizeChangedEventArgs e) => PlaceArt();
-
-    /// <summary>
-    /// Слой арта — во всю высоту, и под верхним меню тоже.
-    /// </summary>
-    /// <remarks>
-    /// Окно отодвигает раздел из-под меню полем сверху (MainWindow.FitUnderNav),
-    /// а картинка должна начинаться от края окна, как картинка окна под ней:
-    /// иначе над карточками стояли бы две картинки со сдвигом — шов.
-    /// </remarks>
-    protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
-    {
-        base.OnPropertyChanged(e);
-
-        if (e.Property == PaddingProperty && ArtLayer is not null)
-            ArtLayer.Margin = new Thickness(0, -Padding.Top, 0, 0);
-    }
 
     /// <summary>Уже этой колонки персонажа в ней не ставим — картинка ляжет по центру страницы.</summary>
     private const double ArtColumnMin = 220;
@@ -320,8 +304,20 @@ public partial class StatusView : UserControl
         _refresh.Tick += (_, _) => Update();
         _clock.Tick += (_, _) => ShowUptime();
 
+        // Задержка меряется раз в пять секунд — на графике две минуты.
+        LatencyChart.TimeLabels = ["−2 мин", "−1 мин", "сейчас"];
+
+        // Лента событий из журнала (StatusView.Events.cs) — пока раздел на экране.
+        Loaded += (_, _) => StartEvents();
+        Unloaded += (_, _) => StopEvents();
+
+        // Раскладка по ширине: компактная — на узком окне (880 и меньше).
+        SizeChanged += (_, e) => SetCompact(e.NewSize.Width < CompactBelow);
+
         Loaded += (_, _) =>
         {
+            // В Unloaded раздел уже вне дерева и Window.GetWindow — null, поэтому окно запоминается здесь.
+            _host = Window.GetWindow(this) as MainWindow;
             Update();
             _clock.Start();
 
@@ -341,10 +337,8 @@ public partial class StatusView : UserControl
             UpdateNotice.Changed += OnUpdateChanged;
             ShowUpdate();
 
-            // Возврат на вкладку посреди запуска: сам запуск никуда не делся,
-            // а анимация была снята при уходе — заводим её обратно.
-            if (_startingSince is not null)
-                StartAnimations();
+            // Слой частиц узнаёт о запуске, если «Главную» открыли посреди него.
+            Pulse();
 
             _refresh.Start();
         };
@@ -356,9 +350,8 @@ public partial class StatusView : UserControl
             _clock.Stop();
             StopNet();
 
-            // Анимация на скрытом виде продолжала бы будить композитор
-            // впустую. Само состояние запуска при этом сохраняется.
-            StopAnimations();
+            // «Главная» ушла с экрана — частицам больше нечего показывать от неё.
+            FieldPulse(null, null);
         };
     }
 
@@ -591,7 +584,7 @@ public partial class StatusView : UserControl
         {
             _startingSince = DateTimeOffset.Now;
             _refresh.Interval = StartingInterval;
-            StartAnimations();
+            Pulse();
         }
 
         ShowState(settings, state, running, seen.SingBoxUp, seen.Coming);
@@ -656,6 +649,11 @@ public partial class StatusView : UserControl
 
     private void ShowState(AppSettings settings, SupervisorState? state, bool running, bool singBoxUp, bool coming)
     {
+        // Сборка конфига кнопкой «Запустить» показывает свой запуск: чтение состояния
+        // посреди неё сказало бы «Выключен», а запуск уже идёт.
+        if (_building)
+            return;
+
         // Запуск показывается своим чередом: пока он идёт, «остановлено»
         // означает не отказ, а то, что супервизор ещё не дописал состояние.
         if (_startingSince is not null && ShowStarting(settings, state, running, singBoxUp, coming))
@@ -668,27 +666,31 @@ public partial class StatusView : UserControl
 
         if (!running)
         {
-            ShowDot("Faint");
-            ShowStateBar("Faint");
-
-            StateLine.Text = "Остановлено";
-
-            StateHint.Text = settings.NeedsProxy || settings.NeedsDesync
+            ShowHero(HomeState.Off, settings.NeedsProxy || settings.NeedsDesync
                 ? "Обход не работает: трафик идёт напрямую."
-                : "В этом режиме запускать нечего: VPN выключен, пресет не выбран.";
+                : "В этом режиме запускать нечего: VPN выключен, пресет не выбран.");
 
             StartButton.IsEnabled = settings.NeedsProxy || settings.NeedsDesync;
 
-            // Движки остаются на виду и остановленными, просто серыми. Пустое
+            // Движки остаются на виду и выключенными, просто серыми. Пустое
             // место на их месте читается как «их нет вовсе», тогда как раздел
             // отвечает на другой вопрос: что должно работать и работает ли.
-            SetEngines(Planned(settings, "остановлен", "Faint"));
+            SetEngines(Planned(settings, "остановлен", HomeState.Off));
+            SetDnsWarning(null);
 
             return;
         }
 
         var services = state!.Services;
-        bool healthy = services.All(s => s.Health == ServiceHealth.Healthy);
+
+        // Резолвер, который не отвечает, — не «Работает»: 25.10 у владельца умер
+        // Comss DNS, каждое имя ждало 11–12 с, «всё виснет», а «Главная» была зелёной.
+        bool dnsDown = services.Any(s => s.DnsDown);
+        bool healthy = services.All(s => s.Health == ServiceHealth.Healthy) && !dnsDown;
+
+        SetDnsWarning(services.FirstOrDefault(s => s.DnsNotice is { Length: > 0 }) is { } dns
+            ? DnsWarning(dns)
+            : null);
 
         // Три состояния, а не два. «Оговорки» бывают разной тяжести: движок,
         // которому не удалась глубокая проверка, ещё несёт трафик, а умерший
@@ -697,23 +699,47 @@ public partial class StatusView : UserControl
         bool broken = services.Any(s =>
             s.Health is ServiceHealth.Dead or ServiceHealth.Faulted);
 
-        var colour = healthy ? "Accent" : broken ? "Danger" : "Warn";
+        ShowHero(
+            healthy ? HomeState.Running : broken ? HomeState.Failed : HomeState.Degraded,
+            healthy
+                ? Carrying(settings)
+                : broken
+                    ? BrokenHint(services)
+                    : dnsDown
+                        ? "Резолвер движка не отвечает — сайты открываются с задержкой или не открываются. Подробности ниже."
+                        : "Часть движков не в порядке — подробности ниже.");
 
-        ShowDot(colour);
-        ShowStateBar(colour);
-
-        StateLine.Text = healthy
-            ? "Работает"
-            : broken ? "Движок не работает" : "Работает с оговорками";
-
-        StateHint.Text = healthy
-            ? $"Запущено {Ago(state.StartedAt)}."
-            : broken
-                ? "Один из движков не запущен — обход работает не полностью. Подробности ниже."
-                : "Часть движков не в порядке — подробности ниже.";
+        // Причина упавшего движка — целиком строкой ниже, а не только подсказкой
+        // его строки: та в одну строку и обрезается. 22.10 у знакомого владельца
+        // «кодом 433» с объяснением, что делать, было видно лишь при наведении.
+        if (broken && Failures(services) is { Length: > 0 } failures)
+            ShowProblem(failures);
 
         SetEngines(services.Select(Row).ToList());
     }
+
+    /// <summary>Пояснение под «Сбой»: какой движок упал.</summary>
+    /// <remarks>Куда при этом идёт трафик, не утверждаем: в «Маршрутах» второй движок может работать.</remarks>
+    internal static string BrokenHint(IEnumerable<ServiceState> services)
+    {
+        var broken = services.Where(s => s.Health is ServiceHealth.Dead or ServiceHealth.Faulted).ToList();
+        var names = string.Join(" и ", broken.Select(s => s.Name));
+        var verb = broken.Count > 1 ? "не работают" : "не работает";
+        var faulted = broken.Any(s => s.Health == ServiceHealth.Faulted)
+            ? $" ({(broken.Count > 1 ? "супервизор перестал их поднимать" : "супервизор перестал его поднимать")})"
+            : string.Empty;
+
+        return $"{(broken.Count > 1 ? "Движки" : "Движок")} {names} {verb}{faulted} — {(broken.Count > 1 ? "их части" : "его части")} обхода нет. Подробности ниже.";
+    }
+
+    /// <summary>Что несёт трафик при исправном обходе — по выбранному режиму.</summary>
+    private static string Carrying(AppSettings settings) => WorkModes.Of(settings.Engines) switch
+    {
+        WorkMode.Desync => "Трафик идёт через десинк.",
+        WorkMode.Tunnel => "Трафик идёт через туннель.",
+        WorkMode.Route => "Маршруты — через туннель, остальное — напрямую, закрытое чинит десинк.",
+        _ => "Движки работают.",
+    };
 
     /// <summary>
     /// Показывает ход запуска. Возвращает <c>false</c>, когда показывать
@@ -747,21 +773,19 @@ public partial class StatusView : UserControl
         StopButton.Visibility = Visibility.Visible;
         StopButton.IsEnabled = true;
 
-        ShowDot("Warn");
-        ShowStateBar("Warn");
-
-        StateLine.Text = "Запускается…";
-
         var seconds = (int)(DateTimeOffset.Now - since).TotalSeconds;
-        StateHint.Text = $"{DescribePhase(settings, running, singBoxUp, services)} — {seconds} с";
+        ShowHero(HomeState.Starting, $"{DescribePhase(settings, running, singBoxUp, services)} — {seconds} с");
 
-        // Пока супервизор не дописал состояние, движки показываются жёлтыми
-        // и «запускается». Прежде список опустошался, и они пропадали ровно
+        // Каждый тик продлевает навязанный окну «Запуск»: срок у него свой, а запуск идёт до 90 с.
+        Pulse();
+
+        // Пока супервизор не дописал состояние, движки показываются как
+        // «запускается». Прежде список опустошался, и они пропадали ровно
         // на те десятки секунд, когда на них и смотрят: раздел отвечал «их
         // нет» на вопрос «поднимаются ли они».
         SetEngines(services.Count > 0
             ? services.Select(Row).ToList()
-            : Planned(settings, "запускается", "Warn"));
+            : Planned(settings, "запускается", HomeState.Starting));
 
         return true;
     }
@@ -822,7 +846,7 @@ public partial class StatusView : UserControl
         _startingSince = DateTimeOffset.Now;
         _refresh.Interval = StartingInterval;
 
-        StartAnimations();
+        Pulse();
         Update();
     }
 
@@ -831,110 +855,190 @@ public partial class StatusView : UserControl
         _startingSince = null;
         _refresh.Interval = CalmInterval;
 
-        StopAnimations();
-    }
-
-    private void StartAnimations()
-    {
-        // Анимации выключены — запуск видно цветом полосы, без бега и мигания.
-        if (!Motion.Enabled)
-        {
-            ShowStateBar("Warn");
-            return;
-        }
-
-        // Дорожка тусклая, засечка яркая. Прежде оба красились в Warn,
-        // и бегущая метка была невидима: она ехала по полосе своего же цвета.
-        ShowStateBar("Border");
-        StartProgressMark.Visibility = Visibility.Visible;
-
-        // Ширину берём измеренную: полоса на экране уже есть, потому что
-        // кнопку только что нажали. Запасное значение — на случай, если
-        // раскладка почему-то ещё не прошла: метка уехала бы мимо полосы.
-        var span = StateBar.ActualWidth > 0 ? StateBar.ActualWidth : 520;
-
-        StartProgressShift.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation
-        {
-            From = -StartProgressMark.Width,
-            To = span,
-            Duration = new Duration(TimeSpan.FromSeconds(1.3)),
-            RepeatBehavior = RepeatBehavior.Forever,
-        });
-
-        Dot.BeginAnimation(OpacityProperty, new DoubleAnimation
-        {
-            From = 1,
-            To = 0.2,
-            Duration = new Duration(TimeSpan.FromSeconds(0.8)),
-            AutoReverse = true,
-            RepeatBehavior = RepeatBehavior.Forever,
-        });
-    }
-
-    private void StopAnimations()
-    {
-        StartProgressMark.Visibility = Visibility.Collapsed;
-
-        // Снятие анимации передачей null обязательно: остановленная анимация
-        // продолжает удерживать своё последнее значение, и точка осталась бы
-        // навсегда полупрозрачной, а «работает» выглядело бы приглушённым.
-        StartProgressShift.BeginAnimation(TranslateTransform.XProperty, null);
-        Dot.BeginAnimation(OpacityProperty, null);
-        Dot.Opacity = 1;
+        Pulse();
     }
 
     /// <summary>
-    /// Красит полосу состояния в тот же цвет, что и точка.
+    /// Слою частиц в окне — запуск идёт или кончился (успехом или ошибкой) и
+    /// настоящая скорость приёма; <c>null</c> — замера нет.
     /// </summary>
-    /// <remarks>
-    /// Один источник цвета на оба показа: разойдясь, они дали бы зелёную
-    /// точку над красной полосой — и человеку пришлось бы решать, какой
-    /// из них верить.
-    /// </remarks>
+    private void Pulse() =>
+        FieldPulse(_startingSince is not null || _building ? FieldMode.Starting : null, _mbps);
+
+    private void FieldPulse(FieldMode? mode, double? mbps) =>
+        (Window.GetWindow(this) as MainWindow ?? _host)?.FieldPulse(mode, mbps);
+
+    /// <summary>Окно, в котором раздел показан (с Loaded): им гасится слой при уходе.</summary>
+    private MainWindow? _host;
+
+    /// <summary>Последний настоящий замер приёма, Мбит/с; <c>null</c> — не меряется.</summary>
+    private double? _mbps;
+
+    /// <summary>Идёт сборка конфига после «Запустить»: состояние — «Запуск», чтение с диска его не перебивает.</summary>
+    private bool _building;
+
+    /// <summary>Ниже этой ширины раздела — компактная раскладка (880x560).</summary>
+    private const double CompactBelow = 980;
+
+    private bool _compact;
+
     /// <summary>
-    /// Красит точку состояния, её свечение и точку в строке внизу — одним цветом.
+    /// Состояние на плашке: слово, цвет, знак, тинт и дорожки — одним местом.
     /// </summary>
     /// <remarks>
-    /// Серая «стоит» — без свечения: светящаяся серая точка выглядит
-    /// включённой лампочкой, а обход в это время не идёт.
+    /// Слово и знак меняются только при смене состояния (слово проявляется 200 мс,
+    /// знаки — кроссфейд 160, при «Работает» один раз расходится кольцо), а
+    /// пояснение и время обновляются на каждом тике. Движение — через Motion.Enabled.
     /// </remarks>
-    private void ShowDot(string colourKey)
+    private void ShowHero(HomeState state, string hint)
     {
-        var brush = (Brush)FindResource(colourKey);
+        StateHint.Text = hint;
 
-        Dot.Fill = brush;
-        FooterDot.Fill = brush;
-
-        // Плашка состояния и таймер — тем же цветом (макет 0.16): плашка
-        // светится подложкой и рамкой своего цвета, у серой — нейтральные.
-        _stateKey = colourKey;
-        StateLine.Foreground = brush;
-
-        if (colourKey == "Faint")
+        if (!_homeShown || state != _home)
         {
-            StatePill.SetResourceReference(Border.BackgroundProperty, "Wash");
-            StatePill.SetResourceReference(Border.BorderBrushProperty, "LineStrong");
-        }
-        else
-        {
-            StatePill.SetResourceReference(Border.BackgroundProperty, colourKey + "Soft");
-            StatePill.SetResourceReference(Border.BorderBrushProperty, colourKey + "Line");
+            bool animate = _homeShown && IsLoaded && Motion.Enabled;
+            var key = state switch
+            {
+                HomeState.Starting => "Accent",
+                HomeState.Running => "Success",
+                HomeState.Degraded => "Warn",
+                HomeState.Failed => "Danger",
+                _ => "Muted",
+            };
+
+            _home = state;
+            _homeShown = true;
+
+            StateLine.Text = state switch
+            {
+                HomeState.Starting => "Запуск",
+                HomeState.Running => "Работает",
+                HomeState.Degraded => "Работает частично",
+                HomeState.Failed => "Сбой",
+                _ => "Выключен",
+            };
+            StateLine.SetResourceReference(TextBlock.ForegroundProperty, key);
+            Fade(StateLine, 0, 1, 200, animate);
+
+            // Тонкий тинт цвета состояния; у «Выключен» его нет.
+            Tint.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, key);
+            Tint.Visibility = state == HomeState.Off ? Visibility.Collapsed : Visibility.Visible;
+
+            // Знак: приходящий проявляется, уходящий гаснет.
+            var (front, back) = _markFrontIsA ? (MarkA, MarkB) : (MarkB, MarkA);
+            back.Tag = state.ToString();
+            Fade(back, 0, 1, 160, animate);
+            Fade(front, 1, 0, 160, animate);
+            _markFrontIsA = !_markFrontIsA;
+
+            FooterMark.Tag = state.ToString();
+            ShowLanes();
+
+            if (state == HomeState.Running && animate)
+                Burst();
         }
 
         ShowUptime();
     }
 
-    /// <summary>Цвет нынешнего состояния: Faint, Accent, Warn или Danger.</summary>
-    private string _stateKey = "Faint";
+    /// <summary>
+    /// Только для снимков экрана: показывает состояние плашки и трасс без поднятых
+    /// движков (тест называет его сам). Опрос гасится, чтобы настоящее не перебило.
+    /// </summary>
+    internal void Present(HomeState state, string hint, HomeState desync, HomeState tunnel)
+    {
+        _refresh.Stop();
+        _clock.Stop();
 
-    /// <summary>С какого момента обход работает; <c>null</c> — не работает.</summary>
-    private DateTimeOffset? _runningSince;
+        bool on = state != HomeState.Off;
+        StartButton.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+        StopButton.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        _runningSince = state is HomeState.Running or HomeState.Degraded or HomeState.Failed ? DateTimeOffset.Now.AddSeconds(-768) : null;
 
-    /// <summary>Часы таймера: секунды должны идти, а опрос состояния — раз в две.</summary>
-    private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(1) };
+        ShowHero(state, hint);
+        SetEngines([new("winws2", desync.ToString(), string.Empty, desync), new("sing-box", tunnel.ToString(), string.Empty, tunnel)]);
+    }
+
+    private HomeState _home;
+    private bool _homeShown;
+    private bool _markFrontIsA = true;
+
+    /// <summary>Значение сразу в конечном виде; при <paramref name="animate"/> — с проявлением от <paramref name="from"/>.</summary>
+    private static void Fade(UIElement element, double from, double to, int ms, bool animate)
+    {
+        element.Opacity = to;
+
+        if (animate)
+        {
+            element.BeginAnimation(OpacityProperty, new DoubleAnimation(from, to, TimeSpan.FromMilliseconds(ms))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+                FillBehavior = FillBehavior.Stop,
+            });
+        }
+    }
+
+    /// <summary>Разовое кольцо у знака «Работает»: прозрачность .5 → 0, масштаб 1 → 1.8 за 600 мс.</summary>
+    private void Burst()
+    {
+        var time = TimeSpan.FromMilliseconds(600);
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+
+        Ring.BeginAnimation(OpacityProperty, new DoubleAnimation(0.5, 0, time) { FillBehavior = FillBehavior.Stop });
+
+        foreach (var axis in new[] { ScaleTransform.ScaleXProperty, ScaleTransform.ScaleYProperty })
+            RingScale.BeginAnimation(axis, new DoubleAnimation(1, 1.8, time) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
+    }
 
     /// <summary>
-    /// Крупный таймер: сколько работает обход, а при запуске — сколько идёт запуск.
+    /// Компактная раскладка: плашка на всю ширину, «Компоненты» двумя плитками
+    /// под ней, числа сети 2x2, графики друг под другом, слово 20, кнопки 36.
+    /// </summary>
+    private void SetCompact(bool compact)
+    {
+        if (compact == _compact)
+            return;
+
+        _compact = compact;
+
+        Grid.SetColumnSpan(HeroCell, compact ? 3 : 1);
+        Grid.SetRow(ComponentsCell, compact ? 1 : 0);
+        Grid.SetColumn(ComponentsCell, compact ? 0 : 2);
+        Grid.SetColumnSpan(ComponentsCell, compact ? 3 : 1);
+        ComponentsCell.Margin = new Thickness(0, compact ? 12 : 0, 0, 0);
+
+        Chips.Columns = compact ? 2 : 1;
+        DesyncChip.Margin = new Thickness(0, 0, compact ? 8 : 0, compact ? 0 : 8);
+
+        // Узко: числа строкой под заголовком, по два; широко — в строке заголовка.
+        NetMetrics.Columns = compact ? 2 : 4;
+        Grid.SetRow(NetMetrics, compact ? 1 : 0);
+        Grid.SetColumn(NetMetrics, compact ? 0 : 1);
+        Grid.SetColumnSpan(NetMetrics, compact ? 3 : 1);
+        NetMetrics.Margin = new Thickness(0, compact ? 8 : 0, 0, 0);
+
+        foreach (var cell in new FrameworkElement[] { NetDownCell, NetUpCell, NetPingCell, NetLossCell })
+            cell.Margin = new Thickness(0, 0, 16, compact ? 4 : 0);
+
+        ChartRowGap.Height = new GridLength(compact ? 8 : 0);
+        Grid.SetColumnSpan(ThroughputChart, compact ? 3 : 1);
+        Grid.SetRow(LatencyChart, compact ? 2 : 0);
+        Grid.SetColumn(LatencyChart, compact ? 0 : 2);
+        Grid.SetColumnSpan(LatencyChart, compact ? 3 : 1);
+
+        // Слово 20, кнопки 36 — свои значения, а не стилевые 24 / 40.
+        if (compact)
+            StateLine.FontSize = 20;
+        else
+            StateLine.ClearValue(TextBlock.FontSizeProperty);
+
+        foreach (var button in new Button[] { StartButton, StopButton, EngineMenuButton })
+            button.Height = compact ? 36 : 40;
+    }
+
+    /// <summary>
+    /// Время работы под словом: сколько работает обход, а при запуске — сколько
+    /// идёт запуск. Остановленный обход времени не показывает.
     /// </summary>
     /// <remarks>
     /// Время начала — супервизора (SupervisorState.StartedAt), то есть то же,
@@ -948,25 +1052,27 @@ public partial class StatusView : UserControl
         if (_startingSince is { } starting)
         {
             Uptime.Text = Clock(now - starting);
-            Uptime.SetResourceReference(TextBlock.ForegroundProperty, "Warn");
-            UptimeCaption.Text = "ЗАПУСК · ДВИЖКИ ПОДНИМАЮТСЯ";
-            return;
+            UptimeBox.ToolTip = "Сколько идёт запуск";
         }
-
-        if (_runningSince is { } since)
+        else if (_runningSince is { } since)
         {
             Uptime.Text = Clock(now - since);
-            Uptime.SetResourceReference(TextBlock.ForegroundProperty, _stateKey == "Accent" ? "Text" : _stateKey);
-            UptimeCaption.Text = "UPTIME · С " + since.ToString("HH:mm") + (since.Date != now.Date ? since.ToString(" dd.MM") : string.Empty);
+            UptimeBox.ToolTip = "Обход работает с " + since.ToString("HH:mm") + (since.Date != now.Date ? since.ToString(" dd.MM") : string.Empty);
+        }
+        else
+        {
+            UptimeBox.Visibility = Visibility.Collapsed;
             return;
         }
 
-        // Нули, а не прочерк: моноширинное тире в таком кегле читалось
-        // жирной чертой, а не «времени нет».
-        Uptime.Text = "00:00:00";
-        Uptime.SetResourceReference(TextBlock.ForegroundProperty, "LineStrong");
-        UptimeCaption.Text = "UPTIME · НЕ ЗАПУЩЕНО";
+        UptimeBox.Visibility = Visibility.Visible;
     }
+
+    /// <summary>С какого момента обход работает; <c>null</c> — не работает.</summary>
+    private DateTimeOffset? _runningSince;
+
+    /// <summary>Часы таймера: секунды должны идти, а опрос состояния — раз в две.</summary>
+    private readonly DispatcherTimer _clock = new() { Interval = TimeSpan.FromSeconds(1) };
 
     /// <summary>«04:12:09», а больше суток — «2д 04:12:09».</summary>
     internal static string Clock(TimeSpan span)
@@ -1150,13 +1256,6 @@ public partial class StatusView : UserControl
         }
     }
 
-    private void ShowStateBar(string colourKey) =>
-        StateBarFill.Fill = (Brush)FindResource(
-            // Точки и полосы берут насыщенный жёлтый: текстовый на светлой
-            // теме выглядит у мелкой метки не предупреждением, а выцветшей
-            // серостью — у неё нет площади, чтобы донести приглушённый оттенок.
-            colourKey == "Warn" ? "WarnFill" : colourKey);
-
     /// <summary>
     /// Движки, которые поднимутся при нынешней настройке.
     /// </summary>
@@ -1165,16 +1264,15 @@ public partial class StatusView : UserControl
     /// хоть что-то через VPN, десинк — когда выбран пресет. В режиме, где
     /// не запускается ничего, список пуст, и это верно: запускать нечего.
     /// </remarks>
-    private IReadOnlyList<EngineRow> Planned(AppSettings settings, string detail, string colourKey)
+    private static IReadOnlyList<EngineRow> Planned(AppSettings settings, string detail, HomeState mark)
     {
         var rows = new List<EngineRow>();
-        var colour = (Brush)FindResource(colourKey);
 
         if (settings.NeedsProxy)
-            rows.Add(new EngineRow("sing-box", detail, string.Empty, colour, Key: colourKey));
+            rows.Add(new EngineRow("sing-box", detail, string.Empty, mark));
 
         if (settings.NeedsDesync)
-            rows.Add(new EngineRow("winws2", detail, string.Empty, colour, Key: colourKey));
+            rows.Add(new EngineRow("winws2", detail, string.Empty, mark));
 
         return rows;
     }
@@ -1186,12 +1284,17 @@ public partial class StatusView : UserControl
         // нельзя, иначе окно будет уверять в исправности молчащей трубы.
         // Слова — общие с треем и zy status (EngineHealth.Status): причина
         // надзора и время начала, а не «запущен, но не отвечает» (26.09).
-        var key = service.Health switch
+        // Пока идёт запуск, не поднявшийся ещё движок — «запуск», а не оговорка или сбой;
+        // «сдался» (Faulted) — сбой всегда.
+        bool starting = _startingSince is not null;
+
+        var mark = service.Health switch
         {
-            ServiceHealth.Healthy => "Accent",
-            ServiceHealth.Degraded => "Warn",
-            ServiceHealth.Dead or ServiceHealth.Faulted => "Danger",
-            _ => "Faint",
+            ServiceHealth.Healthy => HomeState.Running,
+            ServiceHealth.Degraded or ServiceHealth.Dead when starting => HomeState.Starting,
+            ServiceHealth.Degraded => HomeState.Degraded,
+            ServiceHealth.Dead or ServiceHealth.Faulted => HomeState.Failed,
+            _ => HomeState.Off,
         };
 
         // Причина — только у того, что не работает: у работающего Status
@@ -1201,24 +1304,25 @@ public partial class StatusView : UserControl
             ? service.Remark ?? string.Empty
             : EngineHealth.Status(service);
 
-        return new EngineRow(service.Name, EngineHealth.Word(service.Health), detail, (Brush)FindResource(key), service.ProcessId, key);
+        return new EngineRow(service.Name, EngineHealth.Word(service.Health), detail, mark, service.ProcessId);
     }
 
     /// <summary>
     /// То, что стоит знать до запуска.
     /// </summary>
     /// <remarks>
-    /// Оба случая измерены на живых машинах и оба приходят молча. Защитник
-    /// со своим сетевым фильтром обесценивает десинк, ничего об этом
-    /// не сообщая; Kaspersky вдобавок возвращает файл hosts к своему
-    /// умолчанию, стирая все пины.
+    /// Измерено на живых машинах и приходит молча: защитник со своим сетевым
+    /// фильтром обесценивает десинк, ничего об этом не сообщая. Что Kaspersky
+    /// вернул hosts к своему умолчанию, с 24.10 говорит только «Диагностика»
+    /// (а ещё «Файл hosts» и проверка блокировок), не «Главная» — владелец:
+    /// «предупреждение … прям на главной, а должно быть в диагностике».
     /// </remarks>
     private IReadOnlyList<EngineRow>? _engines;
     private IReadOnlyList<WarningRow>? _warnings;
     private DateTimeOffset _warningsAt = DateTimeOffset.MinValue;
     private bool _warningsBusy;
 
-    /// <summary>Сколько держать проверку антивирусов и hosts, прежде чем повторить.</summary>
+    /// <summary>Сколько держать проверку антивирусов, прежде чем повторить.</summary>
     private static readonly TimeSpan WarningsInterval = TimeSpan.FromSeconds(30);
 
     /// <summary>
@@ -1232,8 +1336,12 @@ public partial class StatusView : UserControl
     /// </remarks>
     private void SetEngines(IReadOnlyList<EngineRow> rows)
     {
+        // Те же строки — знаки не трогаем, но трассам общее состояние могло смениться.
         if (_engines is not null && _engines.SequenceEqual(rows))
+        {
+            ShowLanes();
             return;
+        }
 
         _engines = rows;
         ShowEngines(rows);
@@ -1244,23 +1352,20 @@ public partial class StatusView : UserControl
         // Движки — в карточке «Режим» (04.10), оба при любом режиме (владелец:
         // «пусть эти движки будут и в десинке, и в туннеле»): не нужный режиму
         // скажет «выключен», как в трее, а высота карточки от режима не зависит.
-        ShowEngine(rows.FirstOrDefault(r => r.Name == "winws2"), DesyncChip, DesyncDot, DesyncState, DesyncPid, _desyncIdle);
-        ShowEngine(rows.FirstOrDefault(r => r.Name == "sing-box"), TunnelChip, TunnelDot, TunnelState, TunnelPid);
+        var desync = rows.FirstOrDefault(r => r.Name == "winws2");
+        var tunnel = rows.FirstOrDefault(r => r.Name == "sing-box");
+
+        ShowEngine(desync, DesyncMark, DesyncState, DesyncPid, _desyncIdle);
+        ShowEngine(tunnel, TunnelMark, TunnelState, TunnelPid);
+
+        ShowLanes();
     }
 
-    /// <summary>Плашка движка светится цветом его состояния; у выключенного и остановленного — нейтральная.</summary>
-    private static void PaintPill(Border pill, string key)
-    {
-        if (key == "Faint")
-        {
-            pill.SetResourceReference(Border.BackgroundProperty, "Wash");
-            pill.SetResourceReference(Border.BorderBrushProperty, "Border");
-            return;
-        }
-
-        pill.SetResourceReference(Border.BackgroundProperty, key + "Soft");
-        pill.SetResourceReference(Border.BorderBrushProperty, key + "Line");
-    }
+    /// <summary>Трассы — тем же состоянием, что знаки движков; нет движка — «выключен».</summary>
+    private void ShowLanes() => Lanes.Show(
+        _home,
+        _engines?.FirstOrDefault(r => r.Name == "winws2")?.Mark ?? HomeState.Off,
+        _engines?.FirstOrDefault(r => r.Name == "sing-box")?.Mark ?? HomeState.Off);
 
     /// <summary>
     /// Десинк включён, а не поднимается: всё забрал туннель.
@@ -1278,20 +1383,18 @@ public partial class StatusView : UserControl
     /// подписки. «Остановлен» здесь соврало бы, что он был.
     /// </remarks>
     /// <param name="idle">Почему не поднимали включённый; <c>null</c> — выключен.</param>
-    private void ShowEngine(EngineRow? row, Border pill, System.Windows.Shapes.Shape dot, TextBlock state, TextBlock pid, string? idle = null)
+    private void ShowEngine(EngineRow? row, Control mark, TextBlock state, TextBlock pid, string? idle = null)
     {
-        PaintPill(pill, row?.Key ?? "Faint");
-
         if (row is null)
         {
-            dot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "Faint");
+            mark.Tag = nameof(HomeState.Off);
             state.Text = idle is null ? "выключен" : "не нужен";
             pid.Text = idle is null ? string.Empty : "всё через VPN";
             pid.ToolTip = idle;
             return;
         }
 
-        dot.Fill = row.Color;
+        mark.Tag = row.Mark.ToString();
         state.Text = row.Word;
 
         // Номер процесса — чтобы найти движок в диспетчере задач (владелец,
@@ -1309,9 +1412,8 @@ public partial class StatusView : UserControl
     /// Предупреждения — в фоне и раз в полминуты, а не в потоке окна каждые две секунды.
     /// </summary>
     /// <remarks>
-    /// Проверка антивирусов перебирает все процессы системы, а проверка hosts
-    /// читает почти тысячу строк файла. Ни то, ни другое за две секунды
-    /// не меняется, а делалось в потоке окна на каждом тике.
+    /// Проверка антивирусов перебирает все процессы системы. За две секунды
+    /// это не меняется, а делалось в потоке окна на каждом тике.
     /// </remarks>
     private void ShowWarnings(AppSettings settings)
     {
@@ -1332,13 +1434,50 @@ public partial class StatusView : UserControl
         }, TaskScheduler.FromCurrentSynchronizationContext());
     }
 
+    /// <summary>Предупреждения о защитниках — из фоновой проверки раз в полминуты.</summary>
+    private IReadOnlyList<WarningRow> _guardWarnings = [];
+
+    /// <summary>Карточка о резолвере движка — из состояния надзора, каждые две секунды.</summary>
+    private WarningRow? _dnsWarning;
+
     private void SetWarnings(IReadOnlyList<WarningRow> rows)
     {
+        _guardWarnings = rows;
+        ShowAllWarnings();
+    }
+
+    private void SetDnsWarning(WarningRow? row)
+    {
+        if (row == _dnsWarning)
+            return;
+
+        _dnsWarning = row;
+        ShowAllWarnings();
+    }
+
+    /// <summary>Резолвер — первым: без имён не работает ничего, и это важнее защитника.</summary>
+    private void ShowAllWarnings()
+    {
+        IReadOnlyList<WarningRow> rows = _dnsWarning is { } dns ? [dns, .. _guardWarnings] : _guardWarnings;
+
         if (_warnings is not null && _warnings.SequenceEqual(rows))
             return;
 
         _warnings = rows;
         Warnings.ItemsSource = rows;
+    }
+
+    /// <summary>Карточка о резолвере (SingBoxService, DnsLadder): что с ним и что делать.</summary>
+    private static WarningRow DnsWarning(ServiceState service)
+    {
+        var notice = service.DnsNotice!;
+
+        return service.DnsDown
+            ? new WarningRow("Резолвер движка не отвечает",
+                char.ToUpper(notice[0]) + notice[1..] + ". Выберите другой резолвер на вкладке DNS и перезапустите движки.")
+            : new WarningRow("Резолвер движка не отвечает — работает запасной путь",
+                char.ToUpper(notice[0]) + notice[1..] + ". Сайты открываются; вернётся сам, как только резолвер ответит. "
+                + "Чтобы не зависеть от него, выберите другой на вкладке DNS.");
     }
 
     private static IReadOnlyList<WarningRow> CollectWarnings(bool needsDesync, bool hybrid)
@@ -1363,15 +1502,6 @@ public partial class StatusView : UserControl
             }
         }
 
-        if (HostsEditor.WhoReplaced() is { } who)
-        {
-            rows.Add(new WarningRow(
-                $"Файл hosts переписан: {who}",
-                "Изменённый hosts он считает признаком заражения и вернул файл к своему "
-                + "умолчанию — вместе со всеми пинами. Пин на этой машине не живёт, пока "
-                + "файл не внесён в доверенные."));
-        }
-
         var guards = SecuritySoftware.Running();
 
         if (guards.Count > 0 && needsDesync)
@@ -1387,6 +1517,18 @@ public partial class StatusView : UserControl
 
         return rows;
     }
+
+    /// <summary>Причины упавших движков, по строке на движок: «Десинк: …».</summary>
+    private static string Failures(IEnumerable<ServiceState> services) => string.Join("\n", services
+        .Where(s => s.Health is ServiceHealth.Dead or ServiceHealth.Faulted && s.LastError is { Length: > 0 })
+        .Select(s => $"{EngineTitle(s.Name)}: {s.LastError}"));
+
+    private static string EngineTitle(string name) => name switch
+    {
+        "winws2" => "Десинк",
+        "sing-box" => "Туннель",
+        _ => name,
+    };
 
     private void ShowProblem(string text)
     {
@@ -1700,15 +1842,18 @@ public partial class StatusView : UserControl
     private async void OnStart(object sender, RoutedEventArgs e)
     {
         StartButton.IsEnabled = false;
-        StateLine.Text = "Собираю конфиг…";
-        StateHint.Text = "Читаю подписку и правила.";
+        _building = true;
+        ShowHero(HomeState.Starting, "Собираю конфиг: читаю подписку и правила.");
+        Pulse();
 
         var outcome = await EngineControl.StartAsync("кнопка «Запустить» на «Главной»", CancellationToken.None);
 
+        _building = false;
         StartButton.IsEnabled = true;
 
         if (!outcome.Ok)
         {
+            Pulse();
             ShowProblem(outcome.Message);
             Update();
             return;
@@ -1726,7 +1871,7 @@ public partial class StatusView : UserControl
         EndStarting();
 
         StopButton.IsEnabled = false;
-        StateLine.Text = "Останавливаю…";
+        StateHint.Text = "Останавливаю движки…";
 
         await EngineControl.StopAsync("кнопка «Остановить» на «Главной»", CancellationToken.None);
 
@@ -1760,8 +1905,11 @@ public partial class StatusView : UserControl
             Layout(column: double.PositiveInfinity, page: double.PositiveInfinity, art: false);
             SetResourceReference(BackgroundProperty, "Chrome");
         }
-        else if (HasSideArt())
+        else if (HasSideArt() && TryFindResource(HomePlacement.Key) is HomePlacement)
         {
+            // Колонка под арт — только когда тема сама уложила картинку (background.home):
+            // иначе «Главная» с картинкой в теме съезжала влево (владелец, 25.10) —
+            // встроенные темы с фоном теперь по центру, как все.
             Layout(column: 940, page: double.PositiveInfinity, art: true);
             SetResourceReference(BackgroundProperty, "Backdrop");
 

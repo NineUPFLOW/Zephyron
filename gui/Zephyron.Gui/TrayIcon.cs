@@ -66,6 +66,14 @@ internal sealed class TrayIcon : IDisposable
     }
 
     private readonly NotifyIcon _icon;
+
+    /// <summary>Знак программы без метки — запасной, если метку нарисовать не вышло.</summary>
+    private readonly Icon _base;
+
+    /// <summary>Знак с меткой состояния — по одному на состояние и цвет, собранные один раз.</summary>
+    private readonly Dictionary<string, (Icon Icon, nint Handle)> _badged = [];
+
+    private string? _badge;
     private TrayMenu? _menu;
     private readonly DispatcherTimer _refresh = new() { Interval = TimeSpan.FromSeconds(2) };
     private ShellWatcher? _shell;
@@ -99,9 +107,10 @@ internal sealed class TrayIcon : IDisposable
         // меню WinForms не видит словаря ресурсов, и цвета ему приходилось
         // зашивать второй раз — первой тёмной палитрой, так что при любой
         // другой теме меню оставалось чужим (владелец 24.09).
+        _base = OwnIcon();
         _icon = new NotifyIcon
         {
-            Icon = OwnIcon(),
+            Icon = _base,
             Text = "Zephyron",
             Visible = true,
         };
@@ -242,7 +251,133 @@ internal sealed class TrayIcon : IDisposable
         // Подсказка ограничена шестьюдесятью тремя знаками: Windows режет
         // длиннее молча, поэтому здесь коротко и по делу.
         _icon.Text = "Zephyron — " + status.Headline;
+
+        ShowBadge(StateOf(status));
     }
+
+    /// <summary>
+    /// Состояние метки на значке — та же форма, что знак состояния в окне
+    /// (StateMark): кольцо — выключен, дуга — запуск, диск — работает,
+    /// ромб — частично, треугольник — сбой.
+    /// </summary>
+    /// <remarks>Форма, а не только цвет: значок в трее мелкий, цвета на нём различают не все.</remarks>
+    internal static FieldMode StateOf(TrayStatus status) =>
+        status.Starting || status.Stopping || status.Busy ? FieldMode.Starting
+        : !status.Running ? FieldMode.Off
+        : status.AllHealthy ? FieldMode.Running
+        : status.Tunnel is ServiceHealth.Dead or ServiceHealth.Faulted
+            || status.Desync is ServiceHealth.Dead or ServiceHealth.Faulted ? FieldMode.Failed
+        : FieldMode.Degraded;
+
+    private void ShowBadge(FieldMode state)
+    {
+        // Ключ с цветами: смена темы перерисовывает метку и при прежнем состоянии.
+        string key = BadgeKey(state);
+
+        if (key == _badge)
+            return;
+
+        _badge = key;
+
+        try
+        {
+            _icon.Icon = Badged(state);
+        }
+        catch (Exception)
+        {
+            // Метка — удобство: без неё значок остаётся знаком программы.
+            _icon.Icon = _base;
+        }
+
+        // Держим только показанную метку: живой подбор цвета темы иначе копил бы
+        // HICON на каждый оттенок до выхода (предел GDI на процесс — 10 000).
+        foreach (var stale in _badged.Where(e => e.Key != key).ToList())
+        {
+            stale.Value.Icon.Dispose();
+            DestroyIcon(stale.Value.Handle);
+            _badged.Remove(stale.Key);
+        }
+    }
+
+    /// <summary>Цвет ключа темы приложения; окна и словаря нет — нейтральный серый.</summary>
+    private static Color ThemeColor(string key)
+    {
+        if (Application.Current?.TryFindResource(key) is System.Windows.Media.SolidColorBrush brush)
+            return Color.FromArgb(brush.Color.A, brush.Color.R, brush.Color.G, brush.Color.B);
+
+        return Color.Gray;
+    }
+
+    // Цвета — из темы, как у окна: те же ключи, что у StateMark. Окно может
+    // быть закрыто, но словарь приложения живёт всё время работы.
+    private static string ColorKey(FieldMode state) => state switch
+    {
+        FieldMode.Starting => "Accent",
+        FieldMode.Running => "Success",
+        FieldMode.Degraded => "Warn",
+        FieldMode.Failed => "Danger",
+        _ => "Faint",
+    };
+
+    /// <summary>Ключ метки: состояние + ARGB её цвета и обводки (Backdrop).</summary>
+    internal static string BadgeKey(FieldMode state) =>
+        $"{state}{ThemeColor(ColorKey(state)).ToArgb():X}{ThemeColor("Backdrop").ToArgb():X}";
+
+    /// <summary>Знак программы с меткой состояния в правом нижнем углу — один раз на состояние и цвет.</summary>
+    private Icon Badged(FieldMode state)
+    {
+        var color = ThemeColor(ColorKey(state));
+        string cache = BadgeKey(state);
+
+        if (_badged.TryGetValue(cache, out var made))
+            return made.Icon;
+
+        using var bitmap = new Bitmap(32, 32);
+
+        using (var g = Graphics.FromImage(bitmap))
+        {
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.DrawIcon(_base, new Rectangle(0, 0, 32, 32));
+
+            // Обводка цветом подложки темы отделяет метку от знака на любой панели задач.
+            using var ring = new SolidBrush(ThemeColor("Backdrop"));
+            using var fill = new SolidBrush(color);
+            using var pen = new Pen(color, 2f);
+            g.FillEllipse(ring, 15, 15, 17, 17);
+
+            switch (state)
+            {
+                case FieldMode.Off:
+                    g.DrawEllipse(pen, 20, 20, 8, 8);
+                    break;
+
+                case FieldMode.Starting:
+                    g.DrawArc(pen, 20, 20, 8, 8, -90, 270);
+                    break;
+
+                case FieldMode.Running:
+                    g.FillEllipse(fill, 18, 18, 12, 12);
+                    break;
+
+                case FieldMode.Degraded:
+                    g.FillPolygon(fill, new System.Drawing.Point[] { new System.Drawing.Point(24, 17), new System.Drawing.Point(31, 24), new System.Drawing.Point(24, 31), new System.Drawing.Point(17, 24) });
+                    break;
+
+                default:
+                    g.FillPolygon(fill, new System.Drawing.Point[] { new System.Drawing.Point(24, 17), new System.Drawing.Point(31, 30), new System.Drawing.Point(17, 30) });
+                    break;
+            }
+        }
+
+        var handle = bitmap.GetHicon();
+        var icon = Icon.FromHandle(handle);
+        _badged[cache] = (icon, handle);
+
+        return icon;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool DestroyIcon(nint handle);
 
     /// <summary>Меню сейчас открывается — второй щелчок ждёт, а не открывает его ещё раз.</summary>
     private bool _opening;
@@ -560,6 +695,15 @@ internal sealed class TrayIcon : IDisposable
         // в панели до наведения мышью, и программа выглядит незакрытой.
         _icon.Visible = false;
         _icon.Dispose();
+
+        // Значки с меткой собраны из HICON — их освобождает только DestroyIcon.
+        foreach (var (icon, handle) in _badged.Values)
+        {
+            icon.Dispose();
+            DestroyIcon(handle);
+        }
+
+        _badged.Clear();
 
         // Окно наблюдателя — тоже окно, и оставленное висеть оно держит
         // процесс живым после того, как всё остальное закрыто.

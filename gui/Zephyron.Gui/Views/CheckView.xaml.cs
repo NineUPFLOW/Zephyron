@@ -220,6 +220,7 @@ public partial class CheckView : UserControl
             Status.Text = _status;
             Sections.ItemsSource = _sections;
             Header.Visibility = Collected.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            ApplyTotals();
 
             RunButton.IsEnabled = !_running;
             StopButton.IsEnabled = _running;
@@ -337,8 +338,8 @@ public partial class CheckView : UserControl
         if (running)
         {
             SetupTitle.Text = "Движки работают — видно сеть уже с обходом";
-            SetupBody.Text = "Чтобы увидеть, что закрыто на самом деле, остановите их в разделе "
-                + "«Состояние» и повторите. Доступное сейчас может быть доступно как раз "
+            SetupBody.Text = "Чтобы увидеть, что закрыто на самом деле, остановите их на "
+                + "«Главной» и повторите. Доступное сейчас может быть доступно как раз "
                 + "благодаря обходу.";
         }
 
@@ -354,6 +355,7 @@ public partial class CheckView : UserControl
         _markers.Clear();
         _reports.Clear();
         _sections = [];
+        _totalsHead = string.Empty;
 
         // Метка журнала снимается до первой пробы: всё, что движок напишет
         // после неё, относится к этому прогону, а всё, что было раньше, —
@@ -361,6 +363,7 @@ public partial class CheckView : UserControl
         _logMark = EngineLog.Position();
         View.Sections.ItemsSource = null;
         View.Header.Visibility = Visibility.Visible;
+        View.ApplyTotals();
 
         _work?.Cancel();
         _work = new CancellationTokenSource();
@@ -456,9 +459,57 @@ public partial class CheckView : UserControl
             // Прерванная проверка тоже пишется: набранное до остановки —
             // такой же замер, а переделывать его ради файла значит потратить
             // ещё столько же времени.
-            if (SaveReport(running, interrupted) is { } note)
-                Say(_status + "  " + note);
+            var note = SaveReport(running, interrupted);
+
+            if (Collected.Count > 0)
+                View.ShowTotals(note, interrupted);
         }
+    }
+
+    private static string _totalsHead = string.Empty;
+    private static string _totalsNote = string.Empty;
+    private static IReadOnlyList<SectionRow> _totalsItems = [];
+
+    /// <summary>
+    /// Итог внизу: сколько проверено, по каким вердиктам и где отчёт.
+    /// </summary>
+    /// <remarks>
+    /// Числа — по вердиктам строк, как они стоят на экране, а не по заранее
+    /// заведённым видам: набор видов задаёт отчёт, и список здесь не должен
+    /// разойтись с ним. Хранится в статике, как и строки: раздел пересоздаётся.
+    /// </remarks>
+    internal void ShowTotals(string? reportNote, bool interrupted)
+    {
+        _totalsHead = (interrupted ? "Прервано, проверено " : "Проверено ") + Collected.Count
+            + (_target is null ? string.Empty : $" — «{_target.Describe}»");
+
+        _totalsItems = Collected
+            .GroupBy(r => r.Verdict)
+            .OrderByDescending(g => g.Count())
+            .Select(g => new SectionRow(g.Key, g.Count().ToString(), g.First().Color))
+            .ToList();
+
+        _totalsNote = string.Join("\n", new[]
+        {
+            _markers.Count > 0 ? $"Без адреса, в таблицу не вошли: {_markers.Count}." : null,
+            reportNote,
+        }.Where(t => !string.IsNullOrEmpty(t)));
+
+        ApplyTotals();
+    }
+
+    /// <summary>Показывает итог, если он есть; пока его нет, на виду строка хода.</summary>
+    private void ApplyTotals()
+    {
+        bool has = _totalsHead.Length > 0;
+
+        Totals.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
+        Status.Visibility = has ? Visibility.Collapsed : Visibility.Visible;
+
+        TotalsHead.Text = _totalsHead;
+        TotalsItems.ItemsSource = _totalsItems;
+        TotalsNote.Text = _totalsNote;
+        TotalsNote.Visibility = _totalsNote.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>Сколько отчётов держать. То же число, что у консоли.</summary>
@@ -493,7 +544,7 @@ public partial class CheckView : UserControl
 
             // Без метки порядка байтов: файл читают и Windows, и веб-формы,
             // куда его прикладывают.
-            File.WriteAllText(full, BuildReport(enginesRunning, interrupted), new UTF8Encoding(false));
+            File.WriteAllText(full, OwnAddress.Mask(BuildReport(enginesRunning, interrupted)), new UTF8Encoding(false));
 
             KeepRecentReports();
 
@@ -931,7 +982,7 @@ public partial class CheckView : UserControl
     {
         var key = report.Kind switch
         {
-            BlockKind.None => "Accent",
+            BlockKind.None => "Success",
             BlockKind.NoAddress => "Faint",
 
             // Жёлтый, а не красный. Гео-отказ — это работающая связь: ответ
@@ -1090,7 +1141,7 @@ public partial class CheckView : UserControl
                 _target is null
                     ? "Обходить нечего."
                     : $"У «{_target.Describe}» обходить нечего. Проверено вчетверо глубже полного прогона.",
-                (Brush)FindResource("Accent"))
+                (Brush)FindResource("Success"))
             : new SectionRow(
                 "Итог",
                 string.Join("\n", byKind.Select(g =>
@@ -1494,9 +1545,13 @@ public partial class CheckView : UserControl
                 $"Туннель: {TunnelHealth.Describe(_tunnel)}",
             };
 
+            // Мимо туннеля выход — сам человек: адрес запоминаем, чтобы прятать, и не показываем.
+            if (!exit.Tunnelled)
+                OwnAddress.Learn(exit.Address);
+
             if (exit.Address is { Length: > 0 })
             {
-                lines.Add($"Выход: {exit.Address}"
+                lines.Add($"Выход: {(exit.Tunnelled ? exit.Address : OwnAddress.Hidden)}"
                     + (exit.Country is { Length: > 0 } c ? $", {c}" : string.Empty)
                     + (exit.Tunnelled ? " — через туннель" : " — мимо туннеля"));
             }
@@ -1574,7 +1629,7 @@ public partial class CheckView : UserControl
                     "Через туннель нарочно проверить нечем",
                     "Служебный вход не поднят, а без него не узнать, довозит ли туннель эти "
                     + "имена, когда их отправляют в него намеренно. Включается выключателем "
-                    + "«Проверять проход трафика» в разделе «Ещё» и начинает работать "
+                    + "«Проверять проход трафика» в настройках туннеля и начинает работать "
                     + "с ближайшего перезапуска движков.",
                     (Brush)FindResource("Muted")));
 

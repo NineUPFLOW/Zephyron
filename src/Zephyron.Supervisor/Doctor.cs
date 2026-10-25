@@ -228,6 +228,29 @@ public static class Doctor
         return lines;
     }
 
+    /// <summary>
+    /// Отвечает ли резолвер работающего движка — по замеру надзора (DnsLadder);
+    /// <c>null</c> — движки не работают или резолвер отвечает.
+    /// </summary>
+    /// <remarks>
+    /// 25.10: умер Comss DNS, у владельца висело всё, а «Диагностика» писала
+    /// «Апстрим туннеля: 83.220.169.155» зелёным — из настроек, не из замера.
+    /// </remarks>
+    public static DoctorCheck? EngineDns(SupervisorState? state)
+    {
+        if (state is null || !state.IsSupervisorAlive()
+            || state.Services.FirstOrDefault(s => s.DnsNotice is { Length: > 0 }) is not { } service)
+        {
+            return null;
+        }
+
+        var said = char.ToUpper(service.DnsNotice![0]) + service.DnsNotice[1..] + ".";
+
+        return service.DnsDown
+            ? Bad(said + " Выберите другой резолвер на вкладке DNS и перезапустите движки.")
+            : Warn(said + " Вернётся сам, когда резолвер ответит; чтобы не зависеть от него — другой на вкладке DNS.");
+    }
+
     /// <summary>Служба прокси у живого держателя; <c>null</c> — держателя нет или прокси у него нет.</summary>
     private static ServiceState? Held(SupervisorState? holder) =>
         holder is not null && holder.IsSupervisorAlive()
@@ -492,6 +515,9 @@ public static class Doctor
                 : $"Апстрим туннеля: {settings.DnsServer}, путь — {DnsRoutes.Word(settings.DnsVia)}."),
         };
 
+        if (EngineDns(SupervisorState.Load(SupervisorState.DefaultPath)) is { } dns)
+            lines.Add(dns);
+
         try
         {
             var found = SystemResolvers.Discover();
@@ -706,6 +732,11 @@ public static class Doctor
                 // трубы.
                 ServiceHealth.Degraded => Warn($"{service.Name}: запущен, но не отвечает."),
                 ServiceHealth.Dead => Bad($"{service.Name}: процесс умер."),
+
+                // Попытки исчерпаны — поломка, и с причиной, а не оговорка «остановлен».
+                ServiceHealth.Faulted => Bad(service.LastError is { Length: > 0 } last
+                    ? $"{service.Name}: не поднимается — {last}"
+                    : $"{service.Name}: не поднимается, попытки перезапуска исчерпаны."),
                 _ => Warn($"{service.Name}: остановлен."),
             });
         }

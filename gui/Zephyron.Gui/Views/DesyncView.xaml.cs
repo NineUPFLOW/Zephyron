@@ -56,7 +56,7 @@ public sealed record CatalogRow
 
     /// <summary>Рамка: недоступный рецепт отмечен и ею, не только словами.</summary>
     public Brush Edge => (Brush)Application.Current.FindResource(
-        Complaint.Length > 0 ? "Warn" : "Border");
+        Complaint.Length > 0 ? "WarnLine" : "Border");
 }
 
 /// <summary>Пресет в списке выбора.</summary>
@@ -109,7 +109,7 @@ public sealed record PresetRow(string Name, string Version, string Fake) : INoti
         Name.StartsWith("Universal", StringComparison.OrdinalIgnoreCase);
 
     public Brush Edge =>
-        (Brush)Application.Current.FindResource(Chosen ? "Accent" : "Border");
+        (Brush)Application.Current.FindResource(Chosen ? "AccentLine" : "Border");
 
     public Visibility MarkShown => Chosen ? Visibility.Visible : Visibility.Collapsed;
 
@@ -146,6 +146,7 @@ public partial class DesyncView : UserControl
     public DesyncView()
     {
         InitializeComponent();
+        StatusLook.Attach(StatusBox, Status, StatusMark);
 
         Loaded += (_, _) => Reload();
         Unloaded += (_, _) => _counting?.Cancel();
@@ -413,25 +414,25 @@ public partial class DesyncView : UserControl
 
     private void OnSearch(object sender, TextChangedEventArgs e) => Redraw();
 
-    /// <summary>Ширина, ниже которой плитки параметров встают друг под друга.</summary>
-    private const double ParamsSideBySide = 760;
+    /// <summary>Ширина, ниже которой «Текущий пресет» и «Параметры работы» встают друг под друга.</summary>
+    private const double TopSideBySide = 860;
 
     /// <summary>
-    /// Плитки «Параметров работы» рядом или друг под другом.
+    /// Пресет и параметры — рядом или друг под другом.
     /// </summary>
     /// <remarks>
-    /// По ширине самой сетки, а не окна: окно масштабируется («Шрифт и размер»),
+    /// По ширине самого ряда, а не окна: окно масштабируется («Шрифт и размер»),
     /// и считать надо в тех точках, в которых плитки и раскладываются.
     /// </remarks>
-    private void OnParamsSize(object sender, SizeChangedEventArgs e)
+    private void OnTopSize(object sender, SizeChangedEventArgs e)
     {
-        bool side = ParamsGrid.ActualWidth >= ParamsSideBySide;
+        bool side = TopRow.ActualWidth >= TopSideBySide;
 
-        Grid.SetRow(CaptureTile, side ? 0 : 1);
-        Grid.SetColumn(CaptureTile, side ? 2 : 0);
-        Grid.SetColumnSpan(CaptureTile, side ? 1 : 3);
-        Grid.SetColumnSpan(GameFilterTile, side ? 1 : 3);
-        CaptureTile.Margin = new Thickness(0, side ? 0 : 12, 0, 0);
+        Grid.SetColumnSpan(PresetCell, side ? 1 : 3);
+        Grid.SetRow(ParamsCell, side ? 0 : 1);
+        Grid.SetColumn(ParamsCell, side ? 2 : 0);
+        Grid.SetColumnSpan(ParamsCell, side ? 1 : 3);
+        ParamsCell.Margin = new Thickness(0, side ? 0 : 12, 0, 0);
     }
 
     private static void Show(UIElement header, UIElement note, bool visible)
@@ -573,7 +574,7 @@ public partial class DesyncView : UserControl
             ? "Режим «выключено»: десинк не запустится, какой бы пресет ни стоял."
             : settings.PresetName is null
                 ? "Пакеты не правятся. Всё, что закрыто по имени, останется закрытым — кроме того, что уведено через VPN."
-                : "Применяется при запуске движков в разделе «Состояние».";
+                : "Применяется при запуске движков на «Главной».";
 
         Recommended.Visibility = string.Equals(settings.PresetName, AppSettings.DefaultPresetName,
             StringComparison.OrdinalIgnoreCase)
@@ -810,7 +811,7 @@ public partial class DesyncView : UserControl
             // при старте, и правка в открытом файле сама по себе не меняет
             // ничего. Без этой строки исправленная секция выглядит нерабочей.
             Status.Text = $"Открыт {Path.GetFileName(path)}. "
-                + "Правка подействует после перезапуска движков в разделе «Состояние».";
+                + "Правка подействует после перезапуска движков на «Главной».";
         }
         catch (Exception ex)
         {

@@ -22,6 +22,9 @@ public sealed record DoctorLine(string Text, string Kind, DoctorLevel Level, str
 {
     public Brush Color => (Brush)Application.Current.FindResource(Kind);
 
+    /// <summary>Состояние для знака StateMark: форма, а не только цвет.</summary>
+    public string Mark => DoctorView.MarkOf(Level);
+
     /// <summary>Имя раздела в строке — только в общем списке; в раскрытой плитке он и так виден.</summary>
     public bool ShowSection { get; init; }
 
@@ -39,6 +42,8 @@ public sealed record DoctorTile(string Title, string Glyph, DoctorLevel Level, I
     public double Angle => Chevrons.Angle(Open);
 
     public Brush Color => (Brush)Application.Current.FindResource(DoctorView.KindOf(Level));
+
+    public string Mark => DoctorView.MarkOf(Level);
 
     /// <summary>Значок — цветом только при замечании: десять зелёных значков шумят.</summary>
     public Brush GlyphColor => Level == DoctorLevel.Ok
@@ -117,11 +122,19 @@ public partial class DoctorView : UserControl
         Loaded += (_, _) => Run();
     }
 
+    /// <summary>Значение Tag для StateMark: диск, ромб или треугольник.</summary>
+    internal static string MarkOf(DoctorLevel level) => level switch
+    {
+        DoctorLevel.Bad => "Failed",
+        DoctorLevel.Warn => "Degraded",
+        _ => "Running",
+    };
+
     internal static string KindOf(DoctorLevel level) => level switch
     {
         DoctorLevel.Bad => "Danger",
         DoctorLevel.Warn => "Warn",
-        _ => "Accent",
+        _ => "Success",
     };
 
     private void OnRun(object sender, RoutedEventArgs e) => Run();
@@ -131,18 +144,31 @@ public partial class DoctorView : UserControl
     /// всё это время стоял пустым, а окно не отзывалось (владелец: «диагностика
     /// долго является пустой»). Теперь раздел открывается сразу с многоточием
     /// в сводке, а плитки приходят следом.
+    /// Раздел ждёт итог по слабой ссылке: ушли из него раньше — проверки
+    /// не держат его (и окно через Parent) в памяти, итог просто некуда показать.
     /// </remarks>
-    private async void Run()
+    private void Run()
     {
         RunButton.IsEnabled = false;
         TotalCount.Text = BadCount.Text = WarnCount.Text = "…";
         Status.Visibility = Visibility.Collapsed;
 
+        var dispatcher = Dispatcher;
+        var weak = new WeakReference<DoctorView>(this);
+
+        Task.Run(() => Doctor.Run(AppSettings.Load(AppSettings.DefaultPath)))
+            .ContinueWith(work => dispatcher.InvokeAsync(() =>
+            {
+                if (weak.TryGetTarget(out var view))
+                    view.Finish(work);
+            }));
+    }
+
+    private void Finish(Task<IReadOnlyList<DoctorSection>> work)
+    {
         try
         {
-            var sections = await Task.Run(() => Doctor.Run(AppSettings.Load(AppSettings.DefaultPath)));
-
-            Show(sections);
+            Show(work.Result);
 
             Motion.Arrive(Components, dy: 0, ms: 200);
         }
@@ -204,12 +230,14 @@ public partial class DoctorView : UserControl
     {
         if (kind is null)
         {
+            badge.SetResourceReference(Border.BackgroundProperty, "Wash");
             badge.SetResourceReference(Border.BorderBrushProperty, "Border");
             glyph.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
         }
         else
         {
-            badge.SetResourceReference(Border.BorderBrushProperty, kind);
+            badge.SetResourceReference(Border.BackgroundProperty, kind + "Soft");
+            badge.SetResourceReference(Border.BorderBrushProperty, kind + "Line");
             glyph.SetResourceReference(TextBlock.ForegroundProperty, kind);
         }
     }
@@ -386,8 +414,12 @@ public partial class DoctorView : UserControl
         // Своим поворотом: у стиля стрелки он общий и заморожен.
         DetailsChevron.RenderTransform = new RotateTransform(Chevrons.Angle(_detailsOpen));
 
-        AllFilter.SetResourceReference(StyleProperty, _problemsOnly ? "Ghost" : "Primary");
-        ProblemFilter.SetResourceReference(StyleProperty, _problemsOnly ? "Primary" : "Ghost");
+        // Отбор — сегменты Choice: выбранный отмечен Selector.IsSelected (AccentSoft + точка).
+        System.Windows.Controls.Primitives.Selector.SetIsSelected(AllFilter, !_problemsOnly);
+        System.Windows.Controls.Primitives.Selector.SetIsSelected(ProblemFilter, _problemsOnly);
+        System.Windows.Controls.Primitives.Selector.SetIsSelected(SumAll, _detailsOpen && !_problemsOnly);
+        System.Windows.Controls.Primitives.Selector.SetIsSelected(SumWarn, _detailsOpen && _problemsOnly);
+        System.Windows.Controls.Primitives.Selector.SetIsSelected(SumBad, _detailsOpen && _problemsOnly);
 
         var query = Search.Text.Trim();
 

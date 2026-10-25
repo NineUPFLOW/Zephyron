@@ -1,4 +1,5 @@
 <Window x:Class="Zephyron.Gui.Views.UpdateWindow"
+        Style="{StaticResource Dialog}"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Доступно обновление"
@@ -20,22 +21,24 @@
             <Setter Property="Foreground" Value="{DynamicResource Muted}" />
             <Setter Property="FontFamily" Value="{DynamicResource UiFont}" />
             <Setter Property="FontSize" Value="13" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Shape" Background="Transparent" CornerRadius="8" Padding="14,0" MinHeight="30"
+                        <Border x:Name="Shape" Background="Transparent" CornerRadius="{StaticResource RMd}" Padding="14,0" MinHeight="30"
                                 BorderThickness="1" BorderBrush="Transparent">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Raised}" />
+                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource WashHover}" />
                                 <Setter Property="Foreground" Value="{DynamicResource Text}" />
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentSoft}" />
                                 <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource AccentLine}" />
                                 <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -69,7 +72,7 @@
             </StackPanel>
 
             <!-- Плашка версии справа в шапке — по макету владельца 06.10; крупнее — его же просьба. -->
-            <Border Grid.Column="2" VerticalAlignment="Center" Margin="16,0,0,0" CornerRadius="16"
+            <Border Grid.Column="2" VerticalAlignment="Center" Margin="16,0,0,0" CornerRadius="{StaticResource RXL}"
                     Padding="30,12,30,14" BorderThickness="1" MinWidth="190"
                     Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentLine}">
                 <StackPanel>
@@ -81,8 +84,8 @@
             </Border>
         </Grid>
 
-        <Border Grid.Row="1" Margin="24,16,24,0" CornerRadius="11" Padding="3" HorizontalAlignment="Left"
-                Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}" BorderThickness="1">
+        <Border Grid.Row="1" Margin="24,16,24,0" CornerRadius="{StaticResource RLg}" Padding="3" HorizontalAlignment="Left"
+                Background="{DynamicResource Surface}" BorderBrush="{DynamicResource CardRim}" BorderThickness="1">
             <StackPanel Orientation="Horizontal">
                 <RadioButton x:Name="NotesTab" Style="{StaticResource UpdateTab}" GroupName="UpdateTab"
                              Content="Что нового" IsChecked="True" Click="OnTab" />
@@ -122,7 +125,7 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="ВЕРСИИ" Style="{StaticResource GroupHead}" Margin="18,14,0,6" />
+                    <TextBlock Text="Версии" Style="{StaticResource GroupHead}" Margin="18,14,0,6" />
 
                     <ScrollViewer Grid.Row="1" Style="{StaticResource PageScroll}" Padding="8,0,18,12">
                         <StackPanel x:Name="Timeline" />
@@ -169,9 +172,9 @@
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                 <Button x:Name="SkipButton" Style="{StaticResource Ghost}" Content="Пропустить версию" Click="OnSkip" Padding="14,8" Margin="0,0,8,0" />
-                <Button x:Name="LaterButton" Style="{StaticResource Ghost}" Content="Позже" Click="OnLater" Padding="14,8" />
+                <Button x:Name="LaterButton" Style="{StaticResource Ghost}" Content="Позже" Click="OnLater" Padding="14,8" IsCancel="True" />
                 <Button x:Name="InstallButton" Style="{StaticResource Primary}" Click="OnInstall"
-                        Padding="18,9" Margin="8,0,0,0" IsDefault="True" ToolTipService.ShowOnDisabled="True">
+                        Padding="16,6" Margin="8,0,0,0" IsDefault="True" ToolTipService.ShowOnDisabled="True">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock FontFamily="{StaticResource IconFont}" FontSize="13" Text="&#xE896;" Margin="0,0,8,0" VerticalAlignment="Center"
                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />

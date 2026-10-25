@@ -1,28 +1,28 @@
 {
-  // «Кремовая» — основная светлая тема Zephyron и основа для чужих: "base": "light".
+  // «Светлая» — основная светлая тема Zephyron и основа для чужих: "base": "light".
   // Значения — те же, что в gui/Zephyron.Gui/Theme/Light.xaml;
   // расхождение ловит тест ThemeFilesMatchXamlPalettes.
-  "name": "Кремовая",
+  "name": "Светлая",
   "author": "Zephyron",
   "colors": {
-    "backdrop": "#FFF5F8",
+    "backdrop": "#EEF0F3",
     "surface": "#FFFFFF",
-    "raised": "#FBEAF1",
-    "border": "#F0D3E0",
-    "text": "#3A2E3F",
-    "muted": "#6E5F76",
-    "faint": "#9C89A5",
-    "accent": "#C2185B",
-    "accent-dim": "#F3C6DC",
-    "danger": "#C62828",
+    "raised": "#F5F6F8",
+    "border": "#D5D9E0",
+    "text": "#14171C",
+    "muted": "#4A5260",
+    "faint": "#646C7A",
+    "accent": "#0B6BCB",
+    "accent-dim": "#D6E8FA",
+    "danger": "#C0262D",
     "warn": "#8A5200",
-    "accent-fill": "#D6336C",
+    "accent-fill": "#0E74D8",
     "on-accent": "#FFFFFF",
     "warn-fill": "#B26A00"
   },
   "fonts": {
-    "ui": "Comfortaa, Segoe UI",
+    "ui": "Segoe UI Variable Text, Segoe UI",
     "mono": "Cascadia Mono, Consolas",
-    "display": "Comfortaa, Segoe UI"
+    "display": "Segoe UI Variable Display, Segoe UI"
   }
 }

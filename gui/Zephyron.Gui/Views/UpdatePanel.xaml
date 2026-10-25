@@ -51,7 +51,7 @@
                 -->
                 <Button x:Name="InstallButton" Style="{StaticResource Primary}"
                         Content="Обновить" Click="OnInstallUpdate" Margin="0,8,0,0"
-                        Padding="18,9" Visibility="Collapsed" />
+                        Padding="16,6" Visibility="Collapsed" />
             </StackPanel>
         </Grid>
     </Border>

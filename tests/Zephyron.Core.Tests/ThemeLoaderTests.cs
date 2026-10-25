@@ -112,7 +112,7 @@ public sealed class ThemeLoaderTests : IDisposable
 
         var theme = load.Theme!;
         Assert.Equal("#F2D335", theme[ThemeSlots.Accent].ToString());
-        Assert.Equal("#0F1219", theme[ThemeSlots.Surface].ToString());
+        Assert.Equal("#14161A", theme[ThemeSlots.Surface].ToString());
         Assert.Equal("Bahnschrift Condensed", theme.Fonts.Display);
         Assert.Equal("Segoe UI Variable Text, Segoe UI", theme.Fonts.Ui);
     }

@@ -151,7 +151,7 @@ public partial class PathWindow : Window
 
         var button = new Button { Content = grid };
         button.SetResourceReference(StyleProperty, "Choice");
-        button.SetResourceReference(BorderBrushProperty, chosen ? "Accent" : "Border");
+        System.Windows.Controls.Primitives.Selector.SetIsSelected(button, chosen);
 
         button.Click += (_, e) =>
         {
@@ -225,7 +225,7 @@ public partial class PathWindow : Window
 
         var button = new Button { Content = text, Padding = new Thickness(14, 9, 14, 9), Margin = new Thickness(0, 0, 0, 6) };
         button.SetResourceReference(StyleProperty, "Choice");
-        button.SetResourceReference(BorderBrushProperty, chosen ? "Accent" : "Border");
+        System.Windows.Controls.Primitives.Selector.SetIsSelected(button, chosen);
 
         button.Click += (_, e) =>
         {

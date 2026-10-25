@@ -41,6 +41,7 @@ public partial class TunnelSettingsWindow : Window
     public TunnelSettingsWindow()
     {
         InitializeComponent();
+        StatusLook.Attach(StatusBox, Status, StatusMark);
 
         // Не выше рабочей области экрана: при масштабе интерфейса 820 точек
         // окна выходили за край, и низ с кнопкой «Закрыть» уходил под панель

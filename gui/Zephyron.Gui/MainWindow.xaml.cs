@@ -3,8 +3,12 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Zephyron.Core;
 using Zephyron.Core.Updates;
@@ -44,11 +48,9 @@ public partial class MainWindow : Window
 
         DrawerLog.CloseRequested += (_, _) => ShowLog(false);
 
-        SourceInitialized += (_, _) =>
-        {
-            DarkenTitleBar();
-            AllowDropFromExplorer();
-        };
+        // Заголовок Windows — цветами темы, как у всех окон (TitleBar).
+        TitleBar.SetThemed(this, true);
+        SourceInitialized += (_, _) => AllowDropFromExplorer();
 
         _toastTimer.Tick += (_, _) => HideToast();
 
@@ -77,6 +79,31 @@ public partial class MainWindow : Window
         IsVisibleChanged += (_, _) => BackdropVideo.Update();
         StateChanged += (_, _) => BackdropVideo.Update();
 
+        // Свернули или скрыли — ореол точки гаснет; вернули — ShowTopDot зажжёт его снова.
+        IsVisibleChanged += (_, _) => ShowTopDot();
+        StateChanged += (_, _) => ShowTopDot();
+
+        // Слой «сеть»: курсор и клики — с корня окна, в том числе уже обработанные
+        // (кнопки и поля съедают нажатие, а слой должен его видеть). Обработчики
+        // стоят на элементах самого окна и держат только его; статическая
+        // подписка Motion.Changed снимается в Closed.
+        Root.AddHandler(PreviewMouseMoveEvent, new MouseEventHandler((_, e) => Field.Pointer(e.GetPosition(Field))), handledEventsToo: true);
+        Root.AddHandler(PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler((_, e) => Field.Burst(e.GetPosition(Field))), handledEventsToo: true);
+        MouseLeave += (_, _) => Field.Leave();
+
+        _onMotion = (_, _) =>
+        {
+            // Событие бывает с чужого потока (смена уровня отрисовки).
+            if (Dispatcher.CheckAccess())
+                OnMotionChanged();
+            else
+                Dispatcher.BeginInvoke(OnMotionChanged);
+        };
+        Motion.Changed += _onMotion;
+        Closed += (_, _) => Motion.Changed -= _onMotion;
+
+        Loaded += (_, _) => ApplyBackdropKind();
+
         _release.Tick += (_, _) => Release();
         IsVisibleChanged += (_, _) =>
         {
@@ -95,6 +122,7 @@ public partial class MainWindow : Window
     }
 
     private readonly Action _onUpdate;
+    private readonly EventHandler _onMotion;
 
     /// <summary>Проверка обновления и прогрев «Маршрутов» уже запускались в этом процессе.</summary>
     private static bool _startedOnce;
@@ -449,15 +477,18 @@ public partial class MainWindow : Window
         // задержка — создание раздела и есть частая её причина.
         UiStallWatch.Section = (sender as RadioButton)?.Content as string ?? name;
 
-        // Пункты живут в двух местах — в полосе и во всплывающем «Ещё», а у
-        // всплывающего меню своё дерево: сами друг друга переключатели
-        // не снимут, снимаем здесь. Раздел из «Ещё» подсвечивает его кнопку.
+        // Пункты лежат в двух группах панели. Одно имя группы и так снимает
+        // соседей, но снимаем и здесь: выбор не должен зависеть от того,
+        // в одном ли дереве окажутся группы при следующей перекладке.
         foreach (var item in Items().Where(i => !ReferenceEquals(i, sender)))
             item.IsChecked = false;
 
-        bool fromMore = MoreRail.Children.Contains((RadioButton)sender);
-        MoreToggle.Tag = fromMore ? "active" : null;
-        MorePopup.IsOpen = false;
+        // Черта едет после раскладки: в сжатой полосе пункт мог ещё не встать на место.
+        Dispatcher.InvokeAsync(() => MoveIndicator(), DispatcherPriority.Loaded);
+
+        // Скорость слоя — только с «Главной»: уходим — данных нет.
+        if (name != "status")
+            Field.Mbps = null;
 
         // Ушли из мастера в другой раздел — он закрыт, как «Пропустить».
         (Section.Content as OnboardingView)?.Leave();
@@ -471,7 +502,6 @@ public partial class MainWindow : Window
             Section.Content = null;
             Section.Visibility = Visibility.Collapsed;
             RoutesHost.Visibility = Visibility.Visible;
-            FitUnderNav();
             return;
         }
 
@@ -501,7 +531,6 @@ public partial class MainWindow : Window
         RoutesHost.Visibility = Visibility.Collapsed;
         Section.Visibility = Visibility.Visible;
         Section.Content = page;
-        FitUnderNav();
     }
 
     /// <summary>
@@ -535,38 +564,9 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>Все пункты меню: полоса и всплывающее «Ещё».</summary>
+    /// <summary>Все пункты боковой панели: разделы на каждый день и инструменты.</summary>
     private IEnumerable<RadioButton> Items() =>
         Rail.Children.OfType<RadioButton>().Concat(MoreRail.Children.OfType<RadioButton>());
-
-    /// <summary>Когда закрылось «Ещё» — щелчок мимо меню, пришедшийся на его же кнопку.</summary>
-    private DateTime _moreClosedAt;
-
-    /// <summary>
-    /// Открывает и закрывает «Ещё».
-    /// </summary>
-    /// <remarks>
-    /// Меню закрывается само при щелчке мимо (StaysOpen="False"), и щелчок
-    /// по его же кнопке сперва закрывает меню, а затем доходит до кнопки —
-    /// та открыла бы его снова. Закрытое только что — значит, закрыли этим
-    /// щелчком, и открывать не надо.
-    /// </remarks>
-    private void OnMoreToggle(object sender, RoutedEventArgs e)
-    {
-        if (DateTime.UtcNow - _moreClosedAt < TimeSpan.FromMilliseconds(250))
-        {
-            MoreToggle.IsChecked = false;
-            return;
-        }
-
-        MorePopup.IsOpen = MoreToggle.IsChecked == true;
-    }
-
-    private void OnMoreClosed(object? sender, EventArgs e)
-    {
-        _moreClosedAt = DateTime.UtcNow;
-        MoreToggle.IsChecked = false;
-    }
 
     private void OnLogToggle(object sender, RoutedEventArgs e) => ShowLog(LogButton.IsChecked == true);
 
@@ -595,6 +595,13 @@ public partial class MainWindow : Window
     /// </remarks>
     private void ShowTopDot()
     {
+        // Скрытому в трей и свёрнутому окну читать файл состояния каждые три секунды незачем.
+        if (!IsVisible || WindowState == WindowState.Minimized)
+        {
+            Breathe(false);
+            return;
+        }
+
         string key;
 
         try
@@ -602,7 +609,7 @@ public partial class MainWindow : Window
             var state = SupervisorState.Load(SupervisorState.DefaultPath);
 
             key = state is null || !state.IsSupervisorAlive() || state.Services.Count == 0 ? "Faint"
-                : state.Services.All(s => s.Health == ServiceHealth.Healthy) ? "Accent"
+                : state.Services.All(s => s.Health == ServiceHealth.Healthy) ? "Success"
                 : state.Services.Any(s => s.Health is ServiceHealth.Dead or ServiceHealth.Faulted) ? "Danger"
                 : "Warn";
         }
@@ -611,52 +618,187 @@ public partial class MainWindow : Window
             key = "Faint";
         }
 
-        var brush = (System.Windows.Media.Brush)FindResource(key);
-        TopDot.Fill = brush;
+        _dotMode = ModeOf(key);
+        ShowState();
+        ApplyBackdropKind();
     }
 
-    private void OnNavSize(object sender, SizeChangedEventArgs e)
+    /// <summary>Режим слоя и знака по ключу цвета состояния (ShowTopDot).</summary>
+    internal static FieldMode ModeOf(string key) => key switch
     {
-        FitUnderNav();
-        FitNav();
+        "Success" => FieldMode.Running,
+        "Warn" => FieldMode.Degraded,
+        "Danger" => FieldMode.Failed,
+        _ => FieldMode.Off,
+    };
+
+    /// <summary>Режим от файла состояния (ShowTopDot) — пока «Главная» не навязала свой.</summary>
+    private FieldMode _dotMode;
+
+    private FieldMode? _fieldOverride;
+    private DateTime _fieldOverrideUntil;
+
+    /// <summary>
+    /// Сколько навязанный «Запуск» держится, если «Главная» так и не сняла его: дольше
+    /// её терпения к запуску (StatusView.StartupPatience, 90 с) — она продлевает его каждым тиком.
+    /// </summary>
+    private static readonly TimeSpan OverrideLife = TimeSpan.FromSeconds(120);
+
+    /// <summary>Часы срока навязанного режима; тесты подменяют.</summary>
+    internal Func<DateTime> Now = () => DateTime.UtcNow;
+
+    /// <summary>
+    /// «Главная» сообщает слою и знаку своё: <paramref name="mode"/> — навязанный режим
+    /// (Starting на время запуска), <c>null</c> — вернуть режим по файлу состояния;
+    /// <paramref name="mbps"/> — реальная скорость приёма или <c>null</c> (нет данных / ушли с «Главной»).
+    /// </summary>
+    internal void FieldPulse(FieldMode? mode, double? mbps)
+    {
+        Field.Mbps = mbps;
+        _fieldOverride = mode;
+        _fieldOverrideUntil = mode is null ? default : Now() + OverrideLife;
+        ShowState();
+    }
+
+    /// <summary>Действующий режим: навязанный (не старше OverrideLife) или от файла состояния.</summary>
+    private FieldMode EffectiveMode()
+    {
+        if (_fieldOverride is not null && Now() > _fieldOverrideUntil)
+            _fieldOverride = null;
+
+        return _fieldOverride ?? _dotMode;
+    }
+
+    /// <summary>Слово, знак и слой — по действующему режиму; не только цветом.</summary>
+    private void ShowState()
+    {
+        var mode = EffectiveMode();
+        Field.Mode = mode;
+
+        TopMark.Tag = mode.ToString();
+        TopStatus.Text = mode switch
+        {
+            FieldMode.Starting => "Запуск",
+            FieldMode.Running => "Работает",
+            FieldMode.Degraded => "Работает частично",
+            FieldMode.Failed => "Сбой",
+            _ => "Выключен",
+        };
+
+        // Дыхание — только при «Работает» (и не в «Лёгком»: Breathe проверит).
+        Breathe(mode == FieldMode.Running);
+
+        // В сжатой полосе слова не видно — оно остаётся подсказкой.
+        StatusRow.ToolTip = TopStatus.Text + " — подробности на «Главной»";
+    }
+
+    /// <summary>
+    /// Слой частиц по виду фона темы: видео — слой прячется (две непрерывные
+    /// перерисовки), картинка — приглушён вдвое.
+    /// </summary>
+    /// <remarks>
+    /// Не .5·Decor, как в спеке: у тем с картинкой Decor = 0, и слой пропал бы.
+    /// Тема меняется без события — проверяется на каждом тике точки состояния.
+    /// </remarks>
+    private void ApplyBackdropKind()
+    {
+        bool video = BackdropVideo.Current is not null;
+        bool image = !video && TryFindResource("BackdropImage") is not SolidColorBrush;
+
+        Field.Visibility = video ? Visibility.Collapsed : Visibility.Visible;
+        Field.Dim = image ? 0.5 : 1;
+    }
+
+    /// <summary>Выключатель или профиль сменились: движение гаснет или возвращается сразу.</summary>
+    private void OnMotionChanged()
+    {
+        Breathe(IsLoaded && EffectiveMode() == FieldMode.Running);
+        MoveIndicator(animate: false);
+    }
+
+    private void OnStatusRow(object sender, RoutedEventArgs e) => Open("status");
+
+    private bool _breathing;
+
+    /// <summary>
+    /// Ореол вокруг знака состояния, расходящийся раз в 2,4 с, — пока обход работает.
+    /// </summary>
+    /// <remarks>
+    /// Единственное движение в полосе без действия человека: работающий обход
+    /// должен быть заметен краем глаза. Гаснет вместе с обходом, со скрытым
+    /// и свёрнутым окном, с выключенными анимациями и в профиле «Лёгкий»;
+    /// тридцать кадров в секунду. Motion.Changed останавливает его сразу.
+    /// </remarks>
+    private void Breathe(bool on)
+    {
+        on = on && Motion.Enabled && Motion.Profile != EffectsProfile.Lite && IsVisible && WindowState != WindowState.Minimized;
+
+        if (on == _breathing)
+            return;
+
+        _breathing = on;
+        var scale = (ScaleTransform)TopHalo.RenderTransform;
+
+        if (!on)
+        {
+            TopHalo.BeginAnimation(OpacityProperty, null);
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            TopHalo.Opacity = 0;
+            return;
+        }
+
+        var time = TimeSpan.FromSeconds(2.4);
+        var grow = new DoubleAnimation(1, 2.6, time)
+        {
+            RepeatBehavior = RepeatBehavior.Forever,
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+        };
+        var fade = new DoubleAnimation(0.55, 0, time) { RepeatBehavior = RepeatBehavior.Forever };
+        Timeline.SetDesiredFrameRate(grow, 30);
+        Timeline.SetDesiredFrameRate(fade, 30);
+
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty, grow);
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty, grow);
+        TopHalo.BeginAnimation(OpacityProperty, fade);
     }
 
     private void OnRootSize(object sender, SizeChangedEventArgs e) => FitNav();
 
-    /// <summary>Меню сжато до значков.</summary>
+    private void OnNavSize(object sender, SizeChangedEventArgs e)
+    {
+        FitNav();
+        MoveIndicator(animate: false);
+    }
+
+    /// <summary>Полоса сжата: вкладки — значками, без имени программы, версии и слова состояния.</summary>
     private bool _navCompact;
 
-    /// <summary>Ширина меню с подписями — замерена, пока они были видны.</summary>
+    /// <summary>Сколько занимает полоса с подписями — замерено, пока они были видны.</summary>
     private double _navWide;
 
-    /// <summary>Сколько свободного места по бокам меню держать, прежде чем сжимать.</summary>
-    private const double NavRoom = 24;
-
     /// <summary>
-    /// Сжимает верхнее меню до значков, когда с подписями оно не помещается в окно.
+    /// Сжимает командную полосу, когда с подписями она не помещается в окно.
     /// </summary>
     /// <remarks>
-    /// Владелец, 22.10: «кнопка журнала не должна ничего перекрывать при изменении
-    /// размера окна». Полоса с подписями шире окна у нижнего предела ширины;
-    /// без подписей она вчетверо уже, а подпись остаётся подсказкой. Обратно —
-    /// с запасом, чтобы на самой границе меню не мигало туда-сюда.
+    /// Замер, а не порог ширины окна: ширина полосы зависит от масштаба
+    /// интерфейса и шрифта темы. Обратно — с запасом, чтобы на самой границе
+    /// полоса не мигала туда-сюда.
     /// </remarks>
     private void FitNav()
     {
-        if (Nav is null || Root.ActualWidth <= 0)
+        if (Nav is null || Nav.ActualWidth <= 0)
             return;
 
-        // Меню стоит по центру, а журнал — плашкой справа: место меню —
-        // ширина окна без плашки журнала с обеих сторон, иначе центр
-        // наехал бы на неё.
-        double side = LogHost is null ? 0 : LogHost.ActualWidth + LogHost.Margin.Right + NavRoom;
-        double room = Root.ActualWidth - 2 * side - NavRoom;
+        double room = Nav.ActualWidth - Nav.Padding.Left - Nav.Padding.Right;
+        double used = Brand.ActualWidth + Brand.Margin.Right + Rail.ActualWidth + MoreRail.ActualWidth
+            + BarEnd.ActualWidth + BarEnd.Margin.Left;
 
         if (!_navCompact)
         {
-            _navWide = Nav.ActualWidth;
+            _navWide = used;
 
-            if (_navWide > room)
+            if (used > room)
                 SetNavCompact(true);
         }
         else if (_navWide + 40 <= room)
@@ -670,37 +812,57 @@ public partial class MainWindow : Window
         _navCompact = compact;
 
         Resources["NavLabel"] = compact ? Visibility.Collapsed : Visibility.Visible;
-        Resources["NavGlyphGap"] = compact ? new Thickness(0) : new Thickness(0, 0, 7, 0);
+        Resources["NavIcon"] = compact ? Visibility.Visible : Visibility.Collapsed;
         VersionLabel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        BrandName.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
 
-        // Без подписи имя пункта — подсказкой. «Ещё» и «Журнал» подписи
-        // не теряют: их значки сами по себе ничего не называют.
+        // Без подписи имя вкладки — подсказкой. У инструментов она своя, из стиля.
         foreach (var item in Rail.Children.OfType<RadioButton>())
             item.ToolTip = compact ? item.Content : null;
     }
 
     /// <summary>
-    /// Отодвигает содержимое раздела из-под верхнего меню.
+    /// Ставит черту под выбранный пункт полосы — переездом, если анимации включены.
     /// </summary>
     /// <remarks>
-    /// Раздел лежит под меню во всю высоту окна, а не под ним строкой ниже:
-    /// так картинка темы на «Главной» (её свой слой, PlaceArt) доходит до
-    /// верхнего края и не встречается с картинкой окна швом над карточками
-    /// (владелец, 22.10: «при смещении обоев они отображаются не правильно»).
-    /// Отступ — полем самого раздела: фон раздела под меню остаётся,
-    /// а карточки начинаются ниже меню.
+    /// Одна черта на всю полосу вместо подложки у каждого пункта: переезд
+    /// показывает, откуда и куда вы перешли. Ширина прямоугольника постоянна,
+    /// двигаются только сдвиг и масштаб его RenderTransform — перекладки нет.
     /// </remarks>
-    private void FitUnderNav()
+    private void MoveIndicator(bool animate = true)
     {
-        var under = new Thickness(0, Nav.ActualHeight + Nav.Margin.Top, 0, 0);
+        if (NavIndicator.Parent is not Canvas canvas || Items().FirstOrDefault(i => i.IsChecked == true) is not { } item
+            || !item.IsVisible || item.ActualWidth <= 0)
+        {
+            return;
+        }
 
-        if (Section?.Content is Control page)
-            page.Padding = under;
+        // Вкладка — черта под подписью; инструмент — под его квадратом.
+        double inset = Rail.Children.Contains(item) ? 12 : 4;
+        double left = item.TranslatePoint(new Point(inset, 0), canvas).X;
+        double scale = Math.Max(8, item.ActualWidth - 2 * inset) / IndicatorBase;
 
-        // «Маршруты» живут своим местом (RoutesHost) и тоже лежат под меню.
-        if (RoutesHost?.Content is Control routes)
-            routes.Padding = under;
+        // Текущие значения — с идущей анимацией, чтобы новый переезд начался с места, а не скачком.
+        double fromLeft = NavShift.X, fromScale = NavScale.ScaleX;
+        NavShift.BeginAnimation(TranslateTransform.XProperty, null);
+        NavScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        NavShift.X = left;
+        NavScale.ScaleX = scale;
+
+        if (!animate || !Motion.Enabled || fromScale == 0)
+            return;
+
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        var time = TimeSpan.FromMilliseconds(260);
+
+        NavShift.BeginAnimation(TranslateTransform.XProperty,
+            new DoubleAnimation(fromLeft, left, time) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
+        NavScale.BeginAnimation(ScaleTransform.ScaleXProperty,
+            new DoubleAnimation(fromScale, scale, time) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
     }
+
+    /// <summary>Постоянная ширина черты (NavIndicator.Width в разметке); длину даёт ScaleX.</summary>
+    internal const double IndicatorBase = 64;
 
     /// <summary>Сколько уведомление висит, прежде чем уйти само.</summary>
     private static readonly TimeSpan ToastLife = TimeSpan.FromSeconds(14);
@@ -740,16 +902,41 @@ public partial class MainWindow : Window
         ToastAct.IsEnabled = true;
         ToastAct.Visibility = Visibility.Visible;
         ToastLater.Content = "Позже";
+        ShowToastKind("Degraded", assertive: false);
 
         // Угасание от прошлого «Позже» могло ещё идти — снимаем, иначе оно
         // спрятало бы только что показанное.
         Toast.BeginAnimation(OpacityProperty, null);
         Toast.Visibility = Visibility.Visible;
-        Motion.Arrive(Toast, dy: 18);
+        Motion.Arrive(Toast, dy: 8, ms: 180);
 
+        ArmToast();
+    }
+
+    /// <summary>Знак тоста (ромб — предложение, диск — готово, треугольник — не вышло) и как его читает скринридер.</summary>
+    private void ShowToastKind(string mark, bool assertive)
+    {
+        ToastMark.Tag = mark;
+        AutomationProperties.SetLiveSetting(Toast, assertive ? AutomationLiveSetting.Assertive : AutomationLiveSetting.Polite);
+    }
+
+    /// <summary>Отсчёт до ухода тоста идёт (его останавливает «Перезапускаю…» и наведённая мышь).</summary>
+    private bool _toastArmed;
+
+    private void ArmToast()
+    {
+        _toastArmed = true;
         _toastTimer.Stop();
         _toastTimer.Interval = ToastLife;
         _toastTimer.Start();
+    }
+
+    private void OnToastEnter(object sender, MouseEventArgs e) => _toastTimer.Stop();
+
+    private void OnToastLeave(object sender, MouseEventArgs e)
+    {
+        if (_toastArmed && Toast.Visibility == Visibility.Visible)
+            ArmToast();
     }
 
     private void OnToastLater(object sender, RoutedEventArgs e) => HideToast();
@@ -784,7 +971,7 @@ public partial class MainWindow : Window
             GreetingTitle.Text = $"Zephyron обновлён до {current}";
             GreetingToast.BeginAnimation(OpacityProperty, null);
             GreetingToast.Visibility = Visibility.Visible;
-            Motion.Arrive(GreetingToast, dy: 18);
+            Motion.Arrive(GreetingToast, dy: 8, ms: 180);
 
             Journal.Write("окно", $"уведомление после обновления до {current}");
         }
@@ -816,6 +1003,7 @@ public partial class MainWindow : Window
 
     private void HideToast()
     {
+        _toastArmed = false;
         _toastTimer.Stop();
         Motion.Leave(Toast);
     }
@@ -832,6 +1020,7 @@ public partial class MainWindow : Window
     {
         ToastAct.IsEnabled = false;
         ToastTitle.Text = "Перезапускаю движки…";
+        _toastArmed = false;
         _toastTimer.Stop();
 
         var outcome = await EngineControl.RestartAsync("«Перезапустить» во всплывающем сообщении", CancellationToken.None);
@@ -841,6 +1030,7 @@ public partial class MainWindow : Window
             ToastTitle.Text = "Перезапустить не вышло";
             ToastBody.Text = outcome.Message;
             ToastAct.IsEnabled = true;
+            ShowToastKind("Failed", assertive: true);
 
             return;
         }
@@ -855,9 +1045,9 @@ public partial class MainWindow : Window
             + "изменение, обновите страницу через Ctrl+F5 или откройте её в окне инкогнито.";
         ToastAct.Visibility = Visibility.Collapsed;
         ToastLater.Content = "Понятно";
+        ShowToastKind("Running", assertive: false);
 
-        _toastTimer.Interval = ToastLife;
-        _toastTimer.Start();
+        ArmToast();
     }
 
     internal static string Version()
@@ -908,40 +1098,4 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>Идентификатор атрибута тёмного оформления рамки.</summary>
-    private const int UseImmersiveDarkMode = 20;
-
-    [DllImport("dwmapi.dll", SetLastError = true)]
-    private static extern int DwmSetWindowAttribute(nint window, int attribute, ref int value, int size);
-
-    /// <summary>
-    /// Просит систему нарисовать заголовок окна тёмным.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Само окно тёмное, а рамку и заголовок рисует Windows, и по умолчанию
-    /// они светлые. Белая полоса над тёмным содержимым — первое, что видно
-    /// при запуске, и выглядит она поломкой, а не задумкой.
-    /// </para>
-    /// <para>
-    /// Отказ не проверяется намеренно: на сборках Windows старше 2020 года
-    /// атрибута нет, вызов вернёт ошибку, и заголовок останется светлым.
-    /// Это некрасиво, но работать не мешает, а падать из-за оформления
-    /// не стоит ничего.
-    /// </para>
-    /// </remarks>
-    private void DarkenTitleBar()
-    {
-        try
-        {
-            var handle = new WindowInteropHelper(this).Handle;
-            int enabled = 1;
-
-            DwmSetWindowAttribute(handle, UseImmersiveDarkMode, ref enabled, sizeof(int));
-        }
-        catch (Exception)
-        {
-            // Оформление не стоит того, чтобы из-за него не открылось окно.
-        }
-    }
 }

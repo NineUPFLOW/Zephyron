@@ -18,18 +18,18 @@
                 <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
                 <Border Grid.Column="1" Height="5" CornerRadius="2.5" Background="{DynamicResource Raised}" VerticalAlignment="Center"
                         Width="{Binding Track}">
-                    <Border Height="5" CornerRadius="2.5" Background="{DynamicResource Accent}"
+                    <Border Height="5" CornerRadius="2.5" Background="{DynamicResource Accent2}"
                             HorizontalAlignment="Left" Width="{Binding Bar}" />
                 </Border>
                 <TextBlock Grid.Column="2" Text="{Binding Count}" HorizontalAlignment="Right" />
             </Grid>
         </DataTemplate>
 
-        <!-- Значок счётчика — акцентом, как на макете владельца 10.10. -->
+        <!-- Значок счётчика — приглушённым: акцент в «Сигнале» только у выбранного и главного. -->
         <Style x:Key="StatGlyph" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="{DynamicResource IconFont}" />
             <Setter Property="FontSize" Value="22" />
-            <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+            <Setter Property="Foreground" Value="{DynamicResource Muted}" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="Margin" Value="2,0,12,0" />
         </Style>
@@ -48,7 +48,7 @@
         справа кольцо долей и «кто шумит». На узком окне правая колонка уходит
         под таблицу (OnBodySize): у владельца ~830 точек содержимого.
     -->
-    <Grid Margin="32,28,32,24">
+    <Grid Margin="{StaticResource PagePad}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -72,10 +72,10 @@
             <WrapPanel Margin="0,16,0,-8">
                 <WrapPanel.Resources>
                     <Style TargetType="Button" BasedOn="{StaticResource Ghost}">
-                        <Setter Property="Padding" Value="14,9" />
+                        <Setter Property="Padding" Value="12,6" />
                     </Style>
                 </WrapPanel.Resources>
-                <Button x:Name="PowerButton" Style="{StaticResource Primary}" Padding="18,9"
+                <Button x:Name="PowerButton" Style="{StaticResource Primary}" Padding="16,6"
                         Content="Начать" Click="OnPower" MinWidth="110" Margin="0,0,8,8"
                         gui:ButtonGlyph.Lead="&#xE768;" />
                 <Button x:Name="ProcessButton" MinWidth="150"
@@ -147,12 +147,11 @@
                 </Grid.RowDefinitions>
 
                 <!--
-                    Лупа поверх поля. Отступ слева 17: шаблон поля складывает
-                    Padding дважды (см. Hint.cs), и текст с подсказкой встают
-                    на 37,5 — сразу за лупой.
+                    Лупа поверх поля. Отступ поля слева 34 — текст
+                    с подсказкой встают сразу за лупой.
                 -->
                 <Grid Grid.Row="0">
-                    <TextBox x:Name="Search" TextChanged="OnSearch" Padding="17,7,11,7"
+                    <TextBox x:Name="Search" TextChanged="OnSearch" Padding="34,7,11,7"
                              gui:Hint.Text="Поиск по имени, адресу, программе, правилу" />
                     <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE721;" FontSize="14"
                                HorizontalAlignment="Left" Margin="14,0,0,0" IsHitTestVisible="False" />
@@ -241,11 +240,11 @@
                         <ColumnDefinition Width="36" />
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Grid.Column="0" Text="ВРЕМЯ" Style="{StaticResource Caption}" />
-                    <TextBlock Grid.Column="1" Text="КУДА" Style="{StaticResource Caption}" />
-                    <TextBlock Grid.Column="2" Text="ПРОГРАММА" Style="{StaticResource Caption}" />
-                    <TextBlock Grid.Column="3" Text="НАЗНАЧЕНИЕ" Style="{StaticResource Caption}" />
-                    <TextBlock Grid.Column="4" Text="ПРАВИЛО" Style="{StaticResource Caption}" />
+                    <TextBlock Grid.Column="0" Text="Время" Style="{StaticResource Caption}" />
+                    <TextBlock Grid.Column="1" Text="Куда" Style="{StaticResource Caption}" />
+                    <TextBlock Grid.Column="2" Text="Программа" Style="{StaticResource Caption}" />
+                    <TextBlock Grid.Column="3" Text="Назначение" Style="{StaticResource Caption}" />
+                    <TextBlock Grid.Column="4" Text="Правило" Style="{StaticResource Caption}" />
                 </Grid>
 
                 <!--
@@ -257,6 +256,20 @@
                     VirtualizingStackPanel получает бесконечную высоту и строит всё.
                 -->
                 <Border x:Name="TableCard" Grid.Row="3" Style="{StaticResource Card}" Padding="0">
+                    <Grid>
+                    <!-- Пусто: показывается, пока в таблице нет строк (отбор или наблюдение выключено). -->
+                    <ContentControl local:PageHead.Title="Соединений пока нет"
+                                    local:PageHead.Subtitle="Нажмите «Начать» — они появятся по мере открытия. Если наблюдение идёт, смягчите отбор.">
+                        <ContentControl.Style>
+                            <Style TargetType="ContentControl" BasedOn="{StaticResource EmptyState}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasItems, ElementName=Rows}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ContentControl.Style>
+                    </ContentControl>
                         <ItemsControl x:Name="Rows"
                                       VirtualizingPanel.IsVirtualizing="True"
                                       VirtualizingPanel.VirtualizationMode="Recycling"
@@ -317,11 +330,13 @@
                                         <Button Grid.Column="5" Style="{StaticResource Ghost}" Content="⋮"
                                                 Padding="0,2" MinWidth="28" HorizontalAlignment="Right"
                                                 VerticalAlignment="Center" Click="OnRowMenu"
-                                                ToolTip="Что сделать с этим соединением" />
+                                                ToolTip="Что сделать с этим соединением"
+                                                AutomationProperties.Name="Действия с соединением" />
                                     </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                    </Grid>
                 </Border>
 
                 <TextBlock Grid.Row="4" Style="{StaticResource Caption}" Margin="4,8,0,0" TextWrapping="Wrap"

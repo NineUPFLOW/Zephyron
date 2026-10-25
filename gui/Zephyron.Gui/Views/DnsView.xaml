@@ -17,17 +17,17 @@
     <UserControl.Resources>
         <!-- Ярлык свойства резолвера: «Надёжный», «Без фильтрации». -->
         <Style x:Key="Tag" TargetType="Border">
-            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="CornerRadius" Value="{StaticResource RMd}" />
             <Setter Property="Padding" Value="8,2,8,3" />
             <Setter Property="Margin" Value="0,0,6,0" />
             <Setter Property="Background" Value="{DynamicResource Raised}" />
             <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
-            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderThickness" Value="{StaticResource Stroke}" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
     </UserControl.Resources>
 
-    <ScrollViewer Style="{StaticResource PageScroll}" Padding="32,28,32,28">
+    <ScrollViewer Style="{StaticResource PageScroll}" Padding="{StaticResource PagePad}">
         <StackPanel>
 
             <ContentControl Style="{StaticResource PageHead}"
@@ -76,7 +76,7 @@
                                        Text="Кто на самом деле отвечает на DNS и подменяет ли ответы." />
                         </StackPanel>
 
-                        <Button Grid.Column="2" x:Name="SurveyButton" Style="{StaticResource Primary}" Padding="18,9"
+                        <Button Grid.Column="2" x:Name="SurveyButton" Style="{StaticResource Primary}" Padding="16,6"
                                 Content="Проверить" Click="OnSurvey" VerticalAlignment="Top" />
                     </Grid>
                 </Border>
@@ -111,7 +111,7 @@
                                        Text="Живы ли адреса, к которым прибиты имена, и что посредники отдают сейчас." />
                         </StackPanel>
 
-                        <Button Grid.Column="2" x:Name="PinsButton" Style="{StaticResource Ghost}" Padding="18,9"
+                        <Button Grid.Column="2" x:Name="PinsButton" Style="{StaticResource Ghost}" Padding="16,6"
                                 Content="Проверить" Click="OnPins" VerticalAlignment="Top"
                                 ToolTip="Проверить актуальные адреса посредников и заменить умершие пины" />
                     </Grid>
@@ -182,8 +182,8 @@
                                                 Content="Кому Windows отдаёт запросы всего, что идёт мимо туннеля. Их выдаёт сеть или задаёт адаптер." />
                             </StackPanel>
 
-                            <Border Margin="0,10,0,0" CornerRadius="9" Padding="10,7"
-                                    Background="{DynamicResource Raised}" BorderBrush="{DynamicResource Border}" BorderThickness="1">
+                            <Border Margin="0,10,0,0" CornerRadius="{StaticResource RMd}" Padding="10,7"
+                                    Background="{DynamicResource Raised}" BorderBrush="{DynamicResource Border}" BorderThickness="{StaticResource Stroke}">
                                 <TextBlock x:Name="SystemValue" Style="{StaticResource Mono}" TextWrapping="Wrap" />
                             </Border>
 
@@ -207,12 +207,12 @@
                             <ColumnDefinition Width="64" />
                         </Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Column="0" Text="ПРОВАЙДЕР" Style="{StaticResource Caption}" />
+                        <TextBlock Grid.Column="0" Text="Провайдер" Style="{StaticResource Caption}" />
                         <TextBlock Grid.Column="1" Text="DoH" Style="{StaticResource Caption}" />
                         <TextBlock Grid.Column="2" Text="DoT" Style="{StaticResource Caption}" />
                         <TextBlock Grid.Column="3" Text="UDP" Style="{StaticResource Caption}" />
-                        <TextBlock Grid.Column="4" Text="КТО ОТВЕЧАЕТ НА UDP" Style="{StaticResource Caption}" />
-                        <TextBlock Grid.Column="5" Text="ПОДМЕНА" Style="{StaticResource Caption}" />
+                        <TextBlock Grid.Column="4" Text="Кто отвечает на UDP" Style="{StaticResource Caption}" />
+                        <TextBlock Grid.Column="5" Text="Подмена" Style="{StaticResource Caption}" />
                     </Grid>
 
                     <ItemsControl x:Name="Survey">
@@ -248,7 +248,8 @@
                 в туннель, — после каждого обзора. Выбор строкой ниже
                 автовыбор выключает.
             -->
-            <Button Style="{StaticResource Choice}" Margin="0,14,0,0" Click="OnAutoDns">
+            <Button Style="{StaticResource Choice}" Margin="0,14,0,0" Click="OnAutoDns"
+                    Selector.IsSelected="{Binding IsChecked, ElementName=AutoDnsSwitch, Mode=OneWay}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -304,6 +305,7 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Button Style="{StaticResource Choice}" BorderBrush="{Binding Edge}"
+                                Selector.IsSelected="{Binding Chosen, Mode=OneWay}"
                                 Tag="{Binding Address}" Click="OnChoose">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -317,7 +319,7 @@
 
                                 <!-- Логотип с сайта резолвера (SiteIcons); нет — первая буква. -->
                                 <Grid Grid.Column="0" Width="30" Height="30" Margin="0,0,14,0" VerticalAlignment="Center">
-                                    <Border CornerRadius="8" Background="{DynamicResource Raised}"
+                                    <Border CornerRadius="{StaticResource RMd}" Background="{DynamicResource Raised}"
                                             Visibility="{Binding LetterShown}">
                                         <TextBlock Text="{Binding Letter}" FontWeight="SemiBold" FontSize="14"
                                                    Foreground="{DynamicResource Muted}"
@@ -362,12 +364,7 @@
                                                Margin="0,2,0,0" TextTrimming="CharacterEllipsis" MaxWidth="150" />
                                 </StackPanel>
 
-                                <!-- Выбранный — заполненный квадратик, как у переключателя. -->
-                                <Grid Grid.Column="4" Width="20" Height="20" Margin="16,0,0,0" VerticalAlignment="Center">
-                                    <Rectangle RadiusX="4" RadiusY="4" Stroke="{Binding Edge}" StrokeThickness="1.6" />
-                                    <Rectangle RadiusX="2" RadiusY="2" Width="10" Height="10" Fill="{DynamicResource Accent}"
-                                             Visibility="{Binding MarkShown}" />
-                                </Grid>
+                                <!-- Выбранный отмечает стиль Choice: подложка, рамка и точка слева (Selector.IsSelected). -->
 
                                 <!-- Только у своих: встроенные убирать нечем и незачем. -->
                                 <Button Grid.Column="5" Style="{StaticResource Ghost}"
@@ -381,7 +378,18 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <TextBlock x:Name="Status" Style="{StaticResource Caption}" Margin="4,10,0,0" TextWrapping="Wrap" />
+            <!-- Строка состояния: ошибка — панелью ErrorState (StatusLook). -->
+            <Border x:Name="StatusBox" Margin="0,10,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Control x:Name="StatusMark" Style="{StaticResource StateMark}" Visibility="Collapsed"
+                             VerticalAlignment="Top" Margin="0,1,10,0" />
+                    <TextBlock x:Name="Status" Grid.Column="1" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+                </Grid>
+            </Border>
 
             <!--
                 Свой резолвер (владелец, 26.09, после отзыва в обсуждении #7).
@@ -431,8 +439,18 @@
                                     Content="Проверить и добавить" Click="OnAddOwn" />
                         </Grid>
 
-                        <TextBlock x:Name="OwnStatus" Style="{StaticResource Caption}" Margin="0,8,0,0"
-                                   TextWrapping="Wrap" Visibility="Collapsed" />
+                        <Border x:Name="OwnStatusBox" Margin="0,8,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Control x:Name="OwnStatusMark" Style="{StaticResource StateMark}" Visibility="Collapsed"
+                                         VerticalAlignment="Top" Margin="0,1,10,0" />
+                                <TextBlock x:Name="OwnStatus" Grid.Column="1" Style="{StaticResource Caption}"
+                                           TextWrapping="Wrap" Visibility="Collapsed" />
+                            </Grid>
+                        </Border>
                     </StackPanel>
                 </Grid>
             </Border>

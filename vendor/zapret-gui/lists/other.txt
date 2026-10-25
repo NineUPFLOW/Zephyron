@@ -85,7 +85,7 @@ matrix.org
 maven.neoforged.net
 medium.com
 meduza.io
-mega.co.zy
+mega.co.nz
 minecraftrating.ru
 moscowtimes.ru
 mullvad.net

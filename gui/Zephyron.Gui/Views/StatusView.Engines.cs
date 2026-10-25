@@ -55,12 +55,12 @@ public partial class StatusView
             var parts = new List<string>
             {
                 "ЦП " + EngineLoad.Cores(engines),
-                "ПАМЯТЬ " + (engines.Count > 0 ? size(engines.Sum(e => e.Memory)) : "—"),
+                "память " + (engines.Count > 0 ? size(engines.Sum(e => e.Memory)) : "—"),
             };
 
             // Трафик — только у туннеля: у десинка своего счёта нет.
             if (totals is { } moved)
-                parts.Add($"ТУННЕЛЬ ↑ {size(moved.Up)} ↓ {size(moved.Down)}");
+                parts.Add($"туннель ↑ {size(moved.Up)} ↓ {size(moved.Down)}");
 
             EngineMeters.Text = string.Join("  ·  ", parts);
             EngineMeters.ToolTip = EngineLoad.Explain(engines, size)

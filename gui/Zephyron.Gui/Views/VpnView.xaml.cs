@@ -117,7 +117,8 @@ public sealed record QuickTile(
     Visibility MarkShown,
     Brush Edge,
     Brush Fill,
-    string Tip);
+    string Tip,
+    bool Chosen = false);
 
 /// <summary>Строка «Недавних серверов»: флаг, а нет его — знак (буквы страны, у WARP — облачко).</summary>
 public sealed record RecentRow(
@@ -271,7 +272,7 @@ public sealed class SubRow : System.ComponentModel.INotifyPropertyChanged
     /// </remarks>
     public double ChevronAngle => Chevrons.Angle(Open);
 
-    public Brush Edge => (Brush)Application.Current.FindResource(Active ? "Accent" : "Border");
+    public Brush Edge => (Brush)Application.Current.FindResource(Active ? "AccentLine" : "Border");
 
     public Visibility ActiveShown => Active ? Visibility.Visible : Visibility.Collapsed;
 
@@ -324,6 +325,7 @@ public partial class VpnView : UserControl
     public VpnView()
     {
         InitializeComponent();
+        StatusLook.Attach(StatusBox, Status, StatusMark);
 
         // Верх вкладки и подпись внизу размечены в Holder, а живут первым
         // и последним элементом виртуального списка (Page): иначе их
@@ -635,8 +637,8 @@ public partial class VpnView : UserControl
 
         // Метка состояния: зелёная, пока выход отвечает; красная — не ответил
         // на последнюю проверку; без проверки — по тому, работают ли движки.
-        var key = probe is { Ok: false } ? "Danger" : running ? "Accent" : "Faint";
-        CurrentDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, key);
+        var key = probe is { Ok: false } ? "Danger" : running ? "Success" : "Faint";
+        CurrentDot.Tag = probe is { Ok: false } ? "Failed" : running ? "Running" : "Off";
         CurrentState.SetResourceReference(TextBlock.ForegroundProperty, key);
         CurrentState.Text = probe switch
         {
@@ -1161,7 +1163,7 @@ public partial class VpnView : UserControl
             Bar4 = Bar(4),
             Bar5 = Bar(5),
             NowShown = running && live == server.Tag ? Visibility.Visible : Visibility.Collapsed,
-            Edge = (Brush)FindResource(chosen ? "Accent" : "Border"),
+            Edge = (Brush)FindResource(chosen ? "AccentLine" : "Border"),
             Fade = _paused ? 0.55 : 1,
             ExcludedShown = skip.Label is null ? Visibility.Collapsed : Visibility.Visible,
             SkipLabel = skip.Label ?? "вне подбора",
@@ -1619,7 +1621,7 @@ public partial class VpnView : UserControl
 
         // Пять полосок по 20 %; хоть один ответ — хоть одна полоска.
         int bars = percent == 0 ? 0 : Math.Max(1, (int)Math.Round(percent / 20.0));
-        var color = (Brush)FindResource(percent >= 80 ? "Accent" : percent >= 50 ? "Warn" : "Danger");
+        var color = (Brush)FindResource(percent >= 80 ? "Success" : percent >= 50 ? "Warn" : "Danger");
 
         return ($"{percent} %", tip, color, bars);
     }
@@ -1629,7 +1631,7 @@ public partial class VpnView : UserControl
         // Отвечает через раз — жёлтым (владелец 29.09): ОБС у SecureWay
         // отвечали 2–3 раза из 5, и зелёный на таком врал бы.
         { Flaky: true } => "Warn",
-        { Success: true } => "Accent",
+        { Success: true } => "Success",
 
         // Обычно отвечает, промахнулась последняя проверка — жёлтым, а не
         // красным: красный рядом с «80 %» читался как «мёртв» (12.10).
@@ -1701,7 +1703,7 @@ public partial class VpnView : UserControl
 
         WarpSwitch.IsChecked = on;
         WarpWord.Text = on ? "Включён" : "Выключен";
-        WarpDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, on ? "Accent" : "Faint");
+        WarpDot.Tag = on ? "Running" : "Off";
 
         var exit = Warp.Exits()[0];
         var measured = Seen(exit.Tag) is { Success: true, LatencyMs: { } ms } ? $" · {ms:0} мс" : string.Empty;
@@ -1721,6 +1723,7 @@ public partial class VpnView : UserControl
 
         // Подписки и лента на паузе — видно сразу, а не только в подписи.
         PausedLine.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        PausedBox.Visibility = PausedLine.Visibility;
         _paused = on;
         QuickCard.Opacity = on ? 0.55 : 1;
         QuickServers.IsEnabled = !on;
@@ -2040,8 +2043,8 @@ public partial class VpnView : UserControl
 
         if (fresh.Count == 0)
         {
-            Status.Text = "Ключей не нашлось: нужны строки вида vless://, trojan://, hysteria2://, tuic://, "
-                + "wireguard:// и подобные.";
+            Status.Text = "Ключей не нашлось: нужны строки вида vless://, trojan://, hysteria2://, tuic://, socks5://, "
+                + "http://адрес:порт, wireguard:// и подобные.";
             return;
         }
 
@@ -2087,6 +2090,20 @@ public partial class VpnView : UserControl
     /// Если курсор в поле ввода, Ctrl+V остаётся обычной вставкой: человек
     /// вставляет в поле — значит, хочет видеть вставленное там.
     /// </remarks>
+    /// <summary>
+    /// Вкладка не шире «Главной» (ContentMax): лишняя ширина окна уходит в поля по бокам.
+    /// </summary>
+    /// <remarks>
+    /// Полями, а не MaxWidth списка: обёртка вокруг панели сняла бы виртуализацию строк
+    /// (подписка на сотни серверов), а центровка сжала бы строки до их содержимого.
+    /// </remarks>
+    private void OnPageSize(object sender, SizeChangedEventArgs e)
+    {
+        var pad = (Thickness)FindResource("PagePad");
+        double side = Math.Max(0, (e.NewSize.Width - pad.Left - pad.Right - (double)FindResource("ContentMax")) / 2);
+        Page.Padding = new Thickness(pad.Left + side, pad.Top, pad.Right + side, pad.Bottom);
+    }
+
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != System.Windows.Input.Key.V || Keyboard.Modifiers != ModifierKeys.Control)
@@ -2996,7 +3013,7 @@ public partial class VpnView : UserControl
         {
             new(null, "Авто", "быстрейший", (Brush)FindResource("Muted"),
                 null, Visibility.Collapsed, "", icons, Visibility.Visible,
-                Edge(auto), Fill(auto), "Автоподбор: быстрейший из живых"),
+                Edge(auto), Fill(auto), "Автоподбор: быстрейший из живых", auto),
         };
 
         // Мёртвые и незамеренные — в конце: лента для быстрого выбора, а не перечень.
@@ -3026,15 +3043,16 @@ public partial class VpnView : UserControl
                 flag is null ? Visibility.Visible : Visibility.Collapsed,
                 Edge(chosen),
                 Fill(chosen),
-                server.Tag));
+                server.Tag,
+                chosen));
         }
 
         QuickServers.ItemsSource = tiles;
 
-        Brush Edge(bool on) => (Brush)FindResource(on ? "Accent" : "Border");
+        Brush Edge(bool on) => (Brush)FindResource(on ? "AccentLine" : "Border");
         // Выбранная плитка светится акцентом (0.16), а не заливается им:
         // подпись на ней остаётся цветом текста и читается в любой теме.
-        Brush Fill(bool on) => (Brush)FindResource(on ? "AccentSoft" : "Surface");
+        Brush Fill(bool on) => (Brush)FindResource(on ? "AccentSoft" : "Wash");
     }
 
     /// <summary>Короткое имя для плитки: «Эстония — TLS XHTTP» → «Эстония».</summary>
@@ -3070,10 +3088,10 @@ public partial class VpnView : UserControl
 
     /// <summary>Сдвиг ленты на три плитки.</summary>
     private void OnQuickLeft(object sender, RoutedEventArgs e) =>
-        QuickScroll.ScrollToHorizontalOffset(Math.Max(0, QuickScroll.HorizontalOffset - 3 * 124));
+        QuickScroll.ScrollToHorizontalOffset(Math.Max(0, QuickScroll.HorizontalOffset - 3 * 94));
 
     private void OnQuickRight(object sender, RoutedEventArgs e) =>
-        QuickScroll.ScrollToHorizontalOffset(QuickScroll.HorizontalOffset + 3 * 124);
+        QuickScroll.ScrollToHorizontalOffset(QuickScroll.HorizontalOffset + 3 * 94);
 
     /// <summary>
     /// Колесо над лентой листает страницу, а не ленту; с Shift — ленту.
@@ -3128,7 +3146,8 @@ public partial class VpnView : UserControl
             SubsHeader.BringIntoView();
     }
 
-    private string _recentShown = string.Empty;
+    // null, а не пусто: иначе пустая история не отличалась бы от «ещё не рисовали», и подсказка «пока нет» не появлялась.
+    private string? _recentShown;
 
     /// <summary>«Недавние серверы»: последние разные выходы из журнала, свежие первыми.</summary>
     private void ShowRecent(string? current)
@@ -3171,6 +3190,7 @@ public partial class VpnView : UserControl
         }).ToList();
 
         RecentEmpty.Visibility = recent.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        RecentEmptyBox.Visibility = RecentEmpty.Visibility;
     }
 
     /// <summary>Сводка у заголовка подписок: сколько в работе и серверов.</summary>

@@ -1,4 +1,5 @@
 <Window x:Class="Zephyron.Gui.Views.ThemeEditorWindow"
+        Style="{StaticResource Dialog}"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Своя тема" Height="760" Width="720"
@@ -33,7 +34,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="Название" VerticalAlignment="Center" />
-                        <TextBox Grid.Column="1" x:Name="NameField" />
+                        <TextBox Grid.Column="1" x:Name="NameField" AutomationProperties.Name="Название темы" />
                     </Grid>
                 </Border>
 
@@ -49,8 +50,8 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <Border Width="40" Height="26" CornerRadius="6" Margin="0,0,14,0"
-                                            Background="{Binding Swatch}" BorderBrush="{DynamicResource Border}"
+                                    <Border Width="40" Height="26" CornerRadius="{StaticResource RMd}" Margin="0,0,14,0"
+                                            Background="{Binding Swatch}" BorderBrush="{DynamicResource LineStrong}"
                                             BorderThickness="1" />
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding Label}" />
@@ -93,7 +94,7 @@
                                     <ColumnDefinition Width="200" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Укладка" VerticalAlignment="Center" />
-                                <ComboBox Grid.Column="1" x:Name="FitChoice" SelectionChanged="OnChanged">
+                                <ComboBox Grid.Column="1" x:Name="FitChoice" AutomationProperties.Name="Укладка картинки" SelectionChanged="OnChanged">
                                     <ComboBoxItem Content="на всё окно" />
                                     <ComboBoxItem Content="целиком" />
                                     <ComboBoxItem Content="плиткой" />
@@ -105,7 +106,7 @@
                                     <ColumnDefinition Width="200" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Затемнение" VerticalAlignment="Center" />
-                                <ComboBox Grid.Column="1" x:Name="DimChoice" SelectionChanged="OnChanged" />
+                                <ComboBox Grid.Column="1" x:Name="DimChoice" AutomationProperties.Name="Затемнение" SelectionChanged="OnChanged" />
                             </Grid>
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
@@ -113,7 +114,7 @@
                                     <ColumnDefinition Width="200" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Размытие под карточками" VerticalAlignment="Center" />
-                                <ComboBox Grid.Column="1" x:Name="BlurChoice" SelectionChanged="OnChanged">
+                                <ComboBox Grid.Column="1" x:Name="BlurChoice" AutomationProperties.Name="Размытие под карточками" SelectionChanged="OnChanged">
                                     <ComboBoxItem Content="нет" />
                                     <ComboBoxItem Content="слабое" />
                                     <ComboBoxItem Content="среднее" />
@@ -130,7 +131,7 @@
                                     <TextBlock Style="{StaticResource Caption}" Margin="0,2,0,0" TextWrapping="Wrap"
                                                Text="Чем прозрачнее, тем больше видно картинку сквозь стекло." />
                                 </StackPanel>
-                                <ComboBox Grid.Column="1" x:Name="AlphaChoice" VerticalAlignment="Center" SelectionChanged="OnChanged" />
+                                <ComboBox Grid.Column="1" x:Name="AlphaChoice" AutomationProperties.Name="Плотность карточек" VerticalAlignment="Center" SelectionChanged="OnChanged" />
                             </Grid>
 
                             <!--
@@ -147,7 +148,7 @@
                                        Text="Тяните картинку по миниатюре «Главной», колесом или ползунком — размер. Что картинка не закрывает, зальётся градиентом из фона окна в её цвет." />
 
                             <Border x:Name="HomeMini" Width="480" Height="307" Margin="0,10,0,0"
-                                    HorizontalAlignment="Left" CornerRadius="10" ClipToBounds="True"
+                                    HorizontalAlignment="Left" CornerRadius="{StaticResource RLg}" ClipToBounds="True"
                                     BorderBrush="{DynamicResource Border}" BorderThickness="1"
                                     Background="{DynamicResource Backdrop}" Cursor="SizeAll"
                                     MouseLeftButtonDown="OnMiniDown" MouseMove="OnMiniMove"
@@ -167,7 +168,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Размер" VerticalAlignment="Center" />
-                                <Slider Grid.Column="1" x:Name="SizeSlider" Minimum="0.2" Maximum="3"
+                                <Slider Grid.Column="1" x:Name="SizeSlider" AutomationProperties.Name="Размер картинки" Minimum="0.2" Maximum="3"
                                         VerticalAlignment="Center" ValueChanged="OnSize" />
                                 <TextBlock Grid.Column="2" x:Name="SizeText" Style="{StaticResource Mono}"
                                            Width="52" TextAlignment="Right" VerticalAlignment="Center" />
@@ -183,7 +184,7 @@
 
                 <!-- Один на всю тему; каждый в списке написан собой. -->
                 <Border Style="{StaticResource Card}">
-                    <ComboBox x:Name="FontChoice" SelectionChanged="OnChanged">
+                    <ComboBox x:Name="FontChoice" AutomationProperties.Name="Шрифт темы" SelectionChanged="OnChanged">
                         <ComboBox.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <VirtualizingStackPanel />

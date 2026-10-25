@@ -1,24 +1,24 @@
 {
-  // «Полночь» — основная тёмная тема Zephyron и основа для чужих: "base": "dark".
+  // «Сигнал» — основная тёмная тема Zephyron и основа для чужих: "base": "dark".
   // Значения — те же, что в gui/Zephyron.Gui/Theme/Palette.xaml;
   // расхождение ловит тест ThemeFilesMatchXamlPalettes.
-  "name": "Полночь",
+  "name": "Сигнал",
   "author": "Zephyron",
   "colors": {
-    "backdrop": "#08090F",
-    "surface": "#0F1219",
-    "raised": "#161A23",
-    "border": "#21252F",
-    "text": "#EEF1F7",
-    "muted": "#A8B0C2",
-    "faint": "#7B849B",
-    "accent": "#22D3EE",
-    "accent-dim": "#0B4651",
-    "danger": "#F43F5E",
-    "warn": "#FBBF24",
-    "accent-fill": "#22D3EE",
-    "on-accent": "#04181C",
-    "warn-fill": "#FBBF24"
+    "backdrop": "#0B0C0E",
+    "surface": "#14161A",
+    "raised": "#1C1F24",
+    "border": "#2A2D33",
+    "text": "#ECEEF2",
+    "muted": "#A0A6B1",
+    "faint": "#858C99",
+    "accent": "#4CB8FF",
+    "accent-dim": "#12324A",
+    "danger": "#FF6B6B",
+    "warn": "#F5B14A",
+    "accent-fill": "#3AA8F5",
+    "on-accent": "#04131F",
+    "warn-fill": "#F5B14A"
   },
   "fonts": {
     "ui": "Segoe UI Variable Text, Segoe UI",

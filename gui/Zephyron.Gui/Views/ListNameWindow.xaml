@@ -1,4 +1,5 @@
 <Window x:Class="Zephyron.Gui.Views.ListNameWindow"
+        Style="{StaticResource Dialog}"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:gui="clr-namespace:Zephyron.Gui"
@@ -21,13 +22,13 @@
 
         <TextBlock Text="Название списка" FontWeight="SemiBold" Margin="0,18,0,6" />
 
-        <TextBox x:Name="NameBox" KeyDown="OnKey" gui:Hint.Text="например, мой-сайт" />
+        <TextBox x:Name="NameBox" AutomationProperties.Name="Название списка" KeyDown="OnKey" gui:Hint.Text="например, мой-сайт" />
 
         <TextBlock x:Name="Problem" Style="{StaticResource Caption}" Margin="0,8,0,0"
                    TextWrapping="Wrap" Foreground="{DynamicResource Danger}" Visibility="Collapsed" />
 
         <Border x:Name="ClashCard" Style="{StaticResource Card}" Margin="0,16,0,0"
-                BorderBrush="{DynamicResource Warn}" Visibility="Collapsed">
+                Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}" Visibility="Collapsed">
             <TextBlock x:Name="ClashText" Style="{StaticResource Caption}" TextWrapping="Wrap" />
         </Border>
 

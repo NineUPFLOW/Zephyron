@@ -33,6 +33,56 @@ public static class WinDivertDriver
     /// <summary>Имена службы: нынешнее и исходное WinDivert.</summary>
     public static IReadOnlyList<string> ServiceNames { get; } = ["Monkey", "WinDivert"];
 
+    /// <summary>
+    /// Код выхода winws2, когда WinDivert не открыл своё устройство:
+    /// ERROR_NO_SUCH_DEVICE, «A device which does not exist was specified».
+    /// </summary>
+    public const int NoSuchDevice = 433;
+
+    /// <summary>Что значит код выхода winws2 и что делать; <c>null</c> — объяснения нет.</summary>
+    /// <remarks>
+    /// <para>
+    /// Только 433: сам код человеку ничего не говорит, а «Диагностика»
+    /// показывала про упавший winws2 одно «остановлен».
+    /// </para>
+    /// <para>
+    /// Найден рядом другой обход — он и назван, с процессом или службой
+    /// (владелец 24.10: «WinDivert занят другим обходом (GoodbyeDPI)»). У знакомого
+    /// владельца 22.10 так и было: работал goodbyedpi.exe, а его служба с
+    /// автозапуском подняла бы его снова после перезагрузки.
+    /// </para>
+    /// </remarks>
+    /// <param name="nearby">Чужие обходы рядом (<see cref="Core.Diagnostics.OtherBypassScan"/>).</param>
+    public static string? Explain(int exitCode, IReadOnlyList<Core.Diagnostics.OtherBypass>? nearby = null)
+    {
+        if (exitCode != NoSuchDevice)
+            return null;
+
+        var running = nearby?.Where(b => b.Running).ToList() ?? [];
+        var services = nearby?.Where(b => !b.Running).ToList() ?? [];
+
+        if (running.Count == 0)
+        {
+            return "драйвер перехвата WinDivert не открылся. Так бывает, когда рядом работает "
+                + "другой обход на WinDivert (GoodbyeDPI, Zapret) или драйвер завис после остановки: "
+                + "закройте другой обход, перезагрузите компьютер и запустите снова";
+        }
+
+        var names = string.Join(", ", running.Select(b => b.Name).Distinct());
+        var where = string.Join(", ", running.Select(b => b.Where));
+
+        var text = $"драйвер перехвата WinDivert занят: рядом работает {names} ({where}). "
+            + "Закройте его и запустите снова; не поможет — перезагрузите компьютер";
+
+        if (services.Count > 0)
+        {
+            text += $". После перезагрузки его поднимет {string.Join(", ", services.Select(b => b.Where))} — "
+                + "её стоит отключить";
+        }
+
+        return text;
+    }
+
     /// <summary>Процессы, которые держат драйвер: наш движок и движок Zapret GUI.</summary>
     public static IReadOnlyList<string> Users { get; } = ["winws2", "winws"];
 

@@ -20,6 +20,7 @@ public partial class TgProxyView : UserControl
     public TgProxyView()
     {
         InitializeComponent();
+        StatusLook.Attach(StatusBox, Status, StatusMark);
         Loaded += (_, _) => ShowState();
 
         // Вкладку сменили — мерцание незачем: окно перерисовывалось бы ради невидимой точки.
@@ -145,7 +146,7 @@ public partial class TgProxyView : UserControl
     {
         string brush = look.Tone switch
         {
-            Tone.Good => "Accent",
+            Tone.Good => "Success",
             Tone.Wait => "Warn",
             Tone.Bad => "Danger",
             _ => "Muted",
@@ -155,7 +156,14 @@ public partial class TgProxyView : UserControl
         PillFrame.SetResourceReference(Border.BorderBrushProperty, brush);
         PillGlyph.SetResourceReference(TextBlock.ForegroundProperty, brush);
         PillWord.SetResourceReference(TextBlock.ForegroundProperty, brush);
-        HealthDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, brush);
+        // Знак состояния: форма (кольцо, диск, ромб, треугольник) + цвет — StateMark по Tag.
+        HealthDot.Tag = look.Tone switch
+        {
+            Tone.Good => "Running",
+            Tone.Wait => "Degraded",
+            Tone.Bad => "Failed",
+            _ => "Off",
+        };
         HealthText.SetResourceReference(TextBlock.ForegroundProperty, brush);
 
         PillGlyph.Text = look.Tone switch
@@ -249,15 +257,24 @@ public partial class TgProxyView : UserControl
         Grid.SetColumnSpan(ManualCard, narrow ? 2 : 1);
         ConnectCard.Margin = narrow ? new Thickness(0) : new Thickness(0, 0, 7, 0);
         ManualCard.Margin = narrow ? new Thickness(0, 12, 0, 0) : new Thickness(7, 0, 0, 0);
+    }
 
-        // Ссылка с секретом — около 80 знаков: в колонке узкого окна от неё
-        // оставалось «tg:/…» (снимок 21.10).
-        LinkColumn.Width = narrow ? new GridLength(0) : new GridLength(2.8, GridUnitType.Star);
-        LinkLine.Visibility = narrow ? Visibility.Collapsed : Visibility.Visible;
-        Grid.SetRow(LinkField, narrow ? 1 : 0);
-        Grid.SetColumn(LinkField, narrow ? 0 : 4);
-        Grid.SetColumnSpan(LinkField, narrow ? 7 : 1);
-        LinkField.Margin = narrow ? new Thickness(0, 16, 0, 0) : new Thickness(0);
+    /// <summary>Ширина ряда, ниже которой «Пути» и «Текущие настройки» встают друг под друга.</summary>
+    private const double InfoSideBySide = 860;
+
+    /// <summary>
+    /// «Пути к Telegram» и «Текущие настройки» — рядом или столбиком; по ширине самого ряда,
+    /// а не окна (как OnTopSize в «Десинке»).
+    /// </summary>
+    private void OnInfoSize(object sender, SizeChangedEventArgs e)
+    {
+        bool side = InfoRow.ActualWidth >= InfoSideBySide;
+
+        Grid.SetColumnSpan(PathsCell, side ? 1 : 3);
+        Grid.SetRow(SettingsCell, side ? 0 : 1);
+        Grid.SetColumn(SettingsCell, side ? 2 : 0);
+        Grid.SetColumnSpan(SettingsCell, side ? 1 : 3);
+        SettingsCell.Margin = new Thickness(0, side ? 0 : 12, 0, 0);
     }
 
     /// <summary>

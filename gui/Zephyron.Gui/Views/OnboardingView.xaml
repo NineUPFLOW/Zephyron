@@ -5,29 +5,42 @@
              Background="{DynamicResource Chrome}">
 
     <UserControl.Resources>
-        <!-- Карточка режима на шаге «Режим работы ZY»: выбранная обведена цветом темы. -->
+        <!--
+            Карточка режима на шаге «Режим работы ZY». Выбранная: AccentSoft + AccentLine
+            и галочка справа — признак не только цветом (спека «Сигнал», раздел 9).
+        -->
         <Style x:Key="ModeCard" TargetType="RadioButton">
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Foreground" Value="{DynamicResource Text}" />
             <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Shape" Background="{DynamicResource Surface}"
-                                BorderBrush="{DynamicResource Border}" BorderThickness="1"
-                                CornerRadius="12" Padding="16,13">
-                            <ContentPresenter />
-                        </Border>
+                        <Grid>
+                            <Border x:Name="Shape" Background="{DynamicResource Surface}"
+                                    BorderBrush="{DynamicResource CardRim}" BorderThickness="{StaticResource Stroke}"
+                                    CornerRadius="{StaticResource RLg}" Padding="{StaticResource CardPad}">
+                                <ContentPresenter />
+                            </Border>
+                            <Border x:Name="Hover" Background="{DynamicResource WashHover}" CornerRadius="{StaticResource RLg}"
+                                    Opacity="0" IsHitTestVisible="False" />
+                            <Path x:Name="Check" Data="M 1,5.5 L 4.5,9 L 11,1.5" Stroke="{DynamicResource Accent}"
+                                  StrokeThickness="2" StrokeLineJoin="Round" HorizontalAlignment="Right"
+                                  VerticalAlignment="Top" Margin="0,12,14,0" Visibility="Collapsed" IsHitTestVisible="False" />
+                        </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource Raised}" />
+                                <Setter TargetName="Hover" Property="Opacity" Value="1" />
+                                <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource LineStrong}" />
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <!-- Выбор — цветом рамки, а не толщиной: толщина сдвигала бы подпись. -->
-                                <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentSoft}" />
+                                <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource AccentLine}" />
+                                <Setter TargetName="Check" Property="Visibility" Value="Visible" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Shape" Property="Opacity" Value="0.5" />
+                                <Setter TargetName="Shape" Property="Opacity" Value="0.45" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -50,7 +63,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-    <ScrollViewer Grid.Row="0" Style="{StaticResource PageScroll}" Padding="32,28,32,12">
+    <ScrollViewer Grid.Row="0" Style="{StaticResource PageScroll}" Padding="28,22,28,12">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -98,21 +111,21 @@
                     <UniformGrid x:Name="Features" Columns="3" Margin="-5,14,-5,0">
                         <Border Style="{StaticResource Card}" Margin="5,0" Opacity="0">
                             <StackPanel>
-                                <TextBlock Text="Десинк" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" />
+                                <TextBlock Text="Десинк" FontWeight="SemiBold" />
                                 <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
                                            Text="Режет и переставляет первые пакеты, чтобы ТСПУ не узнал сайт. Работает без подписки." />
                             </StackPanel>
                         </Border>
                         <Border Style="{StaticResource Card}" Margin="5,0" Opacity="0">
                             <StackPanel>
-                                <TextBlock Text="VPN по маршрутам" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" />
+                                <TextBlock Text="VPN по маршрутам" FontWeight="SemiBold" />
                                 <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
                                            Text="В туннель уходит только то, что назвали. Банки, игры и российские сайты идут как шли." />
                             </StackPanel>
                         </Border>
                         <Border Style="{StaticResource Card}" Margin="5,0" Opacity="0">
                             <StackPanel>
-                                <TextBlock Text="Разбор" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" />
+                                <TextBlock Text="Разбор" FontWeight="SemiBold" />
                                 <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
                                            Text="Проверка блокировок и диагностика говорят, что сломалось и чем лечится, а не «не работает»." />
                             </StackPanel>
@@ -137,7 +150,8 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Button Tag="{Binding Id}" Click="OnTheme" Margin="0,0,14,10" Cursor="Hand"
-                                        ToolTip="{Binding Tip}" Opacity="{Binding Fade}">
+                                        ToolTip="{Binding Tip}" Opacity="{Binding Fade}"
+                                        FocusVisualStyle="{StaticResource FocusRing}" AutomationProperties.Name="{Binding Name}">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
                                             <ContentPresenter />
@@ -145,17 +159,17 @@
                                     </Button.Template>
 
                                     <StackPanel Width="112">
-                                        <Border Height="84" CornerRadius="12" BorderThickness="1"
+                                        <Border Height="84" CornerRadius="{StaticResource RLg}" BorderThickness="1"
                                                 Background="{Binding Backdrop}" BorderBrush="{Binding Edge}">
                                             <Grid>
                                                 <Rectangle RadiusX="10" RadiusY="10" Fill="{Binding Image}" />
                                                 <Rectangle RadiusX="10" RadiusY="10" Fill="{Binding Backdrop}"
                                                            Opacity="{Binding Dim}" />
 
-                                                <Border Background="{Binding Surface}" CornerRadius="5"
+                                                <Border Background="{Binding Surface}" CornerRadius="{StaticResource RMd}"
                                                         Width="52" Height="14" Margin="10,10,0,0"
                                                         HorizontalAlignment="Left" VerticalAlignment="Top" />
-                                                <Border Background="{Binding Fill}" CornerRadius="5"
+                                                <Border Background="{Binding Fill}" CornerRadius="{StaticResource RMd}"
                                                         Width="44" Height="14" Margin="0,30,10,0"
                                                         HorizontalAlignment="Right" VerticalAlignment="Top" />
 
@@ -201,7 +215,7 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <Border Style="{StaticResource IconTile}" Margin="0,0,14,0">
-                                    <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE9E9;" Foreground="{DynamicResource Accent}" />
+                                    <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE9E9;" Foreground="{DynamicResource Muted}" />
                                 </Border>
                                 <StackPanel Grid.Column="1">
                                     <TextBlock x:Name="PickDesyncName" FontWeight="SemiBold" FontSize="15" />
@@ -218,7 +232,7 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <Border Style="{StaticResource IconTile}" Margin="0,0,14,0">
-                                    <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE774;" Foreground="{DynamicResource Accent}" />
+                                    <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE774;" Foreground="{DynamicResource Muted}" />
                                 </Border>
                                 <StackPanel Grid.Column="1">
                                     <TextBlock x:Name="PickTunnelName" FontWeight="SemiBold" FontSize="15" />
@@ -238,7 +252,7 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <Border Style="{StaticResource IconTile}" Margin="0,0,14,0">
-                                    <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE8AB;" Foreground="{DynamicResource Accent}" />
+                                    <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE8AB;" Foreground="{DynamicResource Muted}" />
                                 </Border>
                                 <StackPanel Grid.Column="1">
                                     <TextBlock x:Name="PickRouteName" FontWeight="SemiBold" FontSize="15" />
@@ -282,7 +296,7 @@
                         </Grid.RowDefinitions>
 
                         <TextBlock Text="DNS" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0" />
-                        <ComboBox Grid.Column="1" x:Name="DnsPick" Width="260" VerticalAlignment="Center"
+                        <ComboBox Grid.Column="1" x:Name="DnsPick" AutomationProperties.Name="Путь DNS" Width="260" VerticalAlignment="Center"
                                   SelectionChanged="OnDnsPicked"
                                   ToolTip="Через что программа узнаёт адреса сайтов. Сменить можно на вкладке DNS.">
                             <ComboBoxItem Content="авто: напрямую, при отказе DoH — по TCP, затем туннель" Tag="Auto" />
@@ -294,7 +308,7 @@
                         <TextBlock Grid.Row="1" Text="Прокси Telegram" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,10,12,0" />
                         <Border Grid.Row="1" Grid.Column="1" Width="260" Margin="0,10,0,0" Padding="12,4,8,4"
                                 Background="{DynamicResource Raised}" BorderBrush="{DynamicResource Border}"
-                                BorderThickness="1" CornerRadius="10"
+                                BorderThickness="1" CornerRadius="{StaticResource RLg}"
                                 ToolTip="Telegram Desktop без VPN. Сменить можно на вкладке «TG Proxy».">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -302,7 +316,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock x:Name="TgPickState" VerticalAlignment="Center" Text="выключен" />
-                                <ToggleButton Grid.Column="1" x:Name="TgPick" Style="{StaticResource Switch}" VerticalAlignment="Center"
+                                <ToggleButton Grid.Column="1" x:Name="TgPick" Style="{StaticResource Switch}" AutomationProperties.Name="Прокси Telegram" VerticalAlignment="Center"
                                               ToolTipService.ShowOnDisabled="True"
                                               Checked="OnTgPicked" Unchecked="OnTgPicked" />
                             </Grid>
@@ -330,7 +344,7 @@
                         Пароль, не текст: ссылка на подписку равносильна
                         паролю, выдаёт весь список серверов с ключами.
                     -->
-                    <PasswordBox x:Name="SubLink" Padding="10,8" />
+                    <PasswordBox x:Name="SubLink" AutomationProperties.Name="Ссылка на подписку" Padding="10,8" />
 
                     <TextBlock x:Name="VpnStatus" Style="{StaticResource Caption}"
                                Margin="4,10,0,0" TextWrapping="Wrap" />

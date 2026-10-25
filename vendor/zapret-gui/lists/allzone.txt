@@ -42,7 +42,7 @@ media
 me
 net
 name
-zy
+nz
 org
 one
 party

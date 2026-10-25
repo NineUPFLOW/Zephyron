@@ -459,7 +459,7 @@ public partial class UpdateWindow : Window
             var version = release.Version;
             _dots[version] = (dot, newer || installed ? "Accent" : "Muted", size);
             item.MouseLeftButtonUp += (_, _) => Select(version);
-            item.MouseEnter += (_, _) => { if (_shown != version) item.SetResourceReference(Border.BackgroundProperty, "Raised"); };
+            item.MouseEnter += (_, _) => { if (_shown != version) item.SetResourceReference(Border.BackgroundProperty, "WashHover"); };
             item.MouseLeave += (_, _) => { if (_shown != version) item.Background = Brushes.Transparent; };
 
             _items[version] = item;
@@ -588,8 +588,9 @@ public partial class UpdateWindow : Window
 
         if (_items.TryGetValue(version, out var now))
         {
-            now.SetResourceReference(Border.BackgroundProperty, "Raised");
-            now.SetResourceReference(Border.BorderBrushProperty, "Border");
+            // Выбранное — AccentSoft + AccentLine; не-цветовой признак даёт крупная точка ленты.
+            now.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
+            now.SetResourceReference(Border.BorderBrushProperty, "AccentLine");
             now.BringIntoView();
         }
 
@@ -642,7 +643,7 @@ public partial class UpdateWindow : Window
 
             // Прочие заголовки — как заголовки групп в окнах настроек: малыми прописными.
             case NotesBlockKind.Heading:
-                var heading = new TextBlock { Text = block.Plain.ToUpperInvariant(), Margin = new Thickness(0, 14, 0, 8) };
+                var heading = new TextBlock { Text = block.Plain, Margin = new Thickness(0, 14, 0, 8) };
                 heading.SetResourceReference(StyleProperty, "GroupHead");
                 return heading;
 

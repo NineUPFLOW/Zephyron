@@ -345,8 +345,22 @@ public static class Themes
         return dictionary;
     }
 
-    /// <summary>Доли прозрачности производных кистей — те же, что записаны в Palette.xaml.</summary>
-    private const byte SoftAlpha = 0x1F, LineAlpha = 0x61, StateSoftAlpha = 0x1A, DangerLineAlpha = 0x57, WarnLineAlpha = 0x4D, WashAlpha = 0x08, WashHoverAlpha = 0x12, LineStrongAlpha = 0x24;
+    /// <summary>
+    /// Доли прозрачности производных кистей — те же, что записаны в Palette.xaml
+    /// (тёмная ветка) и Light.xaml (светлая).
+    /// </summary>
+    /// <remarks>
+    /// Раздельные: одна и та же доля текста даёт на белом заметно более бледную
+    /// рамку, чем на графите, и светлой теме нужны более плотные линии.
+    /// </remarks>
+    private readonly record struct Alphas(byte Soft, byte Line, byte StateSoft, byte DangerLine, byte WarnLine, byte Wash, byte WashHover, byte LineStrong,
+        byte Field, byte RimTop, byte RimBottom);
+
+    private static readonly Alphas DarkAlphas = new(0x1F, 0x59, 0x1A, 0x57, 0x4D, 0x06, 0x0F, 0x2E, 0x8C, 0x26, 0x0D);
+    private static readonly Alphas LightAlphas = new(0x1A, 0x59, 0x14, 0x66, 0x66, 0x08, 0x10, 0x38, 0xB3, 0x1F, 0x14);
+
+    /// <summary>Затемнение под модальным слоем: подложка темы при 70 %.</summary>
+    private const byte ScrimAlpha = 0xB3;
 
     /// <summary>
     /// Полупрозрачные подложки и рамки из цветов состояния темы.
@@ -358,18 +372,96 @@ public static class Themes
     /// </remarks>
     private static void Derive(ResourceDictionary dictionary, Theme theme)
     {
-        SolidColorBrush Tint(string slot, byte alpha) =>
-            Frozen(new SolidColorBrush(ToColor(theme[slot] with { A = alpha })));
+        bool light = theme[ThemeSlots.Backdrop].Luminance > 0.5;
+        var alpha = light ? LightAlphas : DarkAlphas;
 
-        dictionary["AccentSoft"] = Tint(ThemeSlots.Accent, SoftAlpha);
-        dictionary["AccentLine"] = Tint(ThemeSlots.Accent, LineAlpha);
-        dictionary["DangerSoft"] = Tint(ThemeSlots.Danger, StateSoftAlpha);
-        dictionary["DangerLine"] = Tint(ThemeSlots.Danger, DangerLineAlpha);
-        dictionary["WarnSoft"] = Tint(ThemeSlots.Warn, StateSoftAlpha);
-        dictionary["WarnLine"] = Tint(ThemeSlots.Warn, WarnLineAlpha);
-        dictionary["Wash"] = Tint(ThemeSlots.Text, WashAlpha);
-        dictionary["WashHover"] = Tint(ThemeSlots.Text, WashHoverAlpha);
-        dictionary["LineStrong"] = Tint(ThemeSlots.Text, LineStrongAlpha);
+        SolidColorBrush Tint(string slot, byte a) =>
+            Frozen(new SolidColorBrush(ToColor(theme[slot] with { A = a })));
+
+        dictionary["AccentSoft"] = Tint(ThemeSlots.Accent, alpha.Soft);
+        dictionary["AccentLine"] = Tint(ThemeSlots.Accent, alpha.Line);
+        dictionary["DangerSoft"] = Tint(ThemeSlots.Danger, alpha.StateSoft);
+        dictionary["DangerLine"] = Tint(ThemeSlots.Danger, alpha.DangerLine);
+        dictionary["WarnSoft"] = Tint(ThemeSlots.Warn, alpha.StateSoft);
+        dictionary["WarnLine"] = Tint(ThemeSlots.Warn, alpha.WarnLine);
+        dictionary["Wash"] = Tint(ThemeSlots.Text, alpha.Wash);
+        dictionary["WashHover"] = Tint(ThemeSlots.Text, alpha.WashHover);
+        dictionary["LineStrong"] = Tint(ThemeSlots.Text, alpha.LineStrong);
+        dictionary["CardRim"] = Rim(theme[ThemeSlots.Text], alpha.RimTop, alpha.RimBottom);
+
+        // Рамка поля — приглушённым, плотнее остальных линий: граница ввода
+        // должна отличаться от фона не меньше чем втрое (WCAG 1.4.11).
+        dictionary["FieldLine"] = Tint(ThemeSlots.Muted, alpha.Field);
+        dictionary["Scrim"] = Tint(ThemeSlots.Backdrop, ScrimAlpha);
+
+        // Второй акцент — для сетевых данных, чтобы «приём» не путался
+        // с «выбрано». Тон +60° от акцента; насыщенность и светлота зажаты,
+        // чтобы он читался (4.5:1) на любой подложке, а у голубого акцента
+        // не выходил зелёным, как Success.
+        var accent = theme[ThemeSlots.Accent];
+        var (h, sat, lightness) = ColorMath.ToHsl(accent);
+        sat = Math.Min(sat, 0.85);
+        lightness = light ? Math.Min(lightness, 0.45) : Math.Max(lightness, 0.74);
+        var second = ColorMath.FromHsl(h + 60, sat, lightness);
+        double backdrop = theme[ThemeSlots.Backdrop].Luminance;
+
+        // HSL-светлота — не яркость: жёлто-зелёный при 0.45 на светлой подложке
+        // даёт < 4.5:1. Досдвигаем светлоту от подложки, пока не прочтётся.
+        for (int step = 0; step < 50 && ThemeContrast.Ratio(second.Luminance, backdrop) < 4.5; step++)
+        {
+            lightness = Math.Clamp(lightness + (light ? -0.02 : 0.02), 0, 1);
+            second = ColorMath.FromHsl(h + 60, sat, lightness);
+        }
+
+        dictionary["Accent2Color"] = ToColor(second);
+        dictionary["Accent2"] = Frozen(new SolidColorBrush(ToColor(second)));
+        dictionary["AccentGradient"] = FillGradient(theme[ThemeSlots.AccentFill], theme[ThemeSlots.OnAccent]);
+        dictionary["AccentFlow"] = Gradient(accent, second, new Point(1, 0));
+
+        // «Работает» — зелёный, отдельный от акцента: яркий на тёмной
+        // подложке, глубокий на светлой, чтобы читался и там, и там.
+        var success = light
+            ? new ThemeColor(255, 0x0A, 0x7A, 0x4F)
+            : new ThemeColor(255, 0x35, 0xE6, 0xA0);
+
+        dictionary["SuccessColor"] = ToColor(success);
+        dictionary["Success"] = Frozen(new SolidColorBrush(ToColor(success)));
+        dictionary["SuccessSoft"] = Frozen(new SolidColorBrush(ToColor(success with { A = alpha.StateSoft })));
+        dictionary["SuccessLine"] = Frozen(new SolidColorBrush(ToColor(success with { A = alpha.DangerLine })));
+    }
+
+    private static Brush Gradient(ThemeColor from, ThemeColor to, Point end)
+    {
+        var brush = new LinearGradientBrush(ToColor(from), ToColor(to), new Point(0, 0), end);
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>
+    /// Заливка главной кнопки: вертикаль, уходящая «от подписи». Тёмная подпись —
+    /// верх светлее заливки, низ сама заливка; светлая — верх заливка, низ темнее.
+    /// Так подпись не теряет контраст ни в одной точке кнопки.
+    /// </summary>
+    internal static Brush FillGradient(ThemeColor fill, ThemeColor ink)
+    {
+        var (h, s, l) = ColorMath.ToHsl(fill);
+        bool darkInk = ink.Luminance < fill.Luminance;
+        var shifted = ColorMath.FromHsl(h, s, darkInk ? l + 0.05 : l - 0.05);
+
+        return darkInk ? Gradient(shifted, fill, new Point(0, 1)) : Gradient(fill, shifted, new Point(0, 1));
+    }
+
+    /// <summary>
+    /// Рамка карточки: волосяная кромка цвета текста, ярче сверху и гаснет вниз.
+    /// Без акцента и диагонали — цвет в рамке несут данные, а не поверхность.
+    /// </summary>
+    internal static Brush Rim(ThemeColor text, byte top, byte bottom)
+    {
+        var rim = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(0, 1) };
+        rim.GradientStops.Add(new GradientStop(ToColor(text with { A = top }), 0));
+        rim.GradientStops.Add(new GradientStop(ToColor(text with { A = bottom }), 1));
+        rim.Freeze();
+        return rim;
     }
 
     /// <summary>
@@ -602,11 +694,13 @@ public static class Themes
             if (merged[i].Contains("BackdropColor"))
             {
                 merged[i] = dictionary;
+                TitleBar.RefreshAll();
                 return;
             }
         }
 
         merged.Insert(0, dictionary);
+        TitleBar.RefreshAll();
     }
 
     private static Color ToColor(ThemeColor color) => Color.FromArgb(color.A, color.R, color.G, color.B);

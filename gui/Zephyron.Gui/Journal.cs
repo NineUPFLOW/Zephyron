@@ -1,4 +1,5 @@
 using System.IO;
+using Zephyron.Core;
 using Zephyron.Supervisor;
 
 namespace Zephyron.Gui;
@@ -23,7 +24,8 @@ internal static class Journal
             using var log = SharedLogWriter.TryOpen(
                 Path.Combine("runtime", "supervisor.log"));
 
-            log?.WriteLine($"[{DateTime.Now:HH:mm:ss}] {source}: {message}");
+            // Свой адрес человека в журнал не попадает (OwnAddress): журнал уходит в отчёты.
+            log?.WriteLine(OwnAddress.Mask($"[{DateTime.Now:HH:mm:ss}] {source}: {message}"));
         }
         catch (Exception)
         {

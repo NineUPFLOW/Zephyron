@@ -345,6 +345,38 @@ public sealed class AppSettingsTests : IDisposable
         Assert.True(settings.NeedsDesync);
         Assert.Equal("авто (по задержке)", settings.DescribeServer());
     }
+
+    /// <summary>Профиль эффектов пишется словом и читается обратно; без поля — выбор окна.</summary>
+    [Fact]
+    public void EffectsProfileRoundTrips()
+    {
+        Assert.Null(AppSettings.Fresh.Effects);
+
+        (AppSettings.Fresh with { Effects = EffectsProfile.Lite }).Save(_path);
+        Assert.Contains("\"Lite\"", File.ReadAllText(_path));
+
+        var read = AppSettings.Load(_path);
+        Assert.Equal(EffectsProfile.Lite, read.Effects);
+    }
+
+    /// <summary>Неизвестный профиль — «авто», а не нечитаемый файл, который затрёт остальные настройки.</summary>
+    [Theory]
+    [InlineData("\"Ultra\"")]
+    [InlineData("42")]
+    [InlineData("{ \"x\": [1] }")]
+    public void UnknownEffectsProfileReadsAsAutoAndKeepsSettings(string effects)
+    {
+        // PresetName не годится: неизвестный пресет загрузчик сам меняет на текущий.
+        // CursorTrail — поле прежних версий (след курсора убран): файл с ним читается как раньше.
+        File.WriteAllText(_path, $$"""{ "Effects": {{effects}}, "OnboardingDone": true, "Animations": false, "CursorTrail": false }""");
+
+        var read = AppSettings.TryLoad(_path, out var result);
+
+        Assert.Equal(AppSettings.ReadResult.Read, result);
+        Assert.Null(read.Effects);
+        Assert.True(read.OnboardingDone);
+        Assert.False(read.Animations);
+    }
 }
 
 public class PreferredServerTests

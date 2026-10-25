@@ -37,6 +37,44 @@ public sealed class EngineExitReasonTests
     }
 
     [Fact]
+    public void WindivertLineIsTheWinwsReason()
+    {
+        Assert.True(WinwsService.IsFailure("windivert: error opening filter: A device which does not exist was specified"));
+        Assert.False(WinwsService.IsFailure("windivert: filter opened"));
+    }
+
+    [Fact]
+    public void Code433IsExplainedOthersAreNot()
+    {
+        Assert.Contains("перезагрузите компьютер", Zephyron.Zapret.WinDivertDriver.Explain(433));
+        Assert.Null(Zephyron.Zapret.WinDivertDriver.Explain(1));
+    }
+
+    /// <summary>
+    /// Найденный рядом обход назван по имени и с процессом, а служба с автозапуском —
+    /// отдельно (владелец 24.10; случай знакомого 22.10: goodbyedpi.exe и служба GoodbyeDPI).
+    /// </summary>
+    [Fact]
+    public void Code433NamesTheBypassFoundNearby()
+    {
+        Zephyron.Core.Diagnostics.OtherBypass[] nearby =
+        [
+            new("GoodbyeDPI", "процесс goodbyedpi.exe, №5176", Running: true),
+            new("GoodbyeDPI", "служба «GoodbyeDPI»", Running: false),
+        ];
+
+        var text = Zephyron.Zapret.WinDivertDriver.Explain(433, nearby);
+
+        Assert.StartsWith("драйвер перехвата WinDivert занят: рядом работает GoodbyeDPI (процесс goodbyedpi.exe, №5176)", text);
+        Assert.Contains("служба «GoodbyeDPI»", text);
+        Assert.DoesNotContain("Zapret)", text);
+
+        // Только служба, процесса нет — драйвер держит не она: общее объяснение.
+        Assert.Equal(Zephyron.Zapret.WinDivertDriver.Explain(433), Zephyron.Zapret.WinDivertDriver.Explain(433, [nearby[1]]));
+        Assert.Null(Zephyron.Zapret.WinDivertDriver.Explain(1, nearby));
+    }
+
+    [Fact]
     public void LongLineIsCut()
     {
         var said = SupervisedService.ExitReason(1, "FATAL[0000] " + new string('x', 1000));
