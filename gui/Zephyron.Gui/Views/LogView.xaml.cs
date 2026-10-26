@@ -113,7 +113,10 @@ public partial class LogView : UserControl
         if (!File.Exists(path))
         {
             Text.Text = string.Empty;
-            Status.Text = $"Журнала нет: {path}. Он появится, когда движок запустится.";
+            // Окно пишет в gui.log только свои сбои (App.Show), а не работу движка.
+            Status.Text = Source.SelectedIndex == 3
+                ? $"Журнала нет: {path}. Окно пишет сюда только свои сбои — их не было."
+                : $"Журнала нет: {path}. Он появится, когда движок запустится.";
 
             return;
         }

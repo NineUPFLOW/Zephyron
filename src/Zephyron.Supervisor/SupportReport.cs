@@ -159,6 +159,9 @@ public static class SupportReport
         // Что автоподбор записал в маршруты и hosts — без него не понять, откуда правило или пин.
         AddFile(parts, "autopick-journal.json", At(root, AutoPickJournal.DefaultPath));
 
+        // Сбои окна (App.Show): исключение со стеком — в остальных журналах их нет.
+        AddFile(parts, "gui.log", At(root, Path.Combine("logs", "gui.log")));
+
         // Журналы подмены: что robocopy не смог заменить и почему (жалоба 06.10).
         AddFile(parts, "update.log", At(root, Core.Updates.UpdateInstaller.LogFile));
         AddFile(parts, "update-failed.log", At(root, Core.Updates.UpdateInstaller.FailedLogFile));
