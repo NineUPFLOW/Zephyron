@@ -173,6 +173,9 @@ public abstract class SupervisedService
     {
     }
 
+    /// <summary>Перед запуском процесса — убрать то, что помешает ему подняться.</summary>
+    protected virtual Task BeforeStartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
     public async Task<bool> StartAsync(TimeSpan readinessTimeout, CancellationToken cancellationToken)
     {
         var problem = ValidatePrerequisites();
@@ -190,6 +193,8 @@ public abstract class SupervisedService
         // её на место ставит OnReadyAsync.
         ForgetRunState();
         _fatal = null;
+
+        await BeforeStartAsync(cancellationToken);
 
         try
         {
@@ -289,6 +294,8 @@ public abstract class SupervisedService
     }
 
     internal void NoteRestart() => RestartCount++;
+
+    internal void ForgetRestarts() => RestartCount = 0;
 
     /// <summary>Служба снова здорова: прежняя причина больше не действует.</summary>
     internal void Recovered() => LastError = null;
@@ -1021,6 +1028,14 @@ public sealed class SingBoxService : SupervisedService
             return $"конфиг не найден: {_configPath}";
 
         return null;
+    }
+
+    // Десять секунд: спокойно ушедший адаптер wintun убирает за пару секунд.
+    // Движку ради DNS адаптер не нужен, а zephyron0 рядом может быть живым туннелем.
+    protected override async Task BeforeStartAsync(CancellationToken cancellationToken)
+    {
+        if (!_dnsOnly && await GhostTunnel.ClearAsync(TimeSpan.FromSeconds(10), cancellationToken) is { } what)
+            Note(what);
     }
 
     protected override ProcessStartInfo BuildStartInfo() => new()

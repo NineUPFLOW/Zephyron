@@ -20,6 +20,18 @@ public sealed class SupervisorOptions
     /// </remarks>
     public int MaxRestarts { get; init; } = 5;
 
+    /// <summary>
+    /// Сколько службе проработать здоровой, чтобы прежние перезапуски
+    /// перестали считаться «подряд».
+    /// </summary>
+    /// <remarks>
+    /// Прежде счётчик не сбрасывался никогда, и предел копился за весь сеанс:
+    /// отчёт 26.10 — winws2 четыре раза не дал запустить антивирус (23:01),
+    /// потом три минуты работал, и следующее же исчезновение стало пятым.
+    /// Ещё одно — и надзор сдался бы навсегда из-за давно прошедшей беды.
+    /// </remarks>
+    public TimeSpan StableResetsRestarts { get; init; } = TimeSpan.FromMinutes(10);
+
     /// <summary>Задержка перед первым перезапуском; дальше удваивается.</summary>
     public TimeSpan RestartBackoff { get; init; } = TimeSpan.FromSeconds(2);
 
@@ -222,6 +234,10 @@ public sealed class ProcessSupervisor
 
                 SetHealth(service, ServiceHealth.Healthy);
                 _degradedStreak[service.Name] = 0;
+
+                if (service.RestartCount > 0 && DateTimeOffset.Now - service.StartedAt >= _options.StableResetsRestarts)
+                    service.ForgetRestarts();
+
                 continue;
             }
 
