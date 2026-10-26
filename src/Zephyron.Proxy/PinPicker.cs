@@ -457,7 +457,7 @@ public static class PinPicker
     /// «ответ 302 → claude.com». Смотрится только путь: в имени слово
     /// «region» ничего не значит.
     /// </remarks>
-    internal static bool IsRegionRefusal(Uri? location)
+    public static bool IsRegionRefusal(Uri? location)
     {
         if (location is null)
             return false;

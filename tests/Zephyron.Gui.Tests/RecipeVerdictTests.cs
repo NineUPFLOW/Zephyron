@@ -1,4 +1,4 @@
-using Zephyron.Gui.Views;
+using Zephyron.Supervisor;
 using Xunit;
 
 namespace Zephyron.Gui.Tests;
@@ -25,7 +25,7 @@ public sealed class RecipeVerdictTests
 {
     private static readonly TimeSpan Second = TimeSpan.FromSeconds(0.8);
 
-    private static RecipeWindow.Flow Answer(int status, int bytes, string? location = null) => new()
+    private static RecipeTrial.Flow Answer(int status, int bytes, string? location = null) => new()
     {
         Bytes = bytes,
         Status = status,
@@ -40,7 +40,7 @@ public sealed class RecipeVerdictTests
 
         Assert.True(flow.Passed);
         Assert.True(flow.Page);
-        Assert.Contains("страница 200", RecipeWindow.Verdict(flow, Second));
+        Assert.Contains("страница 200", RecipeTrial.Verdict(flow, Second));
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public sealed class RecipeVerdictTests
         Assert.True(flow.Passed);
         Assert.False(flow.Page);
 
-        var verdict = RecipeWindow.Verdict(flow, Second);
+        var verdict = RecipeTrial.Verdict(flow, Second);
 
         Assert.Contains("страницы нет", verdict);
         Assert.Contains("elsewhere.example", verdict);
@@ -70,7 +70,7 @@ public sealed class RecipeVerdictTests
             with { Ending = "перенаправления не кончаются" };
 
         Assert.False(flow.Page);
-        Assert.Contains("не кончаются", RecipeWindow.Verdict(flow, Second));
+        Assert.Contains("не кончаются", RecipeTrial.Verdict(flow, Second));
     }
 
     [Fact]
@@ -78,23 +78,23 @@ public sealed class RecipeVerdictTests
     {
         // Прежнее правило — «пришло хоть что-то» — сюда и проваливалось.
         // Обрывок, по которому сказать ничего нельзя, успехом не считается.
-        var flow = new RecipeWindow.Flow
+        var flow = new RecipeTrial.Flow
         {
             Bytes = 512,
             Ending = "512 Б, и это не похоже на HTTP",
         };
 
         Assert.False(flow.Passed);
-        Assert.StartsWith("не помогает", RecipeWindow.Verdict(flow, Second));
+        Assert.StartsWith("не помогает", RecipeTrial.Verdict(flow, Second));
     }
 
     [Fact]
     public void Silence_says_so()
     {
-        var flow = RecipeWindow.Flow.Nothing("тишина");
+        var flow = RecipeTrial.Flow.Nothing("тишина");
 
         Assert.False(flow.Passed);
-        Assert.Contains("тишина", RecipeWindow.Verdict(flow, Second));
+        Assert.Contains("тишина", RecipeTrial.Verdict(flow, Second));
     }
 
     [Fact]
@@ -102,10 +102,10 @@ public sealed class RecipeVerdictTests
     {
         // «Оборвалось на 3069 Б» и «тишина» лечатся разным, а прежде
         // оба выглядели одинаковым «не помогает».
-        var flow = RecipeWindow.Flow.Nothing("оборвалось на 3069 Б");
+        var flow = RecipeTrial.Flow.Nothing("оборвалось на 3069 Б");
 
         Assert.False(flow.Passed);
-        Assert.Contains("3069", RecipeWindow.Verdict(flow, Second));
+        Assert.Contains("3069", RecipeTrial.Verdict(flow, Second));
     }
 
     [Theory]
@@ -136,6 +136,6 @@ public sealed class RecipeVerdictTests
         var flow = Answer(200, 21756);
 
         Assert.True(flow.Page);
-        Assert.Contains("страница 200", RecipeWindow.Verdict(flow, Second));
+        Assert.Contains("страница 200", RecipeTrial.Verdict(flow, Second));
     }
 }

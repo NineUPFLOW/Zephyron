@@ -288,7 +288,40 @@ public sealed class UserRulesFile
             }
         }
 
-        File.WriteAllText(Path, builder.ToString(), new UTF8Encoding(false));
+        WriteAtomic(Path, new UTF8Encoding(false).GetBytes(builder.ToString()));
+    }
+
+    /// <summary>
+    /// Пишет файл целиком или не пишет вовсе: сперва рядом, затем подменой.
+    /// </summary>
+    /// <remarks>
+    /// Прямая запись, прерванная на середине (выключили питание, диск полон),
+    /// оставляла обрубок — и при следующем чтении весь файл уходил в
+    /// <see cref="BrokenSuffix"/>, а с ним все маршруты. Временный файл лежит
+    /// в той же папке: подмена внутри тома атомарна.
+    /// </remarks>
+    public static void WriteAtomic(string path, byte[] content)
+    {
+        var temp = path + ".tmp";
+
+        try
+        {
+            File.WriteAllBytes(temp, content);
+            File.Move(temp, path, overwrite: true);
+        }
+        catch
+        {
+            try
+            {
+                File.Delete(temp);
+            }
+            catch (Exception)
+            {
+                // Остаток не мешает: следующая запись его перезапишет.
+            }
+
+            throw;
+        }
     }
 
     private static string Describe(MatchKind match) => match switch

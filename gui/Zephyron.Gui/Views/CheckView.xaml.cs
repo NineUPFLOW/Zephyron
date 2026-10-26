@@ -735,7 +735,7 @@ public partial class CheckView : UserControl
     /// пустую строку, набирали бы другую.
     /// </para>
     /// </remarks>
-    private static IReadOnlyList<(string Host, string Service)> Targets(
+    internal static IReadOnlyList<(string Host, string Service)> Targets(
         string? zapretRoot,
         CheckTarget? target,
         bool deep)
@@ -820,6 +820,47 @@ public partial class CheckView : UserControl
         }
 
         return targets;
+    }
+
+    /// <summary>
+    /// Выбранный сервер подписки для проб автоподбора через туннель — из того же
+    /// пула, что «Через сервер» (<see cref="AddTunnelReachAsync"/>).
+    /// </summary>
+    /// <remarks>
+    /// Ровно один: через него и пойдёт трафик по записанному маршруту. Пустой
+    /// список — подписки нет либо выбранный сервер не отвечает.
+    /// </remarks>
+    internal static async Task<IReadOnlyList<ProxyServer>> VpnServersAsync(CancellationToken cancellationToken)
+    {
+        var settings = AppSettings.Load(AppSettings.DefaultPath);
+
+        if (string.IsNullOrWhiteSpace(settings.SubscriptionUrl))
+            return [];
+
+        var sources = SubscriptionBook.Load().Pool.Select(e => new PoolSource(e.Name, e.Url)).ToList();
+
+        if (sources.Count == 0)
+            sources.Add(new PoolSource("Основная", settings.SubscriptionUrl));
+
+        var pool = await SubscriptionPool.BuildAsync(sources, cancellationToken);
+        var usable = pool.Servers.Where(s => s.IsUsableOutbound).ToList();
+
+        // Только выбранный сервер (владелец 25.10): через него и пойдёт трафик
+        // по записанному маршруту. Перебор чужих приводил мёртвые серверы
+        // подписки — «wiseKeys» без адреса, адрес Apple с чужим сертификатом.
+        // Порядок: тот, что в работе сейчас; закреплённый; в «Авто» — быстрейший
+        // живой по последнему замеру.
+        var live = await TunnelStatus.CurrentServerAsync(cancellationToken);
+        var health = ServerHealthCache.Load().Entries;
+
+        var server = usable.FirstOrDefault(s => s.Tag == live)
+            ?? usable.FirstOrDefault(s => s.Tag == settings.PreferredServer)
+            ?? usable
+                .Where(s => health.TryGetValue(s.Tag, out var h) && h.Success)
+                .OrderBy(s => health[s.Tag].LatencyMs ?? double.MaxValue)
+                .FirstOrDefault();
+
+        return server is null ? [] : [server];
     }
 
     private async Task RunAsync(

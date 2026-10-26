@@ -241,6 +241,10 @@
                         <Button Style="{StaticResource Ghost}" Content="Настройки" Click="OnSettings" Margin="0,0,8,0"
                                 ToolTip="Перезапуск Discord после смены маршрута, пополнение адресов его голоса." />
 
+                        <Button Style="{StaticResource Ghost}" Content="Автоподбор" Click="OnAutoPick" Margin="0,0,8,0"
+                                AutomationProperties.Name="Автоподбор маршрутов"
+                                ToolTip="Сам проверяет сервисы, ваши маршруты или один сайт по ссылке и подбирает, как их открывать: напрямую, десинком, пином в hosts или через VPN (VPN — только если иначе никак). На 2–5 минут движки остановятся и трафик пойдёт без обхода. Всё записанное можно вернуть." />
+
                         <Button x:Name="ReloadButton" Style="{StaticResource Ghost}"
                                 Content="Перечитать" Click="OnReload"
                                 ToolTip="Перечитывает правила, пресет и файл hosts с диска. Нужно, если правили их снаружи программы." />

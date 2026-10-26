@@ -947,6 +947,34 @@ public static class HostsEditor
         return result;
     }
 
+    /// <summary>Все имена нашего блока, включая выключенные строки.</summary>
+    /// <remarks>
+    /// <see cref="Pins"/> выключенных не видит, а <see cref="Pin"/> заменил бы такую
+    /// строку молча: автоподбор поверх отключённого человеком пина писать не должен.
+    /// </remarks>
+    public static IReadOnlySet<string> OwnNames(string? path = null)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var target = path ?? HostsFile.DefaultPath;
+
+        if (!File.Exists(target))
+            return result;
+
+        var lines = File.ReadAllLines(target).ToList();
+        var (start, end) = FindBlock(lines);
+
+        if (start < 0)
+            return result;
+
+        foreach (var line in Own(lines, start, end))
+        {
+            if ((Split(line) ?? SplitDisabled(line)) is { } pair)
+                result.Add(pair.Name);
+        }
+
+        return result;
+    }
+
     /// <summary>
     /// Наши прибитые имена, лежащие под зонами, — те, что перебьют маршрут.
     /// </summary>

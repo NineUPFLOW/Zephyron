@@ -76,17 +76,28 @@ public sealed record SupervisorState
         if (!File.Exists(path))
             return null;
 
-        try
+        // Короткий повтор, как у пишущего (Save): в миг замены файла чтение получает
+        // «Access denied», и прежде это читалось как «состояния нет». Надзор при этом
+        // жив, и «Главная» с меню объявляли запуск — значок мигал «Запуск» ↔ «Работает»
+        // каждые несколько секунд при работающих движках (26.10).
+        for (int attempt = 1; ; attempt++)
         {
-            // Читающий держит файл, и замена в этот миг получает «Access denied».
-            // Разрешение FileShare.Delete тут не спасает — замерено 23.09:
-            // File.Move с перезаписью открытого файла отказывает и с ним.
-            // Поэтому столкновение переживает пишущий, см. Save.
-            return JsonSerializer.Deserialize<SupervisorState>(File.ReadAllText(path), Options);
-        }
-        catch (Exception)
-        {
-            return null;
+            try
+            {
+                // Читающий держит файл, и замена в этот миг получает «Access denied».
+                // Разрешение FileShare.Delete тут не спасает — замерено 23.09:
+                // File.Move с перезаписью открытого файла отказывает и с ним.
+                // Поэтому столкновение переживает пишущий, см. Save.
+                return JsonSerializer.Deserialize<SupervisorState>(File.ReadAllText(path), Options);
+            }
+            catch (Exception ex) when (IsBusy(ex) && ex is not FileNotFoundException && attempt < 3)
+            {
+                Thread.Sleep(20 * attempt);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
         }
     }
 

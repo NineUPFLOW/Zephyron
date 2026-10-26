@@ -1,7 +1,7 @@
 using System.IO;
 using System.Net.Sockets;
 using System.Security.Authentication;
-using Zephyron.Gui.Views;
+using Zephyron.Supervisor;
 using Xunit;
 
 namespace Zephyron.Gui.Tests;
@@ -25,7 +25,7 @@ public sealed class RecipeFailureTests
         // у неподходящего рецепта.
         Assert.Equal(
             "соединение сброшено",
-            RecipeWindow.Short(new SocketException((int)SocketError.ConnectionReset)));
+            RecipeTrial.Short(new SocketException((int)SocketError.ConnectionReset)));
     }
 
     [Fact]
@@ -37,7 +37,7 @@ public sealed class RecipeFailureTests
             "оболочка",
             new SocketException((int)SocketError.ConnectionReset));
 
-        Assert.Equal("соединение сброшено", RecipeWindow.Short(wrapped));
+        Assert.Equal("соединение сброшено", RecipeTrial.Short(wrapped));
     }
 
     [Fact]
@@ -47,18 +47,18 @@ public sealed class RecipeFailureTests
         // сторона не приняла наше приветствие. Лечатся разным.
         Assert.Equal(
             "отказ в рукопожатии",
-            RecipeWindow.Short(new AuthenticationException("что угодно")));
+            RecipeTrial.Short(new AuthenticationException("что угодно")));
     }
 
     [Fact]
     public void Silence_is_named_silence()
     {
-        Assert.Equal("не дождались", RecipeWindow.Short(new OperationCanceledException()));
-        Assert.Equal("не дождались", RecipeWindow.Short(new TimeoutException()));
+        Assert.Equal("не дождались", RecipeTrial.Short(new OperationCanceledException()));
+        Assert.Equal("не дождались", RecipeTrial.Short(new TimeoutException()));
 
         Assert.Equal(
             "не дождались",
-            RecipeWindow.Short(new SocketException((int)SocketError.TimedOut)));
+            RecipeTrial.Short(new SocketException((int)SocketError.TimedOut)));
     }
 
     [Fact]
@@ -75,8 +75,8 @@ public sealed class RecipeFailureTests
         };
 
         Assert.All(сообщения, ex => Assert.True(
-            RecipeWindow.Short(ex).Length <= 41,
-            $"слишком длинно: {RecipeWindow.Short(ex)}"));
+            RecipeTrial.Short(ex).Length <= 41,
+            $"слишком длинно: {RecipeTrial.Short(ex)}"));
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public sealed class RecipeFailureTests
     {
         // Обрезка осталась для незнакомого, но теперь видно, что обрезали:
         // прежде строка просто кончалась посреди слова.
-        var cut = RecipeWindow.Short(new InvalidOperationException(new string('б', 200)));
+        var cut = RecipeTrial.Short(new InvalidOperationException(new string('б', 200)));
 
         Assert.EndsWith("…", cut);
     }
@@ -92,6 +92,6 @@ public sealed class RecipeFailureTests
     [Fact]
     public void A_short_message_is_left_whole()
     {
-        Assert.Equal("коротко", RecipeWindow.Short(new InvalidOperationException("коротко")));
+        Assert.Equal("коротко", RecipeTrial.Short(new InvalidOperationException("коротко")));
     }
 }

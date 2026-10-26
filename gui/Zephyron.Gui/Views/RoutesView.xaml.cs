@@ -1913,6 +1913,13 @@ public partial class RoutesView : UserControl
     private void OnSettings(object sender, RoutedEventArgs e) =>
         new RoutesSettingsWindow { Owner = Window.GetWindow(this) }.ShowDialog();
 
+    /// <summary>«Автоподбор маршрутов» — модально; записанное окно читается заново, как по «Перечитать».</summary>
+    private void OnAutoPick(object sender, RoutedEventArgs e)
+    {
+        new AutoPickWindow { Owner = Window.GetWindow(this) }.ShowDialog();
+        Reload();
+    }
+
     private void OnExpandAll(object sender, RoutedEventArgs e)
     {
         bool open = ExpandButton.Content as string == "Раскрыть всё";
