@@ -42,6 +42,51 @@ public sealed class HomeStateTests
         });
     }
 
+    /// <summary>
+    /// Ширина «Главной» не зависит от состояния: страница во всю ширину предела, по центру.
+    /// </summary>
+    /// <remarks>
+    /// 26.10, видео владельца: с HorizontalAlignment.Center страница сжималась до
+    /// ширины содержимого — «Выключен» уже, «Работает» шире, — и прыгала при каждой
+    /// смене состояния, а в узкой колонке карточки вытягивались и низ уходил за край.
+    /// </remarks>
+    [Fact]
+    public void The_page_keeps_its_width_whatever_the_state()
+    {
+        Sta.Run(() =>
+        {
+            var view = new StatusView();
+            view.Page.MaxWidth = 1120;
+
+            (double Width, double Row) Size(HomeState state, string hint, double width = 1900)
+            {
+                view.Present(state, hint, state, state);
+                view.Measure(new System.Windows.Size(width, 1000));
+                view.Arrange(new System.Windows.Rect(0, 0, width, 1000));
+                view.UpdateLayout();
+                return (view.Page.ActualWidth, view.TopRow.ActualHeight);
+            }
+
+            var off = Size(HomeState.Off, "Обход не работает");
+            var running = Size(HomeState.Running, "Маршруты — через туннель, остальное — напрямую, закрытое чинит десинк.");
+            var failed = Size(HomeState.Failed, string.Join(" ", Enumerable.Repeat("Движок туннеля не поднялся, супервизор перестал его поднимать.", 4)));
+
+            Assert.Equal(System.Windows.HorizontalAlignment.Stretch, view.Page.HorizontalAlignment);
+            Assert.Equal(1120, off.Width, 1);
+            Assert.Equal(off.Width, running.Width, 1);
+
+            // Высота ряда с плашкой тоже одна: время, строка счётчиков и длинное
+            // пояснение не делают плашку выше «Компонентов» рядом.
+            Assert.Equal(off.Row, running.Row, 1);
+            Assert.Equal(off.Row, failed.Row, 1);
+
+            // И в узкой раскладке, где плашка во всю ширину и «Компоненты» её не выравнивают.
+            var narrowOff = Size(HomeState.Off, "Обход не работает", 900);
+            var narrowRunning = Size(HomeState.Running, "Маршруты — через туннель, остальное — напрямую, закрытое чинит десинк.", 900);
+            Assert.Equal(narrowOff.Row, narrowRunning.Row, 1);
+        });
+    }
+
     /// <summary>Длинная строка в плитке не раздвигает колонку: края плиток соседних рядов совпадают.</summary>
     [Fact]
     public void A_long_line_does_not_widen_its_tile_column()

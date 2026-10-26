@@ -26,7 +26,8 @@ public partial class StatusView
     {
         if (!running)
         {
-            EngineMeters.Visibility = Visibility.Collapsed;
+            // Hidden, а не Collapsed: строка держит свою высоту, и плашка не прыгает при пуске и остановке.
+            EngineMeters.Visibility = Visibility.Hidden;
             return;
         }
 

@@ -1934,8 +1934,11 @@ public partial class StatusView : UserControl
         ArtLayer.Visibility = art ? Visibility.Visible : Visibility.Collapsed;
         Grid.SetColumnSpan(PageScroller, art ? 1 : 2);
 
+        // Только Stretch: с пределом WPF и так ставит страницу по центру, но во всю
+        // ширину предела. Center сжимал её до ширины содержимого, и «Главная»
+        // меняла ширину вместе с текстом состояния — прыгала при «Выключен» →
+        // «Запуск» → «Работает» и переносила карточки так, что низ уходил за край (26.10).
         Page.MaxWidth = page;
-        Page.HorizontalAlignment = double.IsPositiveInfinity(page) ? HorizontalAlignment.Stretch : HorizontalAlignment.Center;
     }
 
     /// <summary>Есть ли у темы картинка или живой фон для колонки справа.</summary>
