@@ -1,9 +1,9 @@
 using Zephyron.Zapret;
 
-namespace Zephyron.Gui.Views;
+namespace Zephyron.Supervisor;
 
 /// <summary>Один пункт выбора рецепта, ещё без вердиктов и кистей.</summary>
-internal sealed record RecipeChoice
+public sealed record RecipeChoice
 {
     /// <summary>Что ляжет в правило.</summary>
     public required string Name { get; init; }
@@ -43,7 +43,7 @@ internal sealed record RecipeChoice
 /// где он встретился; показать оба значило бы предложить дважды одно.
 /// </para>
 /// </remarks>
-internal static class RecipeChoices
+public static class RecipeChoices
 {
     public static IReadOnlyList<RecipeChoice> Build(
         ZapretPreset preset,

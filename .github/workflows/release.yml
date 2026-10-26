@@ -180,7 +180,8 @@ jobs:
           # Личное не должно попасть в архив: подписка — это пароль,
           # отчёты и runtime описывают сеть этой машины.
           for bad in config/zephyron.json config/subscriptions.json \
-                     config/rules.user.yaml runtime reports; do
+                     config/rules.user.yaml config/autopick-journal.json \
+                     config/rules.user.before-autopick.yaml runtime reports; do
             if [ -e "$STAGE/$bad" ]; then
               echo "Отказ: $bad личное и не должно уехать в архив." >&2
               exit 1

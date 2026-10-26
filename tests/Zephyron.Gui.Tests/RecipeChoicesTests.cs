@@ -1,4 +1,5 @@
 using Zephyron.Gui.Views;
+using Zephyron.Supervisor;
 using Zephyron.Zapret;
 using Xunit;
 

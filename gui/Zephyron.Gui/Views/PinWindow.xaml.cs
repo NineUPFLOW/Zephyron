@@ -701,14 +701,13 @@ public partial class PinWindow : Window
         var main = zones.FirstOrDefault() ?? names[0];
 
         Status.Text = "Спрашиваю у XBOX DNS, Comss, AstraCat и GeoHide, какие адреса они отдают сейчас…";
-        var live = await IntermediaryDns.AskManyAsync([main], CancellationToken.None);
+        // Источники кандидатов — общие с автоподбором маршрутов (PinSources).
+        var (known, pool) = await Zephyron.Supervisor.PinSources.LoadAsync([main], _catalog, own, CancellationToken.None);
 
-        // Посредники — из живого каталога Zapret, где он стоит, и из снимка,
-        // который едет с программой: без Zapret остался бы только второй.
         var picks = await PinPicker.PickAsync(
             names,
-            host => [.. own.PinCandidates(host), .. live.TryGetValue(host, out var now) ? now : [], .. _catalog?.AnswersFor(host) ?? []],
-            [.. _catalog?.Intermediaries() ?? [], .. own.Intermediaries],
+            known,
+            pool,
             progress,
             CancellationToken.None,
             probes,

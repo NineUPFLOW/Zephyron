@@ -80,8 +80,17 @@ public static class TunnelReach
         var configPath = Path.Combine(workDirectory, "reach.json");
         var logPath = Path.Combine(workDirectory, "reach.log");
 
-        if (File.Exists(logPath))
-            File.Delete(logPath);
+        try
+        {
+            if (File.Exists(logPath))
+                File.Delete(logPath);
+        }
+        catch (IOException)
+        {
+            // Журнал держит недобитый sing-box прошлой проверки: этот сервер
+            // не проверен, но и вся проверка из-за него падать не должна.
+            return Unavailable(hosts, "журнал занят прошлым запуском sing-box");
+        }
 
         // Имя сервера разрешается заранее и честным резолвером. При работающих
         // движках обычный запрос перехватывает наш же TUN, и проверка падала бы

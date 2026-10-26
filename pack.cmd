@@ -310,7 +310,7 @@ rem so these files should never be here - but testing happens in the unpacked
 rem folder, and config\zephyron.json holds a subscription link, which is a
 rem password. A leaked release cannot be recalled, so this is checked rather
 rem than assumed.
-for %%F in ("%STAGE%\config\zephyron.json" "%STAGE%\config\subscriptions.json" "%STAGE%\config\rules.user.yaml") do (
+for %%F in ("%STAGE%\config\zephyron.json" "%STAGE%\config\subscriptions.json" "%STAGE%\config\rules.user.yaml" "%STAGE%\config\autopick-journal.json" "%STAGE%\config\rules.user.before-autopick.yaml") do (
     if exist "%%~F" (
         echo.
         echo Refusing to archive: %%~nxF is personal and must not ship.
