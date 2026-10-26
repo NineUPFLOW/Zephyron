@@ -91,7 +91,7 @@ if %errorlevel% equ 0 set EXITCODE=1
 if %EXITCODE% neq 0 (
     echo.
     echo Refusing to archive: Zephyron.exe has no native libraries inside it
-    echo (%ZSIZE% bytes, and stray DLLs beside it). The program would start and
+    echo ^(%ZSIZE% bytes, and stray DLLs beside it^). The program would start and
     echo silently exit. Build with -p:IncludeNativeLibrariesForSelfExtract=true,
     echo as pack.cmd does.
     exit /b 1
