@@ -199,6 +199,35 @@ public sealed class ProcessSupervisorTests : IDisposable
         await Stop(cts, run);
     }
 
+    /// <summary>Проработав здоровой, служба начинает счёт перезапусков заново.</summary>
+    /// <remarks>Отчёт 26.10: без сброса предел копился за весь сеанс.</remarks>
+    [Fact]
+    public async Task AStableRunForgetsEarlierRestarts()
+    {
+        var service = new FakeService();
+        var options = new SupervisorOptions
+        {
+            CheckInterval = TimeSpan.FromMilliseconds(80),
+            ReadinessTimeout = TimeSpan.FromSeconds(2),
+            RestartBackoff = TimeSpan.FromMilliseconds(10),
+            StableResetsRestarts = TimeSpan.FromMilliseconds(300),
+            StatePath = Path.Combine(_dir, "supervisor.state.json"),
+            LogPath = Path.Combine(_dir, "supervisor.log"),
+        };
+        using var cts = new CancellationTokenSource();
+
+        var run = new ProcessSupervisor([service], options).RunAsync(cts.Token);
+        await WaitFor(options, s => s.Health == ServiceHealth.Healthy, "служба поднялась");
+
+        service.Current!.Kill();
+        await WaitFor(options, s => s.RestartCount == 1 && s.Health == ServiceHealth.Healthy, "перезапуск");
+
+        var calm = await WaitFor(options, s => s.RestartCount == 0, "счёт сброшен после спокойной работы");
+        Assert.Equal(ServiceHealth.Healthy, calm.Health);
+
+        await Stop(cts, run);
+    }
+
     [Fact]
     public async Task ABrokenEngineIsRestartedOnlyAfterSeveralChecksInARow()
     {
