@@ -56,6 +56,9 @@ public sealed class SupportReportTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "config", "rules.user.yaml"),
             "rules:\n  - match: domain\n    value: \"*.example.org\"\n    mode: proxy\n");
 
+        File.WriteAllText(Path.Combine(_root, "config", "autopick-journal.json"),
+            "[ { \"Preset\": \"Universal V12 Lite\", \"Entries\": [ { \"Host\": \"autopick.example.org\" } ] } ]");
+
         // Вторая подписка — только в книге: отчёт обязан найти её сам.
         File.WriteAllText(Path.Combine(_root, "config", "subscriptions.json"),
             $"{{ \"Entries\": [ {{ \"Name\": \"вторая\", \"Url\": \"{BookOnly}\" }} ] }}");
@@ -100,6 +103,7 @@ public sealed class SupportReportTests : IDisposable
         Assert.Contains("не прочиталась", text);
         Assert.Contains("DNS: 8.8.4.4, через туннель", text);
         Assert.Contains("*.example.org", text);
+        Assert.Contains("autopick.example.org", text);
         Assert.Contains("ERROR", text);
         Assert.Contains("youtube.com ок", text);
         Assert.DoesNotContain("старая проверка", text);
