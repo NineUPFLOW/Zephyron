@@ -102,7 +102,8 @@
             <Rectangle x:Name="ArtShade" />
         </Grid>
 
-        <ScrollViewer x:Name="PageScroller" Grid.Column="0" Style="{StaticResource PageScroll}" Padding="{StaticResource PagePad}">
+        <!-- Низ 16, а не PagePad 24: «Главная» целиком влезает в развёрнутое окно 1920x1080 (26.10). -->
+        <ScrollViewer x:Name="PageScroller" Grid.Column="0" Style="{StaticResource PageScroll}" Padding="24,20,24,16">
             <StackPanel x:Name="Page">
 
                 <!--
@@ -234,7 +235,7 @@
                                 </Grid.RowDefinitions>
 
                                 <!-- Два знака друг над другом: при смене состояния один гаснет, другой проявляется (160 мс). -->
-                                <Grid Grid.Column="0" Width="40" Height="40" VerticalAlignment="Center">
+                                <Grid Grid.Column="0" Width="40" Height="40" VerticalAlignment="Top">
                                     <Ellipse x:Name="Ring" Stroke="{DynamicResource Success}" StrokeThickness="2" Opacity="0"
                                              IsHitTestVisible="False" RenderTransformOrigin="0.5,0.5">
                                         <Ellipse.RenderTransform>
@@ -245,18 +246,24 @@
                                     <Control x:Name="MarkB" Style="{StaticResource StateMark}" Width="40" Height="40" Tag="Off" Opacity="0" />
                                 </Grid>
 
-                                <StackPanel Grid.Column="1" Margin="16,0,16,0" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="1" Margin="16,0,16,0" VerticalAlignment="Top">
                                     <TextBlock x:Name="StateLine" Style="{StaticResource StateWord}" Foreground="{DynamicResource Muted}"
                                                Text="Проверяю…" TextTrimming="CharacterEllipsis"
                                                AutomationProperties.LiveSetting="Polite" />
 
-                                    <!-- Время, затем одна строка пояснения; не помещается — пояснение уходит строкой ниже. -->
-                                    <WrapPanel Margin="0,2,0,0">
+                                    <!--
+                                        Время, затем одна строка пояснения; не помещается — пояснение уходит строкой ниже.
+                                        Высота 52 — строка времени и две строки пояснения при любом состоянии: иначе
+                                        плашка росла при пуске и ряд под ней прыгал (видео владельца, 26.10).
+                                    -->
+                                    <WrapPanel Margin="0,2,0,0" Height="52">
                                         <StackPanel x:Name="UptimeBox" Orientation="Horizontal" Visibility="Collapsed">
                                             <TextBlock x:Name="Uptime" Style="{StaticResource HeroTime}" Margin="0,0,12,0" Text="00:00:00" />
                                         </StackPanel>
+                                        <!-- Не больше двух строк: длиннее — плашка перерастала соседей, и ряд прыгал (26.10). Целиком — в подсказке. -->
                                         <TextBlock x:Name="StateHint" Style="{StaticResource Caption}" TextWrapping="Wrap"
-                                                   VerticalAlignment="Center" MaxWidth="560" />
+                                                   VerticalAlignment="Center" MaxWidth="560" MaxHeight="32" TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
                                     </WrapPanel>
                                 </StackPanel>
 
@@ -266,7 +273,7 @@
                                     её ширина берётся по содержимому и отнимается у слова
                                     и пояснения слева.
                                 -->
-                                <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                <StackPanel Grid.Column="2" VerticalAlignment="Top" HorizontalAlignment="Right">
                                     <Grid HorizontalAlignment="Right">
                                         <Button x:Name="StartButton" Style="{StaticResource Primary}" Height="40" MinWidth="150" Padding="22,0"
                                                 Click="OnStart" Visibility="Collapsed"
@@ -293,13 +300,13 @@
                                     ширине окна слово «Работает» и пояснение сжимались в столбик (25.10).
                                 -->
                                 <TextBlock Grid.Row="1" Grid.ColumnSpan="3" x:Name="EngineMeters" Style="{StaticResource MonoTag}"
-                                           Margin="56,10,0,0" TextTrimming="CharacterEllipsis" Visibility="Collapsed" />
+                                           Margin="56,10,0,0" TextTrimming="CharacterEllipsis" Visibility="Hidden" Text=" " />
 
                                 <!--
                                     Трассы (FlowLanes): какие пути от компьютера к сети открыты
                                     сейчас и как бежит по ним трафик. Знак «Главной» Zephyron.
                                 -->
-                                <views:FlowLanes Grid.Row="2" Grid.ColumnSpan="3" x:Name="Lanes" Margin="0,16,0,0"
+                                <views:FlowLanes Grid.Row="2" Grid.ColumnSpan="3" x:Name="Lanes" Margin="0,10,0,0"
                                                  AutomationProperties.Name="Пути трафика: десинк, напрямую, туннель" />
                             </Grid>
                         </Grid>
@@ -315,11 +322,11 @@
                             <DockPanel>
                                 <StackPanel DockPanel.Dock="Top">
                                     <TextBlock Text="Компоненты" Style="{StaticResource SectionHead}" />
-                                    <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,12" TextWrapping="Wrap"
+                                    <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,8" TextWrapping="Wrap"
                                                Text="Движки этого запуска: состояние и номер процесса." />
                                 </StackPanel>
 
-                                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,12,0,0">
+                                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
                                     <Button Style="{StaticResource Quiet}" Click="OnQuickDoctor" Padding="8,5"
                                             local:ButtonGlyph.Lead="&#xE9D9;" Content="Диагностика" />
                                 </StackPanel>
@@ -819,7 +826,7 @@
                     Подвал: сколько работает обход и когда собран конфиг туннеля,
                     справа — ссылки на описание, исходники и канал.
                 -->
-                <Border BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0" Padding="4,14,0,0" Margin="0,4,0,0">
+                <Border BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0" Padding="4,10,0,0">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />

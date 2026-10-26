@@ -88,7 +88,8 @@ public sealed class FlowLanes : Grid
 
     public FlowLanes()
     {
-        Height = 104;
+        // 88, а не 104: плашка «Главной» не должна перерастать «Компоненты» рядом (26.10).
+        Height = 88;
         SnapsToDevicePixels = false;
         Children.Add(_canvas);
 
