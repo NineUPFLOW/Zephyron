@@ -85,6 +85,22 @@ public sealed class ThemeLoaderTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// «Работает» без своего цвета — акцент; старый автоматический зелёный, записанный
+    /// редактором нетронутым, — тоже (жалоба 28.10: «Главная» не шла за акцентом).
+    /// </summary>
+    [Fact]
+    public void RunningFollowsTheAccentUnlessSetOnPurpose()
+    {
+        var plain = Write("plain", """{ "name": "А", "base": "dark", "colors": { "accent": "#9ED27A" } }""").Theme!;
+        var stale = Write("stale", """{ "name": "Б", "base": "dark", "colors": { "accent": "#9ED27A", "success": "#35E6A0" } }""").Theme!;
+        var own = Write("own", """{ "name": "В", "base": "dark", "colors": { "accent": "#9ED27A", "success": "#FF2020" } }""").Theme!;
+
+        Assert.Equal("#9ED27A", plain[ThemeSlots.Success].ToString());
+        Assert.Equal("#9ED27A", stale[ThemeSlots.Success].ToString());
+        Assert.Equal("#FF2020", own[ThemeSlots.Success].ToString());
+    }
+
     [Fact]
     public void AllThemesAreListedBuiltInFirst()
     {

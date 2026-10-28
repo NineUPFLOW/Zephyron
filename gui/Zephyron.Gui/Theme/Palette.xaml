@@ -63,11 +63,11 @@
     <SolidColorBrush x:Key="Accent2" Color="{StaticResource Accent2Color}" />
 
     <!--
-        «Работает» — зелёным, отдельно от акцента: синий значит «выбрано»
-        и «главное». В theme.json слота нет: Themes.Derive ставит зелёный,
-        читаемый на подложке темы.
+        «Работает» — как акцент, пока тема не задала свой слот «Работает»
+        (ThemeSlots.Default; жалоба 28.10: точки и дорожки «Главной» не шли
+        за акцентом). Свой цвет задаётся в редакторе темы.
     -->
-    <Color x:Key="SuccessColor">#FF35E6A0</Color>
+    <Color x:Key="SuccessColor">#FF4CB8FF</Color>
     <SolidColorBrush x:Key="Success" Color="{StaticResource SuccessColor}" />
     <SolidColorBrush x:Key="SuccessSoft" Color="#1A35E6A0" />
     <SolidColorBrush x:Key="SuccessLine" Color="#5735E6A0" />

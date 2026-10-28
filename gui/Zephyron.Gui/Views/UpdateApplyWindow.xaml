@@ -125,7 +125,7 @@
                         <Border x:Name="DoneMark" Width="40" Height="40" CornerRadius="{StaticResource RMd}"
                                 Background="{DynamicResource Accent}" VerticalAlignment="Center">
                             <TextBlock x:Name="DoneGlyph" FontFamily="{StaticResource IconFont}" Text="&#xE73E;" FontSize="18"
-                                       Foreground="{DynamicResource Backdrop}"
+                                       Foreground="{DynamicResource OnAccent}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
 

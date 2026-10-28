@@ -41,6 +41,23 @@ public sealed class ThemeWriterTests : IDisposable
         ["warn-fill"] = ThemeColor.Parse("#D29922"),
     };
 
+    /// <summary>«Работает», равный акценту, не пишется — иначе застыл бы и не шёл за акцентом.</summary>
+    [Fact]
+    public void RunningEqualToTheAccentIsNotWritten()
+    {
+        var colors = new Dictionary<string, ThemeColor>(Dark())
+        {
+            ["success"] = ThemeColor.Parse("#3FB950"),
+            ["window"] = ThemeColor.Parse("#FF2020"),
+        };
+
+        var id = ThemeWriter.Save(new ThemeDraft { Name = "Следом", Colors = colors }, root: _root);
+        var json = File.ReadAllText(Path.Combine(_root, id, ThemeLoader.FileName));
+
+        Assert.DoesNotContain("\"success\"", json);
+        Assert.Contains("\"window\"", json);
+    }
+
     /// <summary>Своя тема удаляется целиком; встроенная и путь вместо имени — отказ.</summary>
     [Fact]
     public void OnlyAnOwnThemeFolderIsDeleted()
