@@ -43,7 +43,8 @@ Zephyron — самостоятельный проект: свой интерф�
 
 ## Скриншот главного меню
 
-<img width="1917" height="1030" alt="image" src="https://github.com/user-attachments/assets/8227c637-4830-48e5-8b7f-4777d6761a1d"/>
+<img width="1919" height="1030" alt="image" src="https://github.com/user-attachments/assets/fcf6d6c2-01f6-43c1-86ae-16b8a49a5b93" />
+
 
 ## 💜 Благодарности
 
