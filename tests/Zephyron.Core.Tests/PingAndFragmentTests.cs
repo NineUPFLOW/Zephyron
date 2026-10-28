@@ -95,6 +95,34 @@ public sealed class PingAndFragmentTests
     private static JsonObject Outbound(string json, string tag) =>
         JsonNode.Parse(json)!["outbounds"]!.AsArray().OfType<JsonObject>().Single(o => o["tag"]?.GetValue<string>() == tag);
 
+    /// <summary>Xray-вариант flow sing-box отвергает фатально — уходит как обычный vision.</summary>
+    [Theory]
+    [InlineData("xtls-rprx-vision-udp443", "xtls-rprx-vision")]
+    [InlineData("xtls-rprx-direct", null)]
+    public void FlowIsWhatSingBoxKnows(string flow, string? expected)
+    {
+        var engine = RuleSetLoader.Load("mode: selective\nrules: []\n");
+        ProxyServer[] servers = [Servers[1] with { Tag = "v", Flow = flow }];
+        var result = new SingBoxConfigCompiler().Compile(engine.RuleSet, servers, new SingBoxOptions());
+        Assert.Equal(expected, Outbound(result.Json, "v")["flow"]?.GetValue<string>());
+    }
+
+    /// <summary>Битый ключ REALITY роняет весь sing-box — такой сервер мимо конфига.</summary>
+    [Theory]
+    [InlineData("jNXHt1yRo0vDuchQlIP6Z0ZvjT3KtzVI-T4E7RoLJS0", true)]
+    [InlineData("", false)]
+    [InlineData("short", false)]
+    public void RealityNeedsRealKey(string key, bool usable) =>
+        Assert.Equal(usable, (Servers[1] with { RealityPublicKey = key }).IsUsableOutbound);
+
+    [Fact]
+    public void OutlineKeyWithSlashParses()
+    {
+        var link = "ss://" + Convert.ToBase64String("chacha20-ietf-poly1305:pass"u8.ToArray()) + "@1.2.3.4:8388/?outline=1#O";
+        Assert.True(ProxyUriParser.TryParse(link, out var server, out var error), error);
+        Assert.Equal(8388, (int)server!.Port);
+    }
+
     /// <summary>
     /// Режется приветствие TLS поверх TCP — у VLESS (и с REALITY), Trojan;
     /// у Hysteria2 рукопожатие в пакетах QUIC, у Shadowsocks TLS нет. Конфиг

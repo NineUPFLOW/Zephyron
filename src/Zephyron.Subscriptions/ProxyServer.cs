@@ -293,7 +293,23 @@ public sealed record ProxyServer
     /// с ним пропускается — <see cref="ShadowsocksMethods"/>.
     /// </remarks>
     public bool IsSupportedBySingBox =>
-        Protocol != ProxyProtocol.Shadowsocks || ShadowsocksMethods.ForSingBox(Method) is not null;
+        (Protocol != ProxyProtocol.Shadowsocks || ShadowsocksMethods.ForSingBox(Method) is not null)
+        && (!Security.Equals("reality", StringComparison.OrdinalIgnoreCase) || IsRealityKey(RealityPublicKey));
+
+    /// <summary>
+    /// Ключ REALITY — 32 байта в base64url. С пустым или битым ключом sing-box
+    /// не стартует целиком («decode public_key»), поэтому такой сервер — мимо конфига.
+    /// </summary>
+    internal static bool IsRealityKey(string? key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            return false;
+
+        var padded = key.Trim().Replace('-', '+').Replace('_', '/').TrimEnd('=');
+        padded = padded.PadRight(padded.Length + (4 - padded.Length % 4) % 4, '=');
+        Span<byte> bytes = stackalloc byte[48];
+        return Convert.TryFromBase64String(padded, bytes, out int written) && written == 32;
+    }
 
     /// <summary>
     /// Адрес, в который вообще можно дозвониться.

@@ -76,7 +76,8 @@ public static class TitleBar
                 return;
 
             var backdrop = Color(window, "BackdropColor", Colors.Black);
-            var accent = Color(window, "AccentColor", Colors.SlateBlue);
+            // Рамка — свой слот темы «window», а не акцент «выбранного».
+            var accent = Color(window, "WindowColor", Color(window, "AccentColor", Colors.SlateBlue));
             var text = Color(window, "TextColor", Colors.White);
 
             int dark = Luminance(backdrop) < 0.5 ? 1 : 0;

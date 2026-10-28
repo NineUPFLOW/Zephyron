@@ -26,6 +26,7 @@
     <Color x:Key="FaintColor">#FF858C99</Color>
 
     <Color x:Key="AccentColor">#FF4CB8FF</Color>
+    <Color x:Key="WindowColor">#FF4CB8FF</Color>
     <Color x:Key="AccentDimColor">#FF12324A</Color>
     <Color x:Key="DangerColor">#FFFF6B6B</Color>
     <Color x:Key="WarnColor">#FFF5B14A</Color>

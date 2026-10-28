@@ -30,6 +30,7 @@
     <Color x:Key="FaintColor">#FF646C7A</Color>
 
     <Color x:Key="AccentColor">#FF0B6BCB</Color>
+    <Color x:Key="WindowColor">#FF0B6BCB</Color>
     <Color x:Key="AccentDimColor">#FFD6E8FA</Color>
     <Color x:Key="DangerColor">#FFC0262D</Color>
     <Color x:Key="WarnColor">#FF8A5200</Color>

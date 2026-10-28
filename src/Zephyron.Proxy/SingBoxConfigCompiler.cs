@@ -1741,8 +1741,10 @@ public sealed class SingBoxConfigCompiler
             case ProxyProtocol.Vless:
                 outbound["type"] = "vless";
                 outbound["uuid"] = server.Credential;
-                if (!string.IsNullOrEmpty(server.Flow))
-                    outbound["flow"] = server.Flow;
+                // sing-box знает только «xtls-rprx-vision»: xray-варианты вроде
+                // «-udp443» он отвергает фатально и роняет весь туннель, а не один сервер.
+                if (server.Flow?.StartsWith("xtls-rprx-vision", StringComparison.OrdinalIgnoreCase) == true)
+                    outbound["flow"] = "xtls-rprx-vision";
                 break;
 
             case ProxyProtocol.Vmess:
