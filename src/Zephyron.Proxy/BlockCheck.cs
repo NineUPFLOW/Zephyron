@@ -514,7 +514,8 @@ public sealed record TargetReport
         {
             var decisive = Kind switch
             {
-                BlockKind.None => null,
+                // Открытому объяснять нечего — кроме молчащего QUIC: по TCP открыт, а браузер подвиснет.
+                BlockKind.None => Data.QuicSilent == true ? Data : null,
                 BlockKind.GeoBlock or BlockKind.Stall => Data,
                 BlockKind.TlsDpi or BlockKind.Handshake => Tls,
                 BlockKind.HttpsPort or BlockKind.Full or BlockKind.Dns
@@ -1141,8 +1142,9 @@ public static class BlockCheck
             ? await CutAsync(answered, cancellationToken)
             : null;
 
+        // К TLS, а не к данным: «почему» у DPI по TLS читается из стадии TLS (Why).
         if (cut is { } by)
-            data = data with { Detail = (data.Detail is { Length: > 0 } said ? said + "; " : string.Empty) + CutText(by) };
+            tls = tls with { Detail = (tls.Detail is { Length: > 0 } said ? said + "; " : string.Empty) + CutText(by) };
 
         // Открыт по TCP, но объявил HTTP/3: браузер пойдёт по QUIC, и если тот
         // молчит — страница подвисает, хотя проба по TCP её получила.

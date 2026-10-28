@@ -393,9 +393,13 @@ public partial class TgProxyView : UserControl
             bool byWindow = TgWsProxyKeeper.Running;
             bool byEngines = !byWindow && settings.TelegramProxyWithEngines && EngineControl.IsRunning;
 
-            // Остановка ждёт ухода процесса до 10 с — не на потоке окна.
+            // Остановка ждёт ухода процесса до 10 с — не на потоке окна; плашку
+            // перерисовываем, когда он поднялся, иначе застрянет «Не запущен».
             if (byWindow)
-                _ = Task.Run(() => TgWsProxyKeeper.Restart(settings, enginesHoldIt: false));
+            {
+                _ = Task.Run(() => TgWsProxyKeeper.Restart(settings, enginesHoldIt: false))
+                    .ContinueWith(_ => Dispatcher.InvokeAsync(ShowState), TaskScheduler.Default);
+            }
 
             Status.Text = done + (byWindow
                 ? " Прокси перезапущен."

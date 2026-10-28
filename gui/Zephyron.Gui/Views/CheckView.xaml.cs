@@ -1124,7 +1124,7 @@ public partial class CheckView : UserControl
             report.Describe(),
             (Brush)FindResource(key),
             why ?? string.Empty,
-            report.Actionable && why is not null ? Visibility.Visible : Visibility.Collapsed,
+            (report.Actionable || report.Data.QuicSilent == true) && why is not null ? Visibility.Visible : Visibility.Collapsed,
             note,
             note.Length == 0 ? Visibility.Collapsed : Visibility.Visible,
             report.Actionable);
