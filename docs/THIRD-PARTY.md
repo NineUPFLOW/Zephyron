@@ -106,7 +106,7 @@ GPLv3 прямо оговаривает такой случай: объедин�
 
 `engines/zapret/exe/winws2.exe` — с 07.10 родная сборка под Windows от loop-uh
 (автора Zapret GUI): [zapret2-fork](https://git.zapret.moe/zapretdiscordyoutube/zapret2-fork),
-выпуск `v1.0.6-25-g26fb2e8-native` (с 0.18.0; до того — `v1.0.5.2-41-g204fd66-native`).
+выпуск `v1.0.6-33-gcb4b3d2-native` (с 0.19.3; до того — `v1.0.6-25-g26fb2e8-native`, а до 0.18.0 — `v1.0.5.2-41-g204fd66-native`).
 Это исходники bol-van без изменений, новее выпуска 1.0.6, а вместо Cygwin — своя прослойка
 (`nfq2/winnative/` форка): файлы, пути, разбор командной строки, сигналы,
 пакетная отправка пакетов. Внутри статически собраны LuaJIT и zlib.
