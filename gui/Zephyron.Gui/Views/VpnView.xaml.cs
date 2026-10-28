@@ -1690,6 +1690,7 @@ public partial class VpnView : UserControl
         ShowPickLine(_pickBase);
         ForeignSwitch.IsChecked = settings.ForeignExitsOnly;
         StableSwitch.IsChecked = settings.StableFirst;
+        KillSwitchToggle.IsChecked = settings.KillSwitch;
 
         // Выход — следом, не дожидаясь таймера: иначе первые четверть минуты
         // на вкладке строка была бы без него.
@@ -3237,6 +3238,28 @@ public partial class VpnView : UserControl
                 + (EngineControl.IsRunning ? " Подействует после перезапуска движков." : string.Empty);
 
             this.Offer("Отбор серверов изменён");
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Не удалось: " + ex.GetBaseException().Message;
+        }
+    }
+
+    private void OnKillSwitch(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
+            settings = settings with { KillSwitch = KillSwitchToggle.IsChecked == true };
+            settings.Save(AppSettings.DefaultPath);
+
+            // Фильтры ставит надзор при запуске — работающие движки о выключателе не знают.
+            Status.Text = (settings.KillSwitch
+                ? "Kill switch включён: в режиме «Туннель» мимо туннеля не уйдёт ничего, пока он не работает."
+                : "Kill switch выключен.")
+                + (EngineControl.IsRunning ? " Подействует после перезапуска движков." : string.Empty);
+
+            this.Offer("Kill switch изменён");
         }
         catch (Exception ex)
         {

@@ -398,6 +398,15 @@ public sealed record AppSettings
     public int TelegramProxyCfTimeout { get; init; } = TgWsProxy.DefaultCfConnectTimeout;
 
     /// <summary>
+    /// Kill switch в режиме «Туннель»: пока туннель не работает, трафик мимо
+    /// него не уходит (KillSwitch в надзоре). Выключен по умолчанию.
+    /// </summary>
+    public bool KillSwitch { get; init; }
+
+    /// <summary>Свой воркер Cloudflare для прокси Telegram (<see cref="TgWsProxy.WorkerHost"/>); пусто — нет.</summary>
+    public string? TelegramProxyWorker { get; init; }
+
+    /// <summary>
     /// Держать автоподбор сервера подальше от отечественных выходов.
     /// </summary>
     /// <remarks>

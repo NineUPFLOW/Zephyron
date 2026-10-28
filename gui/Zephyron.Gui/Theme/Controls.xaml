@@ -183,6 +183,8 @@
         <Setter Property="BorderThickness" Value="{StaticResource Stroke}" />
         <Setter Property="CornerRadius" Value="{StaticResource RLg}" />
         <Setter Property="Padding" Value="{StaticResource CardPad}" />
+        <!-- Тень — только у светлых тем (Themes.Derive); у тёмных ресурс пуст. -->
+        <Setter Property="Effect" Value="{DynamicResource CardShadow}" />
         <!-- Стекло под карточкой, если у темы фон и размытие включено (Glass.cs). -->
         <Setter Property="local:Glass.IsOn" Value="True" />
     </Style>

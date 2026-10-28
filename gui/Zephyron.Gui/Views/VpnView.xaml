@@ -692,12 +692,20 @@
                                                         Content="Автоподбор не берёт отечественные выходы. Подбор идёт по задержке и потому сползает на ближайший сервер — свой же, а через него не работает ровно то, ради чего туннель обычно и нужен: адрес остаётся отечественным, и отказ по стране приходит тот же, что без туннеля.&#x0a;&#x0a;Выбрать отечественный плиткой или в списке это не мешает. Применяется при следующем запуске движков." />
                                     </StackPanel>
 
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,32,4">
                                         <ToggleButton x:Name="StableSwitch" Style="{StaticResource Switch}"
                                                       VerticalAlignment="Center" Click="OnStable" />
                                         <TextBlock Text="Сначала стабильные" Margin="10,0,0,0" VerticalAlignment="Center" />
                                         <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                                         Content="Нестабильные — серверы, что работают через раз: из последних пяти и больше замеров удачных меньше четырёх из пяти. Они жёлтые в списке.&#x0a;&#x0a;Включено — автоподбор их не берёт, а в ленте и при сортировке по задержке они идут после стабильных. Выключено — только по задержке, как все.&#x0a;&#x0a;Выбрать нестабильный руками можно всегда. Автоподбор меняется при следующем запуске движков." />
+                                    </StackPanel>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                        <ToggleButton x:Name="KillSwitchToggle" Style="{StaticResource Switch}"
+                                                      VerticalAlignment="Center" Click="OnKillSwitch" />
+                                        <TextBlock Text="Kill switch" Margin="10,0,0,0" VerticalAlignment="Center" />
+                                        <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
+                                                        Content="Только для режима «Туннель». Пока туннель не работает — упал, перезапускается или ждёт сервера, — трафик мимо него с вашего адреса не уходит вовсе: выходить в сеть мимо туннеля могут лишь сам движок, Zephyron и локальная сеть (роутер, принтеры).&#x0a;&#x0a;Фильтры Windows держит надзор: остановили движки или закрыли программу — Windows снимает их сама, сеть не остаётся закрытой.&#x0a;&#x0a;По умолчанию выключен. Применяется при следующем запуске движков." />
                                     </StackPanel>
                                 </WrapPanel>
                             </StackPanel>

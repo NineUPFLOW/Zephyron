@@ -437,6 +437,37 @@
                             <ComboBoxItem Content="10 секунд (по умолчанию)" Tag="10" />
                         </ComboBox>
                     </Grid>
+
+                    <Border Style="{StaticResource RowLine}" Margin="0,12,0,12" />
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Style="{StaticResource RowTile}" VerticalAlignment="Top">
+                            <TextBlock Style="{StaticResource RowGlyph}" Text="&#xE753;" />
+                        </Border>
+
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="Свой воркер Cloudflare" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,8" TextWrapping="Wrap"
+                                       Text="Общие домены Cloudflare упираются в лимиты и отвечают 503 — Telegram подключается через раз. Свой воркер прокси пробует раньше них. Создать: dash.cloudflare.com → Workers → Create → вставить код кнопкой ниже → Deploy, затем вписать сюда адрес вида имя.workers.dev." />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="WorkerBox" VerticalAlignment="Center"
+                                         ToolTip="Адрес воркера, например tg.имя.workers.dev; пусто — без воркера" />
+                                <Button Grid.Column="1" Content="Сохранить" Margin="8,0,0,0" Click="OnWorker" />
+                                <Button Grid.Column="2" Content="Скопировать код" Margin="8,0,0,0" Click="OnWorkerCode"
+                                        ToolTip="Код воркера — в буфер обмена" />
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
                 </StackPanel>
             </Border>
                 </views:FitWidth>

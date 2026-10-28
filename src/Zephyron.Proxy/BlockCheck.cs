@@ -281,6 +281,12 @@ public sealed record ProbeOutcome
     /// </remarks>
     public IReadOnlyList<string> Assets { get; init; } = [];
 
+    /// <summary>Сайт объявил HTTP/3 (<c>Alt-Svc: h3</c>) — браузер пойдёт к нему по QUIC.</summary>
+    public bool Http3 { get; init; }
+
+    /// <summary>QUIC у сайта с HTTP/3 не ответил, хотя TCP открыт; <c>null</c> — не проверяли.</summary>
+    public bool? QuicSilent { get; init; }
+
     public string Describe() => Ok
         ? "ок"
         : Reset ? "RST"
@@ -289,6 +295,19 @@ public sealed record ProbeOutcome
 }
 
 /// <summary>Что выяснилось про одну цель.</summary>
+/// <summary>Чем режут закрытое рукопожатие.</summary>
+public enum CutBy
+{
+    /// <summary>С чужим именем адрес отвечает — режут имя, поможет десинк.</summary>
+    Name,
+
+    /// <summary>Не отвечает ни с каким именем — режут адрес: нужен другой адрес или VPN.</summary>
+    Address,
+
+    /// <summary>Отвечает только с разрешённым именем — белый список: нужен рецепт с подделкой разрешённого имени.</summary>
+    Whitelist,
+}
+
 public sealed record TargetReport
 {
     public required string Host { get; init; }
@@ -403,6 +422,9 @@ public sealed record TargetReport
     /// имя откроется, хотя проба с настоящим именем закрыта.
     /// </summary>
     public bool EchHelloAccepted { get; init; }
+
+    /// <summary>Чем режут закрытое рукопожатие — проба тем же адресом с другим именем; <c>null</c> — не пробовали.</summary>
+    public CutBy? Cut { get; init; }
 
     /// <summary>
     /// Ячейка рукопожатия: версия при успехе, причина отказа при неудаче.
@@ -896,6 +918,26 @@ public static class BlockCheck
         // объявлять хост закрытым — значит назвать чужой отказ своим.
         var real = addresses.Where(a => a.AddressFamily == AddressFamily.InterNetwork).ToList();
 
+        // Только домашние адреса (10/8, 172.16/12, 192.168/16) — сайта у имени
+        // нет: голая зона, у которой сайты на поддоменах. Это «нет адреса»,
+        // а не провал туннеля с советом сменить сервер.
+        if (real.Count > 0 && !real.Any(IsStub) && real.All(IsHome))
+        {
+            return new TargetReport
+            {
+                Host = host,
+                Service = service,
+                Tcp = Failed($"у имени только домашний адрес {real[0]}"),
+                Tls = Failed(null),
+                Http = Failed(null),
+                Data = Failed(null),
+                Kind = BlockKind.NoAddress,
+                Addresses = real.Select(a => a.ToString()).Take(3).ToList(),
+                Tunnelled = false,
+                ExpectedTunnel = throughTunnel,
+            };
+        }
+
         if (real.All(IsStub))
         {
             return new TargetReport
@@ -1095,6 +1137,27 @@ public static class BlockCheck
                 echAccepted = (await BrowserHello.AskAsync(answered, echName, Timeout, cancellationToken)).Answer == HelloAnswer.Accepted;
         }
 
+        CutBy? cut = !viaTunnel && kind == BlockKind.TlsDpi && answered is not null
+            ? await CutAsync(answered, cancellationToken)
+            : null;
+
+        if (cut is { } by)
+            data = data with { Detail = (data.Detail is { Length: > 0 } said ? said + "; " : string.Empty) + CutText(by) };
+
+        // Открыт по TCP, но объявил HTTP/3: браузер пойдёт по QUIC, и если тот
+        // молчит — страница подвисает, хотя проба по TCP её получила.
+        if (!viaTunnel && kind == BlockKind.None && data.Http3 && answered is not null)
+        {
+            bool silent = !await QuicAnswersAsync(answered, cancellationToken);
+            data = data with
+            {
+                QuicSilent = silent,
+                Detail = silent ? (data.Detail is { Length: > 0 } d ? d + "; " : string.Empty)
+                    + "QUIC молчит, а TCP работает — браузер ждёт HTTP/3 и подвисает; поможет десинк QUIC или выключить QUIC в браузере"
+                    : data.Detail,
+            };
+        }
+
         return new TargetReport
         {
             Host = host,
@@ -1107,6 +1170,7 @@ public static class BlockCheck
             Kind = kind,
             EchName = echName,
             EchHelloAccepted = echAccepted,
+            Cut = cut,
 
             // Через туннель вердикт о подмене не выносится, и это важно.
             // Проксируемому имени движок выдаёт fakeip из 198.18.0.0/15,
@@ -1121,6 +1185,40 @@ public static class BlockCheck
             ExpectedTunnel = throughTunnel,
         };
     }
+
+    /// <summary>Нейтральное имя — его не режут ни по какому списку; разрешённое — из тех, что пускает белый список.</summary>
+    private static readonly string[] NeutralNames = ["example.com", "www.iana.org"];
+    private const string AllowedName = "ya.ru";
+
+    /// <summary>
+    /// Чем режут: тот же адрес, то же приветствие браузера, другое имя.
+    /// </summary>
+    /// <remarks>
+    /// Дошло — значит сторона жива, ответ (даже отказ словами: имя не её)
+    /// пришёл обратно. Молчание у одного нейтрального имени — ещё не приговор:
+    /// переспрашивается второе, прежде чем звать это белым списком или адресом.
+    /// </remarks>
+    private static async Task<CutBy> CutAsync(IPAddress address, CancellationToken cancellationToken)
+    {
+        static bool Reached(HelloAnswer answer) => answer is HelloAnswer.Accepted or HelloAnswer.Refused;
+
+        foreach (var name in NeutralNames)
+        {
+            if (Reached((await BrowserHello.AskAsync(address, name, Timeout, cancellationToken)).Answer))
+                return CutBy.Name;
+        }
+
+        return Reached((await BrowserHello.AskAsync(address, AllowedName, Timeout, cancellationToken)).Answer)
+            ? CutBy.Whitelist
+            : CutBy.Address;
+    }
+
+    public static string CutText(CutBy cut) => cut switch
+    {
+        CutBy.Name => "с чужим именем адрес отвечает — режут имя, поможет десинк",
+        CutBy.Address => "адрес молчит с любым именем — режут адрес: нужен другой адрес или VPN",
+        _ => "пропускают только разрешённое имя — белый список: нужен рецепт с подделкой разрешённого имени",
+    };
 
     /// <summary>
     /// Сверяет чужой сертификат с тем, что даёт честный адрес.
@@ -1399,6 +1497,58 @@ public static class BlockCheck
     /// никуда не ведёт.
     /// </remarks>
     internal static bool IsStub(IPAddress address) => DnsSpoof.IsSinkhole(address);
+
+    /// <summary>
+    /// Отвечает ли адрес по QUIC: пакет Initial с версией-пустышкой, на который
+    /// всякий сервер QUIC обязан ответить списком своих версий (RFC 9000, 6).
+    /// </summary>
+    /// <remarks>
+    /// Рукопожатия не нужно: ответ на неизвестную версию приходит до всякой
+    /// криптографии, а провайдер, режущий QUIC, режет и его.
+    /// </remarks>
+    internal static async Task<bool> QuicAnswersAsync(IPAddress address, CancellationToken cancellationToken)
+    {
+        // Длинный заголовок, версия 0x?a?a?a?a — зарезервирована под проверку согласования.
+        var packet = new byte[1200];
+        packet[0] = 0xC0;
+        packet[1] = 0x1A; packet[2] = 0x2A; packet[3] = 0x3A; packet[4] = 0x4A;
+        packet[5] = 8;
+        System.Security.Cryptography.RandomNumberGenerator.Fill(packet.AsSpan(6, 8));
+        packet[14] = 8;
+        System.Security.Cryptography.RandomNumberGenerator.Fill(packet.AsSpan(15, 8));
+
+        using var udp = new UdpClient(AddressFamily.InterNetwork);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(Timeout);
+
+        try
+        {
+            for (int attempt = 0; attempt < 2; attempt++)
+                await udp.SendAsync(packet, new IPEndPoint(address, 443), timeout.Token);
+
+            var reply = await udp.ReceiveAsync(timeout.Token);
+
+            // Согласование версий: длинный заголовок и версия 0.
+            return reply.Buffer is [_, 0, 0, 0, 0, ..] && (reply.Buffer[0] & 0x80) != 0;
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or SocketException)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return false;
+        }
+    }
+
+    private static readonly string[] RegionWords =
+    [
+        "country", "region", "your location", "not available in", "unavailable in", "sanction",
+        "стран", "регион",
+    ];
+
+    /// <summary>Страница отказа называет страну или регион.</summary>
+    internal static bool NamesRegion(string page) =>
+        RegionWords.Any(w => page.Contains(w, StringComparison.OrdinalIgnoreCase));
+
+    internal static bool IsHome(IPAddress address) => address.GetAddressBytes() is [10, ..] or [192, 168, ..] or [172, >= 16 and <= 31, ..];
 
     private static ProbeOutcome Failed(string? detail) => new()
     {
@@ -1943,6 +2093,7 @@ public static class BlockCheck
             long? promised = null;
             bool challenged = false;
             bool regionRefusal = false;
+            bool h3 = false;
             bool chunked = false;
             string? moved = null;
             string? contentEncoding = null;
@@ -2018,6 +2169,7 @@ public static class BlockCheck
                     chunked = HeaderValue(buffer, read, "Transfer-Encoding")?
                         .Contains("chunked", StringComparison.OrdinalIgnoreCase) == true;
                     contentEncoding = HeaderValue(buffer, read, "Content-Encoding");
+                    h3 = HeaderValue(buffer, read, "Alt-Svc")?.Contains("h3", StringComparison.OrdinalIgnoreCase) == true;
 
                     if (status is >= 300 and < 400 && !regionRefusal)
                         moved = SameSiteRedirect(host, HeaderValue(buffer, read, "Location"));
@@ -2079,6 +2231,17 @@ public static class BlockCheck
             // «отказывает по стране», пока ChatGPT в браузере работал.
             bool refused = status is 403 or 451 && !challenged || regionRefusal;
 
+            // Отказ по стране — только когда сайт сам называет страну или регион.
+            // Голый 403 бывает чем угодно (антибот, закрытый путь), и звать его
+            // «отказывает по стране» значило слать человека в VPN без причины.
+            bool unnamed = refused && !regionRefusal && status == 403
+                && !(kept is not null && header > 0
+                    && PageAssets.Decode(kept.ToArray()[header..], chunked, contentEncoding) is { } refusalPage
+                    && NamesRegion(refusalPage));
+
+            if (unnamed)
+                refused = false;
+
             // Маленькая страница, пришедшая целиком, заморозки показать
             // не могла — в разметке ищутся скрипты и стили той же зоны,
             // и проба докачает их отдельно (WeighAssetsAsync).
@@ -2097,12 +2260,15 @@ public static class BlockCheck
                 Elapsed = stopwatch.Elapsed,
                 Detail = refused
                     ? $"сайт ответил {status} — связь исправна, отказывает он сам"
+                    : unnamed
+                        ? "сайт ответил 403 и причину не назвал — связь исправна, проверьте в браузере"
                     : challenged
                         ? "Cloudflare проверяет на робота — связь исправна, браузер проверку пройдёт"
                         : promised is { } size ? $"{total} из {size} Б" : $"{total} Б",
                 Received = total,
                 Moved = moved,
                 Assets = assets,
+                Http3 = h3,
             };
         }
         catch (Exception ex)
