@@ -104,6 +104,14 @@ public partial class ThemeEditorWindow : Window
     public ThemeEditorWindow(Theme from, string? editing)
     {
         InitializeComponent();
+        PreviewLanes.Show(HomeState.Running, HomeState.Running, HomeState.Running);
+
+        // Владелец (Owner) известен только после конструктора — мерить «Главную» при показе.
+        Loaded += (_, _) =>
+        {
+            MeasurePage();
+            ShowMini();
+        };
 
         _from = from;
         _editing = editing;
@@ -268,17 +276,59 @@ public partial class ThemeEditorWindow : Window
         }
     }
 
-    /// <summary>Доля страницы «Главной», занятая колонкой арта, — у окна владельца 300 из 1240.</summary>
-    private const double MiniColumn = 300.0 / 1240;
+    /// <summary>
+    /// Область «Главной» в точках — у открытого окна программы (MainWindow.Section),
+    /// чтобы миниатюра была её уменьшенной копией, а не схемой; нет окна — 1240 × 793.
+    /// </summary>
+    private (double Width, double Height) _page = (1240, 793);
 
-    /// <summary>Где карточки «Главной» — доли страницы: слева до колонки, рядами.</summary>
-    private static readonly (double X, double Y, double W, double H)[] MiniCardsAt =
-    [
-        (0.03, 0.10, 0.70, 0.16),
-        (0.03, 0.30, 0.345, 0.20), (0.385, 0.30, 0.345, 0.20),
-        (0.03, 0.55, 0.70, 0.17),
-        (0.03, 0.76, 0.345, 0.15), (0.385, 0.76, 0.345, 0.15),
-    ];
+    /// <summary>
+    /// Карточки «Главной» в точках экрана, сняты с живой «Главной» 28.10: ряды «две колонки
+    /// 1.75 : 1» (плашка | компоненты, режим | события, пресет | подключение, автозапуск |
+    /// обновление), «Сеть» во всю ширину и три кнопки. Отступы — как в StatusView: поля
+    /// 24 × 20, между карточками 12, между кнопками 8, страница до ContentMax по центру.
+    /// </summary>
+    private static readonly (double Height, int Cells)[] MiniRows =
+        [(248, 2), (185, 2), (134, 2), (90, 2), (104, 1), (37, 3)];
+
+    private const double MiniGap = 12, MiniPad = 24, MiniTop = 20;
+
+    /// <summary>Меряет «Главную» у главного окна и подгоняет высоту миниатюры под её пропорции.</summary>
+    private void MeasurePage()
+    {
+        if (Owner?.FindName("Section") is FrameworkElement { ActualWidth: > 200, ActualHeight: > 200 } section)
+            _page = (section.ActualWidth, section.ActualHeight);
+
+        HomeMini.Height = Math.Round(HomeMini.Width * _page.Height / _page.Width);
+    }
+
+    /// <summary>Где карточки на миниатюре: тем же раскладом, что StatusView.ShowWidth.</summary>
+    private IEnumerable<Rect> MiniCardsAt()
+    {
+        double scale = HomeMini.Width / _page.Width;
+        double page = Math.Min((double)FindResource("ContentMax"), _page.Width - 2 * MiniPad);
+        double left = (_page.Width - page) / 2;
+        double y = MiniTop;
+
+        foreach (var (height, cells) in MiniRows)
+        {
+            double[] widths = cells switch
+            {
+                2 => [(page - MiniGap) * 1.75 / 2.75, (page - MiniGap) / 2.75],
+                3 => [(page - 16) / 3, (page - 16) / 3, (page - 16) / 3],
+                _ => [page],
+            };
+            double x = left;
+
+            foreach (var w in widths)
+            {
+                yield return new Rect(x * scale, y * scale, w * scale, height * scale);
+                x += w + (cells == 3 ? 8 : MiniGap);
+            }
+
+            y += height + MiniGap;
+        }
+    }
 
     private double MiniAspect => _poster is { PixelWidth: > 0, PixelHeight: > 0 } p ? (double)p.PixelWidth / p.PixelHeight : 1;
 
@@ -289,7 +339,8 @@ public partial class ThemeEditorWindow : Window
 
         var (left, top, w, h) = _placed
             ? SideArtLayout.Place(width, height, MiniAspect, _homeX, _homeY, _homeSize)
-            : SideArtLayout.Fit(width, height, width * (1 - MiniColumn / 2), MiniAspect);
+            // «Как было» — фон окна, как на прочих вкладках: по центру, заполнением.
+            : SideArtLayout.Fit(width, height, width / 2, MiniAspect);
 
         return new Rect(left, top, w, h);
     }
@@ -324,41 +375,33 @@ public partial class ThemeEditorWindow : Window
         };
         MiniArt.OpacityMask = _placed ? HomePlacement.Feather(place) : null;
 
-        // Затемнение, как у «Главной»: плотное под карточками, лёгкое в колонке.
+        // Затемнение — как StatusView.Shade без колонки: сплошное, в силу «Затемнения» темы.
         double dim = Dims[Math.Max(0, DimChoice.SelectedIndex)];
-        MiniShade.Fill = new LinearGradientBrush
-        {
-            StartPoint = new Point(0, 0),
-            EndPoint = new Point(1, 0),
-            GradientStops =
-            {
-                new GradientStop(System.Windows.Media.Color.FromArgb((byte)(dim * 255), backdrop.R, backdrop.G, backdrop.B), 1 - MiniColumn - 0.1),
-                new GradientStop(System.Windows.Media.Color.FromArgb(30, backdrop.R, backdrop.G, backdrop.B), 1 - MiniColumn * 0.3),
-            },
-        };
+        MiniShade.Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(
+            (byte)Math.Round(dim * 255), backdrop.R, backdrop.G, backdrop.B));
 
         var surface = Draft()[ThemeSlots.Surface];
         var line = _colors[ThemeSlots.Border];
         var card = new SolidColorBrush(System.Windows.Media.Color.FromArgb(surface.A, surface.R, surface.G, surface.B));
-        var edge = new SolidColorBrush(System.Windows.Media.Color.FromRgb(line.R, line.G, line.B));
+        var outline = new SolidColorBrush(System.Windows.Media.Color.FromRgb(line.R, line.G, line.B));
 
         MiniCards.Children.Clear();
 
-        foreach (var (x, y, w, h) in MiniCardsAt)
+        foreach (var at in MiniCardsAt())
         {
             var shape = new System.Windows.Shapes.Rectangle
             {
-                Width = w * HomeMini.Width,
-                Height = h * HomeMini.Height,
-                RadiusX = 5,
-                RadiusY = 5,
+                Width = at.Width,
+                Height = at.Height,
+                RadiusX = 4,
+                RadiusY = 4,
                 Fill = card,
-                Stroke = edge,
+                Stroke = outline,
                 StrokeThickness = 1,
             };
 
-            Canvas.SetLeft(shape, x * HomeMini.Width);
-            Canvas.SetTop(shape, y * HomeMini.Height);
+            Canvas.SetLeft(shape, at.Left);
+            Canvas.SetTop(shape, at.Top);
             MiniCards.Children.Add(shape);
         }
     }

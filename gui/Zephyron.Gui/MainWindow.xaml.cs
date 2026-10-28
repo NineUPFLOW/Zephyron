@@ -23,6 +23,10 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+        // Горячие клавиши разделов (OnPreviewKeyDown) — в подсказке пункта, иначе о них не узнать.
+        foreach (var item in Items().Where(i => Array.IndexOf(Numbered, i.Tag as string) >= 0))
+            item.ToolTip = $"{item.Content} · Ctrl+{Array.IndexOf(Numbered, (string)item.Tag) + 1}";
+
         // Стекло карточек берёт кусок размытого фона по месту в этой сетке:
         // на ней лежит сам фон, и координаты у них общие.
         Glass.Root = Root;
@@ -562,6 +566,44 @@ public partial class MainWindow : Window
                 return;
             }
         }
+    }
+
+    /// <summary>Разделы по Ctrl+1…5 — в порядке верхнего меню.</summary>
+    private static readonly string[] Numbered = ["status", "vpn", "desync", "routes", "tgproxy"];
+
+    /// <summary>
+    /// Горячие клавиши: Ctrl+1…5 — разделы, Ctrl+Enter — запустить или остановить,
+    /// F5 — проверить снова (на «Проверке блокировок»), Ctrl+F — поиск раздела.
+    /// </summary>
+    /// <remarks>
+    /// Окном целиком, в Preview: поле ввода в фокусе иначе съело бы Ctrl+цифру.
+    /// Своих команд у окна нет — клавиши зовут то же, что кнопки.
+    /// </remarks>
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
+    {
+        base.OnPreviewKeyDown(e);
+
+        bool ctrl = Keyboard.Modifiers == ModifierKeys.Control;
+        var page = (RoutesHost.Visibility == Visibility.Visible ? RoutesHost.Content : Section.Content) as FrameworkElement;
+
+        if (ctrl && e.Key is >= Key.D1 and <= Key.D5)
+            Open(Numbered[e.Key - Key.D1]);
+        else if (ctrl && e.Key == Key.Enter)
+        {
+            Open("status");
+            Dispatcher.InvokeAsync(() => (Section.Content as StatusView)?.Toggle(), DispatcherPriority.Loaded);
+        }
+        else if (e.Key == Key.F5 && Keyboard.Modifiers == ModifierKeys.None && page is CheckView check)
+            check.Rerun();
+        else if (ctrl && e.Key == Key.F && page?.FindName("Search") is TextBox search)
+        {
+            search.Focus();
+            search.SelectAll();
+        }
+        else
+            return;
+
+        e.Handled = true;
     }
 
     /// <summary>Все пункты боковой панели: разделы на каждый день и инструменты.</summary>

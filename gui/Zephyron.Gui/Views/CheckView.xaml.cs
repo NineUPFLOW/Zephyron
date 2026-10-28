@@ -47,10 +47,25 @@ public sealed record CheckRow(
     /// TLS» и оказалось среди дел: браузер умеет больше версий, чем наша
     /// проба, и человеку там делать нечего.
     /// </remarks>
-    bool Actionable);
+    bool Actionable,
+
+    /// <summary>Кнопка «Починить» (SiteFixer) — у строк, по которым есть что делать.</summary>
+    Visibility FixShown = Visibility.Collapsed,
+
+    /// <summary>Чем кончилась починка из этой строки; пусто — не чинили.</summary>
+    string FixNote = "")
+{
+    public Visibility FixNoteShown => FixNote.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>Пока строка чинится, кнопка не нажимается второй раз.</summary>
+    public bool FixIdle { get; init; } = true;
+}
 
 /// <summary>Раздел итога под таблицей.</summary>
 public sealed record SectionRow(string Title, string Body, Brush Color);
+
+/// <summary>Вид вердикта над списком: сколько таких и выбран ли он фильтром (рамка его цвета).</summary>
+public sealed record SummaryChip(string Title, int Count, Brush Color, Brush? Edge);
 
 /// <summary>
 /// Проверка блокировок: что закрыто и чем лечится.
@@ -196,14 +211,142 @@ public partial class CheckView : UserControl
         e.Handled = true;
     }
 
+    /// <summary>
+    /// «Починить» из строки — автоподбор на это имя (AutoPickWindow), затем перепроверка.
+    /// </summary>
+    /// <remarks>
+    /// Владелец 28.10: «VPN мы экономим». Подбор идёт от дешёвого к дорогому — напрямую,
+    /// десинк пресета, каждый рецепт, пин в hosts — и только если не помогло ничего, VPN
+    /// (AutoPick.Best); VPN-проба для имени, открывшегося раньше, не делается вовсе.
+    /// Прежде здесь стоял SiteFixer: как есть → напрямую → сразу VPN, без рецептов и пина.
+    /// Окно само останавливает движки на замер, пишет с журналом и поднимает их обратно.
+    /// </remarks>
+    private async void OnFixRow(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not CheckRow row)
+            return;
+
+        void Put(CheckRow next)
+        {
+            int at = Collected.ToList().FindIndex(r => r.Host == row.Host);
+
+            if (at >= 0)
+                Collected[at] = next;
+        }
+
+        var picker = new AutoPickWindow { Owner = Window.GetWindow(this) };
+        picker.PickOnOpen(row.Host);
+        picker.ShowDialog();
+
+        Put(row with { FixNote = "Перепроверяю после подбора…", FixIdle = false });
+
+        try
+        {
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
+            var (engine, _) = RuleSetExpander.LoadFor(settings);
+            bool tunnelled = EngineControl.IsRunning && settings.NeedsProxy && Proxied(engine, row.Host);
+
+            var report = await BlockCheck.CheckAsync(row.Host, null, CancellationToken.None, tunnelled);
+            int at = _reports.FindIndex(r => r.Host == row.Host);
+
+            if (at >= 0)
+                _reports[at] = report;
+
+            Put(Row(report, tunnelled, DesyncBypass.None) with
+            {
+                FixNote = $"После подбора: {report.Describe()}"
+                    + (EngineControl.IsRunning ? string.Empty : " (движки остановлены — видно сеть без обхода)"),
+            });
+        }
+        catch (Exception ex)
+        {
+            Put(row with { FixNote = "Перепроверить не вышло: " + ex.GetBaseException().Message });
+        }
+    }
+
+    /// <summary>Выбранный над списком вердикт; <c>null</c> — все.</summary>
+    private static string? _verdict;
+
+    /// <summary>«Только проблемы»: прячет строки, по которым делать нечего.</summary>
+    private static bool _onlyProblems;
+
+    private static bool Shown(CheckRow row) =>
+        (_verdict is null || row.Verdict == _verdict)
+        && (!_onlyProblems || row.Actionable || row.BypassShown == Visibility.Visible);
+
+    private void OnRowsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) => ShowSummary();
+
+    /// <summary>Итог над списком: виды по убыванию, выбранный — в рамке своего цвета.</summary>
+    private void ShowSummary()
+    {
+        FilterBar.Visibility = Collected.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        Summary.ItemsSource = Collected
+            .GroupBy(r => r.Verdict)
+            .OrderByDescending(g => g.First().Actionable)
+            .ThenByDescending(g => g.Count())
+            .Select(g => new SummaryChip(g.Key, g.Count(), g.First().Color, g.Key == _verdict ? g.First().Color : null))
+            .ToList();
+    }
+
+    private void OnSummary(object sender, RoutedEventArgs e)
+    {
+        var chosen = (sender as FrameworkElement)?.Tag as string;
+
+        _verdict = chosen == _verdict ? null : chosen;
+        System.Windows.Data.CollectionViewSource.GetDefaultView(Collected).Refresh();
+        ShowSummary();
+    }
+
+    private void OnOnlyProblems(object sender, RoutedEventArgs e)
+    {
+        _onlyProblems = OnlyProblems.IsChecked == true;
+        System.Windows.Data.CollectionViewSource.GetDefaultView(Collected).Refresh();
+    }
+
+    private static System.Diagnostics.Stopwatch _stepClock = new();
+    private static double _barValue = -1;
+
+    /// <summary>
+    /// Ход: «что — N из M · осталось ~T» и полоска. Оценка — по среднему на одно
+    /// имя с начала этого шага; до трёх готовых не называется: врала бы втрое.
+    /// </summary>
+    private void Step(string what, int done, int total)
+    {
+        if (done == 0)
+            _stepClock.Restart();
+
+        string left = string.Empty;
+
+        if (done >= 3 && done < total)
+        {
+            var rest = TimeSpan.FromTicks(_stepClock.Elapsed.Ticks / done * (total - done));
+            left = rest.TotalSeconds < 60 ? $" · осталось ~{Math.Max(1, (int)rest.TotalSeconds)} с" : $" · осталось ~{(int)Math.Ceiling(rest.TotalMinutes)} мин";
+        }
+
+        _barValue = total == 0 ? -1 : (double)done / total;
+        View.Bar.Value = Math.Max(0, _barValue);
+        View.Bar.Visibility = Visibility.Visible;
+        Say($"{what} {done} из {total}{left}…");
+    }
+
+    private void HideBar()
+    {
+        _barValue = -1;
+        View.Bar.Visibility = Visibility.Collapsed;
+    }
+
     public CheckView()
     {
         InitializeComponent();
 
         Rows.ItemsSource = Collected;
+        System.Windows.Data.CollectionViewSource.GetDefaultView(Collected).Filter = o => o is CheckRow row && Shown(row);
+        OnlyProblems.IsChecked = _onlyProblems;
 
         Unloaded += (_, _) =>
         {
+            Collected.CollectionChanged -= OnRowsChanged;
+
             if (_shown == this)
                 _shown = null;
         };
@@ -211,6 +354,13 @@ public partial class CheckView : UserControl
         Loaded += (_, _) =>
         {
             _shown = this;
+
+            // Строки общие и живут дольше раздела — подписка только пока он на экране.
+            Collected.CollectionChanged -= OnRowsChanged;
+            Collected.CollectionChanged += OnRowsChanged;
+            ShowSummary();
+            Bar.Value = Math.Max(0, _barValue);
+            Bar.Visibility = _running && _barValue >= 0 ? Visibility.Visible : Visibility.Collapsed;
 
             ShowSetup(Collected.Count > 0 ? _measuredWithEngines : null);
             ShowScopes();
@@ -346,6 +496,13 @@ public partial class CheckView : UserControl
         return running;
     }
 
+    /// <summary>F5: проверить снова, если проверка не идёт.</summary>
+    internal void Rerun()
+    {
+        if (RunButton.IsEnabled)
+            OnRun(RunButton, new RoutedEventArgs());
+    }
+
     private async void OnRun(object sender, RoutedEventArgs e)
     {
         bool running = ShowSetup();
@@ -431,10 +588,12 @@ public partial class CheckView : UserControl
             // надо раньше, чем они появятся на экране.
             await ReadSetupAsync(settings, running, _work.Token);
 
+            _stepClock.Restart();
             await RunAsync(targets, engine, running && settings.NeedsProxy, _work.Token);
             await ReprobeAloneAsync(engine, running && settings.NeedsProxy, _work.Token);
 
             await Summarise(engine);
+            AddHistory(running);
         }
         catch (OperationCanceledException)
         {
@@ -452,6 +611,7 @@ public partial class CheckView : UserControl
             // возврате на вкладку, восстанавливал по нему состояние кнопок:
             // проверка давно закончилась, а «Проверить» больше не нажималась.
             _running = false;
+            HideBar();
 
             View.RunButton.IsEnabled = true;
             View.StopButton.IsEnabled = false;
@@ -510,6 +670,51 @@ public partial class CheckView : UserControl
         TotalsItems.ItemsSource = _totalsItems;
         TotalsNote.Text = _totalsNote;
         TotalsNote.Visibility = _totalsNote.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// «С прошлой проверки»: чей вердикт сменился против последнего сохранённого
+    /// отчёта (BlockCheckHistory). Зовётся до записи нового — иначе сравнил бы с собой.
+    /// </summary>
+    private void AddHistory(bool enginesRunning)
+    {
+        try
+        {
+            var last = new DirectoryInfo("reports").GetFiles("blockcheck-*.txt")
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .FirstOrDefault();
+
+            if (last is null)
+                return;
+
+            var (engines, was) = BlockCheckHistory.Parse(File.ReadAllText(last.FullName));
+            var changes = BlockCheckHistory.Compare(was, Collected.Select(r => (r.Host, r.Verdict)));
+
+            string when = last.LastWriteTime.ToString("dd.MM HH:mm");
+            string body = changes.Count == 0
+                ? "Ни одно имя, проверенное оба раза, вердикта не сменило."
+                : string.Join("\n", changes.Select(c => $"{c.Host}: было «{c.Was}», стало «{c.Now}»"));
+
+            // Движки в прошлый раз стояли иначе — разница может быть от обхода, а не от сети.
+            if (engines is { } before && before != enginesRunning)
+                body += before ? "\nВ прошлый раз движки работали, сейчас — нет." : "\nВ прошлый раз движки были остановлены, сейчас работают.";
+
+            var row = new SectionRow($"С прошлой проверки ({when}): изменилось {changes.Count}", body,
+                (Brush)FindResource(changes.Count == 0 ? "Muted" : "Accent"));
+
+            // В тот же список, что держит Summarise: его дозаписи (туннель и пр.) приходят
+            // позже и ставят этот список заново — копия потеряла бы строку.
+            if (_sections is not List<SectionRow> sections)
+                _sections = sections = _sections.ToList();
+
+            sections.Insert(0, row);
+            View.Sections.ItemsSource = null;
+            View.Sections.ItemsSource = sections;
+        }
+        catch (Exception)
+        {
+            // Нет папки или старый отчёт не читается — сравнивать не с чем.
+        }
     }
 
     /// <summary>Сколько отчётов держать. То же число, что у консоли.</summary>
@@ -918,7 +1123,7 @@ public partial class CheckView : UserControl
                     if (report.Kind == BlockKind.NoAddress && !OwnLists.IsOwnTarget(target.Service))
                     {
                         _markers.Add(report.Host);
-                        Say($"Проверено {Collected.Count} из {targets.Count}…");
+                        Step("Проверено", Collected.Count + _markers.Count, targets.Count);
 
                         return;
                     }
@@ -926,7 +1131,7 @@ public partial class CheckView : UserControl
                     _reports.Add(report);
 
                     Collected.Add(Row(report, tunnelled, HostsFile.BypassFor(bypassed, target.Host, holes)));
-                    Say($"Проверено {Collected.Count} из {targets.Count}…");
+                    Step("Проверено", Collected.Count + _markers.Count, targets.Count);
                 });
             }
             finally
@@ -976,14 +1181,15 @@ public partial class CheckView : UserControl
         if (suspect.Count == 0)
             return;
 
-        Say($"Перепроверяю в тишине: {suspect.Count}…");
-
         var budget = System.Diagnostics.Stopwatch.StartNew();
+        int done = 0;
 
         foreach (var crowded in suspect)
         {
             if (cancellationToken.IsCancellationRequested || budget.Elapsed > TimeSpan.FromSeconds(90))
                 break;
+
+            Step("Перепроверяю в тишине:", done++, suspect.Count);
 
             bool tunnelled = tunnelInUse && engine is not null && Proxied(engine, crowded.Host);
 
@@ -1110,6 +1316,11 @@ public partial class CheckView : UserControl
                 + (note.Length == 0 ? string.Empty : "; " + note);
         }
 
+        // Молчащий QUIC маршрутом не чинится (SiteFixer скажет «открывается как есть») —
+        // поэтому сразу как: выключить HTTP/3 в браузере, и браузер пойдёт по TCP.
+        if (report.Data.QuicSilent == true)
+            note = QuicOff;
+
         return new CheckRow(
             report.Host,
 
@@ -1127,8 +1338,13 @@ public partial class CheckView : UserControl
             (report.Actionable || report.Data.QuicSilent == true) && why is not null ? Visibility.Visible : Visibility.Collapsed,
             note,
             note.Length == 0 ? Visibility.Collapsed : Visibility.Visible,
-            report.Actionable);
+            report.Actionable,
+            report.Actionable ? Visibility.Visible : Visibility.Collapsed);
     }
+
+    private const string QuicOff =
+        "Выключить QUIC: Chrome и Edge — chrome://flags/#enable-quic → Disabled; "
+        + "Firefox — about:config, network.http.http3.enable → false. Или десинк QUIC для этого имени.";
 
     /// <summary>Строка с пометкой про путь и про десинк — для сохраняемого отчёта.</summary>
     private static string Explain(CheckRow row) => (row.Bypass, row.Why) switch

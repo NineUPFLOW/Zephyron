@@ -1839,6 +1839,15 @@ public partial class StatusView : UserControl
     /// правки маршрутов и переключение режима показывались новыми, а до
     /// туннеля не доходили, пока конфиг не соберут отдельно.
     /// </remarks>
+    /// <summary>Ctrl+Enter: та кнопка, что сейчас на виду, — «Запустить» или «Остановить».</summary>
+    internal void Toggle()
+    {
+        if (StartButton is { IsVisible: true, IsEnabled: true })
+            OnStart(StartButton, new RoutedEventArgs());
+        else if (StopButton is { IsVisible: true, IsEnabled: true })
+            OnStop(StopButton, new RoutedEventArgs());
+    }
+
     private async void OnStart(object sender, RoutedEventArgs e)
     {
         StartButton.IsEnabled = false;
@@ -1907,10 +1916,10 @@ public partial class StatusView : UserControl
         }
         else if (HasSideArt() && TryFindResource(HomePlacement.Key) is HomePlacement)
         {
-            // Колонка под арт — только когда тема сама уложила картинку (background.home):
-            // иначе «Главная» с картинкой в теме съезжала влево (владелец, 25.10) —
-            // встроенные темы с фоном теперь по центру, как все.
-            Layout(column: 940, page: double.PositiveInfinity, art: true);
+            // Уложенная руками картинка — под страницей, а страница по центру, как у всех
+            // (владелец 28.10: «не сбоку, а по центру, как у нас»). Прежде здесь была
+            // колонка 940 слева и арт справа, и миниатюра редактора с ней расходилась.
+            Layout(column: double.PositiveInfinity, page: (double)FindResource("ContentMax"), art: true);
             SetResourceReference(BackgroundProperty, "Backdrop");
 
             // Слой мог прятаться — разложить заново, когда станет известен размер.
@@ -1929,10 +1938,12 @@ public partial class StatusView : UserControl
     /// <summary>Раскладка страницы: предел колонки содержимого, предел самой страницы и колонка под арт.</summary>
     private void Layout(double column, double page, bool art)
     {
+        // Колонки под арт больше нет ни в одном раскладе: страница всегда во всю ширину
+        // своего предела, по центру; арт — слоем под ней.
         ContentColumn.MaxWidth = column;
-        ArtColumn.Width = art ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        ArtColumn.Width = new GridLength(0);
         ArtLayer.Visibility = art ? Visibility.Visible : Visibility.Collapsed;
-        Grid.SetColumnSpan(PageScroller, art ? 1 : 2);
+        Grid.SetColumnSpan(PageScroller, 2);
 
         // Только Stretch: с пределом WPF и так ставит страницу по центру, но во всю
         // ширину предела. Center сжимал её до ширины содержимого, и «Главная»

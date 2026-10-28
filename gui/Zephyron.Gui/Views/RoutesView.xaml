@@ -546,7 +546,7 @@
                                                             выбора: карточки не виртуализированы (OnRouteMenu).
                                                         -->
                                                         <Button Style="{StaticResource RowGhost}" Padding="12,6" MinWidth="122"
-                                                                Click="OnRouteMenu" IsEnabled="{Binding CanRoute}"
+                                                                Click="OnRouteMenu" IsEnabled="{Binding CanRoute}" AutomationProperties.Name="{Binding RouteLabel}"
                                                                 HorizontalContentAlignment="Stretch">
                                                             <Grid>
                                                                 <Grid.ColumnDefinitions>

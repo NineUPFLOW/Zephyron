@@ -52,6 +52,43 @@
                 <TextBlock x:Name="Status" Style="{StaticResource Caption}" Margin="4,18,0,0" TextWrapping="Wrap"
                            Text="Проверка идёт минуты: по каждому имени соединение, и каждое ждёт ответа." />
 
+                <!-- Ход прогона и перепроверки: сколько сделано и сколько примерно осталось (Step). -->
+                <ProgressBar x:Name="Bar" Height="4" Minimum="0" Maximum="1" Margin="4,8,0,0" Visibility="Collapsed"
+                             AutomationProperties.Name="Ход проверки" />
+
+                <!--
+                    Итог по вердиктам — над списком, а не только под ним: щелчок по виду
+                    оставляет в списке только его, «Только проблемы» прячет «доступен».
+                -->
+                <Grid x:Name="FilterBar" Margin="0,14,0,0" Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ItemsControl x:Name="Summary">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Style="{StaticResource Ghost}" Margin="0,0,6,6" Padding="10,3"
+                                        Tag="{Binding Title}" BorderBrush="{Binding Edge}" Click="OnSummary"
+                                        ToolTip="Показать только эти; ещё раз — все"
+                                        AutomationProperties.Name="{Binding Title}">
+                                    <TextBlock><Run Text="{Binding Title, Mode=OneWay}" Foreground="{Binding Color, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding Count, Mode=OneWay}" FontWeight="SemiBold" /></TextBlock>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="12,2,0,0">
+                        <TextBlock Text="Только проблемы" Style="{StaticResource Caption}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <ToggleButton x:Name="OnlyProblems" Style="{StaticResource Switch}" Click="OnOnlyProblems"
+                                      AutomationProperties.Name="Только проблемы" />
+                    </StackPanel>
+                </Grid>
+
                 <!--
                     Расшифровка подписей в карточках. Таблицы в две колонки нет,
                     общей шапки у неё быть не может: каждое значение подписано
@@ -153,6 +190,16 @@
                                                Foreground="{DynamicResource Warn}"
                                                Margin="0,4,0,0" TextWrapping="Wrap"
                                                Visibility="{Binding BypassShown}" />
+
+                                    <!-- Починка из строки — автоподбор на это имя: VPN последним (OnFixRow). -->
+                                    <Button Style="{StaticResource Ghost}" Content="Починить" HorizontalAlignment="Left"
+                                            Margin="0,8,0,0" Padding="12,4" Click="OnFixRow"
+                                            Visibility="{Binding FixShown}" IsEnabled="{Binding FixIdle}"
+                                            ToolTip="Автоподбор для этого имени: напрямую, десинк пресета, рецепты, пин в hosts — и только если не помогло ничего, VPN"
+                                            AutomationProperties.Name="{Binding Host, StringFormat=Починить {0}}" />
+                                    <TextBlock Text="{Binding FixNote}" Style="{StaticResource Caption}"
+                                               Margin="0,6,0,0" TextWrapping="Wrap"
+                                               Visibility="{Binding FixNoteShown}" />
                                 </StackPanel>
                             </Border>
                         </DataTemplate>

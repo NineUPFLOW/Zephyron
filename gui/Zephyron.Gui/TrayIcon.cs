@@ -125,6 +125,10 @@ internal sealed class TrayIcon : IDisposable
 
         _icon.DoubleClick += (_, _) => Show();
 
+        // Сервер отвалился и надзор сам поставил другой — сказать, а не только записать
+        // в журнал: окно в трее, человек в игре, и смену иначе не видно.
+        Zephyron.Supervisor.SingBoxService.ExitReplaced += (title, text) => Notify(title, text, link: null);
+
         _icon.BalloonTipClicked += (_, _) =>
         {
             if (_link is { } link)

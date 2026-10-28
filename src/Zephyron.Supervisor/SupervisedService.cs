@@ -1620,6 +1620,14 @@ public sealed class SingBoxService : SupervisedService
             promise: standIn ? $" Вернём «{exit}», как только ответит дважды подряд." : string.Empty);
     }
 
+    /// <summary>
+    /// Выход сменился сам — прежний молчал (заголовок, текст): для уведомления в трее.
+    /// Журнал пишется и так; без уведомления смену видно, только открыв окно.
+    /// </summary>
+    public static event Action<string, string>? ExitReplaced;
+
+    private static string Capital(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
+
     /// <summary>Примечание, пока вместо закреплённого сервера стоит замена.</summary>
     private string StandInRemark => $"временная замена — выбранный «{_preferredExit}» не отвечал";
 
@@ -1648,9 +1656,15 @@ public sealed class SingBoxService : SupervisedService
                     return;
 
                 if (best is not null && await api.SelectAsync(SelectorGroup, best, CancellationToken.None))
+                {
                     Note($"{why} — поставлен «{best}», первый ответивший при проверке по одному.{promise}");
+                    ExitReplaced?.Invoke("Сервер не отвечает — переключился", $"{Capital(why)}. Теперь «{best}».{promise}");
+                }
                 else if (best is null)
+                {
                     Note($"{why}, и ни один сервер автоподбора не ответил.");
+                    ExitReplaced?.Invoke("Ни один сервер не отвечает", $"{Capital(why)}, и замены не нашлось. Туннель ждёт, пока сервер оживёт.");
+                }
             }
             catch (Exception)
             {

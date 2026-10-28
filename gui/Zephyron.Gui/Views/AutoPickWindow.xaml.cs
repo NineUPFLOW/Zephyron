@@ -780,6 +780,14 @@ public partial class AutoPickWindow : Window
         OnStart(sender, e);
     }
 
+    /// <summary>Подбор одного имени сразу при открытии — «Починить» из проверки блокировок.</summary>
+    public void PickOnOpen(string host) =>
+        Loaded += (_, _) =>
+        {
+            SiteBox.Text = host;
+            OnPickSite(SiteButton, new RoutedEventArgs());
+        };
+
     /// <summary>
     /// Чей это сайт: часть известного сервиса — маршрут пишется ей, иначе своё имя.
     /// </summary>
