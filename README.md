@@ -801,7 +801,7 @@ TUN. Нужна именно extended: обычный sing-box не знает x
 `winws2.exe` новее, чем в установке, кладётся в `tools\` и едет поверх.
 Сейчас это родная сборка без Cygwin —
 [zapret2-fork](https://git.zapret.moe/zapretdiscordyoutube/zapret2-fork/releases)
-от loop-uh, выпуск `v1.0.6-25-g26fb2e8-native`; почему она и как проверять
+от loop-uh, выпуск `v1.0.6-33-gcb4b3d2-native`; почему она и как проверять
 новый выпуск — в [tools/README.md](tools/README.md).
 
 **4. tg-ws-proxy-rs** — для вкладки «TG Proxy». Сборку
