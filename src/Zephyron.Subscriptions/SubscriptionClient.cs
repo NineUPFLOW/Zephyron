@@ -114,7 +114,7 @@ public sealed class SubscriptionClient : IDisposable
                 if (!request.Headers.UserAgent.TryParseAdd(agent))
                     request.Headers.TryAddWithoutValidation("User-Agent", agent);
 
-                response = await _http.SendAsync(request, cancellationToken);
+                response = await SendAsync(request, agent, cancellationToken);
 
                 // Отказ «такого нет» или «не для тебя» — пробуем другое имя;
                 // сбой самой панели (5xx) другим именем не лечится.
@@ -229,9 +229,80 @@ public sealed class SubscriptionClient : IDisposable
         return null;
     }
 
+    private HttpClient? _direct;
+
+    /// <summary>
+    /// Запрос к панели; не ответила — ещё раз мимо туннеля, через физический адаптер.
+    /// </summary>
+    /// <remarks>
+    /// Запрос идёт через туннель, и туннель на устаревшем, уже мёртвом сервере
+    /// не давал подписке обновиться — то есть получить живые серверы.
+    /// Только у своего клиента: чужой (тесты) переспрашивать незачем.
+    /// </remarks>
+    private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, string agent, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _http.SendAsync(request, cancellationToken);
+        }
+        catch (Exception ex) when (_ownsClient && !cancellationToken.IsCancellationRequested
+            && ex is HttpRequestException or TaskCanceledException
+            && Core.PhysicalNetwork.Interface() is { } nic)
+        {
+            _direct ??= Direct(nic);
+
+            using var again = new HttpRequestMessage(HttpMethod.Get, request.RequestUri);
+            if (!again.Headers.UserAgent.TryParseAdd(agent))
+                again.Headers.TryAddWithoutValidation("User-Agent", agent);
+
+            return await _direct.SendAsync(again, cancellationToken);
+        }
+    }
+
+    private static HttpClient Direct(int nic)
+    {
+        var client = new HttpClient(new SocketsHttpHandler
+        {
+            UseProxy = false,
+            ConnectCallback = async (context, cancellationToken) =>
+            {
+                // Подставной адрес движка (198.18.0.0/15) мимо туннеля никуда не ведёт.
+                var address = (await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken))
+                    .FirstOrDefault(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
+                        && !(a.GetAddressBytes() is [198, 18 or 19, ..]))
+                    ?? throw new HttpRequestException("мимо туннеля у имени панели нет адреса");
+
+                var socket = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork,
+                    System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
+
+                try
+                {
+                    // IP_UNICAST_IF = 31; индекс — в сетевом порядке байт.
+                    socket.SetSocketOption(System.Net.Sockets.SocketOptionLevel.IP, (System.Net.Sockets.SocketOptionName)31,
+                        IPAddress.HostToNetworkOrder(nic));
+                    await socket.ConnectAsync(address, context.DnsEndPoint.Port, cancellationToken);
+                    return new System.Net.Sockets.NetworkStream(socket, ownsSocket: true);
+                }
+                catch
+                {
+                    socket.Dispose();
+                    throw;
+                }
+            },
+        })
+        { Timeout = DefaultTimeout };
+
+        foreach (var (name, value) in DeviceIdentity.Headers())
+            client.DefaultRequestHeaders.TryAddWithoutValidation(name, value);
+
+        return client;
+    }
+
     public void Dispose()
     {
         if (_ownsClient)
             _http.Dispose();
+
+        _direct?.Dispose();
     }
 }

@@ -47,8 +47,27 @@ public sealed class SingBoxOptions
     /// настоящими адресами в обход fakeip — то есть выборочный перехват
     /// обходился через IPv6, даже когда с IPv4 всё было верно.
     /// Диапазон взят из документации sing-box.
+    /// Пусто — адаптер без IPv6: если IPv6 выключен в Windows через реестр,
+    /// движок падает на старте («set ipv6 address: Element not found»).
     /// </remarks>
-    public string TunAddressV6 { get; init; } = "fdfe:dcba:9876::1/126";
+    public string TunAddressV6 { get; init; } = Ipv6OffInWindows() ? string.Empty : "fdfe:dcba:9876::1/126";
+
+    /// <summary>
+    /// IPv6 выключен на обычных адаптерах: бит 0x10 или все биты 0xFF
+    /// у <c>Tcpip6\Parameters\DisabledComponents</c>.
+    /// </summary>
+    public static bool Ipv6OffInWindows()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters");
+            return key?.GetValue("DisabledComponents") is int value && (value & 0x10) != 0;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
 
     /// <summary>Диапазон fakeip для IPv4 — по умолчанию зарезервированный под тесты.</summary>
     public string FakeIpV4Range { get; init; } = "198.18.0.0/15";
@@ -1364,7 +1383,9 @@ public sealed class SingBoxConfigCompiler
             ["type"] = "tun",
             ["tag"] = "tun-in",
             ["interface_name"] = options.TunInterfaceName,
-            ["address"] = new JsonArray { options.TunAddress, options.TunAddressV6 },
+            ["address"] = string.IsNullOrEmpty(options.TunAddressV6)
+                ? new JsonArray { options.TunAddress }
+                : new JsonArray { options.TunAddress, options.TunAddressV6 },
             ["mtu"] = options.TunMtu,
             ["auto_route"] = true,
             // strict_route выключен намеренно: он добавляет фильтры WFP,

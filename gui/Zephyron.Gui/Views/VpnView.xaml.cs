@@ -81,8 +81,13 @@ public sealed record ServerRow(
     string SkipLabel = "вне подбора",
 
     /// <summary>Почему автоподбор не берёт этот сервер — подсказкой к метке.</summary>
-    string? SkipWhy = null)
+    string? SkipWhy = null,
+
+    /// <summary>Описание сервера от панели — строкой под именем; пусто — нет.</summary>
+    string Description = "")
 {
+    public Visibility DescriptionShown => Description.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+
     /// <summary>Подпись под именем на узком окне: «Vless, адрес · замер …».</summary>
     public string Detail => $"{Protocol}, {Address}{Measured}";
 
@@ -1106,7 +1111,8 @@ public partial class VpnView : UserControl
                 "выбрать",
                 true,
                 server.IsMeasurable,
-                Chip: chip);
+                Chip: chip,
+                Description: server.Description ?? string.Empty);
 
             return Decorate(row, settings);
         });

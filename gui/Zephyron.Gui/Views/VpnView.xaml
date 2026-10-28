@@ -327,6 +327,10 @@
                                     </StackPanel>
                                 </Grid>
 
+                                <TextBlock Text="{Binding Description}" Style="{StaticResource Caption}"
+                                           Margin="0,3,0,0" TextTrimming="CharacterEllipsis"
+                                           Visibility="{Binding DescriptionShown}" ToolTip="{Binding Description}" />
+
                                 <TextBlock Text="{Binding Detail}" Style="{StaticResource Caption}"
                                            Margin="0,3,0,0" TextTrimming="CharacterEllipsis"
                                            Visibility="{Binding NarrowShown, RelativeSource={RelativeSource AncestorType=views:VpnView}}" />
