@@ -226,12 +226,16 @@ public static class ThemeLoader
 
             // Картинка на «Главной», уложенная руками (15.10).
             double? homeX = null, homeY = null, homeSize = null;
+            var homeSide = HomeSide.Left;
 
             if (bg.TryGetProperty("home", out var home) && home.ValueKind == JsonValueKind.Object)
             {
                 homeX = Number(home, "x");
                 homeY = Number(home, "y");
                 homeSize = Number(home, "size");
+
+                if (Text(home, "side") is { } sideText && !Enum.TryParse(sideText, ignoreCase: true, out homeSide))
+                    problems.Add($"сторона карточек «{sideText}» — бывает left, center или right");
 
                 if (homeX is null || homeY is null || homeSize is null)
                     problems.Add("картинка на «Главной» — нужны x, y и size");
@@ -252,6 +256,7 @@ public static class ThemeLoader
                     HomeX = homeX is { } x ? Math.Clamp(x, 0, 1) : null,
                     HomeY = homeY is { } y ? Math.Clamp(y, 0, 1) : null,
                     HomeSize = homeSize is { } size ? Math.Clamp(size, SideArtLayout.MinSize, SideArtLayout.MaxSize) : null,
+                    HomeSide = homeSide,
                 };
             }
         }

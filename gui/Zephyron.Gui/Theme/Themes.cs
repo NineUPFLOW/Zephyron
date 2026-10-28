@@ -283,7 +283,7 @@ public static class Themes
             // (SideArtLayout, владелец 15.10: «всё остальное заливается градиентом»).
             if (background.HomePlaced)
             {
-                dictionary[HomePlacement.Key] = new HomePlacement(background.HomeX!.Value, background.HomeY!.Value, background.HomeSize!.Value);
+                dictionary[HomePlacement.Key] = new HomePlacement(background.HomeX!.Value, background.HomeY!.Value, background.HomeSize!.Value, background.HomeSide);
                 dictionary[HomePlacement.GroundKey] = Frozen(HomePlacement.Ground(sample, theme[ThemeSlots.Backdrop]));
             }
 

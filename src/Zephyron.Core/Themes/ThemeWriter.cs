@@ -38,6 +38,8 @@ public sealed record ThemeDraft
 
     public double? HomeSize { get; init; }
 
+    public HomeSide HomeSide { get; init; } = HomeSide.Left;
+
     /// <summary>
     /// «Главная» на всю ширину с этой темой (<see cref="Theme.HomeFullWidth"/>).
     /// </summary>
@@ -138,7 +140,11 @@ public static class ThemeWriter
 
             // Только если уложена руками: без этого «Главная» раскладывает как прежде.
             if (draft.HomeX is { } x && draft.HomeY is { } y && draft.HomeSize is { } size)
-                background["home"] = new JsonObject { ["x"] = Math.Round(x, 3), ["y"] = Math.Round(y, 3), ["size"] = Math.Round(size, 3) };
+                background["home"] = new JsonObject
+                {
+                    ["x"] = Math.Round(x, 3), ["y"] = Math.Round(y, 3), ["size"] = Math.Round(size, 3),
+                    ["side"] = draft.HomeSide.ToString().ToLowerInvariant(),
+                };
 
             json["background"] = background;
         }

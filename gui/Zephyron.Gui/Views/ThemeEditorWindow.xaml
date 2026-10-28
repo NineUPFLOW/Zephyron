@@ -201,6 +201,20 @@
                                            Width="52" TextAlignment="Right" VerticalAlignment="Center" />
                             </Grid>
 
+                            <Grid Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Карточки" VerticalAlignment="Center" />
+                                <ComboBox Grid.Column="1" x:Name="SideChoice" Width="252" AutomationProperties.Name="Где карточки «Главной»"
+                                          SelectionChanged="OnSide">
+                                    <ComboBoxItem Content="Слева, картинка справа" />
+                                    <ComboBoxItem Content="По центру" />
+                                    <ComboBoxItem Content="Справа, картинка слева" />
+                                </ComboBox>
+                            </Grid>
+
                             <Button Style="{StaticResource Ghost}" Content="Как было: фоном окна, как на других вкладках"
                                     HorizontalAlignment="Left" Margin="0,10,0,0" Click="OnHomeReset" />
                         </StackPanel>

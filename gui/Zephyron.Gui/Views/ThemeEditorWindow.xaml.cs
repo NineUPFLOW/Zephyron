@@ -81,6 +81,19 @@ public partial class ThemeEditorWindow : Window
     // Картинка на «Главной», уложенная руками (HomePlacement, 15.10); _placed — уложена.
     private double _homeX = 0.5, _homeY = 0.5, _homeSize = 1;
     private bool _placed;
+
+    /// <summary>Где карточки «Главной» при уложенной картинке (HomeSide); по умолчанию слева, как до 0.20.</summary>
+    private HomeSide _homeSide = HomeSide.Left;
+
+    private void OnSide(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_ready || SideChoice.SelectedIndex < 0)
+            return;
+
+        _homeSide = (HomeSide)SideChoice.SelectedIndex;
+        ShowMini();
+        Changed();
+    }
     private bool _dragging;
 
     /// <summary>Картинка для миниатюры «Главной»; у видео — его кадр.</summary>
@@ -122,6 +135,7 @@ public partial class ThemeEditorWindow : Window
         if (from.Background is { HomePlaced: true } placed)
         {
             (_homeX, _homeY, _homeSize) = (placed.HomeX!.Value, placed.HomeY!.Value, placed.HomeSize!.Value);
+            _homeSide = placed.HomeSide;
             _placed = true;
         }
 
@@ -156,6 +170,7 @@ public partial class ThemeEditorWindow : Window
 
         ShowImage();
 
+        SideChoice.SelectedIndex = (int)_homeSide;
         _ready = true;
         Changed();
 
@@ -202,6 +217,7 @@ public partial class ThemeEditorWindow : Window
                 HomeX = _placed ? _homeX : null,
                 HomeY = _placed ? _homeY : null,
                 HomeSize = _placed ? _homeSize : null,
+                HomeSide = _homeSide,
             },
         HomeFullWidth = _from.HomeFullWidth,
     };
@@ -306,8 +322,16 @@ public partial class ThemeEditorWindow : Window
     private IEnumerable<Rect> MiniCardsAt()
     {
         double scale = HomeMini.Width / _page.Width;
-        double page = Math.Min((double)FindResource("ContentMax"), _page.Width - 2 * MiniPad);
-        double left = (_page.Width - page) / 2;
+
+        // Как StatusView.ShowWidth: уложенная картинка и сторона «слева»/«справа» — колонка
+        // карточек до 940 у своего края; иначе страница до ContentMax по центру.
+        bool aside = _placed && _homeSide != HomeSide.Center;
+        double page = aside
+            ? Math.Min(940, _page.Width * 100 / 101) - 2 * MiniPad
+            : Math.Min((double)FindResource("ContentMax"), _page.Width - 2 * MiniPad);
+        double left = !aside ? (_page.Width - page) / 2
+            : _homeSide == HomeSide.Left ? MiniPad
+            : _page.Width - page - MiniPad;
         double y = MiniTop;
 
         foreach (var (height, cells) in MiniRows)
@@ -375,10 +399,36 @@ public partial class ThemeEditorWindow : Window
         };
         MiniArt.OpacityMask = _placed ? HomePlacement.Feather(place) : null;
 
-        // Затемнение — как StatusView.Shade без колонки: сплошное, в силу «Затемнения» темы.
+        // Затемнение — как StatusView.Shade: по центру сплошное; при колонке арта плотное
+        // под карточками и лёгкое (0,12) в колонке, зеркально для «справа».
         double dim = Dims[Math.Max(0, DimChoice.SelectedIndex)];
-        MiniShade.Fill = new SolidColorBrush(System.Windows.Media.Color.FromArgb(
-            (byte)Math.Round(dim * 255), backdrop.R, backdrop.G, backdrop.B));
+        System.Windows.Media.Color Dimmed(double share) =>
+            System.Windows.Media.Color.FromArgb((byte)Math.Round(share * 255), backdrop.R, backdrop.G, backdrop.B);
+
+        if (!_placed || _homeSide == HomeSide.Center)
+        {
+            MiniShade.Fill = new SolidColorBrush(Dimmed(dim));
+        }
+        else
+        {
+            double scale = HomeMini.Width / _page.Width;
+            double column = (_page.Width - Math.Min(940, _page.Width * 100 / 101)) * scale;
+            bool artLeft = _homeSide == HomeSide.Right;
+            double edge = artLeft ? column : HomeMini.Width - column, toward = artLeft ? -1 : 1;
+
+            MiniShade.Fill = new LinearGradientBrush
+            {
+                MappingMode = BrushMappingMode.Absolute,
+                StartPoint = new Point(edge - 160 * scale * toward, 0),
+                EndPoint = new Point(edge + column * 0.7 * toward, 0),
+                GradientStops =
+                {
+                    new GradientStop(Dimmed(dim), 0),
+                    new GradientStop(Dimmed(dim * 0.45 + 0.12 * 0.55), 0.4),
+                    new GradientStop(Dimmed(0.12), 1),
+                },
+            };
+        }
 
         var surface = Draft()[ThemeSlots.Surface];
         var line = _colors[ThemeSlots.Border];
@@ -645,6 +695,7 @@ public partial class ThemeEditorWindow : Window
             HomeX = _placed ? _homeX : null,
             HomeY = _placed ? _homeY : null,
             HomeSize = _placed ? _homeSize : null,
+                HomeSide = _homeSide,
             HomeFullWidth = _from.HomeFullWidth,
         };
 
