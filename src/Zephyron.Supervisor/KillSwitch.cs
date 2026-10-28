@@ -189,6 +189,13 @@ public sealed class KillSwitch : IDisposable
                 {
                     Add(layer, subLayer.subLayerKey, name, FWP_ACTION_PERMIT, 15,
                         Condition(FWPM_CONDITION_ALE_APP_ID, FWP_BYTE_BLOB_TYPE, blob));
+
+                    // FwpmGetAppIdFromFileName0 опускает в нижний регистр только латиницу,
+                    // а ядро — и кириллицу (замер 28.10: «…\тестовая папка\…»). Без второго
+                    // разрешения программа из папки с русским именем закрыла бы сама себя.
+                    if (Lowered(blob, pinned) is { } lowered)
+                        Add(layer, subLayer.subLayerKey, name, FWP_ACTION_PERMIT, 15,
+                            Condition(FWPM_CONDITION_ALE_APP_ID, FWP_BYTE_BLOB_TYPE, lowered));
                 }
                 finally
                 {
@@ -232,6 +239,37 @@ public sealed class KillSwitch : IDisposable
                     Condition(FWPM_CONDITION_IP_LOCAL_INTERFACE, FWP_UINT64, value));
             }
         }
+    }
+
+    /// <summary>
+    /// Тот же FWP_BYTE_BLOB, путь целиком в нижнем регистре; <c>null</c> — он уже такой.
+    /// </summary>
+    /// <remarks>FWP_BYTE_BLOB на x64: UINT32 size, выравнивание, UINT8* data.</remarks>
+    internal static nint? Lowered(nint blob, List<nint> pinned)
+    {
+        int size = Marshal.ReadInt32(blob, 0);
+        var data = Marshal.ReadIntPtr(blob, 8);
+        var bytes = new byte[size];
+        Marshal.Copy(data, bytes, 0, size);
+
+        var path = System.Text.Encoding.Unicode.GetString(bytes);
+        var lower = path.ToLowerInvariant();
+
+        if (lower == path)
+            return null;
+
+        var lowered = System.Text.Encoding.Unicode.GetBytes(lower);
+        var copy = Marshal.AllocHGlobal(lowered.Length);
+        Marshal.Copy(lowered, 0, copy, lowered.Length);
+
+        var header = Marshal.AllocHGlobal(16);
+        Marshal.WriteInt64(header, 0, 0);
+        Marshal.WriteInt32(header, 0, lowered.Length);
+        Marshal.WriteIntPtr(header, 8, copy);
+
+        pinned.Add(copy);
+        pinned.Add(header);
+        return header;
     }
 
     private static FWPM_FILTER_CONDITION0 Condition(Guid field, uint type, nint value) =>
