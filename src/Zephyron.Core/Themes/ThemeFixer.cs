@@ -30,6 +30,7 @@ public static class ThemeFixer
         (ThemeSlots.Faint, [ThemeSlots.Surface], ThemeContrast.Large),
         (ThemeSlots.OnAccent, [ThemeSlots.AccentFill], ThemeContrast.Text),
         (ThemeSlots.WarnFill, [ThemeSlots.Surface], ThemeContrast.Large),
+        (ThemeSlots.Success, [ThemeSlots.Surface], ThemeContrast.Large),
     ];
 
     /// <summary>Цвета с поправленной светлотой; что читалось — не трогается.</summary>
@@ -38,7 +39,7 @@ public static class ThemeFixer
         var fixedColors = new Dictionary<string, ThemeColor>(colors);
         var backdrop = colors[ThemeSlots.Backdrop];
 
-        foreach (var (fg, bgs, required) in Rules)
+        foreach (var (fg, bgs, required) in Rules.Where(r => colors.ContainsKey(r.Item1)))
         {
             var backgrounds = bgs.Select(b => fixedColors[b].Over(backdrop)).ToList();
             var color = fixedColors[fg];
@@ -66,7 +67,8 @@ public static class ThemeFixer
         var result = new Dictionary<string, string>();
         var backdrop = colors[ThemeSlots.Backdrop];
 
-        foreach (var (fg, bgs, required) in Rules)
+        // Словарь без необязательных слотов (старая тема) — их правила мимо.
+        foreach (var (fg, bgs, required) in Rules.Where(r => colors.ContainsKey(r.Item1)))
         {
             foreach (var bg in bgs)
             {

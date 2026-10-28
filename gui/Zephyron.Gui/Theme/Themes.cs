@@ -418,11 +418,8 @@ public static class Themes
         dictionary["AccentGradient"] = FillGradient(theme[ThemeSlots.AccentFill], theme[ThemeSlots.OnAccent]);
         dictionary["AccentFlow"] = Gradient(accent, second, new Point(1, 0));
 
-        // «Работает» — зелёный, отдельный от акцента: яркий на тёмной
-        // подложке, глубокий на светлой, чтобы читался и там, и там.
-        var success = light
-            ? new ThemeColor(255, 0x0A, 0x7A, 0x4F)
-            : new ThemeColor(255, 0x35, 0xE6, 0xA0);
+        // «Работает» — свой слот, отдельный от акцента (по умолчанию зелёный).
+        var success = theme[ThemeSlots.Success];
 
         dictionary["SuccessColor"] = ToColor(success);
         dictionary["Success"] = Frozen(new SolidColorBrush(ToColor(success)));

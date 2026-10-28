@@ -154,8 +154,10 @@ public static class ThemeLoader
             if (colors.ContainsKey(slot))
                 continue;
 
-            if (basis is not null)
+            if (basis is not null && !ThemeSlots.Optional.Contains(slot))
                 colors[slot] = basis[slot];
+            else if (ThemeSlots.Optional.Contains(slot) && colors.ContainsKey(ThemeSlots.Backdrop) && colors.ContainsKey(ThemeSlots.Accent))
+                colors[slot] = ThemeSlots.Default(slot, colors); // от своих фона и акцента, а не от основы
             else
                 problems.Add($"нет цвета «{slot}» — задайте его или укажите \"base\": \"dark\"");
         }

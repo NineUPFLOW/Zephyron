@@ -551,7 +551,8 @@ public static class ProxyUriParser
             hostPort = decoded[(decodedAt + 1)..];
         }
 
-        var (host, port) = UriParts.SplitHostPort(hostPort);
+        // Ключи Outline: «…@host:port/?outline=1» — косая черта перед запросом.
+        var (host, port) = UriParts.SplitHostPort(hostPort.TrimEnd('/'));
 
         return new ProxyServer
         {

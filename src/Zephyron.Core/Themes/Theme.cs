@@ -28,7 +28,7 @@ public sealed record Theme
     /// <summary>Папка темы, полный путь: от неё отсчитываются фон и шрифты.</summary>
     public required string Folder { get; init; }
 
-    /// <summary>Все 14 цветов, ключ — имя слота из <see cref="ThemeSlots.All"/>.</summary>
+    /// <summary>Все 16 цветов, ключ — имя слота из <see cref="ThemeSlots.All"/>.</summary>
     public required IReadOnlyDictionary<string, ThemeColor> Colors { get; init; }
 
     public required ThemeFonts Fonts { get; init; }

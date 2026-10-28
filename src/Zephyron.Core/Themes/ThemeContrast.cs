@@ -1,6 +1,6 @@
 namespace Zephyron.Core.Themes;
 
-/// <summary>Имена 14 цветовых слотов и ключи, под которыми их ждёт окно.</summary>
+/// <summary>Имена 16 цветовых слотов и ключи, под которыми их ждёт окно.</summary>
 public static class ThemeSlots
 {
     public const string Backdrop = "backdrop";
@@ -17,12 +17,31 @@ public static class ThemeSlots
     public const string AccentFill = "accent-fill";
     public const string OnAccent = "on-accent";
     public const string WarnFill = "warn-fill";
+    public const string Success = "success";
+    public const string Window = "window";
 
     public static IReadOnlyList<string> All { get; } =
     [
         Backdrop, Surface, Raised, Border, Text, Muted, Faint,
-        Accent, AccentDim, Danger, Warn, AccentFill, OnAccent, WarnFill,
+        Accent, AccentDim, Danger, Warn, AccentFill, OnAccent, WarnFill, Success, Window,
     ];
+
+    /// <summary>
+    /// Слоты 0.19.3, которых нет в старых темах: без них тема не ломается,
+    /// цвет подбирается сам (<see cref="Default"/>).
+    /// </summary>
+    public static IReadOnlyList<string> Optional { get; } = [Success, Window];
+
+    /// <summary>Цвет необязательного слота, когда тема его не задала.</summary>
+    public static ThemeColor Default(string slot, IReadOnlyDictionary<string, ThemeColor> colors) => slot switch
+    {
+        // «Работает» — зелёный: яркий на тёмной подложке, глубокий на светлой.
+        Success => colors[Backdrop].Luminance > 0.5
+            ? new ThemeColor(255, 0x0A, 0x7A, 0x4F)
+            : new ThemeColor(255, 0x35, 0xE6, 0xA0),
+        Window => colors[Accent],
+        _ => throw new ArgumentOutOfRangeException(nameof(slot)),
+    };
 
     /// <summary>
     /// Ключ ресурса в окне: <c>accent-fill</c> ⇄ <c>AccentFill</c>.
@@ -101,6 +120,7 @@ public static class ThemeContrast
         Pair(ThemeSlots.Faint, ThemeSlots.Surface, Large);
         Pair(ThemeSlots.OnAccent, ThemeSlots.AccentFill, Text);
         Pair(ThemeSlots.WarnFill, ThemeSlots.Surface, Large);
+        Pair(ThemeSlots.Success, ThemeSlots.Surface, Large);
 
         // Заголовки вкладок и пункты меню стоят прямо на фоне. Меню и
         // заголовки — text и muted; проверяются с обоими краями картинки.

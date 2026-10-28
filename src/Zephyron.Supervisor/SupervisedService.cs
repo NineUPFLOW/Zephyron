@@ -244,6 +244,14 @@ public abstract class SupervisedService
                 {
                 }
 
+                // Один битый сервер не должен ронять весь движок: вырезали — пробуем снова.
+                if (_repairs < MaxRepairs && TryRepair(_fatal))
+                {
+                    _repairs++;
+                    return await StartAsync(readinessTimeout, cancellationToken);
+                }
+
+                _repairs = 0;
                 LastError = ExitReason(Process.ExitCode, _fatal)
                     + (Advice(Process.ExitCode) is { } advice ? " — " + advice : string.Empty);
                 return false;
@@ -255,6 +263,7 @@ public abstract class SupervisedService
             if (await CheckFunctionalAsync(cancellationToken) is not ServiceCheck.Broken)
             {
                 LastError = null;
+                _repairs = 0;
                 await OnReadyAsync(cancellationToken);
                 return true;
             }
@@ -328,6 +337,12 @@ public abstract class SupervisedService
 
     /// <summary>Что значит код выхода движка и что делать; <c>null</c> — сказать нечего.</summary>
     protected virtual string? Advice(int exitCode) => null;
+
+    private const int MaxRepairs = 20;
+    private int _repairs;
+
+    /// <summary>Чинит конфиг по строке отказа; <c>true</c> — есть смысл запустить снова.</summary>
+    protected virtual bool TryRepair(string? fatal) => false;
 
     /// <summary>
     /// Почему процесс вышел на старте — словами движка, а не одним кодом.
@@ -1036,6 +1051,70 @@ public sealed class SingBoxService : SupervisedService
     {
         if (!_dnsOnly && await GhostTunnel.ClearAsync(TimeSpan.FromSeconds(10), cancellationToken) is { } what)
             Note(what);
+    }
+
+    /// <summary>
+    /// «initialize outbound[N]: …» — движок отказался от одного сервера
+    /// подписки (незнакомый flow, метод, ключ) и не поднялся целиком. Такой
+    /// сервер вырезается из конфига, и движок запускается без него.
+    /// </summary>
+    protected override bool TryRepair(string? fatal)
+    {
+        if (fatal is null
+            || System.Text.RegularExpressions.Regex.Match(fatal, @"initialize outbound\[(\d+)\]") is not { Success: true } m)
+            return false;
+
+        try
+        {
+            if (DropOutbound(File.ReadAllText(_configPath), int.Parse(m.Groups[1].Value)) is not { } repaired)
+                return false;
+
+            File.WriteAllText(_configPath, repaired.Json);
+            Note($"сервер «{repaired.Tag}» убран из конфига: {ExitReason(1, fatal)}");
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Конфиг без выхода номер <paramref name="index"/>: он убран и из групп
+    /// выбора; <c>null</c> — убрать нельзя (группа, или группа опустеет,
+    /// или на него ссылается маршрут).
+    /// </summary>
+    public static (string Json, string Tag)? DropOutbound(string json, int index)
+    {
+        var root = System.Text.Json.Nodes.JsonNode.Parse(json)!.AsObject();
+
+        if (root["outbounds"] is not System.Text.Json.Nodes.JsonArray outbounds
+            || index < 0 || index >= outbounds.Count
+            || outbounds[index] is not System.Text.Json.Nodes.JsonObject victim
+            || victim["tag"]?.GetValue<string>() is not { } tag
+            || victim["outbounds"] is not null)
+            return null;
+
+        outbounds.RemoveAt(index);
+
+        foreach (var group in outbounds.OfType<System.Text.Json.Nodes.JsonObject>())
+        {
+            if (group["outbounds"] is not System.Text.Json.Nodes.JsonArray members)
+                continue;
+
+            if (members.FirstOrDefault(n => n?.GetValue<string>() == tag) is { } member)
+                members.Remove(member);
+
+            if (members.Count == 0)
+                return null;
+
+            if (group["default"]?.GetValue<string>() == tag)
+                group["default"] = members[0]!.GetValue<string>();
+        }
+
+        // Остался ли тег где-то ещё — в маршрутах, DNS, detour: тогда не трогаем.
+        var text = root.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        return text.Contains(System.Text.Json.JsonSerializer.Serialize(tag), StringComparison.Ordinal) ? null : (text, tag);
     }
 
     protected override ProcessStartInfo BuildStartInfo() => new()
