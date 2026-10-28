@@ -59,6 +59,8 @@ public static class ProxyUriParser
 
             if (server is null)
                 error = $"неподдерживаемая схема '{scheme}'";
+            else
+                server = WithDescription(server, text);
         }
         catch (Exception ex)
         {
@@ -575,6 +577,39 @@ public static class ProxyUriParser
             throw new FormatException("ожидается 'метод:пароль'");
 
         return (userInfo[..colon], userInfo[(colon + 1)..]);
+    }
+
+    /// <summary>
+    /// Панели кладут описание сервера параметром <c>serverDescription</c> —
+    /// в запрос или хвостом имени («Имя?serverDescription=…»), обычным
+    /// текстом или base64. Имя от него очищается, описание — отдельно.
+    /// </summary>
+    private static ProxyServer WithDescription(ProxyServer server, string link)
+    {
+        const string Key = "serverDescription=";
+        var decoded = Uri.UnescapeDataString(link);
+        int at = decoded.IndexOf(Key, StringComparison.OrdinalIgnoreCase);
+
+        if (at < 0)
+            return server;
+
+        var value = decoded[(at + Key.Length)..];
+        int end = value.IndexOfAny(['&', '#']);
+        value = (end >= 0 ? value[..end] : value).Trim();
+
+        // base64 — только если выходит читаемый текст, иначе это и было описание.
+        if (Base64.DecodeToString(value) is { } text && text.Length > 0 && !text.Any(char.IsControl) && !text.Contains('�'))
+            value = text.Trim();
+
+        int cut = server.Tag.IndexOf("?" + Key, StringComparison.OrdinalIgnoreCase);
+        if (cut < 0)
+            cut = server.Tag.IndexOf("&" + Key, StringComparison.OrdinalIgnoreCase);
+
+        return server with
+        {
+            Tag = cut > 0 ? server.Tag[..cut].Trim() : server.Tag,
+            Description = value.Length > 0 ? value : null,
+        };
     }
 
     private static string StripFragment(string text, out string? fragment)

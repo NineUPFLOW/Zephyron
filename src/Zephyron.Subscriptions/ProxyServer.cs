@@ -118,6 +118,9 @@ public sealed record ProxyServer
 
     public IReadOnlyList<string> Alpn { get; init; } = Array.Empty<string>();
 
+    /// <summary>Описание сервера от панели (<c>serverDescription</c>); в имя не попадает.</summary>
+    public string? Description { get; init; }
+
     /// <summary>xtls-rprx-vision для vless.</summary>
     public string? Flow { get; init; }
 
@@ -294,7 +297,9 @@ public sealed record ProxyServer
     /// </remarks>
     public bool IsSupportedBySingBox =>
         (Protocol != ProxyProtocol.Shadowsocks || ShadowsocksMethods.ForSingBox(Method) is not null)
-        && (!Security.Equals("reality", StringComparison.OrdinalIgnoreCase) || IsRealityKey(RealityPublicKey));
+        && (!Security.Equals("reality", StringComparison.OrdinalIgnoreCase) || IsRealityKey(RealityPublicKey))
+        // «%» без двух шестнадцатеричных цифр в пути: движок не разбирает такой адрес и не стартует.
+        && (Path is null || !System.Text.RegularExpressions.Regex.IsMatch(Path, "%(?![0-9A-Fa-f]{2})"));
 
     /// <summary>
     /// Ключ REALITY — 32 байта в base64url. С пустым или битым ключом sing-box

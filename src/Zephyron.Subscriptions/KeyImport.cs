@@ -34,6 +34,29 @@ public static class KeyImport
         if (string.IsNullOrWhiteSpace(text))
             return new([], null, "пусто");
 
+        if (AmneziaKey.Looks(text))
+        {
+            try
+            {
+                var (configs, keyName) = AmneziaKey.Decode(text);
+                var links = new List<string>();
+
+                foreach (var conf in configs)
+                {
+                    if (WireGuardConf.TryParse(conf, keyName ?? name, out var found, out _))
+                        links.Add(WireGuardConf.ToLink(found!));
+                }
+
+                return links.Count > 0
+                    ? new(links, null, null)
+                    : new([], null, "в ключе AmneziaVPN нет WireGuard или AmneziaWG — ключ Xray добавьте ссылкой vless://");
+            }
+            catch (Exception ex) when (ex is System.FormatException or System.Text.Json.JsonException or InvalidDataException)
+            {
+                return new([], null, "ключ AmneziaVPN не читается");
+            }
+        }
+
         if (WireGuardConf.Looks(text))
         {
             return WireGuardConf.TryParse(text, name, out var server, out var error)
