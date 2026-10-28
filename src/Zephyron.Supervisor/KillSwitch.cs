@@ -23,14 +23,48 @@ namespace Zephyron.Supervisor;
 public sealed class KillSwitch : IDisposable
 {
     private nint _engine;
+    private IReadOnlyList<string> _allowed = [];
+    private readonly object _gate = new();
 
     private KillSwitch(nint engine) => _engine = engine;
 
     /// <summary>
     /// Ставит фильтры; <c>null</c> и причина — не вышло (нет прав, WFP отказал).
     /// </summary>
+    /// <remarks>
+    /// Сеть меняется — фильтры ставятся заново: адаптер, появившийся после
+    /// запуска (второй Wi-Fi, телефон по USB), иначе остался бы открытым.
+    /// Новые ставятся раньше, чем снимаются старые, — окна без фильтров нет.
+    /// </remarks>
     /// <param name="allowed">Программы, которым выход мимо туннеля разрешён: движок и сама программа.</param>
     public static KillSwitch? Open(IReadOnlyList<string> allowed, out string? problem)
+    {
+        var opened = Build(allowed, out problem);
+
+        if (opened is not null)
+        {
+            opened._allowed = allowed;
+            NetworkChange.NetworkAddressChanged += opened.OnNetworkChanged;
+        }
+
+        return opened;
+    }
+
+    private void OnNetworkChanged(object? sender, EventArgs e)
+    {
+        lock (_gate)
+        {
+            if (_engine == 0 || Build(_allowed, out _) is not { } fresh)
+                return;
+
+            var old = _engine;
+            _engine = fresh._engine;
+            fresh._engine = 0;
+            FwpmEngineClose0(old);
+        }
+    }
+
+    private static KillSwitch? Build(IReadOnlyList<string> allowed, out string? problem)
     {
         problem = null;
         var session = new FWPM_SESSION0 { flags = FWPM_SESSION_FLAG_DYNAMIC };
@@ -73,7 +107,14 @@ public sealed class KillSwitch : IDisposable
         }
     }
 
-    /// <summary>Адаптеры, через которые выход закрыт: всё, кроме петли и туннельных.</summary>
+    /// <summary>
+    /// Адаптеры, через которые выход закрыт: с основным шлюзом, кроме петли и туннельных.
+    /// </summary>
+    /// <remarks>
+    /// Без шлюза адаптер в интернет не ведёт: это виртуальные сети — Radmin,
+    /// Hamachi, ZeroTier, Hyper-V, WSL. Их закрывать незачем, а игра по локалке
+    /// перестала бы работать и при живом туннеле.
+    /// </remarks>
     public static IReadOnlyList<ulong> PhysicalAdapters()
     {
         var result = new List<ulong>();
@@ -83,6 +124,7 @@ public sealed class KillSwitch : IDisposable
             if (nic.NetworkInterfaceType is NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel
                 || nic.Description.Contains("Wintun", StringComparison.OrdinalIgnoreCase)
                 || nic.Name.StartsWith("zephyron", StringComparison.OrdinalIgnoreCase)
+                || !HasGateway(nic)
                 || !Guid.TryParse(nic.Id, out var id)
                 || ConvertInterfaceGuidToLuid(ref id, out var luid) != 0)
                 continue;
@@ -93,6 +135,19 @@ public sealed class KillSwitch : IDisposable
         return result;
     }
 
+    private static bool HasGateway(NetworkInterface nic)
+    {
+        try
+        {
+            return nic.GetIPProperties().GatewayAddresses.Any(g =>
+                !g.Address.Equals(System.Net.IPAddress.Any) && !g.Address.Equals(System.Net.IPAddress.IPv6Any));
+        }
+        catch (NetworkInformationException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>Локальная сеть: роутер, принтеры, DHCP и мультикаст не закрываются.</summary>
     private static readonly (uint Address, uint Mask)[] Lan =
     [
@@ -100,8 +155,18 @@ public sealed class KillSwitch : IDisposable
         (0xAC100000, 0xFFF00000), // 172.16/12
         (0xC0A80000, 0xFFFF0000), // 192.168/16
         (0xA9FE0000, 0xFFFF0000), // 169.254/16
+        (0x64400000, 0xFFC00000), // 100.64/10 — шлюз и DHCP у операторов с CGNAT
+        (0x19000000, 0xFF000000), // 25/8 — Hamachi
+        (0x1A000000, 0xFF000000), // 26/8 — Radmin VPN
         (0xE0000000, 0xF0000000), // 224/4
         (0xFFFFFFFF, 0xFFFFFFFF), // широковещание
+    ];
+
+    /// <summary>Локальная сеть IPv6: link-local и мультикаст (обнаружение соседей, принтеры).</summary>
+    private static readonly (System.Net.IPAddress Prefix, byte Length)[] LanV6 =
+    [
+        (System.Net.IPAddress.Parse("fe80::"), 10),
+        (System.Net.IPAddress.Parse("ff00::"), 8),
     ];
 
     private void AddFilters(IReadOnlyList<string> allowed, nint name, List<nint> pinned)
@@ -109,6 +174,9 @@ public sealed class KillSwitch : IDisposable
         var subLayer = new FWPM_SUBLAYER0 { subLayerKey = Guid.NewGuid(), weight = 0xFFFF };
         subLayer.displayData.name = name;
         Check(FwpmSubLayerAdd0(_engine, ref subLayer, 0), "завести подслой");
+
+        // Один снимок адаптеров на оба семейства: иначе списки V4 и V6 могли бы разойтись.
+        var adapters = PhysicalAdapters();
 
         foreach (var layer in new[] { FWPM_LAYER_ALE_AUTH_CONNECT_V4, FWPM_LAYER_ALE_AUTH_CONNECT_V6 })
         {
@@ -140,8 +208,22 @@ public sealed class KillSwitch : IDisposable
                         Condition(FWPM_CONDITION_IP_REMOTE_ADDRESS, FWP_V4_ADDR_MASK, value));
                 }
             }
+            else
+            {
+                // FWP_V6_ADDR_AND_MASK: 16 байт адреса и длина префикса.
+                foreach (var (prefix, length) in LanV6)
+                {
+                    var value = Marshal.AllocHGlobal(17);
+                    pinned.Add(value);
+                    var bytes = prefix.GetAddressBytes();
+                    Marshal.Copy(bytes, 0, value, 16);
+                    Marshal.WriteByte(value, 16, length);
+                    Add(layer, subLayer.subLayerKey, name, FWP_ACTION_PERMIT, 15,
+                        Condition(FWPM_CONDITION_IP_REMOTE_ADDRESS, FWP_V6_ADDR_MASK, value));
+                }
+            }
 
-            foreach (var luid in PhysicalAdapters())
+            foreach (var luid in adapters)
             {
                 var value = Marshal.AllocHGlobal(8);
                 pinned.Add(value);
@@ -193,10 +275,15 @@ public sealed class KillSwitch : IDisposable
     /// <summary>Закрывает сеанс — Windows снимает все его фильтры разом.</summary>
     public void Dispose()
     {
-        if (_engine != 0)
+        NetworkChange.NetworkAddressChanged -= OnNetworkChanged;
+
+        lock (_gate)
         {
-            FwpmEngineClose0(_engine);
-            _engine = 0;
+            if (_engine != 0)
+            {
+                FwpmEngineClose0(_engine);
+                _engine = 0;
+            }
         }
     }
 
@@ -207,6 +294,7 @@ public sealed class KillSwitch : IDisposable
     private const uint FWP_UINT64 = 4;
     private const uint FWP_BYTE_BLOB_TYPE = 12;
     private const uint FWP_V4_ADDR_MASK = 0x100;
+    private const uint FWP_V6_ADDR_MASK = 0x101;
     private const uint FWP_ACTION_BLOCK = 0x1001;
     private const uint FWP_ACTION_PERMIT = 0x1002;
 

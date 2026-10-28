@@ -58,6 +58,7 @@ public static class DnsEngine
         return new SingBoxConfigCompiler().Compile(NoRoutes, [], new SingBoxOptions
         {
             Scope = TunnelScope.ProxyOnly,
+            TunAddressV6 = SingBoxOptions.TunAddressV6Here(),
             DnsServerAddresses = systemResolvers,
             DnsServer = settings.UseRouterDns ? settings.RouterDnsAddress : settings.DnsServer,
             DnsServerType = settings.UseRouterDns ? "udp" : "https",

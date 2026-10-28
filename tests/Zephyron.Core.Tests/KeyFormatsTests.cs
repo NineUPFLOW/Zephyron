@@ -73,12 +73,17 @@ public class KeyFormatsTests
     }
 
     [Theory]
-    [InlineData("/ws%zz", false)]
-    [InlineData("/ws%20ok", true)]
-    public void BrokenEscapeInPathSkipsServer(string path, bool usable) =>
+    [InlineData("ws", "/ws%zz", false)]
+    [InlineData("ws", "/ws%20ok", true)]
+    [InlineData("grpc", "svc%zz", true)]  // у gRPC путь в адрес не идёт
+    public void BrokenEscapeInPathSkipsServer(string transport, string path, bool usable) =>
         Assert.Equal(usable, new ProxyServer
         {
             Protocol = ProxyProtocol.Vless, Tag = "p", Host = "p.example.com", Port = 443,
-            Credential = "b7f3c1d2-4a5e-4c11-9f2b-8e7d6a1c0f33", Transport = "ws", Path = path,
+            Credential = "b7f3c1d2-4a5e-4c11-9f2b-8e7d6a1c0f33", Transport = transport, Path = path,
         }.IsUsableOutbound);
+
+    [Fact]
+    public void HugeAmneziaKeyIsRefused() =>
+        Assert.Equal("ключ AmneziaVPN не читается", KeyImport.FromText("vpn://" + new string('A', 70_000)).Problem);
 }

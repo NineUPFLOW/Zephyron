@@ -18,21 +18,40 @@ public static class AmneziaKey
 {
     public const string Scheme = "vpn://";
 
+    private const int MaxKey = 64 * 1024;
+    private const int MaxJson = 1024 * 1024;
+
     public static bool Looks(string text) => text.TrimStart().StartsWith(Scheme, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Файлы .conf из ключа и имя сервера; пусто — WireGuard внутри нет.</summary>
     public static (IReadOnlyList<string> Configs, string? Name) Decode(string text)
     {
         var body = text.Trim()[Scheme.Length..].Replace('-', '+').Replace('_', '/').TrimEnd('=');
+
+        // Настоящий ключ — несколько килобайт; больше — не ключ, а повод упасть.
+        if (body.Length > MaxKey)
+            throw new InvalidDataException("ключ слишком длинный");
+
         var bytes = Convert.FromBase64String(body.PadRight(body.Length + (4 - body.Length % 4) % 4, '='));
 
         string json;
 
         if (bytes.Length > 6 && bytes[4] == 0x78)
         {
+            // Сжатое разворачивается не дальше мегабайта: крошечный ключ мог бы раздуться в гигабайты.
             using var zlib = new ZLibStream(new MemoryStream(bytes, 4, bytes.Length - 4), CompressionMode.Decompress);
-            using var reader = new StreamReader(zlib, Encoding.UTF8);
-            json = reader.ReadToEnd();
+            using var output = new MemoryStream();
+            var buffer = new byte[16384];
+
+            for (int read; (read = zlib.Read(buffer)) > 0;)
+            {
+                if (output.Length + read > MaxJson)
+                    throw new InvalidDataException("ключ разворачивается слишком большим");
+
+                output.Write(buffer, 0, read);
+            }
+
+            json = Encoding.UTF8.GetString(output.GetBuffer(), 0, (int)output.Length);
         }
         else
         {

@@ -107,6 +107,16 @@ public sealed class PingAndFragmentTests
         Assert.Equal(expected, Outbound(result.Json, "v")["flow"]?.GetValue<string>());
     }
 
+    /// <summary>IPv6 выключен в Windows — у адаптера туннеля только адрес IPv4.</summary>
+    [Fact]
+    public void TunWithoutIpv6HasOnlyV4Address()
+    {
+        var engine = RuleSetLoader.Load("mode: selective\nrules: []\n");
+        var json = new SingBoxConfigCompiler().Compile(engine.RuleSet, Servers, new SingBoxOptions { TunAddressV6 = "" }).Json;
+        var tun = JsonNode.Parse(json)!["inbounds"]!.AsArray().OfType<JsonObject>().Single(i => i["type"]?.GetValue<string>() == "tun");
+        Assert.Equal(["172.19.0.1/30"], tun["address"]!.AsArray().Select(a => a!.GetValue<string>()));
+    }
+
     /// <summary>Битый ключ REALITY роняет весь sing-box — такой сервер мимо конфига.</summary>
     [Theory]
     [InlineData("jNXHt1yRo0vDuchQlIP6Z0ZvjT3KtzVI-T4E7RoLJS0", true)]

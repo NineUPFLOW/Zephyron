@@ -274,9 +274,8 @@ public static class SupportReport
 
     private static string YesNo(bool value) => value ? "да" : "нет";
 
-    /// <summary>Часть отчёта, которая может не собраться: тогда — почему, а не пропуск архива.</summary>
     /// <summary>
-    /// Серверы из сохранённых подписок: имя, протокол, транспорт и почему
+    /// Серверы из сохранённых подписок: номер, протокол, транспорт и почему
     /// отброшен. Без адресов, ключей и паролей — их человек выкладывает в обсуждения.
     /// </summary>
     internal static string SubscriptionServers(string? root)
@@ -296,8 +295,10 @@ public static class SupportReport
 
             text.AppendLine($"Подписка {++n}: серверов {servers.Count}, отброшено {skipped}, не разобрано строк {errors.Count}");
 
+            // Номером, а не именем: имя сервера — часто «хост:порт» или домен поставщика.
+            int i = 0;
             foreach (var s in servers)
-                text.AppendLine($"  {(s.IsUsableOutbound ? "+" : "−")} {s.Tag} — {s.ProtocolName} {s.Transport}/{s.Security}"
+                text.AppendLine($"  {(s.IsUsableOutbound ? "+" : "−")} сервер {++i} — {s.ProtocolName} {s.Transport}/{s.Security}"
                     + (s.UnusableWhy is { } reason ? $": {reason}" : string.Empty));
 
             text.AppendLine();
@@ -306,6 +307,7 @@ public static class SupportReport
         return text.ToString();
     }
 
+    /// <summary>Часть отчёта, которая может не собраться: тогда — почему, а не пропуск архива.</summary>
     private static string Section(Func<string> build)
     {
         try
