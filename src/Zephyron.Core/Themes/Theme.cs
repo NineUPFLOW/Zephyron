@@ -138,6 +138,12 @@ public sealed record ThemeBackground
     /// <summary>Высота картинки долей высоты страницы.</summary>
     public double? HomeSize { get; init; }
 
+    /// <summary>Где карточки «Главной», когда картинка уложена руками: слева (арт справа, как до 0.20), по центру или справа.</summary>
+    public HomeSide HomeSide { get; init; } = HomeSide.Left;
+
     /// <summary>Картинка на «Главной» уложена руками.</summary>
     public bool HomePlaced => HomeX is not null && HomeY is not null && HomeSize is not null;
 }
+
+/// <summary>Сторона карточек «Главной» при уложенной картинке; картинке остаётся другая.</summary>
+public enum HomeSide { Left, Center, Right }

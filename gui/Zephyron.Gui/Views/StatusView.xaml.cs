@@ -146,9 +146,9 @@ public partial class StatusView : UserControl
 
         double aspect = content.Size.Width / content.Size.Height;
 
-        double column = ArtColumn.ActualWidth;
+        double column = (_artLeft ? ContentColumn : ArtColumn).ActualWidth;
         bool side = column >= ArtColumnMin;
-        double centre = side ? width - column / 2 : width / 2;
+        double centre = !side ? width / 2 : _artLeft ? column / 2 : width - column / 2;
 
         // Уложенная руками на миниатюре в редакторе тем (владелец 15.10) —
         // где положили, а под ней градиент; иначе как прежде: по высоте
@@ -200,6 +200,9 @@ public partial class StatusView : UserControl
         Shade(width, column, side);
     }
 
+    /// <summary>Колонка арта слева, карточки справа (HomeSide.Right).</summary>
+    private bool _artLeft;
+
     /// <summary>Затемнение поверх арта: плотное под карточками, лёгкое в колонке.</summary>
     private void Shade(double width, double column, bool side)
     {
@@ -214,7 +217,9 @@ public partial class StatusView : UserControl
             return;
         }
 
-        double edge = width - column;
+        // Арт слева (HomeSide.Right) — тот же переход зеркально: от карточек влево.
+        double edge = _artLeft ? column : width - column;
+        double toward = _artLeft ? -1 : 1;
         var over = Color.FromArgb((byte)Math.Round(ArtDim * 255), backdrop.R, backdrop.G, backdrop.B);
 
         // Переход начинается под карточками и тянется на большую часть
@@ -229,8 +234,8 @@ public partial class StatusView : UserControl
         ArtShade.Fill = new LinearGradientBrush
         {
             MappingMode = BrushMappingMode.Absolute,
-            StartPoint = new Point(edge - 160, 0),
-            EndPoint = new Point(edge + column * 0.7, 0),
+            StartPoint = new Point(edge - 160 * toward, 0),
+            EndPoint = new Point(edge + column * 0.7 * toward, 0),
             GradientStops =
             {
                 new GradientStop(under, 0),
@@ -1914,12 +1919,15 @@ public partial class StatusView : UserControl
             Layout(column: double.PositiveInfinity, page: double.PositiveInfinity, art: false);
             SetResourceReference(BackgroundProperty, "Chrome");
         }
-        else if (HasSideArt() && TryFindResource(HomePlacement.Key) is HomePlacement)
+        else if (HasSideArt() && TryFindResource(HomePlacement.Key) is HomePlacement placed)
         {
-            // Уложенная руками картинка — под страницей, а страница по центру, как у всех
-            // (владелец 28.10: «не сбоку, а по центру, как у нас»). Прежде здесь была
-            // колонка 940 слева и арт справа, и миниатюра редактора с ней расходилась.
-            Layout(column: double.PositiveInfinity, page: (double)FindResource("ContentMax"), art: true);
+            // Уложенная руками картинка: карточки слева (арт справа, как до 0.20), по центру
+            // или справа (арт слева) — как выбрано в редакторе темы (HomeSide, 28.10).
+            if (placed.Side == HomeSide.Center)
+                Layout(column: double.PositiveInfinity, page: (double)FindResource("ContentMax"), art: true);
+            else
+                Layout(column: 940, page: double.PositiveInfinity, art: true, artLeft: placed.Side == HomeSide.Right);
+
             SetResourceReference(BackgroundProperty, "Backdrop");
 
             // Слой мог прятаться — разложить заново, когда станет известен размер.
@@ -1936,14 +1944,26 @@ public partial class StatusView : UserControl
     }
 
     /// <summary>Раскладка страницы: предел колонки содержимого, предел самой страницы и колонка под арт.</summary>
-    private void Layout(double column, double page, bool art)
+    private void Layout(double column, double page, bool art, bool artLeft = false)
     {
-        // Колонки под арт больше нет ни в одном раскладе: страница всегда во всю ширину
-        // своего предела, по центру; арт — слоем под ней.
-        ContentColumn.MaxWidth = column;
-        ArtColumn.Width = new GridLength(0);
+        // Колонка под арт — только при пределе карточек (сторона «слева» или «справа»);
+        // «справа» — колонки меняются местами: слева арт, справа страница.
+        bool side = art && !double.IsInfinity(column);
+        _artLeft = side && artLeft;
+
+        var content = _artLeft ? ArtColumn : ContentColumn;
+        var rest = _artLeft ? ContentColumn : ArtColumn;
+
+        content.Width = new GridLength(100, GridUnitType.Star);
+        content.MinWidth = 560;
+        content.MaxWidth = column;
+        rest.Width = side ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        rest.MinWidth = 0;
+        rest.MaxWidth = double.PositiveInfinity;
+
         ArtLayer.Visibility = art ? Visibility.Visible : Visibility.Collapsed;
-        Grid.SetColumnSpan(PageScroller, 2);
+        Grid.SetColumn(PageScroller, _artLeft ? 1 : 0);
+        Grid.SetColumnSpan(PageScroller, side ? 1 : 2);
 
         // Только Stretch: с пределом WPF и так ставит страницу по центру, но во всю
         // ширину предела. Center сжимал её до ширины содержимого, и «Главная»

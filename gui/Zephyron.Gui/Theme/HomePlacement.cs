@@ -16,7 +16,7 @@ namespace Zephyron.Gui;
 /// градиент (<see cref="Ground"/>), край картинки в него растворяется
 /// (<see cref="Feather"/>). Одно и то же рисует «Главная» и миниатюра.
 /// </remarks>
-public sealed record HomePlacement(double X, double Y, double Size)
+public sealed record HomePlacement(double X, double Y, double Size, HomeSide Side = HomeSide.Left)
 {
     /// <summary>Ключ ресурса темы с местом картинки.</summary>
     public const string Key = "HomePlacement";
