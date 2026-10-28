@@ -462,8 +462,9 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBox x:Name="WorkerBox" VerticalAlignment="Center"
                                          ToolTip="Адрес воркера, например tg.имя.workers.dev; пусто — без воркера" />
-                                <Button Grid.Column="1" Content="Сохранить" Margin="8,0,0,0" Click="OnWorker" />
-                                <Button Grid.Column="2" Content="Скопировать код" Margin="8,0,0,0" Click="OnWorkerCode"
+                                <Button Grid.Column="1" Style="{StaticResource Ghost}" Content="Сохранить" Margin="8,0,0,0" Click="OnWorker" />
+                                <Button Grid.Column="2" Style="{StaticResource Ghost}" Content="Скопировать код" Margin="8,0,0,0" Click="OnWorkerCode"
+                                        gui:ButtonGlyph.Lead="&#xE8C8;"
                                         ToolTip="Код воркера — в буфер обмена" />
                             </Grid>
                         </StackPanel>

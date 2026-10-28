@@ -208,6 +208,17 @@ public class BlockCheckReasonTests
         Assert.Null(Report(Ok(), Ok(), Nope(), Ok("1200 Б")).Why);
     }
 
+    /// <summary>Открытый по TCP, но с молчащим QUIC — объясняется: браузер на нём подвиснет.</summary>
+    [Fact]
+    public void OpenNameWithSilentQuicIsExplained()
+    {
+        var data = new ProbeOutcome { Ok = true, QuicSilent = true, Detail = "QUIC молчит, а TCP работает" };
+        var report = Report(Ok(), Ok(), Nope(), data);
+
+        Assert.Equal(BlockKind.None, report.Kind);
+        Assert.Equal("QUIC молчит, а TCP работает", report.Why);
+    }
+
     /// <summary>
     /// Восьмидесятый порт решает только там, где не встал 443.
     /// </summary>
