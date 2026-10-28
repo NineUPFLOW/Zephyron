@@ -439,6 +439,19 @@ internal static class SupervisorHost
         if (!settings.KillSwitch || options.NoProxy || options.DnsOnly || !settings.NeedsProxy || !settings.Engines.TunnelTakesAll)
             return null;
 
+        // Чужой обход на WinDivert переотправляет пакеты от имени ядра («System»),
+        // и фильтр закрыл бы ими сам туннель — а с ним весь интернет (замер 28.10).
+        // В «Туннеле» свой winws2 не запускается, значит любой найденный — чужой.
+        var foreign = Core.Diagnostics.OtherBypassScan.Find(new HashSet<int>()).Where(b => b.Running).ToList();
+
+        if (foreign.Count > 0)
+        {
+            Console.WriteLine("Kill switch не включён: рядом работает "
+                + string.Join(", ", foreign.Select(b => $"{b.Name} ({b.Where})"))
+                + " — его пакеты фильтр принял бы за чужие и закрыл бы туннель. Остановите его и перезапустите движки.");
+            return null;
+        }
+
         // Под хостом dotnet.exe разрешение «своей программе» открыло бы выход всем программам .NET.
         var own = Environment.ProcessPath is { } path
             && !Path.GetFileNameWithoutExtension(path).Equals("dotnet", StringComparison.OrdinalIgnoreCase) ? path : null;

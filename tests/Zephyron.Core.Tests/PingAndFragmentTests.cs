@@ -107,6 +107,32 @@ public sealed class PingAndFragmentTests
         Assert.Equal(expected, Outbound(result.Json, "v")["flow"]?.GetValue<string>());
     }
 
+    /// <summary>
+    /// Подписка из жалобы 28.10: vless с flow «-udp443», битый ключ REALITY, ws с испорченным
+    /// %-кодом и Outline с «/» — настоящий sing-box принимает конфиг целиком (без IPv6 у TUN тоже).
+    /// </summary>
+    [Theory]
+    [InlineData("fdfe:dcba:9876::1/126")]
+    [InlineData("")]
+    public void EngineAcceptsTheComplainedSubscription(string tunV6)
+    {
+        string[] links =
+        [
+            "vless://c0559f9f-75e5-49bb-93b1-9faf53618f3b@45.79.155.196:8443?security=reality&type=tcp&flow=xtls-rprx-vision-udp443&sni=play.googleapis.com&fp=chrome&pbk=dcUdmplFTzkuh8c-jQJ05b1INoRIuhR4Y_PZGazKSQE&sid=a1a28a2eba67d784#USA-6656",
+            "vless://c0559f9f-75e5-49bb-93b1-9faf53618f3b@1.2.3.4:443?security=reality&type=tcp&sni=x.com&pbk=broken#bad-reality",
+            "vless://c0559f9f-75e5-49bb-93b1-9faf53618f3b@1.2.3.5:443?security=tls&type=ws&path=%2Fws%25zz&sni=y.com#bad-path",
+            "ss://" + Convert.ToBase64String("chacha20-ietf-poly1305:pass"u8.ToArray()) + "@1.2.3.6:8388/?outline=1#outline",
+        ];
+
+        var servers = links.Select(l => ProxyUriParser.TryParse(l, out var s, out var e) ? s! : throw new Exception(e)).ToList();
+        var engine = RuleSetLoader.Load("mode: selective\nrules: []\n");
+        var result = new SingBoxConfigCompiler().Compile(engine.RuleSet, servers, new SingBoxOptions { TunAddressV6 = tunV6 });
+
+        Assert.Equal(["bad-reality", "bad-path"], result.SkippedServers.Select(s => s.Tag));
+        var check = SingBoxCheck.Run(result.Json);
+        Assert.True(check.Ok, check.Said);
+    }
+
     /// <summary>IPv6 выключен в Windows — у адаптера туннеля только адрес IPv4.</summary>
     [Fact]
     public void TunWithoutIpv6HasOnlyV4Address()
