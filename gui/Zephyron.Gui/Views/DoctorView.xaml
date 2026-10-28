@@ -13,7 +13,8 @@
         -->
         <DataTemplate x:Key="TileTemplate">
             <Button Style="{StaticResource Choice}" Margin="0" Padding="12,8"
-                    Tag="{Binding}" Click="OnTile" Selector.IsSelected="{Binding Open, Mode=OneWay}">
+                    Tag="{Binding}" Click="OnTile" Selector.IsSelected="{Binding Open, Mode=OneWay}"
+                    AutomationProperties.Name="{Binding Title}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />

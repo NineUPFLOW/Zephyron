@@ -564,41 +564,22 @@ public partial class MoreView : UserControl
     }
 
     /// <summary>
-    /// «Сайт не открывается»: пути по очереди, сработавший — в правила (SiteFixer).
+    /// «Сайт не открывается» — автоподбор на это имя: VPN последним, после рецептов
+    /// и пина в hosts (владелец 28.10: «VPN мы экономим»; см. CheckView.OnFixRow).
     /// </summary>
-    private async void OnFix(object sender, RoutedEventArgs e)
+    private void OnFix(object sender, RoutedEventArgs e)
     {
-        var input = FixSite.Text;
-
-        if (string.IsNullOrWhiteSpace(input) || !FixButton.IsEnabled)
+        if (Zephyron.Supervisor.SiteFixer.HostOf(FixSite.Text) is not { } host)
+        {
+            FixResult.Visibility = Visibility.Visible;
+            FixResult.Text = "Не понял адрес. Вставьте ссылку или имя сайта, например aternos.org.";
             return;
+        }
 
-        FixButton.IsEnabled = false;
-        FixButton.Content = "Проверяю…";
+        var picker = new AutoPickWindow { Owner = Window.GetWindow(this) };
+        picker.PickOnOpen(host);
+        picker.ShowDialog();
+
         FixResult.Visibility = Visibility.Visible;
-
-        var progress = new Progress<string>(text => FixResult.Text = text);
-
-        try
-        {
-            var result = await Task.Run(() => Zephyron.Supervisor.SiteFixer.FixAsync(input, progress, CancellationToken.None));
-
-            FixResult.Text = result.Summary;
-
-            Journal.Write("починка сайта", $"{result.Host}: "
-                + string.Join("; ", result.Steps.Select(s => $"{s.Path} — {(s.Works ? "да" : "нет")}, {s.Detail}"))
-                + (result.Applied is { } mode ? $" → записан маршрут {mode}" : " → маршрут не менялся"));
-
-            if (result.Applied is not null && result.NeedsRestart)
-                this.Offer($"Маршрут для {result.Host}: через VPN");
-        }
-        catch (Exception ex)
-        {
-            FixResult.Text = "Проверка не удалась: " + ex.GetBaseException().Message;
-        }
-        finally
-        {
-            FixButton.IsEnabled = true;
-            FixButton.Content = "Починить";
-        }
+        FixResult.Text = $"Подбор для {host} закрыт — что записано, видно в «Маршрутах» и в журнале.";
     }}

@@ -57,7 +57,7 @@
 
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Button Tag="{Binding Id}" Click="OnTheme" Margin="0,0,14,6" Cursor="Hand"
+                                    <Button Tag="{Binding Id}" Click="OnTheme" Margin="0,0,14,6" Cursor="Hand" AutomationProperties.Name="{Binding Tip}"
                                             ToolTip="{Binding Tip}" Opacity="{Binding Fade}">
                                         <Button.Template>
                                             <ControlTemplate TargetType="Button">

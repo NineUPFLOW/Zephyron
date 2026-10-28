@@ -263,7 +263,10 @@ public partial class TunnelSettingsWindow : Window
 
     private void ShowBypass(bool on)
     {
-        BypassLine.Text = on
+        // Kill switch обход перекрывает (SupervisorHost) — строка говорит об этом, а не о выключателе.
+        BypassLine.Text = on && AppSettings.Load(AppSettings.DefaultPath).KillSwitch
+            ? "Не действует: включён kill switch на вкладке VPN — мимо туннеля не уводится ничего."
+            : on
             ? "При мёртвых выходах трафик пойдёт открыто и с домашнего адреса."
             : "При мёртвых выходах сеть не работает, но мимо туннеля не идёт ничего.";
 

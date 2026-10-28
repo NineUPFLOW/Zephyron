@@ -493,7 +493,7 @@
                                 <StackPanel Grid.Column="0">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="Сервер" Style="{StaticResource FieldLabel}" />
-                                        <Button x:Name="ServerCopy" Style="{StaticResource CopyGlyph}" Click="OnCopyServer" Margin="4,0,0,0" />
+                                        <Button x:Name="ServerCopy" Style="{StaticResource CopyGlyph}" Click="OnCopyServer" AutomationProperties.Name="Скопировать сервер" Margin="4,0,0,0" />
                                     </StackPanel>
                                     <TextBlock Text="127.0.0.1" Style="{StaticResource FieldValue}" />
                                 </StackPanel>
@@ -501,7 +501,7 @@
                                 <StackPanel Grid.Column="1">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="Порт" Style="{StaticResource FieldLabel}" />
-                                        <Button x:Name="PortCopy" Style="{StaticResource CopyGlyph}" Click="OnCopyPort" Margin="4,0,0,0" />
+                                        <Button x:Name="PortCopy" Style="{StaticResource CopyGlyph}" Click="OnCopyPort" AutomationProperties.Name="Скопировать порт" Margin="4,0,0,0" />
                                     </StackPanel>
                                     <TextBlock x:Name="PortText" Style="{StaticResource FieldValue}" />
                                 </StackPanel>

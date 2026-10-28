@@ -2267,7 +2267,8 @@ public static class BlockCheck
                         ? "сайт ответил 403 и причину не назвал — связь исправна, проверьте в браузере"
                     : challenged
                         ? "Cloudflare проверяет на робота — связь исправна, браузер проверку пройдёт"
-                        : promised is { } size ? $"{total} из {size} Б" : $"{total} Б",
+                        // «784 из 0 Б» у переадресации с Content-Length: 0 — счёт идёт с заголовками, ноль ни о чём.
+                        : promised is { } size and > 0 ? $"{total} из {size} Б" : $"{total} Б",
                 Received = total,
                 Moved = moved,
                 Assets = assets,
