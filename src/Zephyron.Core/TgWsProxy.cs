@@ -175,7 +175,6 @@ public static class TgWsProxy
     /// <summary>Ожидание домена Cloudflare по умолчанию у самого прокси, секунды.</summary>
     public const int DefaultCfConnectTimeout = 10;
 
-    /// <summary>Ожидание домена Cloudflare в разумных пределах.</summary>
     /// <summary>
     /// Имя воркера из того, что вставил человек: «https://x.workers.dev/» → «x.workers.dev»;
     /// <c>null</c> — пусто или не имя хоста (в ключ запуска чужое не пойдёт).
@@ -201,8 +200,10 @@ public static class TgWsProxy
     public const string WorkerScript = """
         import { connect } from 'cloudflare:sockets';
 
-        // Только сети Telegram: 149.154.160.0/20 и 91.108.0.0/16.
-        const telegram = /^(149\.154\.(1[6-7]\d)\.\d{1,3}|91\.108\.\d{1,3}\.\d{1,3})$/;
+        // Только сети Telegram (149.154.160.0/20, 91.108.4.0–91.108.59.255) и его порты.
+        const octet = '(25[0-5]|2[0-4]\\d|1?\\d?\\d)';
+        const telegram = new RegExp(`^(149\\.154\\.(16\\d|17[0-5])|91\\.108\\.([4-9]|[1-5]\\d))\\.${octet}$`);
+        const ports = [80, 443, 5222];
 
         export default {
           async fetch(request) {
@@ -214,7 +215,7 @@ public static class TgWsProxy
             const colon = dst.lastIndexOf(':');
             const host = colon > 0 ? dst.slice(0, colon) : dst;
             const port = colon > 0 ? Number(dst.slice(colon + 1)) : 443;
-            if (!telegram.test(host) || !(port > 0 && port < 65536))
+            if (!telegram.test(host) || !ports.includes(port))
               return new Response('forbidden', { status: 403 });
 
             const [client, server] = Object.values(new WebSocketPair());
@@ -234,6 +235,7 @@ public static class TgWsProxy
         };
         """;
 
+    /// <summary>Ожидание домена Cloudflare в разумных пределах.</summary>
     public static int CfTimeout(int seconds) => seconds is >= 1 and <= 30 ? seconds : DefaultCfConnectTimeout;
 }
 

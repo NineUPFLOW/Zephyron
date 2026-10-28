@@ -44,6 +44,8 @@ env:
   SINGBOX_DIR: sing-box-1.14.3-extended-2.7.3-windows-amd64
   TGWS_URL: https://github.com/valnesfjord/tg-ws-proxy-rs/releases/download/v2.5.6/tg-ws-proxy-x86_64-pc-windows-gnu.zip
   WINWS2_URL: https://git.zapret.moe/zapretdiscordyoutube/zapret2-fork/releases/download/v1.0.6-33-gcb4b3d2-native/winws2.exe
+  # Чужой сервер, а движок работает с правами администратора: файл сверяется по хешу.
+  WINWS2_SHA256: a8755b3734a7275fa55e50ebc7b193fa9c01120b44ead52fb8a7ae07ae17f061
 
 jobs:
   release:
@@ -87,6 +89,7 @@ jobs:
           curl -fsSL -o dl/singbox.zip "$SINGBOX_URL"
           curl -fsSL -o dl/tgws.zip "$TGWS_URL"
           curl -fsSL -o dl/winws2.exe "$WINWS2_URL"
+          echo "$WINWS2_SHA256  dl/winws2.exe" | sha256sum -c -
           unzip -q dl/singbox.zip -d dl/singbox
           unzip -q dl/tgws.zip -d dl/tgws
           echo "sing-box, tg-ws-proxy и winws2 на месте."

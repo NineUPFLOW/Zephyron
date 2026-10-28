@@ -252,15 +252,22 @@ public static class UpdateInstaller
         var unpacked = Path.Combine(staging, $"files-{Guid.NewGuid():N}");
         var deadline = DateTime.UtcNow + ArchivePatience;
 
+        // Архив могли отпустить между отказом и проверкой «занят ли» — тогда
+        // ещё одна попытка сразу, а не отказ: ошибка была от занятости.
+        bool retriedFree = false;
+
         while (true)
         {
+            bool held = false;
+
             try
             {
                 ZipFile.ExtractToDirectory(archive, unpacked);
                 break;
             }
-            catch (IOException) when (DateTime.UtcNow < deadline && IsHeld(archive))
+            catch (IOException) when (DateTime.UtcNow < deadline && ((held = IsHeld(archive)) || !retriedFree))
             {
+                retriedFree |= !held;
                 // Частично распакованное — убрать: следующая попытка пишет туда же.
                 try
                 {
@@ -272,7 +279,8 @@ public static class UpdateInstaller
                     unpacked = Path.Combine(staging, $"files-{Guid.NewGuid():N}");
                 }
 
-                await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+                if (held)
+                    await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
             }
         }
 

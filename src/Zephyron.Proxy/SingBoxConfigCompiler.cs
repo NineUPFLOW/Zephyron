@@ -47,10 +47,15 @@ public sealed class SingBoxOptions
     /// настоящими адресами в обход fakeip — то есть выборочный перехват
     /// обходился через IPv6, даже когда с IPv4 всё было верно.
     /// Диапазон взят из документации sing-box.
-    /// Пусто — адаптер без IPv6: если IPv6 выключен в Windows через реестр,
+    /// Пусто — адаптер без IPv6 (<see cref="TunAddressV6Here"/>): если IPv6 выключен в Windows через реестр,
     /// движок падает на старте («set ipv6 address: Element not found»).
     /// </remarks>
-    public string TunAddressV6 { get; init; } = Ipv6OffInWindows() ? string.Empty : "fdfe:dcba:9876::1/126";
+    public string TunAddressV6 { get; init; } = DefaultTunAddressV6;
+
+    public const string DefaultTunAddressV6 = "fdfe:dcba:9876::1/126";
+
+    /// <summary>Адрес IPv6 адаптера для этой машины: пусто, если IPv6 выключен в Windows.</summary>
+    public static string TunAddressV6Here() => Ipv6OffInWindows() ? string.Empty : DefaultTunAddressV6;
 
     /// <summary>
     /// IPv6 выключен на обычных адаптерах: бит 0x10 или все биты 0xFF

@@ -294,7 +294,6 @@ public sealed record ProbeOutcome
         : Detail is null ? "—" : "нет";
 }
 
-/// <summary>Что выяснилось про одну цель.</summary>
 /// <summary>Чем режут закрытое рукопожатие.</summary>
 public enum CutBy
 {
@@ -308,6 +307,7 @@ public enum CutBy
     Whitelist,
 }
 
+/// <summary>Что выяснилось про одну цель.</summary>
 public sealed record TargetReport
 {
     public required string Host { get; init; }
@@ -2234,10 +2234,11 @@ public static class BlockCheck
             // Отказ по стране — только когда сайт сам называет страну или регион.
             // Голый 403 бывает чем угодно (антибот, закрытый путь), и звать его
             // «отказывает по стране» значило слать человека в VPN без причины.
+            // Страницу не прочли — судить не по чему, и вердикт остаётся прежним.
             bool unnamed = refused && !regionRefusal && status == 403
-                && !(kept is not null && header > 0
-                    && PageAssets.Decode(kept.ToArray()[header..], chunked, contentEncoding) is { } refusalPage
-                    && NamesRegion(refusalPage));
+                && kept is not null && header > 0
+                && PageAssets.Decode(kept.ToArray()[header..], chunked, contentEncoding) is { } refusalPage
+                && !NamesRegion(refusalPage);
 
             if (unnamed)
                 refused = false;

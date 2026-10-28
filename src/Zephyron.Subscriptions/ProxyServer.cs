@@ -299,7 +299,13 @@ public sealed record ProxyServer
         (Protocol != ProxyProtocol.Shadowsocks || ShadowsocksMethods.ForSingBox(Method) is not null)
         && (!Security.Equals("reality", StringComparison.OrdinalIgnoreCase) || IsRealityKey(RealityPublicKey))
         // «%» без двух шестнадцатеричных цифр в пути: движок не разбирает такой адрес и не стартует.
-        && (Path is null || !System.Text.RegularExpressions.Regex.IsMatch(Path, "%(?![0-9A-Fa-f]{2})"));
+        && !BrokenPathEscape;
+
+    /// <summary>Путь уходит в адрес только у ws, http и httpupgrade — у прочих транспортов он не читается.</summary>
+    private bool BrokenPathEscape =>
+        Path is not null
+        && Transport.ToLowerInvariant() is "ws" or "http" or "httpupgrade"
+        && System.Text.RegularExpressions.Regex.IsMatch(Path, "%(?![0-9A-Fa-f]{2})");
 
     /// <summary>
     /// Ключ REALITY — 32 байта в base64url. С пустым или битым ключом sing-box

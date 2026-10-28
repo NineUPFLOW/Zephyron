@@ -439,7 +439,10 @@ internal static class SupervisorHost
         if (!settings.KillSwitch || options.NoProxy || options.DnsOnly || !settings.NeedsProxy || !settings.Engines.TunnelTakesAll)
             return null;
 
-        var allowed = new[] { Engines.FindSingBox(), Environment.ProcessPath }.OfType<string>().ToList();
+        // Под хостом dotnet.exe разрешение «своей программе» открыло бы выход всем программам .NET.
+        var own = Environment.ProcessPath is { } path
+            && !Path.GetFileNameWithoutExtension(path).Equals("dotnet", StringComparison.OrdinalIgnoreCase) ? path : null;
+        var allowed = new[] { Engines.FindSingBox(), own }.OfType<string>().ToList();
         var opened = KillSwitch.Open(allowed, out var problem);
 
         Console.WriteLine(opened is null

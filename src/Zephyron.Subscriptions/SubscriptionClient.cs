@@ -247,6 +247,7 @@ public sealed class SubscriptionClient : IDisposable
         }
         catch (Exception ex) when (_ownsClient && !cancellationToken.IsCancellationRequested
             && ex is HttpRequestException or TaskCanceledException
+            && TunnelUp() && !KillSwitchOn()
             && Core.PhysicalNetwork.Interface() is { } nic)
         {
             _direct ??= Direct(nic);
@@ -256,6 +257,34 @@ public sealed class SubscriptionClient : IDisposable
                 again.Headers.TryAddWithoutValidation("User-Agent", agent);
 
             return await _direct.SendAsync(again, cancellationToken);
+        }
+    }
+
+    /// <summary>Наш адаптер туннеля поднят: без него первый запрос уже шёл напрямую, и второй ничего не даст.</summary>
+    private static bool TunnelUp()
+    {
+        try
+        {
+            return System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+                .Any(n => n.Name.StartsWith("zephyron", StringComparison.OrdinalIgnoreCase)
+                    && n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>С kill switch мимо туннеля не ходят и за подпиской: человек просил не светить адрес.</summary>
+    private static bool KillSwitchOn()
+    {
+        try
+        {
+            return Core.AppSettings.Load(Core.AppSettings.DefaultPath).KillSwitch;
+        }
+        catch (Exception)
+        {
+            return false;
         }
     }
 

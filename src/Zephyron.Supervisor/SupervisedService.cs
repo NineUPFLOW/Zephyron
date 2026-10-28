@@ -248,6 +248,8 @@ public abstract class SupervisedService
                 if (_repairs < MaxRepairs && TryRepair(_fatal))
                 {
                     _repairs++;
+                    Process.Dispose();
+                    Process = null;
                     return await StartAsync(readinessTimeout, cancellationToken);
                 }
 
@@ -271,6 +273,7 @@ public abstract class SupervisedService
             await Task.Delay(300, cancellationToken);
         }
 
+        _repairs = 0;
         LastError = "функциональная проверка не прошла за отведённое время";
         return false;
     }
@@ -1069,7 +1072,10 @@ public sealed class SingBoxService : SupervisedService
             if (DropOutbound(File.ReadAllText(_configPath), int.Parse(m.Groups[1].Value)) is not { } repaired)
                 return false;
 
-            File.WriteAllText(_configPath, repaired.Json);
+            // Через временный файл: оборванная запись не должна оставить битый конфиг.
+            var temp = _configPath + ".repair";
+            File.WriteAllText(temp, repaired.Json);
+            File.Move(temp, _configPath, overwrite: true);
             Note($"сервер «{repaired.Tag}» убран из конфига: {ExitReason(1, fatal)}");
             return true;
         }
