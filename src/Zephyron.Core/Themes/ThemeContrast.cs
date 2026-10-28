@@ -35,13 +35,18 @@ public static class ThemeSlots
     /// <summary>Цвет необязательного слота, когда тема его не задала.</summary>
     public static ThemeColor Default(string slot, IReadOnlyDictionary<string, ThemeColor> colors) => slot switch
     {
-        // «Работает» — зелёный: яркий на тёмной подложке, глубокий на светлой.
-        Success => colors[Backdrop].Luminance > 0.5
-            ? new ThemeColor(255, 0x0A, 0x7A, 0x4F)
-            : new ThemeColor(255, 0x35, 0xE6, 0xA0),
-        Window => colors[Accent],
+        // «Работает» — акцент темы, пока его не задали (жалоба 28.10: точки, «Работает»
+        // и дорожки «Главной» оставались одним зелёным при любом акценте).
+        Success or Window => colors[Accent],
         _ => throw new ArgumentOutOfRangeException(nameof(slot)),
     };
+
+    /// <summary>
+    /// «Работает», который до 0.20.1 подставлялся сам и который редактор записывал
+    /// в тему нетронутым: такой считается незаданным, и тема получает акцент.
+    /// </summary>
+    public static bool IsOldAutoSuccess(ThemeColor color) =>
+        color == new ThemeColor(255, 0x35, 0xE6, 0xA0) || color == new ThemeColor(255, 0x0A, 0x7A, 0x4F);
 
     /// <summary>
     /// Ключ ресурса в окне: <c>accent-fill</c> ⇄ <c>AccentFill</c>.

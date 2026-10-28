@@ -55,8 +55,8 @@ public partial class ThemeEditorWindow : Window
         (ThemeSlots.AccentFill, "Главная кнопка", "заливка; надпись на ней подберётся сама"),
         (ThemeSlots.OnAccent, "Надпись на главной кнопке", "чёрная или белая — что читается"),
         (ThemeSlots.Accent, "Акцент", "выбранное, вкладки, графики"),
-        (ThemeSlots.Success, "«Работает»", "зелёный по смыслу"),
-        (ThemeSlots.Window, "Рамка окна Windows", "обводка окна и диалогов"),
+        (ThemeSlots.Success, "«Работает»", "точки, дорожки и слово на «Главной»; пока не задан — как акцент"),
+        (ThemeSlots.Window, "Рамка окна Windows", "обводка окна и диалогов; пока не задана — как акцент"),
         (ThemeSlots.Danger, "«Закрыто»", "красный по смыслу"),
         (ThemeSlots.Warn, "«Внимание»", "жёлтый по смыслу"),
         (ThemeSlots.WarnFill, "Точки «внимание»", "мелкие метки"),
@@ -502,7 +502,15 @@ public partial class ThemeEditorWindow : Window
         if (picker.ShowDialog() != true)
             return;
 
+        var before = _colors[slot];
         _colors[slot] = picker.Chosen with { A = _colors[slot].A };
+
+        // «Работает» и рамка, не заданные отдельно (равны акценту), идут за акцентом.
+        if (slot == ThemeSlots.Accent)
+        {
+            foreach (var follower in ThemeSlots.Optional.Where(s => _colors[s] == before))
+                _colors[follower] = _colors[slot];
+        }
 
         // Подпись на главной кнопке — следом за заливкой: иначе первая же
         // светлая заливка с белой подписью не прошла бы проверку.

@@ -97,7 +97,13 @@ public static class ThemeWriter
 
         foreach (var slot in ThemeSlots.All)
         {
-            if (draft.Colors.TryGetValue(slot, out var color))
+            // Необязательный слот, равный своему умолчанию (акценту), не пишется: иначе он
+            // застывал бы и не шёл бы за акцентом при следующих правках темы.
+            bool asDefault = ThemeSlots.Optional.Contains(slot)
+                && draft.Colors.TryGetValue(ThemeSlots.Accent, out var accent)
+                && draft.Colors.TryGetValue(slot, out var own) && own == accent;
+
+            if (!asDefault && draft.Colors.TryGetValue(slot, out var color))
                 colors[slot] = color.ToString();
         }
 

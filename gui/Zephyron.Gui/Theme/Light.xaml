@@ -83,8 +83,8 @@
         <GradientStop Color="#1F14171C" Offset="0" />
         <GradientStop Color="#1414171C" Offset="1" />
     </LinearGradientBrush>
-    <!-- «Работает» — тёмно-зелёным, читаемым на светлой подложке (Themes.Derive). -->
-    <Color x:Key="SuccessColor">#FF0A7A4F</Color>
+    <!-- «Работает» — как акцент, пока тема не задала свой (ThemeSlots.Default, 28.10). -->
+    <Color x:Key="SuccessColor">#FF0B6BCB</Color>
     <SolidColorBrush x:Key="Success" Color="#FF0A7A4F" />
     <SolidColorBrush x:Key="SuccessSoft" Color="#140A7A4F" />
     <SolidColorBrush x:Key="SuccessLine" Color="#660A7A4F" />

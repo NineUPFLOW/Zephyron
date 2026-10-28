@@ -149,6 +149,9 @@ public static class ThemeLoader
         if (colors.TryGetValue(ThemeSlots.AccentFill, out var ownFill) && !colors.ContainsKey(ThemeSlots.OnAccent))
             colors[ThemeSlots.OnAccent] = ColorMath.ReadableOn(ownFill);
 
+        if (colors.TryGetValue(ThemeSlots.Success, out var success) && ThemeSlots.IsOldAutoSuccess(success))
+            colors.Remove(ThemeSlots.Success);
+
         foreach (var slot in ThemeSlots.All)
         {
             if (colors.ContainsKey(slot))
