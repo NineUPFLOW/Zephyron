@@ -372,6 +372,14 @@ public sealed record ProxyServer
     /// </remarks>
     public bool IsUsableOutbound => IsSupportedBySingBox && HasDialableAddress;
 
+    /// <summary>Почему сервер мимо конфига — словами для отчёта; <c>null</c> — годен.</summary>
+    public string? UnusableWhy =>
+        IsUsableOutbound ? null
+        : !HasDialableAddress ? "нет адреса (разделитель панели)"
+        : Protocol == ProxyProtocol.Shadowsocks && ShadowsocksMethods.ForSingBox(Method) is null ? $"шифр «{Method}» движок не знает"
+        : Security.Equals("reality", StringComparison.OrdinalIgnoreCase) && !IsRealityKey(RealityPublicKey) ? "ключ REALITY пуст или испорчен"
+        : "испорченный %-код в пути транспорта";
+
     /// <summary>
     /// Протокол словом — для окна.
     /// </summary>

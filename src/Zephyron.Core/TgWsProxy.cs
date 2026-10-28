@@ -133,6 +133,11 @@ public static class TgWsProxy
                 arguments.AddRange(["--dc-ip", target]);
         }
 
+        // Свой воркер Cloudflare: общие домены упираются в лимиты и отвечают 503,
+        // а прокси пробует воркер раньше них.
+        if (WorkerHost(routes.Worker) is { } worker)
+            arguments.AddRange(["--cf-worker-domain", worker]);
+
         int timeout = CfTimeout(routes.CfConnectTimeout);
 
         if (timeout != DefaultCfConnectTimeout)
@@ -171,6 +176,64 @@ public static class TgWsProxy
     public const int DefaultCfConnectTimeout = 10;
 
     /// <summary>Ожидание домена Cloudflare в разумных пределах.</summary>
+    /// <summary>
+    /// Имя воркера из того, что вставил человек: «https://x.workers.dev/» → «x.workers.dev»;
+    /// <c>null</c> — пусто или не имя хоста (в ключ запуска чужое не пойдёт).
+    /// </summary>
+    public static string? WorkerHost(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return null;
+
+        var host = text.Trim();
+        if (Uri.TryCreate(host.Contains("://") ? host : "https://" + host, UriKind.Absolute, out var uri))
+            host = uri.IdnHost;
+
+        return Uri.CheckHostName(host) == UriHostNameType.Dns && host.Contains('.') ? host.ToLowerInvariant() : null;
+    }
+
+    /// <summary>
+    /// Код воркера для <c>--cf-worker-domain</c>: прокси открывает WebSocket
+    /// на <c>/apiws?dst=адрес&amp;dc=…</c>, воркер ведёт его TCP-соединением к
+    /// дата-центру. Пускает только к адресам Telegram — иначе воркер стал бы
+    /// открытым прокси для кого угодно.
+    /// </summary>
+    public const string WorkerScript = """
+        import { connect } from 'cloudflare:sockets';
+
+        // Только сети Telegram: 149.154.160.0/20 и 91.108.0.0/16.
+        const telegram = /^(149\.154\.(1[6-7]\d)\.\d{1,3}|91\.108\.\d{1,3}\.\d{1,3})$/;
+
+        export default {
+          async fetch(request) {
+            const url = new URL(request.url);
+            if (url.pathname !== '/apiws' || request.headers.get('Upgrade') !== 'websocket')
+              return new Response('ok');
+
+            const dst = url.searchParams.get('dst') || '';
+            const colon = dst.lastIndexOf(':');
+            const host = colon > 0 ? dst.slice(0, colon) : dst;
+            const port = colon > 0 ? Number(dst.slice(colon + 1)) : 443;
+            if (!telegram.test(host) || !(port > 0 && port < 65536))
+              return new Response('forbidden', { status: 403 });
+
+            const [client, server] = Object.values(new WebSocketPair());
+            server.accept();
+
+            const socket = connect({ hostname: host, port });
+            const writer = socket.writable.getWriter();
+            server.addEventListener('message', e =>
+              writer.write(typeof e.data === 'string' ? new TextEncoder().encode(e.data) : new Uint8Array(e.data)).catch(() => {}));
+            server.addEventListener('close', () => socket.close());
+            socket.readable
+              .pipeTo(new WritableStream({ write: chunk => server.send(chunk), close: () => server.close() }))
+              .catch(() => server.close());
+
+            return new Response(null, { status: 101, webSocket: client });
+          },
+        };
+        """;
+
     public static int CfTimeout(int seconds) => seconds is >= 1 and <= 30 ? seconds : DefaultCfConnectTimeout;
 }
 
@@ -181,10 +244,12 @@ public static class TgWsProxy
 public sealed record TgWsProxyRoutes(
     bool DirectMain = false,
     bool DirectOther = false,
-    int CfConnectTimeout = TgWsProxy.DefaultCfConnectTimeout)
+    int CfConnectTimeout = TgWsProxy.DefaultCfConnectTimeout,
+    string? Worker = null)
 {
     public static TgWsProxyRoutes From(AppSettings settings) => new(
         settings.TelegramProxyDirect,
         settings.TelegramProxyDirectOther,
-        settings.TelegramProxyCfTimeout);
+        settings.TelegramProxyCfTimeout,
+        settings.TelegramProxyWorker);
 }

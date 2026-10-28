@@ -132,6 +132,9 @@ public static class SupportReport
         if (Servers(root) is { } servers)
             parts.Add(("servers.txt", servers));
 
+        if (Section(() => SubscriptionServers(root)) is { Length: > 0 } listed)
+            parts.Add(("subscription-servers.txt", listed));
+
         // Журналы сменяются по размеру (RollingLog, 4 МБ), а не по запуску:
         // winws2 пишет строку на соединение, и начало запуска с его первой
         // ошибкой к сбору отчёта нередко уже в прошлом поколении.
@@ -272,6 +275,37 @@ public static class SupportReport
     private static string YesNo(bool value) => value ? "да" : "нет";
 
     /// <summary>Часть отчёта, которая может не собраться: тогда — почему, а не пропуск архива.</summary>
+    /// <summary>
+    /// Серверы из сохранённых подписок: имя, протокол, транспорт и почему
+    /// отброшен. Без адресов, ключей и паролей — их человек выкладывает в обсуждения.
+    /// </summary>
+    internal static string SubscriptionServers(string? root)
+    {
+        var folder = At(root, Subscriptions.SubscriptionPool.DefaultReserveDirectory);
+
+        if (!Directory.Exists(folder))
+            return string.Empty;
+
+        var text = new StringBuilder();
+        int n = 0;
+
+        foreach (var file in Directory.GetFiles(folder, "*.txt").OrderBy(f => f, StringComparer.Ordinal))
+        {
+            var (servers, errors) = Subscriptions.SubscriptionParser.ParseBody(File.ReadAllText(file));
+            int skipped = servers.Count(s => !s.IsUsableOutbound);
+
+            text.AppendLine($"Подписка {++n}: серверов {servers.Count}, отброшено {skipped}, не разобрано строк {errors.Count}");
+
+            foreach (var s in servers)
+                text.AppendLine($"  {(s.IsUsableOutbound ? "+" : "−")} {s.Tag} — {s.ProtocolName} {s.Transport}/{s.Security}"
+                    + (s.UnusableWhy is { } reason ? $": {reason}" : string.Empty));
+
+            text.AppendLine();
+        }
+
+        return text.ToString();
+    }
+
     private static string Section(Func<string> build)
     {
         try

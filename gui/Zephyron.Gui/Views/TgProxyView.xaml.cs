@@ -60,6 +60,7 @@ public partial class TgProxyView : UserControl
         var timeout = TgWsProxy.CfTimeout(settings.TelegramProxyCfTimeout).ToString(System.Globalization.CultureInfo.InvariantCulture);
         var items = CfTimeoutChoice.Items.OfType<ComboBoxItem>().ToList();
         CfTimeoutChoice.SelectedItem = items.FirstOrDefault(i => i.Tag as string == timeout) ?? items[^1];
+        WorkerBox.Text = settings.TelegramProxyWorker ?? string.Empty;
         _showingRoutes = false;
 
         // Без десинка прокси молча не работает: его соединения к Telegram
@@ -344,6 +345,34 @@ public partial class TgProxyView : UserControl
             return;
 
         SaveRoutes(s => s with { TelegramProxyCfTimeout = seconds }, $"Домен Cloudflare прокси ждёт {seconds} с.");
+    }
+
+    private void OnWorker(object sender, RoutedEventArgs e)
+    {
+        var text = WorkerBox.Text.Trim();
+        var host = TgWsProxy.WorkerHost(text);
+
+        if (text.Length > 0 && host is null)
+        {
+            WorkerBox.Focus();
+            return;
+        }
+
+        WorkerBox.Text = host ?? string.Empty;
+        SaveRoutes(s => s with { TelegramProxyWorker = host },
+            host is null ? "Без своего воркера: только общие домены." : $"Воркер {host} — раньше общих доменов.");
+    }
+
+    private void OnWorkerCode(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Clipboard.SetText(TgWsProxy.WorkerScript);
+        }
+        catch (Exception)
+        {
+            // Буфер занят другой программой — нажмут ещё раз.
+        }
     }
 
     /// <summary>

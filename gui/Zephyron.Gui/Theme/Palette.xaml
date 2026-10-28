@@ -109,6 +109,9 @@
         Рамка карточки (Themes.Rim): волосяная кромка цвета текста, ярче
         сверху и гаснет вниз. Ни акцента, ни диагонали.
     -->
+    <!-- Тени под карточками у тёмной темы нет (Themes.Derive). -->
+    <x:Null x:Key="CardShadow" />
+
     <LinearGradientBrush x:Key="CardRim" StartPoint="0,0" EndPoint="0,1">
         <GradientStop Color="#26ECEEF2" Offset="0" />
         <GradientStop Color="#0DECEEF2" Offset="1" />

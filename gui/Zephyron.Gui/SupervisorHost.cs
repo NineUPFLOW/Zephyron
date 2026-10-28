@@ -275,6 +275,9 @@ internal static class SupervisorHost
                 $"Служб под присмотром: {services.Count} " +
                 $"({string.Join(", ", services.Select(s => s.Name))})");
 
+            // Kill switch — на всю жизнь надзора: фильтры уходят вместе с ним.
+            using var killSwitch = OpenKillSwitch(options);
+
             await supervisor.RunAsync(cancellationToken);
             return 0;
         }
@@ -423,6 +426,27 @@ internal static class SupervisorHost
         {
             // Мог завершиться сам между проверкой и вызовом.
         }
+    }
+
+    /// <summary>
+    /// Kill switch — только в режиме «Туннель» и только включённый: в «Гибриде»
+    /// и «Десинке» мимо туннеля и должно идти почти всё.
+    /// </summary>
+    private static KillSwitch? OpenKillSwitch(Options options)
+    {
+        var settings = AppSettings.Load(AppSettings.DefaultPath);
+
+        if (!settings.KillSwitch || options.NoProxy || options.DnsOnly || !settings.NeedsProxy || !settings.Engines.TunnelTakesAll)
+            return null;
+
+        var allowed = new[] { Engines.FindSingBox(), Environment.ProcessPath }.OfType<string>().ToList();
+        var opened = KillSwitch.Open(allowed, out var problem);
+
+        Console.WriteLine(opened is null
+            ? $"Kill switch не включился: {problem}. Трафик мимо туннеля не закрыт."
+            : $"Kill switch: мимо туннеля выходят только {string.Join(", ", allowed.Select(Path.GetFileName))} и локальная сеть.");
+
+        return opened;
     }
 
     private static bool TryAddSingBox(Options options, List<SupervisedService> services)

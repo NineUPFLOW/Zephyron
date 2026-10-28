@@ -76,6 +76,9 @@
     <SolidColorBrush x:Key="LineStrong" Color="#3814171C" />
     <SolidColorBrush x:Key="FieldLine" Color="#B34A5260" />
     <SolidColorBrush x:Key="Scrim" Color="#B3EEF0F3" />
+    <!-- Мягкая тень под карточкой: на светлом фоне иначе теряется (Themes.Derive). -->
+    <DropShadowEffect x:Key="CardShadow" BlurRadius="14" ShadowDepth="2" Direction="270" Opacity="0.10" Color="#000000" RenderingBias="Performance" />
+
     <LinearGradientBrush x:Key="CardRim" StartPoint="0,0" EndPoint="0,1">
         <GradientStop Color="#1F14171C" Offset="0" />
         <GradientStop Color="#1414171C" Offset="1" />

@@ -389,6 +389,10 @@ public static class Themes
         dictionary["LineStrong"] = Tint(ThemeSlots.Text, alpha.LineStrong);
         dictionary["CardRim"] = Rim(theme[ThemeSlots.Text], alpha.RimTop, alpha.RimBottom);
 
+        // Светлая карточка на светлом фоне теряется: мягкая тень снизу. У тёмных
+        // тем тени нет — на тёмном её не видно, а рендер она дорожает.
+        dictionary.Add("CardShadow", light ? CardShadow() : null);
+
         // Рамка поля — приглушённым, плотнее остальных линий: граница ввода
         // должна отличаться от фона не меньше чем втрое (WCAG 1.4.11).
         dictionary["FieldLine"] = Tint(ThemeSlots.Muted, alpha.Field);
@@ -425,6 +429,17 @@ public static class Themes
         dictionary["Success"] = Frozen(new SolidColorBrush(ToColor(success)));
         dictionary["SuccessSoft"] = Frozen(new SolidColorBrush(ToColor(success with { A = alpha.StateSoft })));
         dictionary["SuccessLine"] = Frozen(new SolidColorBrush(ToColor(success with { A = alpha.DangerLine })));
+    }
+
+    private static System.Windows.Media.Effects.DropShadowEffect CardShadow()
+    {
+        var shadow = new System.Windows.Media.Effects.DropShadowEffect
+        {
+            BlurRadius = 14, ShadowDepth = 2, Direction = 270, Opacity = 0.10, Color = Colors.Black,
+            RenderingBias = System.Windows.Media.Effects.RenderingBias.Performance,
+        };
+        shadow.Freeze();
+        return shadow;
     }
 
     private static Brush Gradient(ThemeColor from, ThemeColor to, Point end)
