@@ -132,6 +132,14 @@ public partial class RoutesView
         Reload();
     }
 
+    private void OnRouteExpand(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+
+        if ((sender as FrameworkElement)?.DataContext is PartRow part)
+            part.ShowEntries = !part.ShowEntries;
+    }
+
     /// <summary>Автоподбор одного маршрута — кнопкой в его строке.</summary>
     private void OnRoutePick(object sender, RoutedEventArgs e)
     {
