@@ -36,6 +36,53 @@ public sealed record PartRow : INotifyPropertyChanged
     /// <summary>Полный путь к файлу списка; <c>null</c> — ссылки «список» нет.</summary>
     public string? ListPath { get; init; }
 
+    private bool _showEntries;
+    private string? _entries;
+
+    /// <summary>
+    /// Развёрнут ли список имён и подсетей прямо в строке (просьба пользователя 31.10:
+    /// «14 подсетей», «12 доменов» — посмотреть, какие, не открывая Блокнот).
+    /// </summary>
+    public bool ShowEntries
+    {
+        get => _showEntries;
+        set
+        {
+            _showEntries = value;
+
+            if (value)
+                _entries ??= ReadEntries();
+
+            Changed();
+        }
+    }
+
+    public Visibility ExpandShown => ListPath is not null && System.IO.File.Exists(ListPath) ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility EntriesShown => _showEntries ? Visibility.Visible : Visibility.Collapsed;
+    public string EntriesText => _entries ?? string.Empty;
+    public double ExpandAngle => Chevrons.Angle(_showEntries);
+
+    /// <summary>Строки списка без пустых и комментариев; больше 500 — подсчётом, не перечнем.</summary>
+    private string ReadEntries()
+    {
+        try
+        {
+            var all = System.IO.File.ReadLines(ListPath!)
+                .Select(l => l.Trim())
+                .Where(l => l.Length > 0 && !l.StartsWith('#'))
+                .ToList();
+
+            const int shown = 500;
+            var text = string.Join("   ", all.Take(shown));
+
+            return all.Count > shown ? text + $"{Environment.NewLine}…и ещё {all.Count - shown} — весь список кнопкой «список»." : text;
+        }
+        catch (Exception ex)
+        {
+            return "Список не прочитался: " + ex.GetBaseException().Message;
+        }
+    }
+
     /// <remarks>
     /// У своего домена ссылка есть и без файла: нажатие предлагает его
     /// завести. Сам файл не заводится (владелец, 26.09) — см. OwnLists.
@@ -435,9 +482,7 @@ public sealed record ServiceRow(string Name, IReadOnlyList<PartRow> Parts) : INo
     /// показываются одной строкой без шапки и без стрелки, а имя сервиса
     /// переходит в саму строку.
     /// </remarks>
-    // Всегда ложь (просьба пользователя 31.10): у каждого сервиса шапка и разворот, даже с одним
-    // маршрутом — иначе такой нельзя было свернуть и он выглядел не так, как остальные.
-    public bool Single => false;
+    public bool Single => !IsFolder && Parts.Count == 1;
 
     /// <summary>Шапка — только у того, что вправду сворачивается.</summary>
     public Visibility HeaderShown => Single ? Visibility.Collapsed : Visibility.Visible;
@@ -2119,6 +2164,15 @@ public partial class RoutesView : UserControl
         var subnet = found.Count == 0 && program is null ? AddressInput.Normalize(needle) : null;
         var domain = found.Count == 0 && program is null && subnet is null ? DomainInput.Normalize(needle) : null;
 
+        // Имя или подсеть уже лежат в списке сервиса — «Добавить» не предлагается,
+        // говорится где (ExistingRoute; иначе «в списке нет» спорило с предупреждением).
+        if ((domain ?? subnet) is { } typed && ExistingRoute(typed, domain: domain is not null) is { } where)
+        {
+            AddOffer.Visibility = Visibility.Collapsed;
+            Status.Text = $"Такой маршрут уже записан: {typed} — в {where}.";
+            return;
+        }
+
         // Программа с 13.10 — папка из доменов и адресов (ProgramRoutes), а не
         // правило по процессу, снятое 04.10: его и предлагаем.
         AddOffer.Visibility = domain is null && subnet is null && program is null ? Visibility.Collapsed : Visibility.Visible;
@@ -2644,6 +2698,12 @@ public partial class RoutesView : UserControl
             return;
         }
 
+        if (ExistingRoute(name, domain: true) is { } where)
+        {
+            Status.Text = $"Такой маршрут уже записан: {name} — в {where}. Повтор не добавлен: свой дубль перекрыл бы маршрут сервиса.";
+            return;
+        }
+
         try
         {
             var file = UserRulesFile.Load();
@@ -2670,8 +2730,82 @@ public partial class RoutesView : UserControl
     }
 
     /// <summary>Своя подсеть или адрес — правилом ip, сперва «напрямую», как свой домен.</summary>
+    /// <summary>
+    /// Где имя или подсеть уже записаны — своим правилом или в списке сервиса; <c>null</c> — нигде.
+    /// </summary>
+    /// <remarks>
+    /// Просьба пользователя 31.10: добавленный повтор молча ложился рядом, а свой дубль
+    /// домена перехватывает его раньше маршрута сервиса (тот самый дубль Netflix, 26.10).
+    /// Имя ищется и зоной: mail.example.com уже покрыт строкой *.example.com.
+    /// </remarks>
+    private readonly Dictionary<string, (DateTime Changed, string[]? Lines)> _lists = new(StringComparer.OrdinalIgnoreCase);
+
+    private string[]? Lines(string path)
+    {
+        try
+        {
+            var info = new System.IO.FileInfo(path);
+
+            if (!info.Exists || info.Length >= 2_000_000)
+                return null;
+
+            if (_lists.TryGetValue(path, out var cached) && cached.Changed == info.LastWriteTimeUtc)
+                return cached.Lines;
+
+            var lines = System.IO.File.ReadAllLines(path);
+            _lists[path] = (info.LastWriteTimeUtc, lines);
+            return lines;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private string? ExistingRoute(string value, bool domain)
+    {
+        bool Covers(string line)
+        {
+            var entry = line.Trim();
+
+            if (entry.Length == 0 || entry.StartsWith('#'))
+                return false;
+
+            if (!domain)
+                return string.Equals(entry, value, StringComparison.OrdinalIgnoreCase);
+
+            var zone = entry.TrimStart('*', '.');
+            return string.Equals(zone, value, StringComparison.OrdinalIgnoreCase)
+                || value.EndsWith("." + zone, StringComparison.OrdinalIgnoreCase);
+        }
+
+        foreach (var service in _all)
+        {
+            foreach (var part in service.Parts)
+            {
+                bool found = RouteKeys.Parse(part.Key)?.Value is { } own && Covers(own);
+
+                // Огромные списки (реестр) не читаются — в них своё не ищут; прочие читаются
+                // один раз и держатся до перечитывания: поиск зовёт это на каждую букву.
+                if (!found && part.ListPath is { } path && Lines(path) is { } lines)
+                    found = lines.Any(Covers);
+
+                if (found)
+                    return service.Parts.Count == 1 ? $"«{part.Title}»" : $"«{service.Shown} · {part.Title}»";
+            }
+        }
+
+        return null;
+    }
+
     private void AddSubnet(string subnet)
     {
+        if (ExistingRoute(subnet, domain: false) is { } where)
+        {
+            Status.Text = $"Такой маршрут уже записан: {subnet} — в {where}. Повтор не добавлен.";
+            return;
+        }
+
         try
         {
             var file = UserRulesFile.Load();
