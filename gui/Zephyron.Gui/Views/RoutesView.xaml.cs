@@ -435,7 +435,9 @@ public sealed record ServiceRow(string Name, IReadOnlyList<PartRow> Parts) : INo
     /// показываются одной строкой без шапки и без стрелки, а имя сервиса
     /// переходит в саму строку.
     /// </remarks>
-    public bool Single => !IsFolder && Parts.Count == 1;
+    // Всегда ложь (просьба пользователя 31.10): у каждого сервиса шапка и разворот, даже с одним
+    // маршрутом — иначе такой нельзя было свернуть и он выглядел не так, как остальные.
+    public bool Single => false;
 
     /// <summary>Шапка — только у того, что вправду сворачивается.</summary>
     public Visibility HeaderShown => Single ? Visibility.Collapsed : Visibility.Visible;

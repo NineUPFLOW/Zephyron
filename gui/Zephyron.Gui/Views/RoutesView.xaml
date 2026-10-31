@@ -593,6 +593,14 @@
                                                                   Stretch="Uniform" Width="14" Height="14" />
                                                         </Button>
 
+                                                        <!-- Автоподбор одного маршрута (просьба 31.10): те же этапы, что «Автоподбор» сверху. -->
+                                                        <Button Style="{StaticResource RowGhost}" Padding="9,8" MinWidth="36" Margin="6,0,0,0"
+                                                                Tag="{Binding Key}" Click="OnRoutePick"
+                                                                AutomationProperties.Name="Подобрать путь автоподбором"
+                                                                ToolTip="Автоподбор для этого маршрута: напрямую, десинк, рецепты, пин в hosts и только потом VPN">
+                                                            <TextBlock FontFamily="{StaticResource IconFont}" FontSize="15" Text="&#xE9D2;" />
+                                                        </Button>
+
                                                         <!-- Папки и «убрать» у своего — в «⋯» (OnRouteMore). -->
                                                         <Button Style="{StaticResource RowGhost}" Padding="9,8" MinWidth="36" Margin="6,0,0,0"
                                                                 Tag="{Binding Key}" Click="OnRouteMore"
