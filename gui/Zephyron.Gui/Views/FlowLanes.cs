@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using Zephyron.Core;
 
 namespace Zephyron.Gui.Views;
@@ -91,6 +92,7 @@ public sealed class FlowLanes : Grid
         // 88, а не 104: плашка «Главной» не должна перерастать «Компоненты» рядом (26.10).
         Height = 88;
         SnapsToDevicePixels = false;
+        _ease.Tick += OnEase;
         Children.Add(_canvas);
 
         foreach (var lane in Lanes())
@@ -210,14 +212,44 @@ public sealed class FlowLanes : Grid
             _flow = Math.Max(0, value);
 
             // Логарифм: разница между 1 и 10 Мбит/с видна так же, как между 10 и 100.
-            double speed = 0.4 + Math.Min(1, Math.Log10(1 + _flow) / 2.3) * 2.2;
+            // Диапазон уже прежнего (0,4–2,6): скачок приёма не должен бросать бег втрое.
+            _target = 0.7 + Math.Min(1, Math.Log10(1 + _flow) / 2.3) * 0.9;
 
-            foreach (var lane in Lanes())
-            {
-                // У частично работающего пути пакеты идут замедленно.
-                if (lane.Clock?.Controller is { } controller)
-                    controller.SpeedRatio = lane.State == HomeState.Degraded ? speed * 0.4 : speed;
-            }
+            if (!_ease.IsEnabled && Lanes().Any(l => l.Clock is not null))
+                _ease.Start();
+        }
+    }
+
+    /// <summary>Скорость, к которой бег подтягивается, и та, что сейчас.</summary>
+    private double _target = 0.7, _speed = 0.7;
+
+    /// <summary>
+    /// Плавный переход скорости (жалоба 28.10: «то очень быстро, то медленно»): замер
+    /// приёма приходит раз в секунду, и прежде скорость менялась на нём скачком. Теперь
+    /// бег подтягивается к цели по 6 % за кадр 20 раз в секунду — около секунды на переход.
+    /// </summary>
+    private readonly DispatcherTimer _ease = new() { Interval = TimeSpan.FromMilliseconds(50) };
+
+    private void OnEase(object? sender, EventArgs e)
+    {
+        _speed += (_target - _speed) * 0.06;
+
+        if (Math.Abs(_target - _speed) < 0.005)
+        {
+            _speed = _target;
+            _ease.Stop();
+        }
+
+        ApplySpeed();
+    }
+
+    private void ApplySpeed()
+    {
+        foreach (var lane in Lanes())
+        {
+            // У частично работающего пути пакеты идут замедленно.
+            if (lane.Clock?.Controller is { } controller)
+                controller.SpeedRatio = lane.State == HomeState.Degraded ? _speed * 0.4 : _speed;
         }
     }
 
@@ -370,11 +402,13 @@ public sealed class FlowLanes : Grid
             }
         }
 
-        Flow = _flow;
+        // Новые часы — сразу с нынешней скоростью, без рывка к 1,0.
+        ApplySpeed();
     }
 
     private void Stop()
     {
+        _ease.Stop();
         foreach (var lane in Lanes())
         {
             lane.Stream.ApplyAnimationClock(Shape.StrokeDashOffsetProperty, null);

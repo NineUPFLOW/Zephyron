@@ -99,12 +99,37 @@ public partial class RoutesView
             return;
         }
 
+        menu.Items.Add(MenuEntry("", "Проверить автоподбором", () => PickFolder(folder)));
+        menu.Items.Add(new Separator { Style = (Style)FindResource("MenuLine") });
         menu.Items.Add(MenuEntry("", "Переименовать…", () => Rename(folder)));
         menu.Items.Add(MenuEntry("", "Добавить маршрут…", () => OnAddIntoFolder(anchor, e)));
         menu.Items.Add(new Separator { Style = (Style)FindResource("MenuLine") });
         menu.Items.Add(MenuEntry("", folder.Made ? "Удалить папку" : "Распустить папку", () => Dissolve(folder)));
 
         menu.IsOpen = true;
+    }
+
+    /// <summary>
+    /// Автоподбор на все маршруты папки сразу — как «Автоподбор» сверху, только её имена
+    /// (просьба пользователя 28.10: у Discord семь маршрутов, руками их не проверить).
+    /// </summary>
+    private void PickFolder(ServiceRow folder)
+    {
+        var lists = folder.Parts
+            .Select(p => RouteKeys.Parse(p.Key)?.Value)
+            .OfType<string>()
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (lists.Count == 0)
+        {
+            Status.Text = $"В «{folder.Shown}» нет маршрутов по именам — проверять автоподбором нечего.";
+            return;
+        }
+
+        var picker = new AutoPickWindow { Owner = Window.GetWindow(this) };
+        picker.PickListsOnOpen(lists);
+        picker.ShowDialog();
+        Reload();
     }
 
     private void Rename(ServiceRow folder)
