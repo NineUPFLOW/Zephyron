@@ -132,6 +132,20 @@ public partial class RoutesView
         Reload();
     }
 
+    /// <summary>Автоподбор одного маршрута — кнопкой в его строке.</summary>
+    private void OnRoutePick(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+
+        if (sender is not FrameworkElement { Tag: string key } || RouteKeys.Parse(key)?.Value is not { } value)
+            return;
+
+        var picker = new AutoPickWindow { Owner = Window.GetWindow(this) };
+        picker.PickListsOnOpen(new HashSet<string>(StringComparer.OrdinalIgnoreCase) { value });
+        picker.ShowDialog();
+        Reload();
+    }
+
     private void Rename(ServiceRow folder)
     {
         var window = new FolderNameWindow($"Переименовать «{folder.Shown}»", Taken(except: folder.Name), folder.Shown, "Переименовать")
