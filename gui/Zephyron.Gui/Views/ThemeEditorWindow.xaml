@@ -104,7 +104,9 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="Картинка" />
+                                <TextBlock Text="Картинка или видео" />
+                                <TextBlock Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap"
+                                           Text="PNG, JPG или живой фон — видео MP4: оно крутится по кругу без звука." />
                                 <TextBlock x:Name="ImageName" Style="{StaticResource Caption}" Margin="0,3,0,0"
                                            TextTrimming="CharacterEllipsis" />
                             </StackPanel>
@@ -170,7 +172,7 @@
                             -->
                             <Border Height="1" Background="{DynamicResource Border}" Margin="0,16,0,14" />
 
-                            <TextBlock Text="Картинка на «Главной»" />
+                            <TextBlock Text="Картинка или видео на «Главной»" />
                             <TextBlock Style="{StaticResource Caption}" Margin="0,2,0,0" TextWrapping="Wrap"
                                        Text="Тяните картинку по миниатюре «Главной», колесом или ползунком — размер. Что картинка не закрывает, зальётся градиентом из фона окна в её цвет." />
 

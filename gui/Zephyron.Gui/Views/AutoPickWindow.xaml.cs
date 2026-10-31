@@ -780,6 +780,21 @@ public partial class AutoPickWindow : Window
         OnStart(sender, e);
     }
 
+    /// <summary>Списки и имена папки «Маршрутов», для которых идёт подбор; <c>null</c> — весь список.</summary>
+    private IReadOnlySet<string>? _onlyLists;
+
+    /// <summary>
+    /// Подбор для одной папки «Маршрутов» сразу при открытии: все её части — списки
+    /// сервиса (Discord: голос, медиа, обновления…) и свои имена. Проверять их по одной
+    /// руками долго (просьба пользователя 28.10).
+    /// </summary>
+    public void PickListsOnOpen(IReadOnlySet<string> lists) =>
+        Loaded += (_, _) =>
+        {
+            _onlyLists = lists;
+            OnStart(StartButton, new RoutedEventArgs());
+        };
+
     /// <summary>Подбор одного имени сразу при открытии — «Починить» из проверки блокировок.</summary>
     public void PickOnOpen(string host) =>
         Loaded += (_, _) =>
@@ -821,6 +836,8 @@ public partial class AutoPickWindow : Window
         // Подбор одного сайта ставит имя прямо перед вызовом; обычный «Начать» — нет.
         var only = sender == SiteButton || sender == SiteBox ? _onlyHost : null;
         _onlyHost = null;
+        var onlyLists = _onlyLists;
+        _onlyLists = null;
 
         _work = new CancellationTokenSource();
         var token = _work.Token;
@@ -856,11 +873,19 @@ public partial class AutoPickWindow : Window
 
                     var routes = RoutesOf();
 
+                    // Папка «Маршрутов»: свои имена — как отдельные сайты, части сервиса — их списки.
+                    var folderOwn = onlyLists?.Where(v => v.Contains('.') && !v.Contains(Path.DirectorySeparatorChar)
+                            && !v.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)
+                            && !System.Net.IPAddress.TryParse(v.Split('/')[0], out _))
+                        .Select(v => SiteTarget(v, root)).ToList() ?? [];
+
                     return CheckView.Targets(root, null, false)
+                        .Where(t => onlyLists is null || routes.Map.TryGetValue(t.Service, out var mine) && onlyLists.Contains(mine.List))
                         .Where(t => !routes.Skipped.Contains(t.Service))
                         .Select(t => routes.Map.TryGetValue(t.Service, out var part)
                             ? new AutoPickTarget(t.Host, t.Service, part.List, part.Within, part.DefaultOff)
                             : new AutoPickTarget(t.Host, t.Service))
+                        .Concat(folderOwn)
                         // Как в AutoPick.RunAsync: www.x и x — одно правило *.x, строка одна.
                         .DistinctBy(t => SiteFixer.RuleValue(AutoPickRow.Normalize(t.Host)))
                         .ToList();

@@ -395,13 +395,18 @@
                 <ItemsControl x:Name="Warnings">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Style="{StaticResource Card}" Margin="0,0,0,12" Padding="16,14"
-                                    Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="{DynamicResource Warn}" />
-                                    <TextBlock Text="{Binding Body}" Style="{StaticResource Caption}"
-                                               TextWrapping="Wrap" Margin="0,6,0,0" />
-                                </StackPanel>
+                            <!--
+                                Одной строкой, полный текст — в подсказке: плашка не должна
+                                раздвигать «Главную» так, что низ уходит за край (жалоба 28.10).
+                            -->
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,12" Padding="16,10"
+                                    Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}"
+                                    ToolTip="{Binding Body}">
+                                <TextBlock TextTrimming="CharacterEllipsis">
+                                    <Run Text="{Binding Title, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource Warn}" />
+                                    <Run Text="  " />
+                                    <Run Text="{Binding Body, Mode=OneWay}" Foreground="{DynamicResource Muted}" FontSize="12" />
+                                </TextBlock>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -525,7 +530,13 @@
                                 </DockPanel>
 
                                 <Grid>
-                                    <ItemsControl x:Name="Events" Focusable="False">
+                                    <!--
+                                        Не выше четырёх строк: карточка не растёт от числа событий
+                                        и не раздвигает ряд «Режим работы» (жалоба 28.10). Остальное —
+                                        в «Весь журнал».
+                                    -->
+                                    <ItemsControl x:Name="Events" Focusable="False" MaxHeight="96" ClipToBounds="True"
+                                                  VerticalAlignment="Top">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Grid Margin="0,0,0,7" ToolTip="{Binding Full}">

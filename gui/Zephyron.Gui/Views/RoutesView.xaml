@@ -477,7 +477,7 @@
                                         <Button Grid.Column="4" Style="{StaticResource IconGhost}" Content="&#xE712;"
                                                 Margin="10,0,0,0" Click="OnFolderMore"
                                                 AutomationProperties.Name="Действия с папкой"
-                                                ToolTip="Переименовать, распустить, добавить маршрут" />
+                                                ToolTip="Проверить автоподбором, переименовать, распустить, добавить маршрут" />
                                     </Grid>
                                 </Button>
 
