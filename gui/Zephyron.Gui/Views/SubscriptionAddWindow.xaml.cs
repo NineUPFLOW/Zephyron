@@ -187,7 +187,8 @@ public partial class SubscriptionAddWindow : Window
         {
             KindBox.SelectedIndex = 1;
             KeysBox.Password = string.Join(" ", found.Keys);
-            Show($"{where}: {Count(found.Keys.Count, "ключ", "ключа", "ключей")}. Нажмите «Добавить».");
+            Show($"{where}: {Count(found.Keys.Count, "ключ", "ключа", "ключей")}. Нажмите «Добавить»."
+                + (found.Note is { } note ? " " + note + "." : string.Empty));
             return;
         }
 
