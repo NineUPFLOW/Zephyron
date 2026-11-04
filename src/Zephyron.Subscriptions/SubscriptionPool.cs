@@ -332,6 +332,38 @@ public static class SubscriptionPool
     public static IReadOnlyList<IReadOnlyList<string>> Tag(
         IReadOnlyList<(string Source, IReadOnlyList<ProxyServer> Servers)> parts) => Tags(parts);
 
+    /// <summary>
+    /// Копии: для каждого сервера — имя того, кого он повторяет под другим
+    /// именем, иначе <c>null</c>. Тот же порядок, что у <see cref="Tag"/>.
+    /// </summary>
+    /// <remarks>
+    /// Подписка с «Авто-подбором», «Германией» и «Индонезией» на одном входе с одним
+    /// ключом — один узел под разными «странами». Считается только внутри одной
+    /// подписки: один узел у двух продавцов — перепродажа. Которая запись настоящая,
+    /// по подписке не узнать — копией считается всякая после первой.
+    /// </remarks>
+    public static IReadOnlyList<IReadOnlyList<string?>> Copies(
+        IReadOnlyList<(string Source, IReadOnlyList<ProxyServer> Servers)> parts) =>
+        parts
+            .Select(part =>
+            {
+                var first = new Dictionary<string, string>(StringComparer.Ordinal);
+
+                return (IReadOnlyList<string?>)part.Servers
+                    .Select(server =>
+                    {
+                        var name = Name(server);
+
+                        if (first.TryAdd(Identity(server), name))
+                            return null;
+
+                        var original = first[Identity(server)];
+                        return original.Equals(name, StringComparison.OrdinalIgnoreCase) ? null : original;
+                    })
+                    .ToList();
+            })
+            .ToList();
+
     private static List<List<string>> Tags(IReadOnlyList<(string Source, IReadOnlyList<ProxyServer> Servers)> parts)
     {
         // Первое появление каждого узла: кто он и откуда.
