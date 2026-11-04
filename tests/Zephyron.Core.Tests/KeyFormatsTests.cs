@@ -59,7 +59,7 @@ public class KeyFormatsTests
 
     [Fact]
     public void BrokenAmneziaKeyIsNamed() =>
-        Assert.Equal("ключ AmneziaVPN не читается", KeyImport.FromText("vpn://@@@").Problem);
+        Assert.Equal("ключ AmneziaVPN не читается: внутри не base64", KeyImport.FromText("vpn://@@@").Problem);
 
     [Theory]
     [InlineData("#Germany%3FserverDescription%3DFast%20line")]
@@ -85,5 +85,5 @@ public class KeyFormatsTests
 
     [Fact]
     public void HugeAmneziaKeyIsRefused() =>
-        Assert.Equal("ключ AmneziaVPN не читается", KeyImport.FromText("vpn://" + new string('A', 70_000)).Problem);
+        Assert.Equal("ключ AmneziaVPN не читается: ключ слишком длинный", KeyImport.FromText("vpn://" + new string('A', 70_000)).Problem);
 }
