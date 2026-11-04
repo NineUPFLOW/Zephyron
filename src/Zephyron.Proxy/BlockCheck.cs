@@ -598,7 +598,10 @@ public sealed record TargetReport
         BlockKind.HttpsPort => "только VPN",
         BlockKind.Full => "только VPN",
         BlockKind.Sinkhole => "только VPN",
-        BlockKind.Dns => "свой DNS",
+        // Адрес даёт либо резолвер, либо пин в hosts — и тогда смена резолвера
+        // не поможет: в отчёте 27.10 оба таких имени (notion.so, elevenlabs.io)
+        // были прибиты.
+        BlockKind.Dns => "свой DNS, а прибитое в hosts — снять пин",
         BlockKind.GeoBlock => "только VPN — десинк не поможет",
         BlockKind.Forbidden => "открыть в браузере: открывается — ничего не нужно, отказ и там — VPN",
         BlockKind.BrokenCname => "подставить адрес",
@@ -1196,6 +1199,19 @@ public static class BlockCheck
             };
         }
 
+        // Через туннель вердикт о подмене не выносится, и это важно.
+        // Проксируемому имени движок выдаёт fakeip из 198.18.0.0/15,
+        // а настоящее разрешение происходит на выходе — судить по тому,
+        // что мы видим здесь, значило бы объявлять подменой собственную
+        // работу туннеля.
+        var spoof = viaTunnel ? DnsSpoofResult.Unknown : await SettleSpoofAsync(host, real, walk.Spoof, cancellationToken);
+
+        // Чужой сертификат — сайт не открывается, сколько бы байт ни прошло:
+        // браузер на таком рукопожатии остановится. До 27.10 вердикт оставался
+        // «доступен», а подмена жила отдельной строкой (elevenlabs.io: пин в hosts
+        // на чужой прокси). Это тот же случай, что пин на молчащий адрес.
+        (kind, tcp) = WithSpoof(kind, tcp, spoof);
+
         return new TargetReport
         {
             Host = host,
@@ -1209,13 +1225,7 @@ public static class BlockCheck
             EchName = echName,
             EchHelloAccepted = echAccepted,
             Cut = cut,
-
-            // Через туннель вердикт о подмене не выносится, и это важно.
-            // Проксируемому имени движок выдаёт fakeip из 198.18.0.0/15,
-            // а настоящее разрешение происходит на выходе — судить по тому,
-            // что мы видим здесь, значило бы объявлять подменой собственную
-            // работу туннеля.
-            Spoof = viaTunnel ? DnsSpoofResult.Unknown : await SettleSpoofAsync(host, real, walk.Spoof, cancellationToken),
+            Spoof = spoof,
 
             Addresses = shown,
             Answered = answered?.ToString(),
@@ -1235,6 +1245,12 @@ public static class BlockCheck
             ? parsed[0]!.ToString()
             : null;
     }
+
+    /// <summary>«Доступен» с чужим сертификатом — это «резолвер даёт нерабочий адрес», с подменой в причине.</summary>
+    internal static (BlockKind Kind, ProbeOutcome Tcp) WithSpoof(BlockKind kind, ProbeOutcome tcp, DnsSpoofResult spoof) =>
+        kind == BlockKind.None && spoof.Verdict == DnsVerdict.ForeignCertificate
+            ? (BlockKind.Dns, tcp with { Detail = spoof.Detail })
+            : (kind, tcp);
 
     /// <summary>Нейтральное имя — его не режут ни по какому списку; разрешённое — из тех, что пускает белый список.</summary>
     private static readonly string[] NeutralNames = ["example.com", "www.iana.org"];
