@@ -550,11 +550,15 @@ public static class AutoPick
         var paths = ZapretPaths.Discover();
         var winws = paths is null ? null : Path.Combine(paths.Root, "exe", "winws2.exe");
         ZapretPreset? preset = null;
+        string? presetStem = null;
 
         try
         {
             if (settings.PresetName is { } presetName && ZapretPaths.FindPreset(presetName) is { } presetFile)
+            {
                 preset = new PresetReader().Load(presetFile);
+                presetStem = Path.GetFileNameWithoutExtension(presetFile);
+            }
         }
         catch (Exception ex)
         {
@@ -714,8 +718,12 @@ public static class AutoPick
         // game filter и ширина перехвата меняют, какие соединения он берёт, и замер
         // без них мерил бы не то, что потом запустится (вопрос владельца 26.10).
         // Щит, свои профили и туннель не передаются: их и выбирает подбор.
-        IReadOnlyList<string> PresetArguments() =>
-            WinwsCommandLine.Build(preset!, gameFilter: settings.GameFilter, capture: settings.Capture);
+        IReadOnlyList<string> PresetArguments()
+        {
+            var line = WinwsCommandLine.Build(preset!, gameFilter: settings.GameFilter, capture: settings.Capture).ToList();
+            FakeChoice.Apply(line, presetStem, settings.FakeSwaps);
+            return line;
+        }
 
         // a) Напрямую: движков нет, мерим голую сеть.
         await Stage("direct", timings, () =>
