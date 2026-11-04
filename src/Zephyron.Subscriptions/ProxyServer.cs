@@ -124,6 +124,9 @@ public sealed record ProxyServer
     /// <summary>xtls-rprx-vision для vless.</summary>
     public string? Flow { get; init; }
 
+    /// <summary>Шифрование VLESS (<c>encryption</c>); пусто или «none» — без него. См. <see cref="VlessEncryption"/>.</summary>
+    public string? Encryption { get; init; }
+
     /// <summary>Публичный ключ REALITY (<c>pbk</c>).</summary>
     public string? RealityPublicKey { get; init; }
 
@@ -298,6 +301,8 @@ public sealed record ProxyServer
     public bool IsSupportedBySingBox =>
         (Protocol != ProxyProtocol.Shadowsocks || ShadowsocksMethods.ForSingBox(Method) is not null)
         && (!Security.Equals("reality", StringComparison.OrdinalIgnoreCase) || IsRealityKey(RealityPublicKey))
+        // Строку шифрования VLESS, которую движок не разберёт, он не прощает: падает весь конфиг.
+        && (Protocol != ProxyProtocol.Vless || VlessEncryption.ForSingBox(Encryption) is not null)
         // «%» без двух шестнадцатеричных цифр в пути: движок не разбирает такой адрес и не стартует.
         && !BrokenPathEscape;
 
@@ -384,6 +389,7 @@ public sealed record ProxyServer
         : !HasDialableAddress ? "нет адреса (разделитель панели)"
         : Protocol == ProxyProtocol.Shadowsocks && ShadowsocksMethods.ForSingBox(Method) is null ? $"шифр «{Method}» движок не знает"
         : Security.Equals("reality", StringComparison.OrdinalIgnoreCase) && !IsRealityKey(RealityPublicKey) ? "ключ REALITY пуст или испорчен"
+        : Protocol == ProxyProtocol.Vless && VlessEncryption.ForSingBox(Encryption) is null ? "шифрование VLESS в виде, которого движок не разбирает"
         : "испорченный %-код в пути транспорта";
 
     /// <summary>
