@@ -30,7 +30,13 @@ internal static class Sta
     /// Исключение перебрасывается в поток теста, а не глотается: тест,
     /// молча проходящий при упавшем окне, хуже отсутствующего.
     /// </remarks>
-    public static void Run(Action action)
+    public static void Run(Action action) => Run(action, TimeSpan.FromMinutes(1));
+
+    /// <summary>
+    /// То же, но со своим сроком: снимкам разделов минуты не хватает —
+    /// они снимают каждую страницу дважды, обычной высоты и целиком.
+    /// </summary>
+    public static void Run(Action action, TimeSpan timeout)
     {
         Exception? failure = null;
 
@@ -63,8 +69,8 @@ internal static class Sta
 
         // Без срока: висящий тест хуже упавшего только тем, что не назван.
         // Минута с запасом — разбор всех словарей тем занимает доли секунды.
-        if (!thread.Join(TimeSpan.FromMinutes(1)))
-            throw new TimeoutException("поток STA не завершился за минуту");
+        if (!thread.Join(timeout))
+            throw new TimeoutException($"поток STA не завершился за {timeout.TotalMinutes:0.#} мин");
 
         if (failure is not null)
             throw new InvalidOperationException(failure.Message, failure);

@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -63,6 +64,7 @@ public sealed class ScreenshotTests
                     window.Open(section);
                     Pump(TimeSpan.FromMilliseconds(700));
                     Save((FrameworkElement)window.Content, Path.Combine(folder, $"{width}x{height}-{section}.png"));
+                    SaveFull(window, Path.Combine(folder, $"{width}x{height}-{section}-full.png"));
                 }
             }
 
@@ -83,6 +85,7 @@ public sealed class ScreenshotTests
                     window.Open(section);
                     Pump(TimeSpan.FromMilliseconds(700));
                     Save((FrameworkElement)window.Content, Path.Combine(folder, $"light-{section}.png"));
+                    SaveFull(window, Path.Combine(folder, $"light-{section}-full.png"));
                 }
 
                 palettes[dark] = darkPalette;
@@ -126,6 +129,7 @@ public sealed class ScreenshotTests
 
                     Pump(TimeSpan.FromMilliseconds(900));
                     Save((FrameworkElement)window.Content, Path.Combine(folder, $"{width}x{height}-status-{name}.png"));
+                    SaveFull(window, Path.Combine(folder, $"{width}x{height}-status-{name}-full.png"));
                 }
 
                 home.PageScroller.ScrollToVerticalOffset(380);
@@ -185,7 +189,71 @@ public sealed class ScreenshotTests
                 Save(Chrome(dialog), Path.Combine(folder, $"dialog-{name}.png"), dialog.Background);
                 dialog.Close();
             }
-        });
+        }, TimeSpan.FromMinutes(6));
+    }
+
+    /// <summary>
+    /// Снимок страницы целиком: окно раздвигается на высоту содержимого,
+    /// поэтому видно всё, что есть в разделе, а не только верхний экран.
+    /// </summary>
+    /// <remarks>
+    /// Высота берётся у полосы прокрутки раздела (<see cref="ScrollViewer.ExtentHeight"/>),
+    /// к ней добавляется всё, что вне окна прокрутки, — полоса меню и поля
+    /// страницы. Предел 8000 точек: выше снимок становится нечитаемо длинным
+    /// и занимает сотни мегабайт. Окно возвращается к прежнему размеру.
+    /// </remarks>
+    private static void SaveFull(Window window, string path)
+    {
+        if (window.Content is not FrameworkElement root)
+            return;
+
+        var scroller = FindScrollViewer(root);
+
+        if (scroller is null || scroller.ScrollableHeight <= 0)
+        {
+            Save(root, path);
+            return;
+        }
+
+        double chrome = window.Height - root.ActualHeight;
+        double outside = root.ActualHeight - scroller.ViewportHeight;
+        double needed = Math.Min(8000, Math.Ceiling(scroller.ExtentHeight + outside) + 4) + chrome;
+        double old = window.Height;
+
+        window.Height = Math.Max(needed, old);
+        Pump(TimeSpan.FromMilliseconds(450));
+        scroller.ScrollToTop();
+        Pump(TimeSpan.FromMilliseconds(150));
+        Save((FrameworkElement)window.Content, path);
+
+        window.Height = old;
+        Pump(TimeSpan.FromMilliseconds(200));
+    }
+
+    /// <summary>Первая полоса прокрутки с содержимым выше окна; иначе — любая.</summary>
+    private static ScrollViewer? FindScrollViewer(DependencyObject root)
+    {
+        ScrollViewer? first = null;
+
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+
+            if (child is ScrollViewer viewer)
+            {
+                if (viewer.ScrollableHeight > 0)
+                    return viewer;
+
+                first ??= viewer;
+            }
+
+            var deeper = FindScrollViewer(child);
+
+            if (deeper is not null)
+                return deeper;
+        }
+
+        return first;
     }
 
     private static void Pump(TimeSpan time)
