@@ -144,7 +144,8 @@ public partial class RoutesView
             var current = UserRulesFile.Load().Entries;
             var diff = RulesShare.Compare(current, incoming);
 
-            if (diff.Same)
+            // Те же правила, но в наборе есть новый список: его всё равно надо завести.
+            if (diff.Same && RouteBundle.ListNames(dialog.FileName).All(n => OwnLists.Exists(n)))
             {
                 Status.Text = "Маршруты в файле совпадают с вашими — менять нечего.";
                 return;
@@ -197,6 +198,11 @@ public partial class RoutesView
         Listed(text, "Добавится", diff.Added.Select(RulesShare.Describe).ToList());
         Listed(text, "Уйдёт", diff.Removed.Select(RulesShare.Describe).ToList());
         Listed(text, "Изменится", diff.Changed.Select(c => RulesShare.Describe(c.Before, c.After)).ToList());
+
+        int fresh = bundled.Count(n => !OwnLists.Exists(n));
+
+        if (fresh > 0)
+            text.AppendLine($"Заведётся новых списков из файла: {fresh}.");
 
         // Правило на список, которого здесь нет, не ловит ничего — молча.
         var missing = RulesShare.MissingLists(incoming)
