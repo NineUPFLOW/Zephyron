@@ -106,7 +106,7 @@ public sealed record PresetRow(string Name, string Version, string Fake) : INoti
     /// пресет к чужим. Universal ведём мы — это и есть признак.
     /// </remarks>
     public bool Official =>
-        Name.StartsWith("Universal", StringComparison.OrdinalIgnoreCase);
+        Name.StartsWith("Universal", StringComparison.OrdinalIgnoreCase) && Version.Length > 0;
 
     public Brush Edge =>
         (Brush)Application.Current.FindResource(Chosen ? "AccentLine" : "Border");
@@ -584,6 +584,7 @@ public partial class DesyncView : UserControl
         // Открывать нечего, пока пресет не выбран: карточка в этом состоянии
         // описывает отсутствие выбора, а не файл.
         EditButton.IsEnabled = settings.PresetName is not null;
+        FakesButton.IsEnabled = settings.PresetName is not null;
 
         // Подсказка перехвата говорит о выбранном пресете — сменился он,
         // сменилось и то, какие его секции останутся без трафика.
@@ -725,7 +726,91 @@ public partial class DesyncView : UserControl
         menu.Items.Add(MenuEntry("", "Показать файл в папке", () =>
             Process.Start(new ProcessStartInfo { FileName = "explorer.exe", Arguments = $"/select,\"{path}\"" })));
 
+        menu.Items.Add(new Separator());
+        menu.Items.Add(MenuEntry("", "Дублировать…", () => DuplicatePreset(file)));
+
+        // Пресет программы обновление вернёт под прежним именем — переименовывается его копия.
+        var rename = MenuEntry("", "Переименовать…", () => RenamePreset(file));
+
+        if (PresetCopies.Shipped(path))
+        {
+            rename.IsEnabled = false;
+            rename.ToolTip = "Пресет программы возвращается с каждым обновлением — переименуйте его копию.";
+            ToolTipService.SetShowOnDisabled(rename, true);
+        }
+
+        menu.Items.Add(rename);
         menu.IsOpen = true;
+    }
+
+    /// <summary>Окно выбора подделок секций выбранного пресета (<see cref="FakeChoice"/>).</summary>
+    private void OnPickFakes(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
+
+            if (settings.PresetName is not { } name || ZapretPaths.FindPreset(name) is not { } file)
+            {
+                Status.Text = "Пресет не выбран или его файла нет — подделки выбирать не у чего.";
+                return;
+            }
+
+            var window = new FakePickerWindow(new PresetReader().Load(file), Path.GetFileNameWithoutExtension(file),
+                settings.FakeSwaps, ZapretPaths.Discover()?.Root)
+            { Owner = Window.GetWindow(this) };
+
+            if (window.ShowDialog() != true || window.Result is not { } swaps)
+                return;
+
+            (settings with { FakeSwaps = swaps }).Save(AppSettings.DefaultPath);
+            Status.Text = "Подделки секций сохранены. Подействуют со следующего запуска движков.";
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Не вышло: " + ex.GetBaseException().Message;
+        }
+    }
+
+    /// <summary>Копия пресета под новым именем — своя, обновление её не тронет.</summary>
+    private void DuplicatePreset(string file)
+    {
+        var directory = ZapretPaths.PresetDirectory;
+        var name = Path.GetFileNameWithoutExtension(file);
+
+        var window = new PresetNameWindow($"Дублировать «{name}»",
+            "Копия — ваш пресет: её можно править и переименовывать, обновление программы её не тронет.",
+            "Создать", PresetCopies.CopyName(directory, name), directory)
+        { Owner = Window.GetWindow(this) };
+
+        if (window.ShowDialog() != true || window.Chosen is not { } chosen)
+            return;
+
+        PresetCopies.Duplicate(directory, file, chosen);
+        Journal.Write("десинк", $"пресет «{name}» скопирован как «{chosen}»");
+        Reload();
+        Status.Text = $"Создан пресет «{chosen}». Чтобы он заработал, выберите его.";
+    }
+
+    /// <summary>Новое имя своему пресету; выбор идёт за ним.</summary>
+    private void RenamePreset(string file)
+    {
+        var directory = ZapretPaths.PresetDirectory;
+        var name = Path.GetFileNameWithoutExtension(file);
+
+        var window = new PresetNameWindow($"Переименовать «{name}»",
+            "Если пресет выбран, выбор перейдёт на новое имя; движки подхватят его при следующем запуске.",
+            "Переименовать", name, directory, except: file)
+        { Owner = Window.GetWindow(this) };
+
+        if (window.ShowDialog() != true || window.Chosen is not { } chosen || chosen == name)
+            return;
+
+        PresetCopies.Rename(directory, file, chosen);
+        PresetCopies.Renamed(AppSettings.Load(AppSettings.DefaultPath), name, chosen).Save(AppSettings.DefaultPath);
+        Journal.Write("десинк", $"пресет «{name}» переименован в «{chosen}»");
+        Reload();
+        Status.Text = $"Пресет «{name}» теперь называется «{chosen}».";
     }
 
     private MenuItem MenuEntry(string glyph, string text, Action act)

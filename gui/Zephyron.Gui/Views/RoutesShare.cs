@@ -69,8 +69,8 @@ public partial class RoutesView
         var dialog = new SaveFileDialog
         {
             Title = "Куда сохранить маршруты",
-            FileName = "zephyron-routes.yaml",
-            Filter = "Маршруты Zephyron (*.yaml)|*.yaml|Все файлы|*.*",
+            FileName = "zephyron-routes" + RouteBundle.Extension,
+            Filter = "Маршруты со своими списками (*.zyroutes)|*.zyroutes|Только правила (*.yaml)|*.yaml|Все файлы|*.*",
         };
 
         if (dialog.ShowDialog() != true)
@@ -78,13 +78,17 @@ public partial class RoutesView
 
         try
         {
-            File.Copy(source, dialog.FileName, overwrite: true);
-
             var rules = UserRulesFile.Load().Entries;
             var own = RulesShare.OnOwnLists(rules);
+            var bundle = dialog.FileName.EndsWith(RouteBundle.Extension, StringComparison.OrdinalIgnoreCase);
+
+            if (bundle)
+                RouteBundle.Write(source, dialog.FileName);
+            else
+                File.Copy(source, dialog.FileName, overwrite: true);
 
             Status.Text = $"Сохранено: {rules.Count} маршрутов в {dialog.FileName}."
-                + (own > 0 ? $" Правил на свои списки: {own} — их домены в файл не вошли." : string.Empty);
+                + (own > 0 && !bundle ? $" Правил на свои списки: {own} — их домены в файл не вошли; сохраните как .zyroutes, чтобы списки поехали вместе." : string.Empty);
         }
         catch (Exception ex)
         {
@@ -111,7 +115,7 @@ public partial class RoutesView
         var dialog = new OpenFileDialog
         {
             Title = "Откуда загрузить маршруты",
-            Filter = "Маршруты Zephyron (*.yaml)|*.yaml|Все файлы|*.*",
+            Filter = "Маршруты Zephyron (*.zyroutes;*.yaml)|*.zyroutes;*.yaml|Все файлы|*.*",
         };
 
         if (dialog.ShowDialog() != true)
@@ -121,7 +125,7 @@ public partial class RoutesView
 
         try
         {
-            incoming = RulesShare.Read(dialog.FileName);
+            incoming = RouteBundle.Read(dialog.FileName);
         }
         catch (Exception ex)
         {
@@ -146,19 +150,21 @@ public partial class RoutesView
                 return;
             }
 
-            if (MessageBox.Show(Question(diff, incoming), "Загрузить маршруты из файла?",
+            if (MessageBox.Show(Question(diff, incoming, RouteBundle.ListNames(dialog.FileName)), "Загрузить маршруты из файла?",
                     MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK)
             {
                 return;
             }
 
             var backup = RulesShare.Backup();
+            var (created, kept) = RouteBundle.ImportLists(dialog.FileName);
 
             var file = UserRulesFile.Load();
             file.ReplaceAll(incoming);
             file.Save();
 
             Status.Text = $"Загружено: {incoming.Count} маршрутов. Применится при следующем запуске движков."
+                + (created + kept > 0 ? $" Списков заведено: {created}" + (kept > 0 ? $", оставлено ваших с тем же названием: {kept}." : ".") : string.Empty)
                 + (backup is null ? string.Empty : $" Прежние — в {backup}.");
 
             this.Offer("Маршруты загружены");
@@ -172,7 +178,7 @@ public partial class RoutesView
     }
 
     /// <summary>Вопрос перед заменой: сколько и что именно.</summary>
-    private static string Question(RulesDiff diff, IReadOnlyList<UserRuleEntry> incoming)
+    private static string Question(RulesDiff diff, IReadOnlyList<UserRuleEntry> incoming, IReadOnlyList<string> bundled)
     {
         var text = new System.Text.StringBuilder();
 
@@ -183,7 +189,9 @@ public partial class RoutesView
         Listed(text, "Изменится", diff.Changed.Select(c => RulesShare.Describe(c.Before, c.After)).ToList());
 
         // Правило на список, которого здесь нет, не ловит ничего — молча.
-        var missing = RulesShare.MissingLists(incoming);
+        var missing = RulesShare.MissingLists(incoming)
+            .Where(m => !(OwnLists.IsOwn(m.Value) && bundled.Contains(OwnLists.NameOf(m.Value), StringComparer.OrdinalIgnoreCase)))
+            .ToList();
 
         if (missing.Count > 0)
         {

@@ -304,6 +304,13 @@
             <ItemsControl x:Name="Resolvers" Margin="0,10,0,0">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
+                        <StackPanel>
+                        <!-- Заголовок раздела: только у первой строки раздела. -->
+                        <StackPanel Visibility="{Binding HeadShown}" Margin="2,14,0,8">
+                            <TextBlock Text="{Binding HeadTitle}" Style="{StaticResource Eyebrow}" />
+                            <TextBlock Text="{Binding HeadHint}" Style="{StaticResource Caption}" Margin="0,2,0,0"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
                         <Button Style="{StaticResource Choice}" BorderBrush="{Binding Edge}"
                                 Selector.IsSelected="{Binding Chosen, Mode=OneWay}"
                                 Tag="{Binding Address}" Click="OnChoose">
@@ -374,6 +381,7 @@
                                         Tag="{Binding Udp}" Click="OnRemoveOwn" />
                             </Grid>
                         </Button>
+                        </StackPanel>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
