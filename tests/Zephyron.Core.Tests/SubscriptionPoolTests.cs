@@ -448,8 +448,7 @@ public sealed class SubscriptionPoolTests
 
         try
         {
-            SubscriptionPool.SaveReserve(folder, url, "trojan://secret@a.example:443#Германия
-");
+            SubscriptionPool.SaveReserve(folder, url, "trojan://secret@a.example:443#Германия\n");
             Age(folder, TimeSpan.FromMinutes(ageMinutes));
 
             var kept = SubscriptionPool.KeptWhileAsking(url, force, DateTimeOffset.Now, folder);
