@@ -84,8 +84,15 @@ public sealed record ServerRow(
     string? SkipWhy = null,
 
     /// <summary>Описание сервера от панели — строкой под именем; пусто — нет.</summary>
-    string Description = "")
+    string Description = "",
+
+    /// <summary>Чью копию повторяет сервер под другим именем (<see cref="SubscriptionPool.Copies"/>); null — не копия.</summary>
+    string? FakeOf = null)
 {
+    public Visibility FakeShown => FakeOf is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public string? FakeTip => FakeOf is null ? null : $"копия {FakeOf}";
+
     public Visibility DescriptionShown => Description.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
 
     /// <summary>Подпись под именем на узком окне: «Vless, адрес · замер …».</summary>
@@ -808,23 +815,36 @@ public partial class VpnView : UserControl
 
         try
         {
-            // По очереди, а не разом: панели подписок нередко одна и та же,
-            // и три запроса в одну секунду с одного адреса ей не нравятся.
+            // Разные панели — разом, одна панель — по очереди (SubscriptionPool.ByPanel):
+            // три запроса в одну секунду с одного адреса панели не нравятся, а по одной
+            // на всех молчащая панель держала бы соседей.
             //
-            // Номер называется вслух: при зависшей панели «Читаю подписки…»
-            // без номера не говорит даже того, которая из трёх не отвечает.
+            // Ждущие называются по имени: при зависшей панели «Обновляю подписки…»
+            // не говорит даже того, которая не отвечает. Их серверы из запаса
+            // видны в строках уже сейчас (FillAsync).
             bool everyRead = true;
+            var waiting = _rows.Where(r => !r.IsKeys).Select(r => r.Entry.Name).ToList();
 
-            for (int i = 0; i < _rows.Count; i++)
+            void ShowWaiting() => Status.Text = waiting.Count switch
+            {
+                0 => string.Empty,
+                1 => $"Обновляю подписку «{waiting[0]}»…",
+                _ => $"Обновляю подписки: «{string.Join("», «", waiting)}»…",
+            };
+
+            ShowWaiting();
+
+            // Продолжения FillAsync — в потоке окна: строки, флаг и список
+            // ждущих меняются по одному, хоть панели и отвечают вперемешку.
+            await SubscriptionPool.ByPanel(_rows, r => r.IsKeys ? string.Empty : r.Entry.Url, async row =>
             {
                 token.ThrowIfCancellationRequested();
 
-                Status.Text = _rows.Count > 1
-                    ? $"Читаю подписку {i + 1} из {_rows.Count}…"
-                    : "Читаю подписку…";
+                everyRead &= await FillAsync(row, settings, token, force);
 
-                everyRead &= await FillAsync(_rows[i], settings, token, force);
-            }
+                waiting.Remove(row.Entry.Name);
+                ShowWaiting();
+            });
 
             // Теги пула — до чистки замеров: замеры подписок в работе лежат
             // под ними, и чистка по исходным тегам выбросила бы их.
@@ -889,6 +909,15 @@ public partial class VpnView : UserControl
 
         try
         {
+            // Запас — сразу, пока спрашивается панель: серверы лежащей панели видны, а не «читаю…».
+            if (await Task.Run(() => SubscriptionPool.KeptWhileAsking(row.Entry.Url, force, DateTimeOffset.Now), cancellationToken)
+                is { } kept)
+            {
+                var (shown, _) = Take(row, kept.Info, settings);
+                row.Detail = $"обновляю… · серверы из запаса {When(kept.At)} · {shown} серверов";
+                Redraw();
+            }
+
             // Чтение и разбор — в фоне. Без Task.Run разбор шёл продолжением
             // на главном потоке: замер 28.09 — паузы окна по 70–166 мс, пока
             // приходили подписки, прямо посреди появления раздела.
@@ -901,22 +930,8 @@ public partial class VpnView : UserControl
             if (read.Info is not { } info)
                 throw new SubscriptionUnreadException(read.Error ?? "панель не ответила");
 
-            var usable = info.Servers.Where(s => s.IsUsableOutbound).ToList();
-
-            // Теги пула ставятся, когда прочитаны все (ApplyPool): метка
-            // зависит от соседних подписок. До того — исходные.
-            row.Raw = info.Servers;
-            row.Pooled = info.Servers;
-            row.AsGiven = Rows(usable, row.Entry.Name, settings);
-            row.Servers = InChosenOrder(row.AsGiven);
-
-            // Отброшенные называются числом, а не замалчиваются: человек,
-            // видящий в подписке двадцать серверов и пятнадцать здесь,
-            // вправе знать, куда делись пять.
-            int skipped = info.Servers.Count - usable.Count;
-
-            var at = (read.At ?? DateTimeOffset.Now).LocalDateTime;
-            var when = at.Date == DateTime.Today ? $"{at:HH:mm}" : $"{at:dd.MM HH:mm}";
+            var (usable, skipped) = Take(row, info, settings);
+            var when = When(read.At ?? DateTimeOffset.Now);
 
             // Из запаса — так и сказано, с причиной: иначе лежащая панель
             // выглядела бы живой подпиской с часовой давности временем.
@@ -925,22 +940,11 @@ public partial class VpnView : UserControl
                 read.Source == SubscriptionReadSource.Reserve
                     ? $"{read.Error ?? "панель подвела"} — серверы из запаса {when}"
                     : $"обновлена {when}",
-                $"{usable.Count} серверов",
+                $"{usable} серверов",
             };
 
             if (skipped > 0)
                 parts.Add($"ещё {skipped} sing-box не поддерживает");
-
-            // Квота и срок — полоской под именем (19.10, как в Happ), а не словами
-            // в этой строке. Темп — по истории расхода, которую пишет каждое
-            // чтение панели, и окном, и надзором.
-            row.Usage = SubscriptionUsage.Forecast(info, SubscriptionUsage.Samples(row.Entry.Url), DateTimeOffset.Now);
-
-            // Ключи (KeyRing) заголовков не шлют: у них этих полей нет и не будет.
-            row.SupportUrl = info.SupportUrl;
-            row.WebPageUrl = info.WebPageUrl;
-            row.Announce = info.Announce;
-            row.Warning = info.ExpiryWarningText(DateTimeOffset.Now);
 
             // Поставщик перенёс подписку — ссылка в книге новая, и в этой
             // книге тоже: вкладка держит свою и записала бы старую обратно.
@@ -957,7 +961,7 @@ public partial class VpnView : UserControl
             // Пусто, а панель ответила — причина называется. Молча выходило
             // «0 серверов · 14 дн» (issue #3), и понять, что сломан разбор,
             // а не подписка, было нечем.
-            if (usable.Count == 0 && info.Errors.Count > 0)
+            if (usable == 0 && info.Errors.Count > 0)
             {
                 parts.Add("не разобралась: " + info.Errors[0]);
                 Journal.Write("подписка", $"«{row.Entry.Name}» ответила, но серверов 0: "
@@ -974,7 +978,7 @@ public partial class VpnView : UserControl
             // никуда не делись, и их замеры трогать нельзя. Запас — тоже
             // не прочтение: что у панели сейчас, неизвестно.
             return read.Source != SubscriptionReadSource.Reserve
-                && !(usable.Count == 0 && info.Errors.Count > 0);
+                && !(usable == 0 && info.Errors.Count > 0);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -1004,6 +1008,38 @@ public partial class VpnView : UserControl
 
         Redraw();
         return false;
+    }
+
+    /// <summary>Кладёт в строку серверы, квоту и заголовки подписки — из ответа панели или из запаса.</summary>
+    /// <returns>Сколько серверов годятся sing-box и сколько отброшено.</returns>
+    private (int Usable, int Skipped) Take(SubRow row, SubscriptionInfo info, AppSettings settings)
+    {
+        var usable = info.Servers.Where(s => s.IsUsableOutbound).ToList();
+
+        // Теги пула ставятся, когда прочитаны все (ApplyPool): метка
+        // зависит от соседних подписок. До того — исходные.
+        row.Raw = info.Servers;
+        row.Pooled = info.Servers;
+        row.AsGiven = Rows(usable, row.Entry.Name, settings);
+        row.Servers = InChosenOrder(row.AsGiven);
+
+        // Квота и срок — полоской под именем; темп — по истории расхода, которую пишет каждое чтение панели.
+        row.Usage = SubscriptionUsage.Forecast(info, SubscriptionUsage.Samples(row.Entry.Url), DateTimeOffset.Now);
+
+        // Ключи (KeyRing) заголовков не шлют: у них этих полей нет и не будет.
+        row.SupportUrl = info.SupportUrl;
+        row.WebPageUrl = info.WebPageUrl;
+        row.Announce = info.Announce;
+        row.Warning = info.ExpiryWarningText(DateTimeOffset.Now);
+
+        return (usable.Count, info.Servers.Count - usable.Count);
+    }
+
+    /// <summary>«14:05» сегодняшнее, «21.10 14:05» прежнее.</summary>
+    private static string When(DateTimeOffset moment)
+    {
+        var at = moment.LocalDateTime;
+        return at.Date == DateTime.Today ? $"{at:HH:mm}" : $"{at:dd.MM HH:mm}";
     }
 
     /// <summary>
@@ -1039,6 +1075,10 @@ public partial class VpnView : UserControl
             // в папке стояли бы две строки с одним и тем же чужим именем.
             var own = row.Raw.Where(s => s.IsUsableOutbound).ToList();
 
+            // Копии: тот же узел под другим именем внутри подписки — «fake server» с подсказкой, чью копию он повторяет.
+            var copies = SubscriptionPool.Copies([(row.Entry.Name, row.Raw)])[0]
+                .Where((_, j) => row.Raw[j].IsUsableOutbound).ToList();
+
             if (own.Count == row.AsGiven.Count)
             {
                 row.AsGiven = row.AsGiven
@@ -1054,6 +1094,7 @@ public partial class VpnView : UserControl
                             Flag = flag,
                             CountryShown = country.Length == 0 || flag is not null ? Visibility.Collapsed : Visibility.Visible,
                             FlagShown = flag is null ? Visibility.Collapsed : Visibility.Visible,
+                            FakeOf = copies[j],
                         };
                     })
                     .ToList();
