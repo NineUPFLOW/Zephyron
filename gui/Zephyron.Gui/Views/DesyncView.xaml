@@ -269,6 +269,11 @@
                                                Margin="0,4,0,0" TextWrapping="Wrap" />
                                 </StackPanel>
 
+                                <Button Grid.Row="1" Grid.ColumnSpan="2" x:Name="FakesButton" Style="{StaticResource Ghost}"
+                                        HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,14,190,0"
+                                        Content="Подделки секций…" Click="OnPickFakes"
+                                        ToolTip="Выбрать подделку у секции пресета, не правя файл" />
+
                                 <Button Grid.Row="1" Grid.ColumnSpan="2" x:Name="EditButton" Style="{StaticResource Primary}"
                                         HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,14,0,0"
                                         Click="OnOpenPreset">

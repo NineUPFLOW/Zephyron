@@ -584,6 +584,7 @@ public partial class DesyncView : UserControl
         // Открывать нечего, пока пресет не выбран: карточка в этом состоянии
         // описывает отсутствие выбора, а не файл.
         EditButton.IsEnabled = settings.PresetName is not null;
+        FakesButton.IsEnabled = settings.PresetName is not null;
 
         // Подсказка перехвата говорит о выбранном пресете — сменился он,
         // сменилось и то, какие его секции останутся без трафика.
@@ -740,6 +741,35 @@ public partial class DesyncView : UserControl
 
         menu.Items.Add(rename);
         menu.IsOpen = true;
+    }
+
+    /// <summary>Окно выбора подделок секций выбранного пресета (<see cref="FakeChoice"/>).</summary>
+    private void OnPickFakes(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
+
+            if (settings.PresetName is not { } name || ZapretPaths.FindPreset(name) is not { } file)
+            {
+                Status.Text = "Пресет не выбран или его файла нет — подделки выбирать не у чего.";
+                return;
+            }
+
+            var window = new FakePickerWindow(new PresetReader().Load(file), Path.GetFileNameWithoutExtension(file),
+                settings.FakeSwaps, ZapretPaths.Discover()?.Root)
+            { Owner = Window.GetWindow(this) };
+
+            if (window.ShowDialog() != true || window.Result is not { } swaps)
+                return;
+
+            (settings with { FakeSwaps = swaps }).Save(AppSettings.DefaultPath);
+            Status.Text = "Подделки секций сохранены. Подействуют со следующего запуска движков.";
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Не вышло: " + ex.GetBaseException().Message;
+        }
     }
 
     /// <summary>Копия пресета под новым именем — своя, обновление её не тронет.</summary>

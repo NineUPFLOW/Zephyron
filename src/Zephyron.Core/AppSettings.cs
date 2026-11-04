@@ -323,6 +323,11 @@ public sealed record AppSettings
     /// </remarks>
     public bool LearnArcRaidersServers { get; init; } = true;
 
+    /// <summary>
+    /// Подделки, выбранные у секций пресета в «Десинке» (<c>FakeChoice</c>); пусто — всё как в пресете.
+    /// </summary>
+    public IReadOnlyList<FakeSwap> FakeSwaps { get; init; } = [];
+
     /// <summary>Программы в «Маршрутах» — папки из двух списков (<see cref="Rules.ProgramRoutes"/>, 13.10).</summary>
     public IReadOnlyList<Rules.ProgramRoute> ProgramRoutes { get; init; } = [];
 
