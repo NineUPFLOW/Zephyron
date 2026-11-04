@@ -139,7 +139,7 @@
         <Grid Grid.Row="2" x:Name="Body" Margin="0,16,0,0" SizeChanged="OnBodySize">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition x:Name="SideColumn" Width="320" />
+                <ColumnDefinition x:Name="SideColumn" Width="338" />
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
@@ -377,7 +377,7 @@
 
             <!-- Правая колонка; на узком окне — под таблицей, по кнопке «Добавить запись» (OnBodySize). -->
             <ScrollViewer x:Name="SideHost" Grid.Column="1" Style="{StaticResource PageScroll}"
-                          Margin="16,0,0,0" VerticalScrollBarVisibility="Auto">
+                          Margin="16,0,0,0" Padding="0,0,18,0" VerticalScrollBarVisibility="Auto">
                 <StackPanel>
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
@@ -385,11 +385,11 @@
 
                             <UniformGrid Rows="1" Margin="0,12,0,0">
                                 <Button x:Name="OneTab" Style="{StaticResource Choice}" Click="OnOneTab"
-                                        Padding="14,6" Margin="0,0,4,0">
+                                        Padding="12,6" Margin="0,0,4,0">
                                     <TextBlock Text="Одна запись" HorizontalAlignment="Center" />
                                 </Button>
                                 <Button x:Name="ListTab" Style="{StaticResource Choice}" Click="OnListTab"
-                                        Padding="14,6" Margin="4,0,0,0">
+                                        Padding="12,6" Margin="4,0,0,0">
                                     <TextBlock Text="Список" HorizontalAlignment="Center" />
                                 </Button>
                             </UniformGrid>

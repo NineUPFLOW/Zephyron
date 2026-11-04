@@ -77,6 +77,10 @@ public partial class PathWindow : Window
     {
         InitializeComponent();
 
+        // Окно растёт вниз по ходу подбора: высота не больше рабочей области, низ не уходит за панель задач.
+        MaxHeight = Math.Min(MaxHeight, SystemParameters.WorkArea.Height - 40);
+        SizeChanged += (_, _) => KeepOnScreen();
+
         _pools = pools ?? [];
         _poolsOn = pools is not null;
 
@@ -248,4 +252,13 @@ public partial class PathWindow : Window
     private void OnDone(object sender, RoutedEventArgs e) => DialogResult = true;
 
     private void OnCancel(object sender, RoutedEventArgs e) => DialogResult = false;
+
+    /// <summary>Поднимает окно, если его низ ушёл за рабочую область.</summary>
+    private void KeepOnScreen()
+    {
+        var bottom = SystemParameters.WorkArea.Bottom - 20;
+
+        if (Top + ActualHeight > bottom)
+            Top = Math.Max(SystemParameters.WorkArea.Top, bottom - ActualHeight);
+    }
 }

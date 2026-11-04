@@ -30,6 +30,20 @@ public sealed class ResolverRow
     /// <summary>Адрес обычного DNS — по нему свой резолвер и убирается.</summary>
     public string Udp { get; init; } = string.Empty;
 
+    /// <summary>Раздел списка; заголовок показывает первая строка раздела.</summary>
+    public DnsGroup Group { get; init; } = DnsGroup.Popular;
+
+    public bool FirstInGroup { get; init; }
+
+    public string HeadTitle => DnsMarks.Title(Group);
+
+    public string HeadHint => DnsMarks.Hint(Group);
+
+    public Visibility HeadShown => FirstInGroup ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>Пометки по обзору: «блокируется», «UDP подменяют».</summary>
+    public IReadOnlyList<string> Marks { get; set; } = [];
+
     public Visibility RemoveShown => Own ? Visibility.Visible : Visibility.Collapsed;
 
     public Brush Color => (Brush)Application.Current.FindResource(Key);
@@ -44,6 +58,7 @@ public sealed class ResolverRow
     public IReadOnlyList<string> Tags => Note
         .Split(", ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Select(tag => char.ToUpper(tag[0]) + tag[1..])
+        .Concat(Marks)
         .ToList();
 
     /// <summary>Логотип с сайта резолвера; <c>null</c> — вместо него буква.</summary>
@@ -275,10 +290,11 @@ public partial class DnsView : UserControl
         //
         // Свои — и без DoH тоже: выбрать такой туннелю нельзя, но убрать
         // надо где-то уметь, а спрятанный он остался бы в файле навсегда.
-        Resolvers.ItemsSource = DnsSurvey.All
-            .Where(p => p.Choosable || p.Own)
-            .Select(p => new ResolverRow
+        Resolvers.ItemsSource = DnsMarks.Sections(DnsSurvey.All.Where(p => p.Choosable || p.Own))
+            .SelectMany(section => section.Items.Select((p, n) => new ResolverRow
             {
+                Group = section.Group,
+                FirstInGroup = n == 0,
                 Name = p.Name,
                 Address = p.TlsAddress ?? p.Udp[0],
                 Note = p.Note ?? string.Empty,
@@ -287,7 +303,7 @@ public partial class DnsView : UserControl
                 Choosable = p.Choosable,
                 Udp = p.Udp.Count > 0 ? p.Udp[0] : string.Empty,
                 Site = LogoSite(p),
-            })
+            }))
             .ToList();
 
         Status.Text = "Задержку покажет обзор выше.";
@@ -509,6 +525,8 @@ public partial class DnsView : UserControl
 
         if (row is null)
             return;
+
+        row.Marks = DnsMarks.Of(result);
 
         if (result.DohMs is { } ms)
         {

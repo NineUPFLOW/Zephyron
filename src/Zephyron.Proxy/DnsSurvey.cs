@@ -27,12 +27,35 @@ public sealed record DnsProvider(
     string? DohPath = "/dns-query",
     string? Note = null,
     bool ForTunnel = true,
-    bool Own = false)
+    bool Own = false,
+    DnsGroup Group = DnsGroup.Popular)
 {
+    /// <summary>Раздел списка: свои — всегда в своём.</summary>
+    public DnsGroup Section => Own ? DnsGroup.Own : Group;
+
     /// <summary>
     /// Годится ли в DNS туннеля: у sing-box апстрим — DoH по адресу.
     /// </summary>
     public bool Choosable => ForTunnel && TlsAddress is not null && TlsName is not null && DohPath is not null;
+}
+
+/// <summary>
+/// Раздел списка резолверов на вкладке DNS: порядок значений — порядок разделов.
+/// </summary>
+/// <remarks>
+/// Шифрованного DNS сверх DoH/DoT (DNSCrypt, ODoH) здесь нет: sing-box их не умеет,
+/// а отдельный движок не поставляется. Все резолверы списка — уже DoH.
+/// </remarks>
+public enum DnsGroup
+{
+    /// <summary>Закрытые сервисы открывают через свои прокси.</summary>
+    Intermediary,
+    Popular,
+
+    /// <summary>Ничего не отсекают.</summary>
+    Open,
+    Filtering,
+    Own,
 }
 
 /// <summary>Что выяснилось про одного провайдера.</summary>
@@ -121,22 +144,29 @@ public static class DnsSurvey
         new("Cloudflare", ["1.1.1.1", "1.0.0.1"], "1.1.1.1", "cloudflare-dns.com",
             Note: "быстрый, без фильтрации"),
         new("Quad9", ["9.9.9.9", "149.112.112.112"], "9.9.9.9", "dns.quad9.net",
-            Note: "отсекает вредоносные домены"),
+            Note: "отсекает вредоносные домены",
+            Group: DnsGroup.Filtering),
         new("AdGuard", ["94.140.14.14", "94.140.15.15"], "94.140.14.14", "dns.adguard-dns.com",
-            Note: "отсекает рекламу и слежку"),
+            Note: "отсекает рекламу и слежку",
+            Group: DnsGroup.Filtering),
         new("Alibaba", ["223.5.5.5", "223.6.6.6"], "223.5.5.5", "dns.alidns.com",
-            Note: "китайский, без фильтрации"),
+            Note: "китайский, без фильтрации",
+            Group: DnsGroup.Open),
         new("CleanBrowsing", ["185.228.168.9", "185.228.169.9"], "185.228.168.9",
             "security-filter-dns.cleanbrowsing.org", "/doh/security-filter/",
-            Note: "отсекает вредоносные и фишинговые"),
+            Note: "отсекает вредоносные и фишинговые",
+            Group: DnsGroup.Filtering),
         new("DNS.SB", ["185.222.222.222", "45.11.45.11"], "185.222.222.222", "dns.sb",
-            Note: "без цензуры"),
+            Note: "без цензуры",
+            Group: DnsGroup.Open),
         new("OpenDNS", ["208.67.222.222", "208.67.220.220"], "208.67.222.222", "doh.opendns.com",
-            Note: "фильтрация по категориям"),
+            Note: "фильтрация по категориям",
+            Group: DnsGroup.Filtering),
         new("Yandex", ["77.88.8.8", "77.88.8.1"], "77.88.8.8", "common.dot.dns.yandex.net",
             Note: "российский, быстрый"),
         new("Comss.one", ["83.220.169.155", "212.109.195.93"], "83.220.169.155", "dns.comss.one",
-            Note: "российский, отвечает честно — для обхода подмены"),
+            Note: "российский, отвечает честно — для обхода подмены",
+            Group: DnsGroup.Intermediary),
         // Mullvad (194.242.2.2) убран 10.10 по слову владельца: DoH не ответил
         // (TIMEOUT), UDP у него нет, а туннелю нужен именно DoH. Выбравших его
         // настройки переводят на Google (AppSettings, MullvadDns).
@@ -146,20 +176,30 @@ public static class DnsSurvey
         // Cloudflare Security — DoT 5, DoH 14; XBOX DNS — DoT 3, DoH 9.
         // AdGuard без фильтра (94.140.14.140) не ответил ничем — не взят.
         new("NextDNS", ["45.90.28.0", "45.90.30.0"], "45.90.28.0", "dns.nextdns.io",
-            Note: "без фильтрации, пока не заведён свой профиль"),
+            Note: "без фильтрации, пока не заведён свой профиль",
+            Group: DnsGroup.Open),
         new("ControlD", ["76.76.2.0", "76.76.10.0"], "76.76.2.0", "freedns.controld.com", "/p0",
-            Note: "без фильтрации"),
+            Note: "без фильтрации",
+            Group: DnsGroup.Open),
         new("Quad9 без фильтра", ["9.9.9.10", "149.112.112.10"], "9.9.9.10", "dns10.quad9.net",
-            Note: "как Quad9, но ничего не отсекает"),
+            Note: "как Quad9, но ничего не отсекает",
+            Group: DnsGroup.Open),
         new("Cloudflare Security", ["1.1.1.2", "1.0.0.2"], "1.1.1.2", "security.cloudflare-dns.com",
-            Note: "как Cloudflare, отсекает вредоносные"),
+            Note: "как Cloudflare, отсекает вредоносные",
+            Group: DnsGroup.Filtering),
         // Адреса — как на xbox-dns.ru 08.10 (основной .54, дополнительный .55);
         // прежние .50 и .51 на сайте больше не названы, хотя ещё отвечают.
         // Замер 08.10 по одному запросу: отвечают все четыре и «XBOX v2»
         // 87.228.47.200, и все уже отдают новые прокси 188.68.214.x.
         new("XBOX DNS", ["111.88.96.54", "111.88.96.55"], "111.88.96.54", "xbox-dns.ru",
             Note: "российский посредник: закрытые сайты — через свои прокси",
-            ForTunnel: false),
+            ForTunnel: false,
+            Group: DnsGroup.Intermediary),
+        // Семейный AdGuard и Control D «без рекламы» — публичные профили тех же сервисов (DoH).
+        new("AdGuard Семейный", ["94.140.14.15", "94.140.15.16"], "94.140.14.15", "family.adguard-dns.com",
+            Note: "отсекает взрослое и рекламу", Group: DnsGroup.Filtering),
+        new("ControlD без рекламы", ["76.76.2.2", "76.76.10.2"], "76.76.2.2", "freedns.controld.com", "/p2",
+            Note: "отсекает рекламу и трекеры", Group: DnsGroup.Filtering),
         new("MSK-IX", ["62.76.76.62", "62.76.62.76"]),
         new("НСДИ", ["195.208.4.1", "195.208.5.1"]),
     ];
