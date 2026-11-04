@@ -46,6 +46,12 @@ Zephyron — самостоятельный проект: свой интерф�
 <img width="1919" height="1030" alt="image" src="https://github.com/user-attachments/assets/fcf6d6c2-01f6-43c1-86ae-16b8a49a5b93" />
 
 
+## 💜 Благодарности
+
+> [!NOTE]
+> **Спасибо [RixyPow](https://github.com/RixyPow)** — автору NetZapret.
+> С его открытых исходников под MIT когда-то начинался Zephyron.
+
 ## Установка
 
 1. Скачать архив со страницы [релизов](https://github.com/NineUPFLOW/Zephyron/releases/latest).
