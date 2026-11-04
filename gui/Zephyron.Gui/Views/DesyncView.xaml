@@ -472,7 +472,6 @@
                     <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="4,0,16,0">
                         <TextBlock x:Name="OwnHeader" FontWeight="SemiBold" FontSize="18">
                             <Run Text="Пресеты Zephyron" />
-                            <Run Text="  автор RixyPow" FontSize="12" FontWeight="Normal" Foreground="{DynamicResource Faint}" />
                         </TextBlock>
                         <TextBlock x:Name="OwnNote" Style="{StaticResource Caption}" Margin="0,4,0,0"
                                    TextWrapping="Wrap"

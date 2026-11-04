@@ -7,7 +7,11 @@ using Zephyron.Zapret;
 namespace Zephyron.Gui.Views;
 
 /// <summary>Вариант в списке подделок места: «как в пресете» (<see cref="Blob"/> пуст) или образец.</summary>
-public sealed record FakeOption(string Text, string? Blob);
+public sealed record FakeOption(string Text, string? Blob)
+{
+    // Стиль ComboBox показывает выбранное через ToString, а не DisplayMemberPath.
+    public override string ToString() => Text;
+}
 
 /// <summary>Строка окна: одно место подделки и выбранный образец.</summary>
 public sealed class FakeRow
