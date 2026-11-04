@@ -33,7 +33,10 @@ public static class About
     public const string Telegram = "https://t.me/zephyron0";
 
     /// <summary>Поддержать разработку — страница донатов владельца.</summary>
-    public const string Support = "https://tips.tips/ru/000487908";
+    public const string Support = "https://web.tribute.tg/d/Tku";
+
+    /// <summary>Вторая страница донатов владельца — прежняя, тоже рабочая.</summary>
+    public const string SupportTips = "https://tips.tips/ru/000487908";
 
     /// <summary>
     /// Состав поставки, в порядке важности для работы.

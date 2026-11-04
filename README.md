@@ -5,7 +5,7 @@
 [![Последний выпуск](https://img.shields.io/github/v/release/NineUPFLOW/Zephyron?label=%D0%B2%D1%8B%D0%BF%D1%83%D1%81%D0%BA&style=for-the-badge)](https://github.com/NineUPFLOW/Zephyron/releases/latest)
 [![Звёзды](https://img.shields.io/github/stars/NineUPFLOW/Zephyron?label=%D0%B7%D0%B2%D1%91%D0%B7%D0%B4&style=for-the-badge)](https://github.com/NineUPFLOW/Zephyron/stargazers)
 [![VirusTotal](https://img.shields.io/badge/VirusTotal-2%2F64-green?style=for-the-badge&logo=virustotal)](https://www.virustotal.com/gui/file/1e3e5e1f073c22164f39d52a27476a294eaad0ee180351c8cdb5d4408e955ace?nocache=1)
-[![Поддержать](https://img.shields.io/badge/%D0%BF%D0%BE%D0%B4%D0%B4%D0%B5%D1%80%D0%B6%D0%B0%D1%82%D1%8C-%E2%9D%A4-ff69b4?style=for-the-badge)](https://tips.tips/ru/000487908)
+[![Поддержать](https://img.shields.io/badge/%D0%BF%D0%BE%D0%B4%D0%B4%D0%B5%D1%80%D0%B6%D0%B0%D1%82%D1%8C-%E2%9D%A4-ff69b4?style=for-the-badge)](https://web.tribute.tg/d/Tku) [![tips.tips](https://img.shields.io/badge/tips.tips-%E2%9D%A4-ff69b4?style=for-the-badge)](https://tips.tips/ru/000487908)
 [![Телеграм-канал](https://img.shields.io/badge/%D1%82%D0%B5%D0%BB%D0%B5%D0%B3%D1%80%D0%B0%D0%BC-%D0%BA%D0%B0%D0%BD%D0%B0%D0%BB-26A5E4?logo=telegram&logoColor=white&style=for-the-badge)](https://t.me/zephyron0)
 
 **Диспетчер трафика для Windows.** Для каждого сайта, сервиса или программы решает,
@@ -958,7 +958,7 @@ QR-коды с ключами читает [ZXing.Net](https://github.com/micjah
 Программа бесплатная и останется такой: лицензия MIT это и закрепляет.
 Помочь проекту можно звездой на [GitHub](https://github.com/NineUPFLOW/Zephyron)
 и отчётом об ошибке в [issues](https://github.com/NineUPFLOW/Zephyron/issues),
-а если хочется поддержать разработку — [донатом](https://tips.tips/ru/000487908).
+а если хочется поддержать разработку — донатом: [Tribute](https://web.tribute.tg/d/Tku) или [tips.tips](https://tips.tips/ru/000487908).
 
 ## Дальше
 

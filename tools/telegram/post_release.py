@@ -40,7 +40,8 @@ FOOTER = "## Чем это собрано"
 # Кнопка под постом (владелец 15.10: «добавь кнопку поддержать в чейнджлоги
 # на гитхабе и в тг»). Та же ссылка, что About.Support в программе: сменится
 # донат — менять и здесь.
-DONATE_URL = "https://tips.tips/ru/000487908"
+DONATE_URL = "https://web.tribute.tg/d/Tku"
+DONATE_URL_TIPS = "https://tips.tips/ru/000487908"
 
 # Вид изменений по заголовку «### Новое:» (или «## Новое:» до 0.14.0).
 KINDS = {
@@ -224,6 +225,7 @@ def send(text: str, url: str) -> None:
         "reply_markup": json.dumps({"inline_keyboard": [[
             {"text": "📥 Скачать", "url": url},
             {"text": "💛 Поддержать", "url": DONATE_URL},
+            {"text": "💛 tips.tips", "url": DONATE_URL_TIPS},
         ]]}),
     }
 
