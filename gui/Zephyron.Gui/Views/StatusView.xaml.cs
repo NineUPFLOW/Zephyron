@@ -371,7 +371,7 @@ public partial class StatusView : UserControl
     private void OnStar(object sender, RoutedEventArgs e) => OpenLink(About.Repository);
 
     /// <summary>«Поддержать» ведёт на страницу донатов владельца.</summary>
-    private void OnSupport(object sender, RoutedEventArgs e) => OpenLink(About.Support);
+    private void OnSupport(object sender, RoutedEventArgs e) => DonateMenu.Show(sender);
 
     private void OnSupportHide(object sender, RoutedEventArgs e)
     {
