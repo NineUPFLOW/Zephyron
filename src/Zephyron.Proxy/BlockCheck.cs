@@ -204,6 +204,17 @@ public enum BlockKind
     /// VPN-клиент» ему был не по адресу: на ПК клиента не было (01.10).
     /// </remarks>
     RouterFakeIp,
+
+    /// <summary>
+    /// Связь исправна, сайт ответил 403 и причину не назвал.
+    /// </summary>
+    /// <remarks>
+    /// Не <see cref="GeoBlock"/>: 27.10 themoviedb.org звался «отказывает по стране»
+    /// при открытом в браузере сайте — 403 был его собственной проверкой на робота.
+    /// Настоящие отказы страну называли словами. Почему отказали, проба не знает:
+    /// решает браузер — открылся там, отказали только пробе.
+    /// </remarks>
+    Forbidden,
 }
 
 /// <summary>Исход одной пробы.</summary>
@@ -222,6 +233,9 @@ public sealed record ProbeOutcome
     /// не канал, а собеседник, и лечится это не тем же самым.
     /// </remarks>
     public bool Refused { get; init; }
+
+    /// <summary>Сайт ответил 403, страну не назвал и робота не проверял.</summary>
+    public bool Forbidden { get; init; }
 
     /// <summary>
     /// Сторона отказалась от версии протокола, а не оборвала разговор.
@@ -475,6 +489,7 @@ public sealed record TargetReport
         // вердикта значило бы предлагать одно и то же дважды.
         BlockKind.Dns => "резолвер даёт нерабочий адрес",
         BlockKind.GeoBlock => "сайт отказывает по стране",
+        BlockKind.Forbidden => "сайт отказал, причину не назвал",
         BlockKind.BrokenCname => "оборванный CNAME",
 
         // «Сторона не даёт наш TLS» звучало приговором сайту, а замер
@@ -516,7 +531,7 @@ public sealed record TargetReport
             {
                 // Открытому объяснять нечего — кроме молчащего QUIC: по TCP открыт, а браузер подвиснет.
                 BlockKind.None => Data.QuicSilent == true ? Data : null,
-                BlockKind.GeoBlock or BlockKind.Stall => Data,
+                BlockKind.GeoBlock or BlockKind.Forbidden or BlockKind.Stall => Data,
                 BlockKind.TlsDpi or BlockKind.Handshake => Tls,
                 BlockKind.HttpsPort or BlockKind.Full or BlockKind.Dns
                     or BlockKind.Sinkhole or BlockKind.BrokenCname => Tcp,
@@ -583,8 +598,12 @@ public sealed record TargetReport
         BlockKind.HttpsPort => "только VPN",
         BlockKind.Full => "только VPN",
         BlockKind.Sinkhole => "только VPN",
-        BlockKind.Dns => "свой DNS",
+        // Адрес даёт либо резолвер, либо пин в hosts — и тогда смена резолвера
+        // не поможет: в отчёте 27.10 оба таких имени (notion.so, elevenlabs.io)
+        // были прибиты.
+        BlockKind.Dns => "свой DNS, а прибитое в hosts — снять пин",
         BlockKind.GeoBlock => "только VPN — десинк не поможет",
+        BlockKind.Forbidden => "открыть в браузере: открывается — ничего не нужно, отказ и там — VPN",
         BlockKind.BrokenCname => "подставить адрес",
         // Браузеру этот сайт открывается: у него приветствие TLS другое
         // по составу — с GREASE, с расширениями, которых SChannel не шлёт
@@ -1062,6 +1081,26 @@ public static class BlockCheck
                     ExpectedTunnel = throughTunnel,
                 };
             }
+
+            // Адрес есть, но только домашний или петля — так записан сам домен:
+            // это ответ честного DoH, а не подмена. У zapret.moe 27.10 запись A —
+            // 192.168.0.1 (сайты на wiki. и git.). Выход VPN к домашнему адресу
+            // не пойдёт ни с какого сервера, и «сменить сервер» тут не совет.
+            if (PrivateOnly(exists) is { } home)
+            {
+                return new TargetReport
+                {
+                    Host = host,
+                    Service = service,
+                    Tcp = Failed($"у имени только частный адрес {home} — оно покрывает зону, а сайты на поддоменах"),
+                    Tls = Failed(null),
+                    Http = Failed(null),
+                    Data = Failed(null),
+                    Kind = BlockKind.NoAddress,
+                    Tunnelled = viaTunnel,
+                    ExpectedTunnel = throughTunnel,
+                };
+            }
         }
 
         // «Не ответило ничего» бывает двух видов, и лечатся они разным.
@@ -1160,6 +1199,19 @@ public static class BlockCheck
             };
         }
 
+        // Через туннель вердикт о подмене не выносится, и это важно.
+        // Проксируемому имени движок выдаёт fakeip из 198.18.0.0/15,
+        // а настоящее разрешение происходит на выходе — судить по тому,
+        // что мы видим здесь, значило бы объявлять подменой собственную
+        // работу туннеля.
+        var spoof = viaTunnel ? DnsSpoofResult.Unknown : await SettleSpoofAsync(host, real, walk.Spoof, cancellationToken);
+
+        // Чужой сертификат — сайт не открывается, сколько бы байт ни прошло:
+        // браузер на таком рукопожатии остановится. До 27.10 вердикт оставался
+        // «доступен», а подмена жила отдельной строкой (elevenlabs.io: пин в hosts
+        // на чужой прокси). Это тот же случай, что пин на молчащий адрес.
+        (kind, tcp) = WithSpoof(kind, tcp, spoof);
+
         return new TargetReport
         {
             Host = host,
@@ -1173,13 +1225,7 @@ public static class BlockCheck
             EchName = echName,
             EchHelloAccepted = echAccepted,
             Cut = cut,
-
-            // Через туннель вердикт о подмене не выносится, и это важно.
-            // Проксируемому имени движок выдаёт fakeip из 198.18.0.0/15,
-            // а настоящее разрешение происходит на выходе — судить по тому,
-            // что мы видим здесь, значило бы объявлять подменой собственную
-            // работу туннеля.
-            Spoof = viaTunnel ? DnsSpoofResult.Unknown : await SettleSpoofAsync(host, real, walk.Spoof, cancellationToken),
+            Spoof = spoof,
 
             Addresses = shown,
             Answered = answered?.ToString(),
@@ -1187,6 +1233,24 @@ public static class BlockCheck
             ExpectedTunnel = throughTunnel,
         };
     }
+
+    /// <summary>
+    /// Первый адрес, если все адреса имени — домашние или петля; <c>null</c> — есть публичный или нет никакого.
+    /// </summary>
+    internal static string? PrivateOnly(IReadOnlyCollection<string> addresses)
+    {
+        var parsed = addresses.Select(text => IPAddress.TryParse(text, out var address) ? address : null).ToList();
+
+        return parsed.Count > 0 && parsed.All(a => a is not null && (DnsSpoof.IsPrivate(a) || DnsSpoof.IsSinkhole(a)))
+            ? parsed[0]!.ToString()
+            : null;
+    }
+
+    /// <summary>«Доступен» с чужим сертификатом — это «резолвер даёт нерабочий адрес», с подменой в причине.</summary>
+    internal static (BlockKind Kind, ProbeOutcome Tcp) WithSpoof(BlockKind kind, ProbeOutcome tcp, DnsSpoofResult spoof) =>
+        kind == BlockKind.None && spoof.Verdict == DnsVerdict.ForeignCertificate
+            ? (BlockKind.Dns, tcp with { Detail = spoof.Detail })
+            : (kind, tcp);
 
     /// <summary>Нейтральное имя — его не режут ни по какому списку; разрешённое — из тех, что пускает белый список.</summary>
     private static readonly string[] NeutralNames = ["example.com", "www.iana.org"];
@@ -1456,7 +1520,10 @@ public static class BlockCheck
             // Данные пришли, но это отказ самого сайта. Всё, что мы умеем
             // мерить, говорит «работает», и по своим меркам оно право —
             // работает связь, а отказывает сайт.
-            return data.Refused ? BlockKind.GeoBlock : BlockKind.None;
+            if (data.Refused)
+                return BlockKind.GeoBlock;
+
+            return data.Forbidden ? BlockKind.Forbidden : BlockKind.None;
         }
 
         if (tcp.Ok && tls.Reset)
@@ -1540,15 +1607,97 @@ public static class BlockCheck
         }
     }
 
-    private static readonly string[] RegionWords =
+    /// <summary>То, что человек увидел бы на странице: без скриптов, стилей и разметки.</summary>
+    /// <remarks>
+    /// Скрипты вырезаются целиком: страница отказа x.ai по стране тянет
+    /// <c>/cdn-cgi/challenge-platform/…</c>, а в скрипте проверки TMDB есть
+    /// «cookies blocked» — по ним вердикт решался бы чужими словами.
+    /// </remarks>
+    internal static string VisibleText(string body)
+    {
+        var text = System.Text.RegularExpressions.Regex.Replace(body,
+            @"<(script|style)\b[^>]*>.*?</\1\s*>", " ",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+
+        text = System.Text.RegularExpressions.Regex.Replace(text, "<[^>]*>", " ");
+
+        return System.Text.RegularExpressions.Regex.Replace(WebUtility.HtmlDecode(text), @"\s+", " ").Trim();
+    }
+
+    /// <summary>
+    /// Фраза ответа, где сайт отказывает по стране или региону; <c>null</c> — страну он не назвал.
+    /// </summary>
+    /// <remarks>
+    /// Нужны оба слова, отказа и места: «region» встречается и в разметке
+    /// обычной страницы. Ответ API — тот же текст без разметки: у OpenAI это
+    /// «Country, region, or territory not supported».
+    /// </remarks>
+    internal static string? RegionPhrase(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return null;
+
+        var lower = text.ToLowerInvariant();
+
+        if (!RefusalWords.Any(lower.Contains))
+            return null;
+
+        foreach (var place in PlaceWords)
+        {
+            int at = lower.IndexOf(place, StringComparison.Ordinal);
+
+            if (at < 0)
+                continue;
+
+            int start = at == 0 ? 0 : text.LastIndexOfAny(PhraseEnds, at - 1) + 1;
+            int end = text.IndexOfAny(PhraseEnds, at);
+
+            if (end < 0)
+                end = text.Length;
+
+            // Длинная фраза режется вокруг слова о месте, а не с начала: у Miro
+            // с начала в 120 знаков «countries» не попадало (27.10).
+            if (end - start > 120)
+            {
+                int from = Math.Max(start, at - 70);
+                int to = Math.Min(end, at + 50);
+
+                if (from > start && text.IndexOf(' ', from) is var space and >= 0 && space < at)
+                    from = space + 1;
+
+                if (to < end && text.LastIndexOf(' ', to) is var last && last > at)
+                    to = last;
+
+                return (from > start ? "…" : "") + text[from..to].Trim() + (to < end ? "…" : "");
+            }
+
+            return text[start..end].Trim();
+        }
+
+        return null;
+    }
+
+    private static readonly string[] RefusalWords =
     [
-        "country", "region", "your location", "not available in", "unavailable in", "sanction",
-        "стран", "регион",
+        "not available", "unavailable", "not supported", "unsupported", "restrict", "blocked",
+        "denied", "banned", "недоступ", "не доступ", "заблокир", "ограничен", "запрещ",
     ];
 
-    /// <summary>Страница отказа называет страну или регион.</summary>
-    internal static bool NamesRegion(string page) =>
-        RegionWords.Any(w => page.Contains(w, StringComparison.OrdinalIgnoreCase));
+    // «Стран» без окончания нельзя: оно же начало «страницы».
+    private static readonly string[] PlaceWords =
+        ["region", "country", "countries", "territor", "стране", "страны", "регион"];
+
+    private static readonly char[] PhraseEnds = ['.', '!', '?', '"', '{', '}'];
+
+    /// <summary>Страница проверки на робота — по тексту, когда метки Cloudflare нет.</summary>
+    internal static bool LooksLikeBotCheck(string? text) =>
+        text is not null && BotCheckWords.Any(word => text.Contains(word, StringComparison.OrdinalIgnoreCase));
+
+    private static readonly string[] BotCheckWords =
+    [
+        "just a moment", "checking your browser", "verify you are human", "verifying you are human",
+        "captcha", "are you a robot", "ddos-guard",
+    ];
 
     internal static bool IsHome(IPAddress address) => address.GetAddressBytes() is [10, ..] or [192, 168, ..] or [172, >= 16 and <= 31, ..];
 
@@ -2231,19 +2380,23 @@ public static class BlockCheck
             // сам, а проба — нет. Замер 23.09: openai.com и claude.ai через
             // пин в hosts отвечали именно так, с узла во Франкфурте, и числились
             // «отказывает по стране», пока ChatGPT в браузере работал.
-            bool refused = status is 403 or 451 && !challenged || regionRefusal;
+            bool cloudflare = challenged;
 
             // Отказ по стране — только когда сайт сам называет страну или регион.
             // Голый 403 бывает чем угодно (антибот, закрытый путь), и звать его
             // «отказывает по стране» значило слать человека в VPN без причины.
-            // Страницу не прочли — судить не по чему, и вердикт остаётся прежним.
-            bool unnamed = refused && !regionRefusal && status == 403
-                && kept is not null && header > 0
+            // 27.10 themoviedb.org: 403 был его собственной проверкой на робота
+            // («Just a moment…» через CloudFront, без метки Cloudflare).
+            var said = status is 403 && kept is not null && header > 0
                 && PageAssets.Decode(kept.ToArray()[header..], chunked, contentEncoding) is { } refusalPage
-                && !NamesRegion(refusalPage);
+                    ? VisibleText(refusalPage)
+                    : null;
 
-            if (unnamed)
-                refused = false;
+            var region = RegionPhrase(said);
+            bool refused = regionRefusal || status is 451 || status is 403 && region is not null;
+
+            challenged = !refused && (challenged || status is 403 && LooksLikeBotCheck(said));
+            bool forbidden = status is 403 && !refused && !challenged;
 
             // Маленькая страница, пришедшая целиком, заморозки показать
             // не могла — в разметке ищутся скрипты и стили той же зоны,
@@ -2260,13 +2413,16 @@ public static class BlockCheck
             {
                 Ok = true,
                 Refused = refused,
+                Forbidden = forbidden,
                 Elapsed = stopwatch.Elapsed,
                 Detail = refused
-                    ? $"сайт ответил {status} — связь исправна, отказывает он сам"
-                    : unnamed
-                        ? "сайт ответил 403 и причину не назвал — связь исправна, проверьте в браузере"
+                    ? region is not null
+                        ? $"сайт ответил {status}: «{region}» — связь исправна, отказывает он сам"
+                        : $"сайт ответил {status} — связь исправна, отказывает он сам"
+                    : forbidden
+                        ? $"сайт ответил {status} и причину не назвал — связь исправна, проверьте в браузере"
                     : challenged
-                        ? "Cloudflare проверяет на робота — связь исправна, браузер проверку пройдёт"
+                        ? $"{(cloudflare ? "Cloudflare" : "сайт")} проверяет на робота — связь исправна, браузер проверку пройдёт"
                         // «784 из 0 Б» у переадресации с Content-Length: 0 — счёт идёт с заголовками, ноль ни о чём.
                         : promised is { } size and > 0 ? $"{total} из {size} Б" : $"{total} Б",
                 Received = total,
@@ -2358,7 +2514,7 @@ public static class BlockCheck
                 };
             }
 
-            if (asset.Ok && !asset.Refused && asset.Received >= Signatures.FreezeTo)
+            if (asset.Ok && !asset.Refused && !asset.Forbidden && asset.Received >= Signatures.FreezeTo)
             {
                 return data with
                 {

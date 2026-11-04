@@ -419,6 +419,21 @@ internal static class SupervisorHost
         {
             using var process = Process.GetProcessById(processId);
 
+            // Сперва по-хорошему: супервизор гасит службы сам, sing-box — штатно,
+            // с файлом кэша (SupervisorStop). Срок — с запасом на три секунды
+            // sing-box и остановку остальных.
+            if (SupervisorStop.Ask(processId))
+            {
+                try
+                {
+                    await process.WaitForExitAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(8), cancellationToken);
+                    return;
+                }
+                catch (TimeoutException)
+                {
+                }
+            }
+
             process.Kill(entireProcessTree: true);
             await process.WaitForExitAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
         }
@@ -572,7 +587,12 @@ internal static class SupervisorHost
             return;
         }
 
-        var preset = new PresetReader().Load(presetPath);
+        // Секции только по спискам адресов, выключенным в «Маршрутах» (AddressSectionsOff):
+        // выключатель части гасит и секцию, а не одно правило движка.
+        var preset = AddressSectionsOff.Strip(new PresetReader().Load(presetPath), AddressSectionsOff.Read(), out var sectionsOff);
+
+        foreach (var name in sectionsOff)
+            Console.WriteLine($"Секция «{name}» не запущена: её список адресов выключен в «Маршрутах».");
 
         // Список исключений пишется при сборке конфига; если его нет —
         // исключать нечего, и командная строка остаётся нетронутой.

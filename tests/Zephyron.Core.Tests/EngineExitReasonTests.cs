@@ -50,6 +50,18 @@ public sealed class EngineExitReasonTests
         Assert.Null(Zephyron.Zapret.WinDivertDriver.Explain(1));
     }
 
+    /// <summary>FWP_E_IN_USE так и показывает «Главная»: знаковым числом.</summary>
+    [Fact]
+    public void FilterInUseIsExplained()
+    {
+        Assert.Equal(Zephyron.Zapret.WinDivertDriver.FilterInUse, -2144206838);
+
+        var text = Zephyron.Zapret.WinDivertDriver.Explain(-2144206838);
+
+        Assert.NotNull(text);
+        Assert.Contains("перезагрузите", text);
+    }
+
     /// <summary>
     /// Найденный рядом обход назван по имени и с процессом, а служба с автозапуском —
     /// отдельно (владелец 24.10; случай знакомого 22.10: goodbyedpi.exe и служба GoodbyeDPI).
@@ -82,4 +94,16 @@ public sealed class EngineExitReasonTests
         Assert.True(said.Length < 400);
         Assert.EndsWith("…", said);
     }
+
+    /// <summary>Выгрузка драйвера трогает только свой: под именем WinDivert свой драйвер держат GoodbyeDPI и другие обходы.</summary>
+    [Theory]
+    [InlineData(@"\??\C:\Zephyron\engines\zapret\exe\Monkey64.sys", true)]
+    [InlineData(@"C:\Zephyron\engines\zapret\exe\Monkey64.sys", true)]
+    [InlineData(@"\??\C:\GoodbyeDPI\x86_64\WinDivert64.sys", false)]
+    [InlineData(@"\??\C:\Zapret\Dev\exe\Monkey64.sys", false)]
+    [InlineData(@"System32\drivers\WinDivert.sys", false)]
+    [InlineData(@"\??\C:\Zephyron\enginesX\Monkey64.sys", false)]
+    [InlineData(null, false)]
+    public void OnlyOurDriverIsOurs(string? imagePath, bool ours) =>
+        Assert.Equal(ours, Zephyron.Zapret.WinDivertDriver.IsOurs(imagePath, @"C:\Zephyron\engines"));
 }

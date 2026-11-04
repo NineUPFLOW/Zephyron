@@ -94,6 +94,17 @@ public static class SiteFixer
         var decision = engine.Evaluate(ConnectionEvent.Describe(host));
         var route = settings.Engines.Effective(decision.Mode, settings.NeedsProxy);
 
+        // «Десинк» с рецептом pass — это «напрямую»: профиль pass пропускает имя
+        // мимо всего десинка. Иначе подбор пробует «напрямую» как другой путь —
+        // и сравнивает путь сам с собой. 27.10 seriesgraph.com (часть «десинк, pass»):
+        // «как есть» замерло на 27 380 Б, «напрямую» один раз прошло — записалось
+        // «напрямую», а через минуту то же «напрямую» замерло на тех же 27 380 Б.
+        if (route == RoutingMode.Desync && decision.Rule?.Recipe is { } own
+            && own.Trim().Equals(Zephyron.Zapret.RecipeCatalog.Pass, StringComparison.OrdinalIgnoreCase))
+        {
+            route = RoutingMode.Direct;
+        }
+
         // 1. Как есть.
         progress?.Report($"Проверяю {host} как есть…");
         var now = await BlockCheck.CheckAsync(host, null, cancellationToken, throughTunnel: route == RoutingMode.Proxy);
@@ -132,7 +143,7 @@ public static class SiteFixer
         {
             progress?.Report($"Пробую {host} через VPN…");
 
-            var vpn = await ThroughTunnelAsync(host, cancellationToken);
+            var vpn = await ThroughTunnelAsync(host, now.Kind, cancellationToken);
             steps.Add(vpn);
 
             if (vpn.Works)
@@ -209,9 +220,21 @@ public static class SiteFixer
         return (new SiteFixStep("напрямую", works, report?.Describe() ?? "не проверилось"), works);
     }
 
+    /// <summary>Открылось ли через VPN: код ответа через туннель и вердикт мимо него.</summary>
+    /// <remarks>
+    /// 403 через зарубежный выход — почти всегда проверка на робота Cloudflare,
+    /// её браузер проходит; 451 — отказ по закону. Но если мимо туннеля сайт уже
+    /// ответил 403 без объяснений (<see cref="BlockKind.Forbidden"/>), тот же 403
+    /// через VPN — тот же отказ, а не открытие: ns.photonengine.io отвечает
+    /// «403 HTTP not supported» откуда угодно, и подбор записал бы ему «через VPN»
+    /// на пустом месте (27.10).
+    /// </remarks>
+    public static bool TunnelOpens(int code, BlockKind here) =>
+        code < 500 && code != 451 && !(code == 403 && here == BlockKind.Forbidden);
+
     /// <summary>Запрос через вход проверки движка: он ведёт в туннель.</summary>
-    /// <remarks>Ответ сайта — путь рабочий: соединение через туннель прошло.</remarks>
-    private static async Task<SiteFixStep> ThroughTunnelAsync(string host, CancellationToken cancellationToken)
+    /// <remarks>Ответ сайта — путь рабочий: соединение через туннель прошло (<see cref="TunnelOpens"/>).</remarks>
+    private static async Task<SiteFixStep> ThroughTunnelAsync(string host, BlockKind here, CancellationToken cancellationToken)
     {
         try
         {
@@ -226,11 +249,10 @@ public static class SiteFixer
             using var response = await http.GetAsync($"https://{host}/", HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
             int code = (int)response.StatusCode;
-            // 403 через зарубежный выход — почти всегда проверка на робота
-            // Cloudflare, её браузер проходит; 451 — отказ по закону.
-            bool works = code < 500 && code != 451;
+            bool works = TunnelOpens(code, here);
 
-            return new("через VPN", works, $"ответ {code}");
+            return new("через VPN", works,
+                !works && code == 403 ? "ответ 403 — тот же отказ, что и мимо туннеля" : $"ответ {code}");
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {

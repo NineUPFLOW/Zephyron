@@ -89,9 +89,24 @@ public sealed record ServicePart
     /// действовало ничего. Владелец 06.10, по разбору пересечений: запасной
     /// путь — 3,4 млн адресов, из них ~791 тыс. Cloudflare и ~664 тыс. Google,
     /// почти весь список YouTube QUIC и куски голоса Discord и X, — «вот это
-    /// выключи, остальное пока оставь».
+    /// выключи, остальное пока оставь». Запасной путь Discord теперь —
+    /// <see cref="PresetDesync"/>: «выключено» в окне не значило ничего, секция пресета по нему работала.
     /// </remarks>
     public bool DefaultOff { get; init; }
+
+    /// <summary>
+    /// Пока человек не выбрал режим, часть показана «десинк»: её список берёт
+    /// секция пресета по адресам, а заводского правила движка у неё нет.
+    /// </summary>
+    /// <remarks>
+    /// Запасной путь Discord. Секция «discord.com (IP fallback)» по его списку
+    /// стоит в Universal и работает у всех, и на ней держатся голос Discord
+    /// (управляющее соединение к discord.media на 162.159.x) и сайты Cloudflare.
+    /// Правило движку по-прежнему не пишется: 3,4 млн адресов перебили бы голос
+    /// Discord, YouTube QUIC и X «через VPN». Секцию гасит только «выключено»,
+    /// выбранное человеком (<see cref="Zephyron.Zapret.AddressSectionsOff"/>).
+    /// </remarks>
+    public bool PresetDesync { get; init; }
 
     /// <summary>
     /// Более широкий список, внутри которого лежат имена этой части.
@@ -299,8 +314,8 @@ public static class ServiceCatalog
                     Name = "Запасной путь по адресам",
                     List = "config/lists/ipset-discord.txt",
                     ByAddress = true,
-                    Note = "3,4 млн адресов, среди них куски Google Cloud и Amazon — включать в крайнем случае",
-                    DefaultOff = true,
+                    Note = "секция пресета «IP fallback»: 3,4 млн адресов Cloudflare, Google Cloud и Amazon — на ней держатся голос Discord и сайты Cloudflare",
+                    PresetDesync = true,
                 },
             ],
         },

@@ -1236,7 +1236,7 @@ public partial class CheckView : UserControl
             // пришёл, и пришёл от самого сайта. Красный ставил его в один ряд
             // с закрытым наглухо, а лечится он совсем иначе — не рецептом,
             // а выходом в другой стране.
-            BlockKind.TlsDpi or BlockKind.Stall or BlockKind.GeoBlock => "Warn",
+            BlockKind.TlsDpi or BlockKind.Stall or BlockKind.GeoBlock or BlockKind.Forbidden => "Warn",
 
             // Отказ согласования — не поломка вовсе: сторона сама не даёт
             // тех версий, что мы пробуем, а браузер умеет больше.

@@ -30,6 +30,21 @@ public sealed class SiteFixerTests
     }
 
     /// <summary>
+    /// Тот же 403 через VPN, что и мимо него, — не открытие (ns.photonengine.io, 27.10).
+    /// </summary>
+    [Theory]
+    [InlineData(200, Zephyron.Proxy.BlockKind.Forbidden, true)]
+    [InlineData(403, Zephyron.Proxy.BlockKind.Forbidden, false)]
+    [InlineData(403, Zephyron.Proxy.BlockKind.GeoBlock, true)]
+    [InlineData(403, Zephyron.Proxy.BlockKind.TlsDpi, true)]
+    [InlineData(451, Zephyron.Proxy.BlockKind.GeoBlock, false)]
+    [InlineData(502, Zephyron.Proxy.BlockKind.Full, false)]
+    public void The_same_refusal_through_vpn_is_not_an_opening(int code, Zephyron.Proxy.BlockKind here, bool opens)
+    {
+        Assert.Equal(opens, SiteFixer.TunnelOpens(code, here));
+    }
+
+    /// <summary>
     /// Открыл только VPN — итог называет опробованное и не обещает «только»:
     /// рецепты десинка не перебирались (14.10 — modrinth.com открылся рецептом medium).
     /// </summary>
