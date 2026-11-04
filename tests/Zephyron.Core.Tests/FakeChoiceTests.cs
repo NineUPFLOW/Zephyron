@@ -44,6 +44,8 @@ public sealed class FakeChoiceTests
         Assert.Equal(Line.Length, args.Count);
         Assert.Equal(0, FakeChoice.Apply(Line.ToList(), "p", []));
         Assert.Equal(0, FakeChoice.Apply(Line.ToList(), "p", [new FakeSwap("p", "gone", 0, "a.bin")]));
+        Assert.Equal(0, FakeChoice.Apply(Line.ToList(), "p", [new FakeSwap("p", "youtube", 0, "../out.bin")]));
+        Assert.Equal(0, FakeChoice.Apply(Line.ToList(), "p", [new FakeSwap("p", "youtube", 0, "not-a-blob.exe")]));
     }
 
     [Fact]

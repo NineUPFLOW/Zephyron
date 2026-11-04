@@ -62,12 +62,21 @@ public static class OwnLists
         if (trimmed.EndsWith(".txt", StringComparison.Ordinal))
             trimmed = trimmed[..^4];
 
-        if (trimmed.Length == 0 || trimmed.Length > 64 || trimmed.Trim('.').Length == 0)
+        if (trimmed.Length == 0 || trimmed.Length > 64 || trimmed.Trim('.').Length == 0 || IsDeviceName(trimmed))
             return null;
 
         return trimmed.All(c => char.IsLetterOrDigit(c) || c is '.' or '-' or '_')
             ? trimmed
             : null;
+    }
+
+    /// <summary>Имя устройства Windows: запись в «con.txt» ушла бы в устройство, а не в файл.</summary>
+    public static bool IsDeviceName(string name)
+    {
+        var stem = name.Split('.')[0].ToLowerInvariant();
+
+        return stem is "con" or "prn" or "aux" or "nul"
+            || (stem.Length == 4 && (stem.StartsWith("com", StringComparison.Ordinal) || stem.StartsWith("lpt", StringComparison.Ordinal)) && stem[3] is >= '0' and <= '9');
     }
 
     /// <summary>Есть ли уже список с таким названием.</summary>

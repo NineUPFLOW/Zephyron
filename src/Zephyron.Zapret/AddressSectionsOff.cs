@@ -124,9 +124,16 @@ public static class AddressSectionsOff
 
             File.WriteAllLines(target, lists, new UTF8Encoding(false));
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Не записалось — секции пресета остаются все, как до 03.11.
+            // Не записалось — секции пресета остаются все: вчерашний файл гасил бы лишнее.
+            try
+            {
+                File.Delete(target);
+            }
+            catch (Exception gone) when (gone is IOException or UnauthorizedAccessException)
+            {
+            }
         }
     }
 

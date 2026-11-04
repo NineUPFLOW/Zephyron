@@ -29,7 +29,16 @@ public static class SupervisorStop
     /// <summary>Токен, который отменится, когда этот процесс попросят остановиться.</summary>
     public static CancellationToken Listen()
     {
-        var stop = new EventWaitHandle(false, EventResetMode.ManualReset, Name(Environment.ProcessId));
+        var stop = new EventWaitHandle(false, EventResetMode.ManualReset, Name(Environment.ProcessId), out bool created);
+
+        // Имя уже занято — событие чужое и поднять его мог бы кто угодно. Без
+        // него окно дождётся срока и снимет супервизор как раньше.
+        if (!created)
+        {
+            stop.Dispose();
+            return CancellationToken.None;
+        }
+
         var source = new CancellationTokenSource();
 
         ThreadPool.RegisterWaitForSingleObject(stop, (_, _) => source.Cancel(), null, Timeout.Infinite, executeOnlyOnce: true);

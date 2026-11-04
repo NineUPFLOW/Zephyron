@@ -43,6 +43,36 @@ public sealed class RouteBundleTests : IDisposable
     }
 
     [Fact]
+    public void Oversized_bundle_is_refused_before_it_touches_the_disk()
+    {
+        var path = Path.Combine(_root, "bomb.zyroutes");
+
+        using (var zip = ZipFile.Open(path, ZipArchiveMode.Create))
+        {
+            using var writer = new StreamWriter(zip.CreateEntry("own/big.txt").Open());
+            writer.Write(new string('a', 17 * 1024 * 1024));
+        }
+
+        Assert.Throws<InvalidDataException>(() => RouteBundle.ImportLists(path, _root));
+        Assert.False(OwnLists.Exists("big", _root));
+    }
+
+    [Theory]
+    [InlineData("con")]
+    [InlineData("NUL.txt")]
+    [InlineData("com1")]
+    [InlineData("lpt9.old")]
+    public void Windows_device_names_are_not_list_names(string name) =>
+        Assert.Null(OwnLists.Normalize(name));
+
+    [Theory]
+    [InlineData("console")]
+    [InlineData("com")]
+    [InlineData("auxiliary")]
+    public void Names_that_only_start_like_a_device_stay(string name) =>
+        Assert.Equal(name, OwnLists.Normalize(name));
+
+    [Fact]
     public void Plain_yaml_reads_as_before_and_unsafe_names_are_ignored()
     {
         var rules = Rules(Path.Combine(_root, "c"));
