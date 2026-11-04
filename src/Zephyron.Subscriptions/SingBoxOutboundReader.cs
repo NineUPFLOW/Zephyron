@@ -114,7 +114,8 @@ internal static class SingBoxOutboundReader
         var transportSection = Section(outbound, "transport");
         var transport = kind is ProxyProtocol.Hysteria2 or ProxyProtocol.Tuic or ProxyProtocol.Hysteria
             ? "udp"
-            : Empty(Text(transportSection, "type")) ?? "tcp";
+            : StreamTransports.Normalize(Empty(Text(transportSection, "type")));
+        var kcp = transport == "mkcp" ? MkcpSettings.FromSingBox(transportSection) : null;
 
         // У Hysteria2 obfs — объект с типом и паролем, у первой версии — строка-пароль.
         var obfs = Section(outbound, "obfs");
@@ -128,12 +129,15 @@ internal static class SingBoxOutboundReader
             Port = port,
             Credential = credential,
             Transport = transport,
+            KcpOptions = kcp?.Options,
+            TransportRefusal = kcp?.Refusal,
             Security = security,
             Sni = Empty(Text(tls, "server_name")),
             Fingerprint = Flag(utls, "enabled") ? Empty(Text(utls, "fingerprint")) : null,
             Alpn = Strings(tls, "alpn"),
             AllowInsecure = Flag(tls, "insecure"),
             Flow = Empty(Text(outbound, "flow")),
+            Encryption = Empty(Text(outbound, "encryption")),
             RealityPublicKey = Empty(Text(reality, "public_key")),
             RealityShortId = Empty(Text(reality, "short_id")),
             Path = Empty(Text(transportSection, "path")),

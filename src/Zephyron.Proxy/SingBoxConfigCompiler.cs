@@ -1771,6 +1771,10 @@ public sealed class SingBoxConfigCompiler
                 // «-udp443» он отвергает фатально и роняет весь туннель, а не один сервер.
                 if (server.Flow?.StartsWith("xtls-rprx-vision", StringComparison.OrdinalIgnoreCase) == true)
                     outbound["flow"] = "xtls-rprx-vision";
+
+                // VLESS Encryption: без него сервер, который его требует, рвёт рукопожатие.
+                if (VlessEncryption.ForSingBox(server.Encryption) is { Length: > 0 } encryption)
+                    outbound["encryption"] = encryption;
                 break;
 
             case ProxyProtocol.Vmess:
@@ -1960,7 +1964,7 @@ public sealed class SingBoxConfigCompiler
         // ALPN по умолчанию у протоколов на QUIC: серверы TUIC ждут h3,
         // Hysteria первой версии — «hysteria», и без него рукопожатие
         // не сходится. В ссылках его часто не пишут.
-        IReadOnlyList<string> alpnValues = server.Alpn.Count > 0 ? server.Alpn
+        IReadOnlyList<string> alpnValues = server.Alpn.Count > 0 ? WebSocketPath.Alpn(server.Transport, server.Alpn)
             : server.Protocol == ProxyProtocol.Tuic ? ["h3"]
             : server.Protocol == ProxyProtocol.Hysteria ? ["hysteria"]
             : [];
@@ -1975,14 +1979,16 @@ public sealed class SingBoxConfigCompiler
         }
 
         // uTLS подделывает отпечаток клиента. Для REALITY он обязателен:
-        // без него сервер не отвечает.
+        // без него сервер не отвечает. Без отпечатка в ссылке — firefox, не chrome:
+        // chrome у REALITY даёт JA4 того отпечатка, который ТСПУ режет к дата-центрам
+        // (замер 29.10 в NetZapret); REALITY отпечаток клиента не сверяет.
         string? fingerprint = Fingerprint(server.Fingerprint);
         if (fingerprint is not null || reality)
         {
             block["utls"] = new JsonObject
             {
                 ["enabled"] = true,
-                ["fingerprint"] = fingerprint ?? "chrome",
+                ["fingerprint"] = fingerprint ?? "firefox",
             };
         }
 
@@ -2036,9 +2042,17 @@ public sealed class SingBoxConfigCompiler
             case "ws":
             {
                 var transport = new JsonObject { ["type"] = "ws" };
+                var (path, earlyData) = WebSocketPath.Split(server.Path);
 
-                if (!string.IsNullOrEmpty(server.Path))
-                    transport["path"] = server.Path;
+                if (!string.IsNullOrEmpty(path))
+                    transport["path"] = path;
+
+                // «?ed=» из ссылки Xray — ранние данные, а не часть пути.
+                if (earlyData > 0)
+                {
+                    transport["max_early_data"] = earlyData;
+                    transport["early_data_header_name"] = WebSocketPath.EarlyDataHeader;
+                }
 
                 if (!string.IsNullOrEmpty(server.HostHeader))
                     transport["headers"] = new JsonObject { ["Host"] = server.HostHeader };
@@ -2057,8 +2071,9 @@ public sealed class SingBoxConfigCompiler
             {
                 var transport = new JsonObject { ["type"] = "httpupgrade" };
 
-                if (!string.IsNullOrEmpty(server.Path))
-                    transport["path"] = server.Path;
+                // Ранних данных у httpupgrade в sing-box нет — хвост «?ed=» только снять.
+                if (WebSocketPath.Split(server.Path).Path is { Length: > 0 } path)
+                    transport["path"] = path;
 
                 if (!string.IsNullOrEmpty(server.HostHeader))
                     transport["host"] = server.HostHeader;
@@ -2110,7 +2125,22 @@ public sealed class SingBoxConfigCompiler
                 return transport;
             }
 
-            // tcp, udp и прочее транспортной секции не требуют.
+            // Настройки уже в именах сборки и в её пределах — см. MkcpSettings.
+            case "mkcp":
+            {
+                var transport = new JsonObject { ["type"] = "mkcp" };
+
+                if (server.KcpOptions is { } options && JsonNode.Parse(options) is JsonObject kcp)
+                {
+                    foreach (var (key, value) in kcp)
+                        transport[key] = value?.DeepClone();
+                }
+
+                return transport;
+            }
+
+            // tcp и udp транспортной секции не требуют, а незнакомое сюда не
+            // доходит — такой сервер отсеян (ProxyServer.TransportProblem).
             default:
                 return null;
         }

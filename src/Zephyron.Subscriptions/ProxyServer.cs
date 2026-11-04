@@ -99,6 +99,15 @@ public sealed record ProxyServer
     /// <summary>tcp, ws, grpc, http, httpupgrade, xhttp, quic.</summary>
     public string Transport { get; init; } = "tcp";
 
+    /// <summary>
+    /// Почему транспорт не повезти, узнанное при разборе: маски mKCP, маскировка TCP.
+    /// Незнакомое имя транспорта сюда не пишется — его видно и так (<see cref="TransportProblem"/>).
+    /// </summary>
+    public string? TransportRefusal { get; init; }
+
+    /// <summary>Настройки mKCP объектом JSON в именах sing-box (<see cref="MkcpSettings"/>).</summary>
+    public string? KcpOptions { get; init; }
+
     /// <summary>none, tls, reality.</summary>
     public string Security { get; init; } = "none";
 
@@ -123,6 +132,9 @@ public sealed record ProxyServer
 
     /// <summary>xtls-rprx-vision для vless.</summary>
     public string? Flow { get; init; }
+
+    /// <summary>Шифрование VLESS (<c>encryption</c>); пусто или «none» — без него. См. <see cref="VlessEncryption"/>.</summary>
+    public string? Encryption { get; init; }
 
     /// <summary>Публичный ключ REALITY (<c>pbk</c>).</summary>
     public string? RealityPublicKey { get; init; }
@@ -298,8 +310,20 @@ public sealed record ProxyServer
     public bool IsSupportedBySingBox =>
         (Protocol != ProxyProtocol.Shadowsocks || ShadowsocksMethods.ForSingBox(Method) is not null)
         && (!Security.Equals("reality", StringComparison.OrdinalIgnoreCase) || IsRealityKey(RealityPublicKey))
+        // Строку шифрования VLESS, которую движок не разберёт, он не прощает: падает весь конфиг.
+        && (Protocol != ProxyProtocol.Vless || VlessEncryption.ForSingBox(Encryption) is not null)
         // «%» без двух шестнадцатеричных цифр в пути: движок не разбирает такой адрес и не стартует.
-        && !BrokenPathEscape;
+        && !BrokenPathEscape
+        // Незнакомый транспорт раньше молча собирался обычным TCP и выглядел мёртвым сервером.
+        && TransportProblem is null;
+
+    /// <summary>
+    /// Почему транспорт не повезти; <c>null</c> — повезёт или его у протокола нет
+    /// (транспорт выбирают только VLESS, VMess и Trojan, у прочих он служебный).
+    /// </summary>
+    public string? TransportProblem =>
+        Protocol is not (ProxyProtocol.Vless or ProxyProtocol.Vmess or ProxyProtocol.Trojan) ? null
+        : StreamTransports.Problem(Transport) ?? TransportRefusal;
 
     /// <summary>Путь уходит в адрес только у ws, http и httpupgrade — у прочих транспортов он не читается.</summary>
     private bool BrokenPathEscape =>
@@ -384,7 +408,9 @@ public sealed record ProxyServer
         : !HasDialableAddress ? "нет адреса (разделитель панели)"
         : Protocol == ProxyProtocol.Shadowsocks && ShadowsocksMethods.ForSingBox(Method) is null ? $"шифр «{Method}» движок не знает"
         : Security.Equals("reality", StringComparison.OrdinalIgnoreCase) && !IsRealityKey(RealityPublicKey) ? "ключ REALITY пуст или испорчен"
-        : "испорченный %-код в пути транспорта";
+        : Protocol == ProxyProtocol.Vless && VlessEncryption.ForSingBox(Encryption) is null ? "шифрование VLESS в виде, которого движок не разбирает"
+        : BrokenPathEscape ? "испорченный %-код в пути транспорта"
+        : TransportProblem;
 
     /// <summary>
     /// Протокол словом — для окна.
