@@ -30,7 +30,7 @@ public class CheckAndWorkerTests
     [InlineData("Сервис недоступен в вашем регионе", true)]
     [InlineData("<h1>403 Forbidden</h1>", false)]
     public void RefusalNamesRegion(string page, bool named) =>
-        Assert.Equal(named, BlockCheck.NamesRegion(page));
+        Assert.Equal(named, BlockCheck.RegionPhrase(BlockCheck.VisibleText(page)) is not null);
 
     [Theory]
     [InlineData("192.168.1.10", true)]

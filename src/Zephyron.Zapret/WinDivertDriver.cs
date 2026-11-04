@@ -27,6 +27,13 @@ namespace Zephyron.Zapret;
 /// любых, не только наших. Остановить занятый драйвер Windows и так
 /// не даст, но и просить её об этом незачем.
 /// </para>
+/// <para>
+/// И только свой: служба останавливается, лишь если её драйвер лежит в нашей
+/// папке <c>engines</c>. Под исходным именем <c>WinDivert</c> свой драйвер держат
+/// GoodbyeDPI и другие обходы — их процессов среди <see cref="Users"/> нет.
+/// Занятый чужой драйвер не выгружается, а откладывает выгрузку, и новые открытия
+/// его устройства Windows отвергает кодом 433 (<see cref="NoSuchDevice"/>).
+/// </para>
 /// </remarks>
 public static class WinDivertDriver
 {
@@ -39,10 +46,17 @@ public static class WinDivertDriver
     /// </summary>
     public const int NoSuchDevice = 433;
 
+    /// <summary>
+    /// Код выхода winws2, когда Windows не дала WinDivert открыть фильтр:
+    /// FWP_E_IN_USE (0x8032000A), «The object is referenced by other objects
+    /// so cannot be deleted» — объекты фильтрации Windows (WFP) ещё заняты.
+    /// </summary>
+    public const int FilterInUse = unchecked((int)0x8032000A);
+
     /// <summary>Что значит код выхода winws2 и что делать; <c>null</c> — объяснения нет.</summary>
     /// <remarks>
     /// <para>
-    /// Только 433: сам код человеку ничего не говорит, а «Диагностика»
+    /// 433 и FWP_E_IN_USE: сам код человеку ничего не говорит, а «Диагностика»
     /// показывала про упавший winws2 одно «остановлен».
     /// </para>
     /// <para>
@@ -55,6 +69,12 @@ public static class WinDivertDriver
     /// <param name="nearby">Чужие обходы рядом (<see cref="Core.Diagnostics.OtherBypassScan"/>).</param>
     public static string? Explain(int exitCode, IReadOnlyList<Core.Diagnostics.OtherBypass>? nearby = null)
     {
+        if (exitCode == FilterInUse)
+        {
+            return "Windows не дала драйверу перехвата WinDivert открыть фильтр: прежний ещё не освобождён. "
+                + "Остановите движки, подождите секунд десять и запустите снова; не поможет — перезагрузите компьютер";
+        }
+
         if (exitCode != NoSuchDevice)
             return null;
 
@@ -108,10 +128,22 @@ public static class WinDivertDriver
         if (alive.Count > 0)
             return $"Драйвер перехвата оставлен: им пользуется {string.Join(", ", alive)}.";
 
+        var engines = Path.Combine(AppContext.BaseDirectory, ZapretPaths.BundleDirectory);
         var stopped = new List<string>();
+        var foreign = new List<string>();
 
         foreach (var name in ServiceNames)
         {
+            // Службы нет — останавливать нечего; драйвер не из нашей папки — не наш.
+            if (ImagePath(name) is not { } image)
+                continue;
+
+            if (!IsOurs(image, engines))
+            {
+                foreign.Add($"{name} ({Path.GetFileName(DriverFile(image))})");
+                continue;
+            }
+
             var (code, output) = await ScAsync(["stop", name], cancellationToken);
 
             // 1060 — службы нет, 1062 — уже остановлена: для нас это успех.
@@ -121,9 +153,63 @@ public static class WinDivertDriver
                 return $"Драйвер {name} не выгружен: sc stop вернул {code}. {output.Trim()}";
         }
 
-        return stopped.Count > 0
+        var others = foreign.Count > 0 ? $" Чужие драйверы не тронуты: {string.Join(", ", foreign)}." : string.Empty;
+
+        return (stopped.Count > 0
             ? $"Драйвер перехвата выгружен ({string.Join(", ", stopped)}): файлы движка свободны."
-            : "Драйвер перехвата не был загружен.";
+            : "Драйвер перехвата не был загружен.") + others;
+    }
+
+    /// <summary>Путь драйвера службы из реестра (только чтение); <c>null</c> — службы нет.</summary>
+    private static string? ImagePath(string service)
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\{service}");
+            return key?.GetValue("ImagePath") as string;
+        }
+        catch (Exception)
+        {
+            // Не прочли — не знаем, чей он, и не трогаем.
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Файл драйвера по записи службы: «\??\C:\…», «\SystemRoot\…» и «System32\drivers\…».
+    /// </summary>
+    public static string? DriverFile(string? imagePath)
+    {
+        if (string.IsNullOrWhiteSpace(imagePath))
+            return null;
+
+        var path = imagePath.Trim().Trim('"');
+        var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+
+        if (path.StartsWith(@"\??\", StringComparison.Ordinal))
+            return path[4..];
+
+        if (path.StartsWith(@"\SystemRoot\", StringComparison.OrdinalIgnoreCase))
+            return Path.Combine(windows, path[@"\SystemRoot\".Length..]);
+
+        return Path.IsPathRooted(path) ? path : Path.Combine(windows, path);
+    }
+
+    /// <summary>Лежит ли драйвер службы в нашей папке движков.</summary>
+    public static bool IsOurs(string? imagePath, string engines)
+    {
+        if (DriverFile(imagePath) is not { } file)
+            return false;
+
+        try
+        {
+            var root = Path.GetFullPath(engines).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            return Path.GetFullPath(file).StartsWith(root, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     private static List<string> Running()

@@ -503,7 +503,9 @@ public partial class App : Application
     /// </remarks>
     private async void RunAsSupervisor(string[] args)
     {
-        var code = await SupervisorHost.RunAsync(args, CancellationToken.None);
+        // Окно просит остановиться событием, а не только убивает (SupervisorStop):
+        // тогда службы гасятся своим порядком, sing-box — штатно.
+        var code = await SupervisorHost.RunAsync(args, Zephyron.Supervisor.SupervisorStop.Listen());
 
         Shutdown(code);
     }

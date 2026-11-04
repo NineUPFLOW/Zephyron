@@ -193,6 +193,70 @@ public class BlockCheckTests
         Assert.Contains("десинк не поможет", Report(BlockKind.GeoBlock).Remedy());
     }
 
+    /// <summary>
+    /// 403, который страну не назвал, — не отказ по стране.
+    /// </summary>
+    /// <remarks>
+    /// Отчёт 27.10: themoviedb.org «отказывает по стране», а в браузере открыт.
+    /// 403 был проверкой на робота самого TMDB, без метки Cloudflare.
+    /// </remarks>
+    [Theory]
+    [InlineData("This service is not available in your region.", "This service is not available in your region")]
+    [InlineData("You are blocked This request has been blocked. To comply with applicable export control and economic "
+        + "sanctions laws, Miro takes measures to restrict access from countries and regions not falling under Miro's "
+        + "Support Policy .", "restrict access from countries and regions")]
+    [InlineData("{\"error\":{\"message\":\"Country, region, or territory not supported\",\"code\":\"unsupported_country_region_territory\"}}",
+        "Country, region, or territory not supported")]
+    [InlineData("Сервис недоступен в вашей стране.", "Сервис недоступен в вашей стране")]
+    public void A_refusal_that_names_the_country_is_read_as_one(string text, string phrase)
+    {
+        var said = BlockCheck.RegionPhrase(text);
+
+        Assert.NotNull(said);
+        Assert.Contains(phrase, said);
+        Assert.True(said!.Length <= 124);
+    }
+
+    [Theory]
+    [InlineData("Just a moment... - The Movie Database (TMDb) Checking your browser... Please enable JavaScript and cookies to continue.")]
+    [InlineData("HTTP not supported")]
+    [InlineData("403 Forbidden nginx")]
+    [InlineData("Страница недоступна")]
+    [InlineData(null)]
+    public void A_refusal_without_a_country_is_not_read_as_one(string? text)
+    {
+        Assert.Null(BlockCheck.RegionPhrase(text));
+    }
+
+    [Fact]
+    public void A_bot_check_is_known_by_its_words_and_scripts_do_not_count()
+    {
+        // Страница TMDB: в скрипте «cookies blocked», у x.ai — challenge-platform.
+        var tmdb = BlockCheck.VisibleText(
+            "<html><head><title>Just a moment... - The Movie Database (TMDb)</title></head><body>"
+            + "<p>Checking your browser...</p><script>// cookies blocked, or the client keeps changing address\n</script></body></html>");
+
+        Assert.True(BlockCheck.LooksLikeBotCheck(tmdb));
+        Assert.Null(BlockCheck.RegionPhrase(tmdb));
+        Assert.DoesNotContain("cookies blocked", tmdb);
+
+        var xai = BlockCheck.VisibleText(
+            "<body>This service is not available in your region.<script>a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js'</script></body>");
+
+        Assert.Equal("This service is not available in your region.", xai);
+        Assert.False(BlockCheck.LooksLikeBotCheck(xai));
+    }
+
+    [Fact]
+    public void A_bare_refusal_is_its_own_verdict()
+    {
+        var forbidden = new ProbeOutcome { Ok = true, Forbidden = true };
+
+        Assert.Equal(BlockKind.Forbidden, BlockCheck.Classify(Ok(), Ok(), Ok(), forbidden));
+        Assert.Contains("браузере", Report(BlockKind.Forbidden).Remedy());
+        Assert.True(Report(BlockKind.Forbidden).Actionable);
+    }
+
     /// <summary>Оборванный CNAME лечится подстановкой адреса, а не маршрутом.</summary>
     /// <remarks>
     /// Случай <c>tr.rbxcdn.com</c>: Roblox отдаёт по нему ссылки на превью,
@@ -547,5 +611,42 @@ public class BlockCheckTests
         Assert.Contains("роутер", remedy);
         Assert.DoesNotContain("VPN-клиент", remedy);
         Assert.True(Report(BlockKind.RouterFakeIp).Actionable);
+    }
+
+    /// <summary>
+    /// Имя с одним частным адресом — не провал туннеля: zapret.moe 27.10 — запись A 192.168.0.1.
+    /// </summary>
+    [Theory]
+    [InlineData(new[] { "192.168.0.1" }, "192.168.0.1")]
+    [InlineData(new[] { "10.0.0.5", "127.0.0.1" }, "10.0.0.5")]
+    [InlineData(new[] { "192.168.0.1", "104.26.0.147" }, null)]
+    [InlineData(new[] { "104.26.0.147" }, null)]
+    [InlineData(new string[0], null)]
+    public void A_name_with_only_a_home_address_is_named_so(string[] addresses, string? expected)
+    {
+        Assert.Equal(expected, BlockCheck.PrivateOnly(addresses));
+    }
+
+    /// <summary>
+    /// Чужой сертификат — не «доступен»: elevenlabs.io 27.10, пин на прокси с сертификатом instaposts.halahala.ru.
+    /// </summary>
+    [Fact]
+    public void A_foreign_certificate_is_not_an_open_site()
+    {
+        var foreign = new DnsSpoofResult
+        {
+            Verdict = DnsVerdict.ForeignCertificate,
+            Detail = "по адресу отвечает не «elevenlabs.io», а «instaposts.halahala.ru»",
+        };
+
+        var (kind, tcp) = BlockCheck.WithSpoof(BlockKind.None, Ok(), foreign);
+
+        Assert.Equal(BlockKind.Dns, kind);
+        Assert.Contains("instaposts.halahala.ru", tcp.Detail);
+        Assert.Contains("пин", Report(BlockKind.Dns).Remedy());
+
+        // Чистый сертификат и уже закрытое имя — как были.
+        Assert.Equal(BlockKind.None, BlockCheck.WithSpoof(BlockKind.None, Ok(), DnsSpoofResult.Clean).Kind);
+        Assert.Equal(BlockKind.TlsDpi, BlockCheck.WithSpoof(BlockKind.TlsDpi, Ok(), foreign).Kind);
     }
 }
