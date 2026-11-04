@@ -237,7 +237,14 @@ internal static class EngineControl
         // ожидание прерывает — снимет она его по номеру.
         try
         {
-            await SupervisorHost.WaitRegisteredAsync(spawned, RegisterLimit, cancellationToken);
+            // Супервизор, умерший не зарегистрировавшись, движков не поднимет:
+            // успех здесь оставил бы «Движки поднимаются» без движков.
+            if (!await SupervisorHost.WaitRegisteredAsync(spawned, RegisterLimit, cancellationToken)
+                && !SupervisorHost.IsRunning(spawned))
+            {
+                _spawned = null;
+                return new EngineOutcome(false, "Не удалось запустить: супервизор завершился сразу после старта. Причина — в журнале.");
+            }
         }
         catch (OperationCanceledException)
         {
