@@ -548,4 +548,18 @@ public class BlockCheckTests
         Assert.DoesNotContain("VPN-клиент", remedy);
         Assert.True(Report(BlockKind.RouterFakeIp).Actionable);
     }
+
+    /// <summary>
+    /// Имя с одним частным адресом — не провал туннеля: zapret.moe 27.10 — запись A 192.168.0.1.
+    /// </summary>
+    [Theory]
+    [InlineData(new[] { "192.168.0.1" }, "192.168.0.1")]
+    [InlineData(new[] { "10.0.0.5", "127.0.0.1" }, "10.0.0.5")]
+    [InlineData(new[] { "192.168.0.1", "104.26.0.147" }, null)]
+    [InlineData(new[] { "104.26.0.147" }, null)]
+    [InlineData(new string[0], null)]
+    public void A_name_with_only_a_home_address_is_named_so(string[] addresses, string? expected)
+    {
+        Assert.Equal(expected, BlockCheck.PrivateOnly(addresses));
+    }
 }
