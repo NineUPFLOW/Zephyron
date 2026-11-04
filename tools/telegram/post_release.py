@@ -222,11 +222,11 @@ def send(text: str, url: str) -> None:
         "disable_web_page_preview": "true",
         # Кнопки под сообщением, а не ссылки в тексте: так их видно сразу,
         # и пост не удлиняется.
-        "reply_markup": json.dumps({"inline_keyboard": [[
-            {"text": "📥 Скачать", "url": url},
-            {"text": "💛 Поддержать", "url": DONATE_URL},
-            {"text": "💛 tips.tips", "url": DONATE_URL_TIPS},
-        ]]}),
+        # Скачать — на всю ширину, донаты парой: в один ряд три подписи не влезают.
+        "reply_markup": json.dumps({"inline_keyboard": [
+            [{"text": "📥 Скачать", "url": url}],
+            [{"text": "💛 Tribute", "url": DONATE_URL}, {"text": "💛 tips.tips", "url": DONATE_URL_TIPS}],
+        ]}),
     }
 
     # Канал — форум: без номера темы пост уходит в общую ленту, а не
@@ -269,7 +269,7 @@ def main() -> None:
 
     if "--dry-run" in sys.argv:
         print(text)
-        print(f"\n[кнопки под постом: 📥 Скачать → {url} · 💛 Поддержать → {DONATE_URL}]")
+        print(f"\n[кнопки под постом: 📥 Скачать → {url} · 💛 Tribute → {DONATE_URL} · 💛 tips.tips → {DONATE_URL_TIPS}]")
         print(f"[{len(text)} символов из {LIMIT}]")
         return
 
