@@ -39,10 +39,17 @@ public static class WinDivertDriver
     /// </summary>
     public const int NoSuchDevice = 433;
 
+    /// <summary>
+    /// Код выхода winws2, когда Windows не дала WinDivert открыть фильтр:
+    /// FWP_E_IN_USE (0x8032000A), «The object is referenced by other objects
+    /// so cannot be deleted» — объекты фильтрации Windows (WFP) ещё заняты.
+    /// </summary>
+    public const int FilterInUse = unchecked((int)0x8032000A);
+
     /// <summary>Что значит код выхода winws2 и что делать; <c>null</c> — объяснения нет.</summary>
     /// <remarks>
     /// <para>
-    /// Только 433: сам код человеку ничего не говорит, а «Диагностика»
+    /// 433 и FWP_E_IN_USE: сам код человеку ничего не говорит, а «Диагностика»
     /// показывала про упавший winws2 одно «остановлен».
     /// </para>
     /// <para>
@@ -55,6 +62,12 @@ public static class WinDivertDriver
     /// <param name="nearby">Чужие обходы рядом (<see cref="Core.Diagnostics.OtherBypassScan"/>).</param>
     public static string? Explain(int exitCode, IReadOnlyList<Core.Diagnostics.OtherBypass>? nearby = null)
     {
+        if (exitCode == FilterInUse)
+        {
+            return "Windows не дала драйверу перехвата WinDivert открыть фильтр: прежний ещё не освобождён. "
+                + "Остановите движки, подождите секунд десять и запустите снова; не поможет — перезагрузите компьютер";
+        }
+
         if (exitCode != NoSuchDevice)
             return null;
 

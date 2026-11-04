@@ -50,6 +50,18 @@ public sealed class EngineExitReasonTests
         Assert.Null(Zephyron.Zapret.WinDivertDriver.Explain(1));
     }
 
+    /// <summary>FWP_E_IN_USE так и показывает «Главная»: знаковым числом.</summary>
+    [Fact]
+    public void FilterInUseIsExplained()
+    {
+        Assert.Equal(Zephyron.Zapret.WinDivertDriver.FilterInUse, -2144206838);
+
+        var text = Zephyron.Zapret.WinDivertDriver.Explain(-2144206838);
+
+        Assert.NotNull(text);
+        Assert.Contains("перезагрузите", text);
+    }
+
     /// <summary>
     /// Найденный рядом обход назван по имени и с процессом, а служба с автозапуском —
     /// отдельно (владелец 24.10; случай знакомого 22.10: goodbyedpi.exe и служба GoodbyeDPI).
