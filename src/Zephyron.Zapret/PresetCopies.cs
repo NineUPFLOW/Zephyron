@@ -101,11 +101,14 @@ public static class PresetCopies
         return name + ".txt";
     }
 
-    /// <summary>Выбранный пресет идёт за переименованием.</summary>
-    public static AppSettings Renamed(AppSettings settings, string oldName, string newName) =>
-        string.Equals(settings.PresetName, oldName, StringComparison.OrdinalIgnoreCase)
-            ? settings with { PresetName = newName }
-            : settings;
+    /// <summary>Выбранный пресет и подделки его секций идут за переименованием.</summary>
+    public static AppSettings Renamed(AppSettings settings, string oldName, string newName) => settings with
+    {
+        PresetName = string.Equals(settings.PresetName, oldName, StringComparison.OrdinalIgnoreCase) ? newName : settings.PresetName,
+        FakeSwaps = settings.FakeSwaps
+            .Select(s => string.Equals(s.Preset, oldName, StringComparison.OrdinalIgnoreCase) ? s with { Preset = newName } : s)
+            .ToList(),
+    };
 
     internal static IReadOnlyList<string> Retitle(IReadOnlyList<string> lines, string name, bool dropBuiltin)
     {
