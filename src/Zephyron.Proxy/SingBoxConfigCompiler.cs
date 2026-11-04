@@ -1771,6 +1771,10 @@ public sealed class SingBoxConfigCompiler
                 // «-udp443» он отвергает фатально и роняет весь туннель, а не один сервер.
                 if (server.Flow?.StartsWith("xtls-rprx-vision", StringComparison.OrdinalIgnoreCase) == true)
                     outbound["flow"] = "xtls-rprx-vision";
+
+                // VLESS Encryption: без него сервер, который его требует, рвёт рукопожатие.
+                if (VlessEncryption.ForSingBox(server.Encryption) is { Length: > 0 } encryption)
+                    outbound["encryption"] = encryption;
                 break;
 
             case ProxyProtocol.Vmess:
