@@ -178,8 +178,9 @@ public sealed class UpdateWindowDataTests
             return;
 
         Assert.Contains($"({About.Support})", File.ReadAllText(Path.Combine(directory.FullName, "docs", "release-notes.footer.md")));
+        Assert.Contains($"({About.SupportTips})", File.ReadAllText(Path.Combine(directory.FullName, "docs", "release-notes.footer.md")));
         Assert.Contains($"\"{About.Support}\"", File.ReadAllText(Path.Combine(directory.FullName, "tools", "telegram", "post_release.py")));
-        Assert.Contains($"[\"{About.Support}\"]", File.ReadAllText(Path.Combine(directory.FullName, ".github", "FUNDING.yml")));
+        Assert.Contains($"[\"{About.Support}\", \"{About.SupportTips}\"]", File.ReadAllText(Path.Combine(directory.FullName, ".github", "FUNDING.yml")));
     }
 
     [Fact]

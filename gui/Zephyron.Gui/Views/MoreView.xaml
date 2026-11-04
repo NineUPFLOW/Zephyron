@@ -166,7 +166,9 @@
                                     <TextBlock Text="Телеграм-канал" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
-                            <Button x:Name="SupportLink" Style="{StaticResource Ghost}" Content="Поддержать"
+                            <Button x:Name="SupportLink" Style="{StaticResource Ghost}" Content="Поддержать · Tribute"
+                                    Click="OnLink" Margin="0,0,8,8" />
+                            <Button x:Name="SupportTipsLink" Style="{StaticResource Ghost}" Content="Поддержать · tips.tips"
                                     Click="OnLink" Margin="0,0,8,8" />
                         </WrapPanel>
 

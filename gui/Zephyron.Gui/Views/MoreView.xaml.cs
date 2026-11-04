@@ -481,6 +481,7 @@ public partial class MoreView : UserControl
         DiscussionsLink.Tag = About.Discussions;
         TelegramLink.Tag = About.Telegram;
         SupportLink.Tag = About.Support;
+        SupportTipsLink.Tag = About.SupportTips;
 
         Components.ItemsSource = About.Components;
 

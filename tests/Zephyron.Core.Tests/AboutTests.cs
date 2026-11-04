@@ -58,7 +58,7 @@ public sealed class AboutTests
     {
         var links = About.Components.Select(c => c.Source)
             .Concat(About.Components.Select(c => c.Site).OfType<string>())
-            .Concat([About.Repository, About.Issues, About.Discussions, About.Telegram, About.Support]);
+            .Concat([About.Repository, About.Issues, About.Discussions, About.Telegram, About.Support, About.SupportTips]);
 
         Assert.All(links, link => Assert.StartsWith("https://", link));
     }
