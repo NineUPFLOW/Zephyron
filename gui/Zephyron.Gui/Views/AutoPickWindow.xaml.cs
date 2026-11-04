@@ -1357,7 +1357,7 @@ public partial class AutoPickWindow : Window
 
                     await Dispatcher.InvokeAsync(() =>
                     {
-                        item.Post = report.Kind == BlockKind.None;
+                        item.Post = report.Kind is BlockKind.None or BlockKind.Forbidden;
                         item.Refresh();
 
                         if (item.Post == true) open++; else shut++;

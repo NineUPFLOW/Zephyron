@@ -165,6 +165,11 @@ public static class FakeChoice
                 if (swap is null)
                     continue;
 
+                // Значение из файла настроек: только встроенный образец или файл прямо в bin.
+                if (!BuiltIns.Any(b => b.Id == swap.Blob)
+                    && (Path.GetFileName(swap.Blob) != swap.Blob || !swap.Blob.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
                 var blob = NameFor(swap.Blob);
                 var declaration = $"--blob={blob}:@bin/{swap.Blob}";
 

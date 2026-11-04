@@ -70,8 +70,9 @@ public static class RouteBundle
         {
             using (var zip = ZipFile.OpenRead(path))
             {
+                CheckSize(zip);
                 var entry = zip.GetEntry(RulesEntry) ?? throw new InvalidDataException("В наборе нет rules.user.yaml.");
-                entry.ExtractToFile(tmp);
+                File.WriteAllText(tmp, Text(entry), new System.Text.UTF8Encoding(false));
             }
 
             return RulesShare.Read(tmp);
@@ -104,6 +105,7 @@ public static class RouteBundle
         int created = 0, kept = 0;
 
         using var zip = ZipFile.OpenRead(path);
+        CheckSize(zip);
 
         foreach (var entry in zip.Entries)
         {
@@ -116,15 +118,44 @@ public static class RouteBundle
                 continue;
             }
 
-            using var reader = new StreamReader(entry.Open());
+            var text = Text(entry);
             var full = Path.Combine(root ?? string.Empty, OwnLists.PathFor(name).Replace('/', Path.DirectorySeparatorChar));
 
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(full))!);
-            File.WriteAllText(full, reader.ReadToEnd(), new System.Text.UTF8Encoding(false));
+            File.WriteAllText(full, text, new System.Text.UTF8Encoding(false));
             created++;
         }
 
         return (created, kept);
+    }
+
+    // Файл чужой, а программа от администратора: сжатая бомба не должна съесть память и диск.
+    private const int MaxEntries = 512;
+    private const long MaxEntryChars = 16 * 1024 * 1024;
+    private const long MaxTotal = 64 * 1024 * 1024;
+
+    private static void CheckSize(ZipArchive zip)
+    {
+        if (zip.Entries.Count > MaxEntries || zip.Entries.Any(e => e.Length > MaxEntryChars) || zip.Entries.Sum(e => e.Length) > MaxTotal)
+            throw new InvalidDataException("Набор слишком большой.");
+    }
+
+    /// <summary>Текст записи; заголовку архива не верим — считаем прочитанное.</summary>
+    private static string Text(ZipArchiveEntry entry)
+    {
+        using var reader = new StreamReader(entry.Open());
+        var text = new System.Text.StringBuilder();
+        var buffer = new char[81920];
+
+        for (int read; (read = reader.Read(buffer, 0, buffer.Length)) > 0;)
+        {
+            text.Append(buffer, 0, read);
+
+            if (text.Length > MaxEntryChars)
+                throw new InvalidDataException("Набор слишком большой.");
+        }
+
+        return text.ToString();
     }
 
     /// <summary>Название списка из записи набора; <c>null</c> — не список или имя не годится (защита от «../»).</summary>

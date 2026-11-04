@@ -30,6 +30,9 @@ public static class PresetCopies
         if (trimmed.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || trimmed.EndsWith('.'))
             return "В названии нельзя \\ / : * ? \" < > | и точку в конце.";
 
+        if (Zephyron.Core.Rules.OwnLists.IsDeviceName(trimmed))
+            return "Такое имя занято Windows.";
+
         var target = Path.GetFullPath(Path.Combine(directory, trimmed + ".txt"));
 
         if (File.Exists(target) && !(except is not null

@@ -746,7 +746,8 @@ public static class BlockCheck
     {
         var first = await ProbeAsync(host, service, cancellationToken, throughTunnel);
 
-        if (first.Kind == BlockKind.None)
+        // Отказ самого сайта второй заход не изменит, а время удвоит.
+        if (first.Kind is BlockKind.None or BlockKind.Forbidden)
             return first;
 
         // Прерывание проверяется здесь, а не только внутри проб. Первый заход

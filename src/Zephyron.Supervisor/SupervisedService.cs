@@ -289,7 +289,18 @@ public abstract class SupervisedService
 
         try
         {
-            if (!await StopGentlyAsync(Process, cancellationToken))
+            bool gone = false;
+
+            try
+            {
+                gone = await StopGentlyAsync(Process, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Отмена не повод оставлять процесс живым: дальше обычный Kill.
+            }
+
+            if (!gone)
             {
                 Process.Kill(entireProcessTree: true);
                 await Process.WaitForExitAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);

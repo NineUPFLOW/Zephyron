@@ -157,7 +157,17 @@ public partial class RoutesView
             }
 
             var backup = RulesShare.Backup();
-            var (created, kept) = RouteBundle.ImportLists(dialog.FileName);
+            int created, kept;
+
+            try
+            {
+                (created, kept) = RouteBundle.ImportLists(dialog.FileName);
+            }
+            catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
+            {
+                Status.Text = "Файл не загружен: " + ex.GetBaseException().Message;
+                return;
+            }
 
             var file = UserRulesFile.Load();
             file.ReplaceAll(incoming);

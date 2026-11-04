@@ -1907,7 +1907,7 @@ public partial class CheckView : UserControl
                 var report = await BlockCheck.ProbeThroughTunnelAsync(
                     host, null, SingBoxOptions.DefaultHealthPort, token);
 
-                if (report.Kind == BlockKind.None)
+                if (report.Kind is BlockKind.None or BlockKind.Forbidden)
                     opened++;
 
                 lines.Add($"{host}: {report.Describe()}"
