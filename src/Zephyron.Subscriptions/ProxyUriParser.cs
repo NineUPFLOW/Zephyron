@@ -82,6 +82,8 @@ public static class ProxyUriParser
             throw new FormatException("отсутствует часть до '@' с учётными данными");
 
         var q = parts.Query;
+        var transport = StreamTransports.Normalize(Get(q, "type"));
+        var kcp = transport == "mkcp" ? MkcpSettings.FromLink(q) : null;
 
         return new ProxyServer
         {
@@ -90,7 +92,9 @@ public static class ProxyUriParser
             Host = parts.Host,
             Port = parts.Port,
             Credential = Uri.UnescapeDataString(parts.UserInfo),
-            Transport = Get(q, "type") ?? "tcp",
+            Transport = transport,
+            KcpOptions = kcp?.Options,
+            TransportRefusal = kcp?.Refusal ?? StreamTransports.Problem(transport, Get(q, "headerType")),
             Security = Get(q, "security") ?? "none",
             Sni = Get(q, "sni") ?? Get(q, "peer"),
             Fingerprint = Get(q, "fp"),
@@ -493,6 +497,10 @@ public static class ProxyUriParser
             throw new FormatException($"порт '{portText}' не разбирается");
 
         var tls = Field("tls");
+        var transport = StreamTransports.Normalize(Field("net"));
+
+        // У v2rayN поле type — маскировка транспорта (TCP или mKCP), а seed mKCP лежит в path.
+        var kcp = transport == "mkcp" ? MkcpSettings.FromVmess(Field("type"), Field("path")) : null;
 
         return new ProxyServer
         {
@@ -501,10 +509,12 @@ public static class ProxyUriParser
             Host = host,
             Port = port,
             Credential = Field("id") ?? throw new FormatException("в vmess нет поля 'id'"),
-            Transport = Field("net") ?? "tcp",
+            Transport = transport,
+            KcpOptions = kcp?.Options,
+            TransportRefusal = kcp?.Refusal ?? StreamTransports.Problem(transport, Field("type")),
             Security = string.IsNullOrEmpty(tls) ? "none" : tls,
             Sni = Field("sni"),
-            Path = Field("path"),
+            Path = kcp is null ? Field("path") : null,
             HostHeader = Field("host"),
             Fingerprint = Field("fp"),
             Alpn = SplitAlpn(Field("alpn")),
