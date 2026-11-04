@@ -776,7 +776,7 @@ public partial class UpdateWindow : Window
 
     private void OnTelegram(object sender, RoutedEventArgs e) => Open(Telegram);
 
-    private void OnDonate(object sender, RoutedEventArgs e) => Open(Zephyron.Core.About.Support);
+    private void OnDonate(object sender, RoutedEventArgs e) => DonateMenu.Show(sender);
 
     private static void Open(string address)
     {

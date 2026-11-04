@@ -1029,7 +1029,7 @@ public partial class MainWindow : Window
 
     private void OnGreetingTelegram(object sender, RoutedEventArgs e) => OpenLink(About.Telegram);
 
-    private void OnGreetingDonate(object sender, RoutedEventArgs e) => OpenLink(About.Support);
+    private void OnGreetingDonate(object sender, RoutedEventArgs e) => DonateMenu.Show(sender);
 
     private static void OpenLink(string url)
     {

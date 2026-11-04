@@ -480,8 +480,6 @@ public partial class MoreView : UserControl
         IssuesLink.Tag = About.Issues;
         DiscussionsLink.Tag = About.Discussions;
         TelegramLink.Tag = About.Telegram;
-        SupportLink.Tag = About.Support;
-        SupportTipsLink.Tag = About.SupportTips;
 
         Components.ItemsSource = About.Components;
 
@@ -519,6 +517,8 @@ public partial class MoreView : UserControl
             + "она не сообщает о вас никуда.";
         DownloadsValue.Visibility = Visibility.Visible;
     }
+
+    private void OnDonate(object sender, RoutedEventArgs e) => DonateMenu.Show(sender);
 
     private void OnLink(object sender, RoutedEventArgs e)
     {
