@@ -60,11 +60,9 @@ public static class SubscriptionPool
     /// Читает все подписки разом и склеивает пул.
     /// </summary>
     /// <remarks>
-    /// Разные панели — разом: при запуске движков ждать их одну за другой
-    /// значило бы складывать их сроки. Подписки с одной панели — по очереди:
-    /// панель у разных подписок часто одна и та же, и несколько запросов
-    /// в одну секунду с одного адреса ей не нравятся (урок раздела VPN,
-    /// который по той же причине читает подписки по очереди).
+    /// Разные панели — разом, подписки с одной панели — по очереди
+    /// (<see cref="ByPanel"/>): при запуске движков ждать их одну за другой
+    /// значило бы складывать их сроки.
     /// </remarks>
     /// <param name="deferPanels">
     /// Запуск движков: подписку с запасом моложе <see cref="StartFromReserveFor"/>
@@ -80,17 +78,11 @@ public static class SubscriptionPool
         var folder = reserveDirectory ?? DefaultReserveDirectory;
         var raw = new PoolPart[sources.Count];
 
-        await Task.WhenAll(sources
-            .Select((source, index) => (source, index))
-            .GroupBy(x => Panel(x.source.Url), StringComparer.OrdinalIgnoreCase)
-            .Select(async panel =>
-            {
-                foreach (var (source, index) in panel)
-                {
-                    raw[index] = (deferPanels ? Deferred(source, folder, DateTimeOffset.Now) : null)
-                        ?? await ReadAsync(source, folder, cancellationToken);
-                }
-            }));
+        await ByPanel(
+            sources.Select((source, index) => (source, index)).ToList(),
+            x => x.source.Url,
+            async x => raw[x.index] = (deferPanels ? Deferred(x.source, folder, DateTimeOffset.Now) : null)
+                ?? await ReadAsync(x.source, folder, cancellationToken));
 
         // Отдельные ключи — последним источником: читать их не надо, они уже
         // здесь. Разобрались не все — это видно в папке ключей, пул берёт
@@ -121,6 +113,23 @@ public static class SubscriptionPool
 
         return new PoolResult(Merge(parts), parts);
     }
+
+    /// <summary>
+    /// Обходит подписки: разные панели — разом, подписки одной панели — по очереди, в заданном порядке.
+    /// </summary>
+    /// <remarks>
+    /// Одна панель — по очереди: несколько запросов в одну секунду с одного адреса ей не нравятся.
+    /// Разные — разом, иначе их сроки складываются: молчащая панель (12 с до таймаута) держала бы
+    /// соседей, отвечающих за доли секунды. Общее для движка (<see cref="BuildAsync"/>) и вкладки VPN.
+    /// </remarks>
+    public static Task ByPanel<T>(IReadOnlyList<T> items, Func<T, string> url, Func<T, Task> read) =>
+        Task.WhenAll(items
+            .GroupBy(item => Panel(url(item)), StringComparer.OrdinalIgnoreCase)
+            .Select(async panel =>
+            {
+                foreach (var item in panel)
+                    await read(item);
+            }));
 
     /// <summary>Чья панель: адрес после развёртки обёртки клиента.</summary>
     private static string Panel(string url)
@@ -598,6 +607,23 @@ public static class SubscriptionPool
     /// </remarks>
     public static (SubscriptionInfo Info, DateTimeOffset At)? Kept(string url, string? reserveDirectory = null) =>
         LoadReserve(reserveDirectory ?? DefaultReserveDirectory, url);
+
+    /// <summary>
+    /// Запас, который вкладке VPN показать, пока спрашивается панель; <c>null</c> — показывать нечего
+    /// или панель спрашиваться не будет.
+    /// </summary>
+    /// <remarks>
+    /// Свежий запас (моложе <see cref="FreshFor"/>) <see cref="ReadOneAsync"/> и так отдаёт без сети —
+    /// показывать его дважды незачем.
+    /// </remarks>
+    public static (SubscriptionInfo Info, DateTimeOffset At)? KeptWhileAsking(
+        string url, bool force, DateTimeOffset now, string? reserveDirectory = null)
+    {
+        if (Kept(url, reserveDirectory) is not { } kept || kept.Info.Servers.Count == 0)
+            return null;
+
+        return force || now - kept.At >= FreshFor ? kept : null;
+    }
 
     private static (SubscriptionInfo Info, DateTimeOffset At)? LoadReserve(string folder, string url)
     {
