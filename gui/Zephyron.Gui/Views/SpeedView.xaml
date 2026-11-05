@@ -57,7 +57,7 @@
             <StackPanel x:Name="Page" SizeChanged="OnPageSize">
                 <ContentControl Style="{StaticResource PageHead}"
                                 local:PageHead.Title="Замер скорости"
-                                local:PageHead.Subtitle="Задержка, скачивание и отдача — через туннель или напрямую.">
+                                local:PageHead.Subtitle="Отклик, загрузка и отправка: через туннель или без него.">
                     <!-- Путь: что мерить. Туннель — только при поднятом движке. -->
                     <Border VerticalAlignment="Center" CornerRadius="{StaticResource RMd}" Padding="4"
                             Background="{DynamicResource Surface}" BorderBrush="{DynamicResource CardRim}" BorderThickness="1">
@@ -95,7 +95,7 @@
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE896;" FontSize="14"
                                            Foreground="{DynamicResource Accent2}" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                <TextBlock Text="Скачивание" Style="{StaticResource GroupHead}" />
+                                <TextBlock Text="Загрузка" Style="{StaticResource GroupHead}" />
                             </StackPanel>
                             <TextBlock x:Name="DownText" Text="—" Style="{StaticResource SpeedMetric}" Margin="0,4,0,0" />
                             <TextBlock Text="Мбит/с" Style="{StaticResource MetricUnit}" HorizontalAlignment="Center" />
@@ -111,7 +111,7 @@
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE898;" FontSize="14"
                                            Foreground="{DynamicResource Text}" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                <TextBlock Text="Отдача" Style="{StaticResource GroupHead}" />
+                                <TextBlock Text="Отправка" Style="{StaticResource GroupHead}" />
                             </StackPanel>
                             <TextBlock x:Name="UpText" Text="—" Style="{StaticResource SpeedMetric}" Margin="0,4,0,0" />
                             <TextBlock Text="Мбит/с" Style="{StaticResource MetricUnit}" HorizontalAlignment="Center" />
@@ -127,7 +127,7 @@
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE916;" FontSize="14"
                                            Foreground="{DynamicResource Accent2}" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                <TextBlock Text="Задержка" Style="{StaticResource GroupHead}" />
+                                <TextBlock Text="Отклик" Style="{StaticResource GroupHead}" />
                             </StackPanel>
                             <TextBlock x:Name="PingText" Text="—" Style="{StaticResource SpeedMetric}" Margin="0,4,0,0" />
                             <TextBlock Text="мс" Style="{StaticResource MetricUnit}" HorizontalAlignment="Center" />
@@ -183,12 +183,12 @@
                                         <TextBlock x:Name="GoGlyph" FontFamily="{StaticResource IconFont}" Text="&#xE768;"
                                                    FontSize="13" VerticalAlignment="Center" Margin="0,0,9,0"
                                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                        <TextBlock x:Name="GoText" Text="Начать" VerticalAlignment="Center" />
+                                        <TextBlock x:Name="GoText" Text="Запустить" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </Button>
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="18,0,0,0">
-                                    <TextBlock Text="Что проверяет" FontWeight="SemiBold" />
+                                    <TextBlock Text="Что измеряется" FontWeight="SemiBold" />
                                     <TextBlock x:Name="WhatText" Style="{StaticResource Caption}" Margin="0,5,0,0"
                                                TextWrapping="Wrap" />
                                 </StackPanel>
@@ -226,10 +226,10 @@
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
 
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Сервер замера" Style="{StaticResource FactLabel}" />
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Сервер для замера" Style="{StaticResource FactLabel}" />
                                 <TextBlock Grid.Row="0" Grid.Column="1" x:Name="ServerText" Style="{StaticResource FactValue}" />
 
-                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Виден как" Style="{StaticResource FactLabel}" />
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Определяется как" Style="{StaticResource FactLabel}" />
                                 <!-- Свой адрес — на экране, со скрытием (владелец, 25.10); в журналы он не пишется. -->
                                 <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal">
                                     <TextBlock x:Name="SeenText" Style="{StaticResource FactValue}" />
@@ -238,13 +238,13 @@
                                             VerticalAlignment="Center" Visibility="Collapsed" />
                                 </StackPanel>
 
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Соединений" Style="{StaticResource FactLabel}" />
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Подключений" Style="{StaticResource FactLabel}" />
                                 <TextBlock Grid.Row="2" Grid.Column="1" x:Name="StreamsText" Style="{StaticResource FactValue}" />
 
-                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Трафик" Style="{StaticResource FactLabel}" />
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Объём" Style="{StaticResource FactLabel}" />
                                 <TextBlock Grid.Row="3" Grid.Column="1" x:Name="SpentText" Style="{StaticResource FactValue}" />
 
-                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Время" Style="{StaticResource FactLabel}" />
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Длительность" Style="{StaticResource FactLabel}" />
                                 <TextBlock Grid.Row="4" Grid.Column="1" Text="около двадцати секунд" Style="{StaticResource FactValue}" />
                             </Grid>
 
@@ -272,7 +272,7 @@
 
                     <Border x:Name="HistoryCard" Grid.Column="0" Style="{StaticResource Card}" Padding="18,14,18,12">
                         <StackPanel>
-                            <TextBlock Text="Последние замеры" FontWeight="SemiBold" />
+                            <TextBlock Text="Недавние замеры" FontWeight="SemiBold" />
 
                             <Grid Margin="10,10,10,4">
                                 <Grid.ColumnDefinitions>
@@ -283,11 +283,11 @@
                                     <ColumnDefinition Width="70" />
                                 </Grid.ColumnDefinitions>
 
-                                <TextBlock Grid.Column="0" Text="Время" Style="{StaticResource Caption}" />
+                                <TextBlock Grid.Column="0" Text="Длительность" Style="{StaticResource Caption}" />
                                 <TextBlock Grid.Column="1" Text="Путь" Style="{StaticResource Caption}" />
-                                <TextBlock Grid.Column="2" Text="Скачивание" Style="{StaticResource Caption}" />
-                                <TextBlock Grid.Column="3" Text="Отдача" Style="{StaticResource Caption}" />
-                                <TextBlock Grid.Column="4" Text="Задержка" Style="{StaticResource Caption}" />
+                                <TextBlock Grid.Column="2" Text="Загрузка" Style="{StaticResource Caption}" />
+                                <TextBlock Grid.Column="3" Text="Отправка" Style="{StaticResource Caption}" />
+                                <TextBlock Grid.Column="4" Text="Отклик" Style="{StaticResource Caption}" />
                             </Grid>
 
                             <StackPanel x:Name="HistoryRows" />
@@ -301,14 +301,14 @@
 
                     <Border x:Name="VerdictCard" Grid.Column="2" Style="{StaticResource Card}" Padding="18,14,18,14">
                         <DockPanel>
-                            <TextBlock DockPanel.Dock="Top" Text="Вывод" FontWeight="SemiBold" />
+                            <TextBlock DockPanel.Dock="Top" Text="Итог" FontWeight="SemiBold" />
 
                             <Button DockPanel.Dock="Bottom" x:Name="CopyButton" Style="{StaticResource Ghost}"
                                     Click="OnCopy" Margin="0,12,0,0" HorizontalContentAlignment="Left"
-                                    ToolTip="Итог замера текстом — без вашего адреса">
+                                    ToolTip="Итог замера текстом, ваш адрес в него не попадает">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE8C8;" Margin="0,0,10,0" />
-                                    <TextBlock x:Name="CopyText" Text="Скопировать результат" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="CopyText" Text="Копировать итог" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
 

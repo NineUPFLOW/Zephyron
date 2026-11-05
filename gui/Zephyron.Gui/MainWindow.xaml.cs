@@ -938,12 +938,12 @@ public partial class MainWindow : Window
             return;
 
         ToastTitle.Text = what;
-        ToastBody.Text = "Движки работают со старой настройкой. Перезапуск оборвёт соединения "
-            + "на пару секунд — всё, что качается, придётся начать заново.";
+        ToastBody.Text = "Движки ещё работают по старой настройке. Перезапуск на пару секунд оборвёт соединения: то, что качается, придётся начать заново."
+            + "";
 
         ToastAct.IsEnabled = true;
         ToastAct.Visibility = Visibility.Visible;
-        ToastLater.Content = "Позже";
+        ToastLater.Content = "Не сейчас";
         ShowToastKind("Degraded", assertive: false);
 
         // Угасание от прошлого «Позже» могло ещё идти — снимаем, иначе оно
@@ -1069,7 +1069,7 @@ public partial class MainWindow : Window
 
         if (!outcome.Ok)
         {
-            ToastTitle.Text = "Перезапустить не вышло";
+            ToastTitle.Text = "Перезапуск не удался";
             ToastBody.Text = outcome.Message;
             ToastAct.IsEnabled = true;
             ShowToastKind("Failed", assertive: true);
@@ -1083,10 +1083,10 @@ public partial class MainWindow : Window
         // Человек смотрит на неё и решает, что смена маршрута не сработала.
         // Совет из вики Zapret GUI, 27.09.
         ToastTitle.Text = "Движки перезапущены";
-        ToastBody.Text = "Уже открытые вкладки ходят по старым соединениям. Чтобы увидеть "
-            + "изменение, обновите страницу через Ctrl+F5 или откройте её в окне инкогнито.";
+        ToastBody.Text = "Открытые вкладки держат старые соединения. Чтобы увидеть перемену, обновите страницу через Ctrl+F5 или откройте её в окне инкогнито."
+            + "";
         ToastAct.Visibility = Visibility.Collapsed;
-        ToastLater.Content = "Понятно";
+        ToastLater.Content = "Хорошо";
         ShowToastKind("Running", assertive: false);
 
         ArmToast();

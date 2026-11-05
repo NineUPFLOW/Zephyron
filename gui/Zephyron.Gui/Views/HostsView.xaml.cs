@@ -84,7 +84,7 @@ public partial class HostsView : UserControl
         if (HostsEditor.WhoReplaced() is { } who)
         {
             ReplacedCard.Visibility = Visibility.Visible;
-            ReplacedTitle.Text = $"Файл hosts переписан: {who}";
+            ReplacedTitle.Text = $"Файл hosts заменён: ";
         }
         else
         {
@@ -110,7 +110,7 @@ public partial class HostsView : UserControl
         catch (Exception ex)
         {
             _all = [];
-            Say("Файл не читается: " + ex.GetBaseException().Message);
+            Say("Не удалось прочитать файл: " + ex.GetBaseException().Message);
         }
 
         ShowCounts();
@@ -129,7 +129,7 @@ public partial class HostsView : UserControl
         if (!_checked)
         {
             DeadText.Text = "—";
-            DeadCaption.Text = "молчат: не проверено";
+            DeadCaption.Text = "не отвечают: не проверялось";
             DeadGlyph.SetResourceReference(TextBlock.ForegroundProperty, "Faint");
             return;
         }
@@ -137,7 +137,7 @@ public partial class HostsView : UserControl
         int dead = _all.Count(l => l.Row.Enabled && l.Health == HostsHealth.Dead);
 
         DeadText.Text = dead.ToString();
-        DeadCaption.Text = "молчат";
+        DeadCaption.Text = "не отвечают";
         DeadGlyph.SetResourceReference(TextBlock.ForegroundProperty, dead > 0 ? "Danger" : "Success");
     }
 
@@ -179,8 +179,8 @@ public partial class HostsView : UserControl
 
         EmptyText.Visibility = _shown.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         EmptyText.Text = _all.Count == 0
-            ? "В файле нет ни одной записи."
-            : "Ничего не подошло.";
+            ? "В файле нет записей."
+            : "Ничего не найдено.";
 
         ShowSelection();
     }
@@ -199,7 +199,7 @@ public partial class HostsView : UserControl
 
             // «Молчат» до проверки — пустое обещание: говорим, что не проверяли.
             var text = show == HostsShow.Dead && !_checked
-                ? "Молчат — сначала «Проверить адреса»"
+                ? "Не отвечают: сначала нажмите «Проверить доступность»"
                 : $"{HostsFilter.Word(show)} — {count}";
 
             var item = new MenuItem { Header = text, IsChecked = show == _show, IsEnabled = show != HostsShow.Dead || _checked };
@@ -216,7 +216,7 @@ public partial class HostsView : UserControl
         {
             menu.Items.Add(new Separator());
 
-            var all = new MenuItem { Header = "Все источники" };
+            var all = new MenuItem { Header = "Любой источник" };
             all.Click += (_, _) =>
             {
                 _source = null;
@@ -401,7 +401,7 @@ public partial class HostsView : UserControl
             Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
         };
 
-        Add(menu, line.Row.Enabled ? "Отключить" : "Включить", () => Toggle([line], !line.Row.Enabled));
+        Add(menu, line.Row.Enabled ? "Выключить" : "Включить", () => Toggle([line], !line.Row.Enabled));
         Add(menu, "Удалить", () => Delete([line]));
 
         // Вид меняется только у своих: пометку «адрес сервиса» щит верит
@@ -411,14 +411,14 @@ public partial class HostsView : UserControl
             menu.Items.Add(new Separator());
 
             if (line.Row.Kind == HostsPinKind.Service)
-                Add(menu, "Это посредник — пропускать мимо десинка", () => SetKind(line, service: false));
+                Add(menu, "Это посредник — десинк пропускает мимо", () => SetKind(line, service: false));
             else
                 Add(menu, "Это адрес сервиса — оставить десинку", () => SetKind(line, service: true));
         }
 
         menu.Items.Add(new Separator());
-        Add(menu, "Все записи на этом адресе", () => Search.Text = line.Address);
-        Add(menu, "Скопировать строку", () => Copy($"{line.Address} {line.Name}"));
+        Add(menu, "Все строки с этим адресом", () => Search.Text = line.Address);
+        Add(menu, "Копировать строку", () => Copy($"{line.Address} {line.Name}"));
 
         menu.IsOpen = true;
     }
@@ -440,7 +440,7 @@ public partial class HostsView : UserControl
         catch (Exception)
         {
             // Буфер обмена бывает занят другой программой; повторное нажатие поможет.
-            Say("Буфер обмена занят — попробуйте ещё раз.");
+            Say("Буфер обмена занят, повторите.");
         }
     }
 
@@ -455,7 +455,7 @@ public partial class HostsView : UserControl
             () =>
             {
                 if (!HostsEditor.PinsAll().TryGetValue(line.Name, out var addresses))
-                    return "Записи уже нет в нашем блоке — файл менялся.";
+                    return "Записи уже нет в нашем блоке: файл менялся.";
 
                 var entry = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
                 {
@@ -488,7 +488,7 @@ public partial class HostsView : UserControl
         // Выбранный сегмент отмечает Selector.IsSelected (стиль Choice): подложка, рамка и точка.
         System.Windows.Controls.Primitives.Selector.SetIsSelected(OneTab, !list);
         System.Windows.Controls.Primitives.Selector.SetIsSelected(ListTab, list);
-        AddButton.Content = list ? "Добавить списком" : "Добавить запись";
+        AddButton.Content = list ? "Добавить по строкам" : "Новая запись";
     }
 
     private void OnNewKey(object sender, System.Windows.Input.KeyEventArgs e)
@@ -519,7 +519,7 @@ public partial class HostsView : UserControl
             if (pins.Count == 0)
             {
                 Say(bad.Count == 0
-                    ? "Список пуст."
+                    ? "В списке ничего нет."
                     : $"Ни одна строка не разобралась — нужны адрес и имя, например «93.184.216.34 example.com». Первая: {bad[0]}");
                 return;
             }
@@ -528,7 +528,7 @@ public partial class HostsView : UserControl
         {
             if (HostsTable.Name(NewName.Text) is not { } name)
             {
-                Say("В поле «Имя» нужно имя вида example.com.");
+                Say("В поле «Имя» нужно имя вроде example.com.");
                 return;
             }
 
@@ -552,8 +552,8 @@ public partial class HostsView : UserControl
             () =>
             {
                 var result = service
-                    ? HostsEditor.PinWithDesync(entries, note: "вручную")
-                    : HostsEditor.Repin(entries, note: "вручную");
+                    ? HostsEditor.PinWithDesync(entries, note: "руками")
+                    : HostsEditor.Repin(entries, note: "руками");
 
                 NewName.Clear();
                 NewAddress.Clear();
@@ -576,7 +576,7 @@ public partial class HostsView : UserControl
 
                 return result.Reverted ?? said;
             },
-            "Не удалось прибить");
+            "Прибить не удалось");
     }
 
     // --- Повторы ---
@@ -678,7 +678,7 @@ public partial class HostsView : UserControl
         _work = new CancellationTokenSource();
 
         CheckButton.IsEnabled = false;
-        CheckButton.Content = "Проверяю…";
+        CheckButton.Content = "Идёт проверка…";
 
         try
         {
@@ -707,20 +707,20 @@ public partial class HostsView : UserControl
                 ? $"Все {results.Count} адресов отвечают."
                 : $"Молчат {deadAddresses} адресов из {results.Count} — на них {deadNames} записей. "
                   + "Такой пин ведёт в никуда и выглядит блокировкой: удалите его или подберите адрес заново. "
-                  + "Показать их — «Молчат» в отборе.");
+                  + "Раскрыть");
         }
         catch (OperationCanceledException)
         {
-            Say("Проверка прервана.");
+            Say("Проверка остановлена.");
         }
         catch (Exception ex)
         {
-            Say("Проверка не удалась: " + ex.GetBaseException().Message);
+            Say("Проверить не удалось: " + ex.GetBaseException().Message);
         }
         finally
         {
             CheckButton.IsEnabled = true;
-            CheckButton.Content = "Проверить адреса";
+            CheckButton.Content = "Проверить доступность";
         }
     }
 
@@ -740,7 +740,7 @@ public partial class HostsView : UserControl
         }
         catch (Exception ex)
         {
-            Say("Не удалось открыть: " + ex.GetBaseException().Message);
+            Say("Открыть не удалось: " + ex.GetBaseException().Message);
         }
     }
 
@@ -756,7 +756,7 @@ public partial class HostsView : UserControl
         }
         catch (Exception ex)
         {
-            Say("Не удалось открыть папку: " + ex.GetBaseException().Message);
+            Say("Папку открыть не удалось: " + ex.GetBaseException().Message);
         }
     }
 
@@ -800,6 +800,6 @@ public partial class HostsView : UserControl
 
         SideHost.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
         SideRow.Height = _narrow && shown ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
-        SideButton.Content = _sideOpen ? "Скрыть" : "Добавить запись";
+        SideButton.Content = _sideOpen ? "Свернуть" : "Новая запись";
     }
 }

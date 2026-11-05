@@ -56,19 +56,19 @@ internal static class PinConflict
         if (answer != MessageBoxResult.Yes)
         {
             return $"Пин оставлен: {pinned.Count} имён пойдут по прибитому адресу, "
-                + "а не через VPN. Снять можно в «Файле hosts».";
+                + "а не через туннель. Снять можно в «Файле hosts».";
         }
 
         try
         {
             var result = HostsEditor.Unpin(pinned);
-            HostsEditor.FlushDns();
+            _ = HostsEditor.FlushDnsAsync();
 
             return result.Reverted ?? $"Пин снят с {pinned.Count} имён — теперь они пойдут через VPN.";
         }
         catch (Exception ex)
         {
-            return "Пин снять не удалось: " + ex.GetBaseException().Message;
+            return "Снять пин не удалось: " + ex.GetBaseException().Message;
         }
     }
 }

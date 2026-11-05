@@ -50,7 +50,7 @@ public partial class RoutesSettingsWindow : Window
         }
         catch (Exception ex)
         {
-            Status.Text = "Пины напрямую не прочитались: " + ex.GetBaseException().Message;
+            Status.Text = "Не удалось прочитать пины «напрямую»: " + ex.GetBaseException().Message;
         }
     }
 
@@ -83,7 +83,7 @@ public partial class RoutesSettingsWindow : Window
                 result = PinSolutions.Enable(solution, _ipV6 ?? false);
             }
 
-            HostsEditor.FlushDns();
+            _ = HostsEditor.FlushDnsAsync();
 
             var settings = AppSettings.Load(AppSettings.DefaultPath);
 
@@ -140,16 +140,16 @@ public partial class RoutesSettingsWindow : Window
     private void Show(AppSettings settings)
     {
         Restart.IsChecked = settings.OfferDiscordRestart;
-        RestartWord.Text = settings.OfferDiscordRestart ? "вкл." : "выкл.";
+        RestartWord.Text = settings.OfferDiscordRestart ? "включено" : "не включено";
 
         Learn.IsChecked = settings.LearnDiscordVoice;
-        LearnWord.Text = settings.LearnDiscordVoice ? "вкл." : "выкл.";
+        LearnWord.Text = settings.LearnDiscordVoice ? "включено" : "не включено";
 
         LearnRoblox.IsChecked = settings.LearnRobloxServers;
-        LearnRobloxWord.Text = settings.LearnRobloxServers ? "вкл." : "выкл.";
+        LearnRobloxWord.Text = settings.LearnRobloxServers ? "включено" : "не включено";
 
         LearnArc.IsChecked = settings.LearnArcRaidersServers;
-        LearnArcWord.Text = settings.LearnArcRaidersServers ? "вкл." : "выкл.";
+        LearnArcWord.Text = settings.LearnArcRaidersServers ? "включено" : "не включено";
     }
 
     private void OnLearnRoblox(object sender, RoutedEventArgs e)
@@ -157,8 +157,8 @@ public partial class RoutesSettingsWindow : Window
         bool on = LearnRoblox.IsChecked == true;
 
         Save(s => s with { LearnRobloxServers = on },
-            on ? "Адреса серверов Roblox дописываются, пока его серверы «через VPN»."
-               : "Список серверов Roblox больше не пополняется сам.");
+            on ? "Адреса серверов Roblox добавляются, пока его серверы идут «через VPN»."
+               : "Список серверов Roblox больше не пополняется автоматически.");
     }
 
     private void OnLearnArc(object sender, RoutedEventArgs e)
@@ -166,8 +166,8 @@ public partial class RoutesSettingsWindow : Window
         bool on = LearnArc.IsChecked == true;
 
         Save(s => s with { LearnArcRaidersServers = on },
-            on ? "Адреса серверов ARC Raiders дописываются, пока её серверы «через VPN» и игра запущена."
-               : "Список серверов ARC Raiders больше не пополняется сам.");
+            on ? "Адреса серверов ARC Raiders добавляются, пока её серверы идут «через VPN» и игра запущена."
+               : "Список серверов ARC Raiders больше не пополняется автоматически.");
     }
 
     private void OnRestart(object sender, RoutedEventArgs e)
@@ -175,7 +175,7 @@ public partial class RoutesSettingsWindow : Window
         bool on = Restart.IsChecked == true;
 
         Save(s => s with { OfferDiscordRestart = on },
-            on ? "После смены маршрута Discord программа предложит перезапустить его."
+            on ? "После смены маршруты Discord программа предложит его перезапустить."
                : "Перезапуск Discord больше не предлагается.");
     }
 
@@ -184,8 +184,8 @@ public partial class RoutesSettingsWindow : Window
         bool on = Learn.IsChecked == true;
 
         Save(s => s with { LearnDiscordVoice = on },
-            on ? "Адреса голоса Discord дописываются, пока голос «через VPN»."
-               : "Список голоса Discord больше не пополняется сам.");
+            on ? "Адреса голоса Discord добавляются, пока голос идёт «через VPN»."
+               : "Список голоса Discord больше не пополняется автоматически.");
     }
 
     /// <summary>Перечитать, изменить, записать — окно могло пережить чужую правку настроек.</summary>
@@ -201,7 +201,7 @@ public partial class RoutesSettingsWindow : Window
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
             Show(AppSettings.Load(AppSettings.DefaultPath));
         }
     }

@@ -118,7 +118,7 @@
     </LinearGradientBrush>
 
     <!-- Сияние фона окна: видно, только пока у темы нет своей картинки. -->
-    <sys:Double x:Key="Decor">1</sys:Double>
+    <sys:Double x:Key="Decor">0.6</sys:Double>
 
     <!--
         Шрифт назван явно. Segoe UI Variable — системный в Windows 11; в Windows 10

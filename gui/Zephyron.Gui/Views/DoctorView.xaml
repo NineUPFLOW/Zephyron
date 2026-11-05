@@ -135,17 +135,17 @@
             -->
             <ContentControl Style="{StaticResource PageHead}"
                             gui:PageHead.Title="Диагностика"
-                            gui:PageHead.Subtitle="Всё, от чего зависит работа: права, движки, правила, конфиг, резолвер, надзор.">
+                            gui:PageHead.Subtitle="Всё, от чего зависит работа: права, движки, правила, конфиг, резолвер, супервизор.">
 
                 <WrapPanel VerticalAlignment="Center">
                     <Button x:Name="ReportButton" Style="{StaticResource Primary}" Click="OnReport"
-                            Content="Собрать отчёт" gui:ButtonGlyph.Lead="&#xE896;" Margin="0,0,8,0"
+                            Content="Создать отчёт" gui:ButtonGlyph.Lead="&#xE896;" Margin="0,0,8,0"
                             ToolTip="Журналы движков, настройки, свои маршруты и последняя проверка блокировок одним архивом — его прикладывают к сообщению о неполадке. Ссылки подписок, ключи серверов и имя учётной записи Windows вычищаются." />
                     <Button Style="{StaticResource Ghost}" Click="OnLog" Content="Журнал"
                             gui:ButtonGlyph.Lead="&#xE8FD;" Margin="0,0,8,0"
                             ToolTip="Что говорят sing-box, winws2, надзор и окно. Открывается отдельным окном — его можно держать рядом." />
                     <Button x:Name="RunButton" Style="{StaticResource Ghost}" Click="OnRun"
-                            Content="Проверить снова" gui:ButtonGlyph.Lead="&#xE72C;" />
+                            Content="Повторить проверку" gui:ButtonGlyph.Lead="&#xE72C;" />
                 </WrapPanel>
             </ContentControl>
 
@@ -166,7 +166,7 @@
                                        Foreground="{DynamicResource Muted}" />
                         </Border>
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock Style="{StaticResource Caption}" Text="Проверок" />
+                            <TextBlock Style="{StaticResource Caption}" Text="Всего проверок" />
                             <TextBlock x:Name="TotalCount" Text="…" FontSize="22" FontWeight="SemiBold" />
                         </StackPanel>
                     </StackPanel>
@@ -180,7 +180,7 @@
                                        Text="&#xE7BA;" Foreground="{DynamicResource Muted}" />
                         </Border>
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock Style="{StaticResource Caption}" Text="Оговорок" />
+                            <TextBlock Style="{StaticResource Caption}" Text="Предупреждений" />
                             <TextBlock x:Name="WarnCount" Text="…" FontSize="22" FontWeight="SemiBold" />
                         </StackPanel>
                     </StackPanel>
@@ -194,7 +194,7 @@
                                        Text="&#xE783;" Foreground="{DynamicResource Muted}" />
                         </Border>
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock Style="{StaticResource Caption}" Text="Поломок" />
+                            <TextBlock Style="{StaticResource Caption}" Text="Ошибок" />
                             <TextBlock x:Name="BadCount" Text="…" FontSize="22" FontWeight="SemiBold" />
                         </StackPanel>
                     </StackPanel>
@@ -211,7 +211,7 @@
             -->
             <Border Style="{StaticResource Card}" Margin="0,14,0,0">
                 <StackPanel>
-                    <TextBlock Text="Куда пойдёт соединение" FontWeight="SemiBold" FontSize="15" />
+                    <TextBlock Text="Куда пойдёт трафик" FontWeight="SemiBold" FontSize="15" />
 
                     <TextBox x:Name="Host" AutomationProperties.Name="Сайт или домен" Margin="0,12,0,0" KeyDown="OnHostKey"
                              gui:Hint.Text="Сайт или домен, например web.whatsapp.com" />
@@ -231,13 +231,13 @@
                         </Grid.ColumnDefinitions>
 
                         <TextBox Grid.Column="0" Margin="0,0,8,0" x:Name="Exe" KeyDown="OnHostKey"
-                                 gui:Hint.Text="Программа, discord.exe" />
+                                 gui:Hint.Text="Программа, например discord.exe" />
 
                         <TextBox Grid.Column="1" Margin="0,0,8,0" x:Name="Address" KeyDown="OnHostKey"
-                                 gui:Hint.Text="Адрес, 1.2.3.4" />
+                                 gui:Hint.Text="Адрес, например 1.2.3.4" />
 
                         <TextBox Grid.Column="2" Margin="0,0,8,0" x:Name="Port" KeyDown="OnHostKey"
-                                 gui:Hint.Text="Порт 443" />
+                                 gui:Hint.Text="Порт, например 443" />
 
                         <Button Grid.Column="3" Style="{StaticResource Primary}" Content="Проверить"
                                 Click="OnAsk" Padding="22,9" />
@@ -292,7 +292,7 @@
                 </StackPanel>
             </Border>
 
-            <TextBlock Text="Состояние компонентов" FontWeight="SemiBold" FontSize="15" Margin="4,24,0,10" />
+            <TextBlock Text="Как работают компоненты" FontWeight="SemiBold" FontSize="15" Margin="4,24,0,10" />
 
             <!-- Плитки по две в ряд; раскрытая встаёт под своим рядом на всю ширину. -->
             <StackPanel x:Name="Components" />
@@ -317,7 +317,7 @@
                                 MouseLeftButtonUp="OnToggleDetails" VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal">
                                 <Path x:Name="DetailsChevron" Style="{StaticResource Chevron}" Margin="2,0,12,0" />
-                                <TextBlock Text="Подробности проверок" FontWeight="SemiBold" FontSize="15"
+                                <TextBlock Text="Результаты проверок" FontWeight="SemiBold" FontSize="15"
                                            VerticalAlignment="Center" />
                                 <TextBlock x:Name="DetailsCount" Style="{StaticResource Caption}" Margin="12,0,0,0"
                                            VerticalAlignment="Center" />
@@ -327,7 +327,7 @@
                         <StackPanel Grid.Column="2" Orientation="Horizontal" x:Name="DetailsTools"
                                     Visibility="Collapsed">
                             <TextBox x:Name="Search" AutomationProperties.Name="Найти проверку" Width="220" Margin="0,0,8,0" TextChanged="OnSearch"
-                                     gui:Hint.Text="Найти проверку…" />
+                                     gui:Hint.Text="Искать проверку…" />
                             <Button x:Name="AllFilter" Style="{StaticResource Choice}" Padding="18,0,14,0" Margin="0,0,6,0" MinHeight="{StaticResource HControl}"
                                     Click="OnShowAll" />
                             <Button x:Name="ProblemFilter" Style="{StaticResource Choice}" Padding="18,0,14,0" Margin="0" MinHeight="{StaticResource HControl}"

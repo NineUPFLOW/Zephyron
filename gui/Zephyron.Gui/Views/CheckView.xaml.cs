@@ -144,8 +144,8 @@ public partial class CheckView : UserControl
 
     /// <summary>Она же, но всегда чем-то заполненная — для показа.</summary>
     private SectionRow _setup => _setupRow ?? new SectionRow(
-        "Обстановка не выяснена",
-        "Через что шёл замер, узнать не удалось.",
+        "Условия замера не определены",
+        "Не удалось выяснить, через что шёл замер.",
         (Brush)FindResource("Muted"));
 
     /// <summary>Состояние туннеля на момент прогона.</summary>
@@ -182,7 +182,7 @@ public partial class CheckView : UserControl
 
     private CheckView View => _shown ?? this;
     private static IReadOnlyList<SectionRow> _sections = [];
-    private static string _status = "Проверка идёт минуты: по каждому имени четыре пробы, и каждая ждёт ответа.";
+    private static string _status = "Проверка идёт несколько минут: по каждому имени делается четыре пробы, и каждая ждёт ответа.";
 
     /// <summary>Цель точечной проверки; <c>null</c> — проверяется весь справочник.</summary>
     private static CheckTarget? _target;
@@ -192,7 +192,10 @@ public partial class CheckView : UserControl
 
     private const string QuickScope = "Быстрая";
     private const string FullScope = "Полная";
-    private const string SpotScope = "Точечная";
+    private const string ServiceScope = "Один сервис…";
+
+    /// <summary>Набранное рядом с кнопкой: раздел пересоздаётся, а адрес нужен при возврате.</summary>
+    private static string _typed = string.Empty;
 
     /// <summary>Пока список заполняется, выбор в нём не считается выбором человека.</summary>
     private bool _filling;
@@ -255,7 +258,7 @@ public partial class CheckView : UserControl
             Put(Row(report, tunnelled, DesyncBypass.None) with
             {
                 FixNote = $"После подбора: {report.Describe()}"
-                    + (EngineControl.IsRunning ? string.Empty : " (движки остановлены — видно сеть без обхода)"),
+                    + (EngineControl.IsRunning ? string.Empty : " (движки остановлены — видно сеть без десинка)"),
             });
         }
         catch (Exception ex)
@@ -385,12 +388,13 @@ public partial class CheckView : UserControl
         try
         {
             // Только глубина: быстрая — по имени с каждой части, полная —
-            // по два, точечная — одна цель целиком. Прежде под этими двумя
+            // по два, сервис — один целиком. Прежде под этими двумя
             // лежали ещё и два десятка сервисов одной лентой, и список
             // отвечал сразу на два разных вопроса — насколько подробно
             // и что именно, — заставляя пролистывать чужое ради своего.
-            Scope.ItemsSource = new List<string> { QuickScope, FullScope, SpotScope };
+            Scope.ItemsSource = new List<string> { QuickScope, FullScope, ServiceScope };
             Scope.SelectedIndex = Selected();
+            Address.Text = _typed;
 
             RunButton.Content = ChooseLabel();
         }
@@ -405,6 +409,9 @@ public partial class CheckView : UserControl
         if (_filling)
             return;
 
+        // Выбор в списке отменяет набранный адрес: иначе неясно, что поедет в проверку.
+        Address.Clear();
+
         if (Scope.SelectedIndex == 2)
         {
             AskTarget();
@@ -415,6 +422,18 @@ public partial class CheckView : UserControl
         _target = null;
 
         RunButton.Content = ChooseLabel();
+    }
+
+    private void OnAddress(object sender, TextChangedEventArgs e)
+    {
+        _typed = Address.Text;
+        RunButton.Content = ChooseLabel();
+    }
+
+    private void OnAddressKey(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Enter && RunButton.IsEnabled)
+            OnRun(RunButton, new RoutedEventArgs());
     }
 
     /// <summary>
@@ -446,11 +465,14 @@ public partial class CheckView : UserControl
         RunButton.Content = ChooseLabel();
     }
 
-    private static int Selected() => _target is not null ? 2 : _deep ? 1 : 0;
+    private static int Selected() => _target?.Service is not null ? 2 : _deep ? 1 : 0;
 
     private string ChooseLabel()
     {
-        if (_target is null)
+        if (_typed.Trim().Length > 0)
+            return "Проверить адрес";
+
+        if (_target?.Service is null)
             return _deep ? "Проверить полностью" : "Проверить";
 
         var what = _target.Describe;
@@ -487,7 +509,7 @@ public partial class CheckView : UserControl
 
         if (running)
         {
-            SetupTitle.Text = "Движки работают — видно сеть уже с обходом";
+            SetupTitle.Text = "Движки работают — видно сеть уже с десинком";
             SetupBody.Text = "Чтобы увидеть, что закрыто на самом деле, остановите их на "
                 + "«Главной» и повторите. Доступное сейчас может быть доступно как раз "
                 + "благодаря обходу.";
@@ -505,6 +527,15 @@ public partial class CheckView : UserControl
 
     private async void OnRun(object sender, RoutedEventArgs e)
     {
+        // Разбор тот же, что у поля «Маршрутов»: из ссылки берётся имя (19.10 проба искала
+        // адрес у ссылки целиком); IP уходит как есть.
+        var typed = _typed.Trim();
+
+        if (typed.Length > 0)
+            _target = new CheckTarget(null, DomainInput.Normalize(typed) ?? typed);
+        else if (_target?.Host is not null)
+            _target = null;
+
         bool running = ShowSetup();
         _measuredWithEngines = running;
 
@@ -590,7 +621,6 @@ public partial class CheckView : UserControl
 
             _stepClock.Restart();
             await RunAsync(targets, engine, running && settings.NeedsProxy, _work.Token);
-            await ReprobeAloneAsync(engine, running && settings.NeedsProxy, _work.Token);
 
             await Summarise(engine);
             AddHistory(running);
@@ -602,7 +632,7 @@ public partial class CheckView : UserControl
         }
         catch (Exception ex)
         {
-            Say("Проверка сорвалась: " + ex.GetBaseException().Message);
+            Say("Проверка оборвалась: " + ex.GetBaseException().Message);
         }
         finally
         {
@@ -753,11 +783,11 @@ public partial class CheckView : UserControl
 
             KeepRecentReports();
 
-            return $"Отчёт: {full}";
+            return $"Отчёт: ";
         }
         catch (Exception ex)
         {
-            return "Отчёт записать не вышло: " + ex.GetBaseException().Message;
+            return "Отчёт записать не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -899,7 +929,7 @@ public partial class CheckView : UserControl
     private void OnStop(object sender, RoutedEventArgs e)
     {
         StopButton.IsEnabled = false;
-        Say("Прерываю — жду, пока вернутся уже начатые пробы…");
+        Say("Останавливаю: жду, пока завершатся начатые пробы…");
 
         _work?.Cancel();
     }
@@ -1150,71 +1180,6 @@ public partial class CheckView : UserControl
         }
     }
 
-    /// <summary>
-    /// Перепроверяет в тишине то, что могло провалиться от тесноты.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Консоль так делала с самого начала, окно — нет, и это стоило прямой
-    /// ошибки в отчёте: itch.io числился оборванным, работая. Он отдаёт
-    /// страницу chunked на сто одиннадцать килобайт и честно закрывает
-    /// соединение — замер 2026-09-16 в одиночку доходит целиком. Но проверка
-    /// гонит сотню имён разом, и трёхсекундная пауза посреди такой страницы
-    /// набегает от соседей по прогону, а не от сети.
-    /// </para>
-    /// <para>
-    /// Перепроверяются только вердикты, которые теснота способна подделать:
-    /// они ставятся по неполученному ответу. Заглушка в DNS и отказ по стране
-    /// получены по ответу, который пришёл, — такое теснота не подделает.
-    /// Список решает сам отчёт через <see cref="TargetReport.MayBeCrowding"/>.
-    /// </para>
-    /// <para>
-    /// По одному и с бюджетом: перепроверка идёт после полного прогона,
-    /// и превращать её во второй такой же прогон незачем — она нужна, чтобы
-    /// снять обвинение с немногих, а не чтобы удвоить ожидание.
-    /// </para>
-    /// </remarks>
-    private async Task ReprobeAloneAsync(RuleEngine? engine, bool tunnelInUse, CancellationToken cancellationToken)
-    {
-        var suspect = _reports.Where(r => r.Actionable && r.MayBeCrowding).Take(12).ToList();
-
-        if (suspect.Count == 0)
-            return;
-
-        var budget = System.Diagnostics.Stopwatch.StartNew();
-        int done = 0;
-
-        foreach (var crowded in suspect)
-        {
-            if (cancellationToken.IsCancellationRequested || budget.Elapsed > TimeSpan.FromSeconds(90))
-                break;
-
-            Step("Перепроверяю в тишине:", done++, suspect.Count);
-
-            bool tunnelled = tunnelInUse && engine is not null && Proxied(engine, crowded.Host);
-
-            var alone = await BlockCheck.ProbeOnceAsync(
-                crowded.Host, crowded.Service, cancellationToken, tunnelled);
-
-            var settled = BlockCheck.Reconcile(crowded, alone);
-
-            if (settled.Kind == crowded.Kind)
-                continue;
-
-            // Строка в таблице заменяется на месте: вердикт, признанный
-            // недостоверным, не должен остаться на экране рядом с исправленным.
-            int at = _reports.IndexOf(crowded);
-
-            if (at >= 0)
-                _reports[at] = settled;
-
-            int row = Collected.ToList().FindIndex(r => r.Host == crowded.Host);
-
-            if (row >= 0)
-                Collected[row] = Row(settled, tunnelled, DesyncBypass.None);
-        }
-    }
-
     private static bool Proxied(RuleEngine engine, string host) =>
         engine.Evaluate(new ConnectionEvent
         {
@@ -1394,10 +1359,12 @@ public partial class CheckView : UserControl
 
         sections.Add(byKind.Count == 0
             ? new SectionRow(
-                "Всё открыто",
-                _target is null
-                    ? "Обходить нечего."
-                    : $"У «{_target.Describe}» обходить нечего. Проверено вчетверо глубже полного прогона.",
+                "Всё открывается",
+                _target?.Service is { } service
+                    ? $"У «{service}» обходить нечего. Проверено вчетверо глубже полного прогона."
+                    : _target is null
+                        ? "Обходить нечего. Если сайт в браузере всё равно ломается, отключите блокировщик рекламы и проверьте снова."
+                        : $"«{_target.Describe}» отвечает. Если в браузере всё равно не работает, отключите блокировщик рекламы и проверьте снова.",
                 (Brush)FindResource("Success"))
             : new SectionRow(
                 "Итог",
@@ -1780,7 +1747,7 @@ public partial class CheckView : UserControl
             return;
         }
 
-        Say("Выясняю, через что пойдёт замер…");
+        Say("Определяю, через что пойдёт замер…");
 
         try
         {
@@ -1831,7 +1798,7 @@ public partial class CheckView : UserControl
                     + "от страны, откажут так же, как без туннеля.");
             }
 
-            _setupRow = new SectionRow("Обстановка замера", string.Join("\n", lines), (Brush)FindResource(key));
+            _setupRow = new SectionRow("Условия замера", string.Join("\n", lines), (Brush)FindResource(key));
         }
         catch (OperationCanceledException)
         {
@@ -1840,7 +1807,7 @@ public partial class CheckView : UserControl
         catch (Exception ex)
         {
             _setupRow = new SectionRow(
-                "Обстановка не выяснена",
+                "Условия замера не определены",
                 ex.GetBaseException().Message,
                 (Brush)FindResource("Muted"));
         }

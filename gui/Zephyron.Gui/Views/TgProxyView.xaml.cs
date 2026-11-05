@@ -37,7 +37,7 @@ public partial class TgProxyView : UserControl
         PortText.Text = port;
         AddressText.Text = "127.0.0.1:" + port;
         var link = Link();
-        LinkText.Text = link ?? "появится при первом включении";
+        LinkText.Text = link ?? "появится после первого включения";
         LinkText.ToolTip = link;
 
         bool ready = settings.TelegramProxy && TgWsProxy.IsSecret(settings.TelegramProxySecret);
@@ -49,12 +49,12 @@ public partial class TgProxyView : UserControl
 
         Always.IsChecked = settings.TelegramProxyAlways;
         Always.IsEnabled = settings.TelegramProxy;
-        AlwaysWord.Text = settings.TelegramProxyAlways ? "вкл." : "выкл.";
+        AlwaysWord.Text = settings.TelegramProxyAlways ? "включено" : "не включено";
 
         DirectMain.IsChecked = settings.TelegramProxyDirect;
-        DirectMainWord.Text = settings.TelegramProxyDirect ? "вкл." : "выкл.";
+        DirectMainWord.Text = settings.TelegramProxyDirect ? "включено" : "не включено";
         DirectOther.IsChecked = settings.TelegramProxyDirectOther;
-        DirectOtherWord.Text = settings.TelegramProxyDirectOther ? "вкл." : "выкл.";
+        DirectOtherWord.Text = settings.TelegramProxyDirectOther ? "включено" : "не включено";
 
         _showingRoutes = true;
         var timeout = TgWsProxy.CfTimeout(settings.TelegramProxyCfTimeout).ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -93,14 +93,14 @@ public partial class TgProxyView : UserControl
 
         if (!File.Exists(TgWsProxy.Executable()))
         {
-            return new Look(Tone.Bad, "Нет файла", $"Прокси нет в поставке: {TgWsProxy.Executable()}.",
-                "Нет файла прокси", "Его нет в папке программы — переустановите её.");
+            return new Look(Tone.Bad, "Файл отсутствует", $"Прокси нет в поставке: {TgWsProxy.Executable()}.",
+                "Файла прокси нет", "Его нет в папке программы, переустановите её.");
         }
 
         if (!settings.TelegramProxy)
         {
-            return new Look(Tone.Off, "Выключен", "Включите — и он поднимется со следующим запуском движков.",
-                "Выключен", "Включите прокси выключателем выше.");
+            return new Look(Tone.Off, "Выключен", "Включите прокси, и он запустится вместе с движками.",
+                "Выключен", "Включите прокси переключателем выше.");
         }
 
         // Держит окно само (TgWsProxyKeeper) — движки тут ни при чём.
@@ -108,26 +108,26 @@ public partial class TgProxyView : UserControl
         {
             return TgWsProxyKeeper.Running
                 ? new Look(Tone.Good, "Работает", $"{address} — работает без движков, пока открыта программа.",
-                    "Принимает соединения", "Держит программа — и без движков, пока она открыта.")
-                : new Look(Tone.Wait, "Не запущен",
+                    "Готов к соединениям", "Держит программа — и без движков, пока она открыта.")
+                : new Look(Tone.Wait, "Неисправен",
                     "Включён без движков, но сейчас не запущен: ждёт, пока движки, запущенные до этой настройки, отпустят порт, — перезапустите их.",
-                    "Ждёт порт", "Порт держат движки, запущенные до этой настройки.");
+                    "Ждёт освобождения порта", "Порт держат движки, запущенные до этой настройки.");
         }
 
         var state = SupervisorState.Load(SupervisorState.DefaultPath);
 
         if (state is null || !state.IsSupervisorAlive())
         {
-            return new Look(Tone.Off, "Ждёт движков", "Включён; поднимется вместе с движками — сейчас они остановлены.",
-                "Ждёт движков", "Поднимется вместе с ними.");
+            return new Look(Tone.Off, "Ждёт движки", "Включён; поднимется вместе с движками — сейчас они остановлены.",
+                "Ждёт движки", "Поднимется вместе с ними.");
         }
 
         var service = state.Services.FirstOrDefault(s => s.Name == TgWsProxyService.ServiceName);
 
         if (service is null)
         {
-            return new Look(Tone.Wait, "Нужен перезапуск", "Включён, но движки запущены ещё без него — перезапустите их.",
-                "Ждёт перезапуска движков", "Они запущены ещё без прокси.");
+            return new Look(Tone.Wait, "Требуется перезапуск", "Включён, но движки запущены ещё без него — перезапустите их.",
+                "Ждёт перезапуска движков", "Они запущены без прокси.");
         }
 
         string status = EngineHealth.Status(service);
@@ -135,10 +135,10 @@ public partial class TgProxyView : UserControl
 
         return service.Health switch
         {
-            ServiceHealth.Healthy => new Look(Tone.Good, "Работает", line, "Принимает соединения", "Поднят вместе с движками."),
-            ServiceHealth.Degraded => new Look(Tone.Wait, "Не отвечает", line, "Не отвечает", "Процесс жив, порт не слушает."),
-            ServiceHealth.Stopped => new Look(Tone.Off, "Остановлен", line, "Остановлен", "Надзор его не держит."),
-            _ => new Look(Tone.Bad, "Не работает", line, "Не работает", "Надзор не смог его поднять — причина в строке выше."),
+            ServiceHealth.Healthy => new Look(Tone.Good, "Работает", line, "Готов к соединениям", "Запущен вместе с движками."),
+            ServiceHealth.Degraded => new Look(Tone.Wait, "Не откликается", line, "Не откликается", "Процесс жив, но порт не слушает."),
+            ServiceHealth.Stopped => new Look(Tone.Off, "Выключен", line, "Выключен", "Супервизор его не держит."),
+            _ => new Look(Tone.Bad, "Неисправен", line, "Неисправен", "Надзор не смог его поднять — причина в строке выше."),
         };
     }
 
@@ -227,7 +227,7 @@ public partial class TgProxyView : UserControl
         bool open = HowCard.Visibility != Visibility.Visible;
 
         HowCard.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
-        HowButton.Content = open ? "Скрыть пояснение" : "Как это работает?";
+        HowButton.Content = open ? "Свернуть пояснение" : "Как это устроено?";
     }
 
     private bool? _narrow;
@@ -265,7 +265,7 @@ public partial class TgProxyView : UserControl
 
     /// <summary>
     /// «Пути к Telegram» и «Текущие настройки» — рядом или столбиком; по ширине самого ряда,
-    /// а не окна (как OnTopSize в «Десинке»).
+    /// а не окна (как раскладка карточек).
     /// </summary>
     private void OnInfoSize(object sender, SizeChangedEventArgs e)
     {
@@ -303,7 +303,7 @@ public partial class TgProxyView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
 
         ShowState();
@@ -323,14 +323,14 @@ public partial class TgProxyView : UserControl
     {
         bool on = DirectMain.IsChecked == true;
         SaveRoutes(s => s with { TelegramProxyDirect = on },
-            on ? "DC2 и DC4 — напрямую." : "DC2 и DC4 — только через Cloudflare.");
+            on ? "DC2 и DC4: напрямую." : "DC2 и DC4: только через Cloudflare.");
     }
 
     private void OnDirectOther(object sender, RoutedEventArgs e)
     {
         bool on = DirectOther.IsChecked == true;
         SaveRoutes(s => s with { TelegramProxyDirectOther = on },
-            on ? "DC1, DC3 и DC5 — напрямую, на пробу." : "DC1, DC3 и DC5 — через Cloudflare.");
+            on ? "DC1, DC3 и DC5: напрямую, в пробном режиме." : "DC1, DC3 и DC5: через Cloudflare.");
     }
 
     private void OnCfTimeout(object sender, SelectionChangedEventArgs e)
@@ -361,6 +361,12 @@ public partial class TgProxyView : UserControl
         WorkerBox.Text = host ?? string.Empty;
         SaveRoutes(s => s with { TelegramProxyWorker = host },
             host is null ? "Без своего воркера: только общие домены." : $"Воркер {host} — раньше общих доменов.");
+    }
+
+    private void OnWorkerClear(object sender, RoutedEventArgs e)
+    {
+        WorkerBox.Clear();
+        OnWorker(sender, e);
     }
 
     private void OnWorkerCode(object sender, RoutedEventArgs e)
@@ -403,14 +409,14 @@ public partial class TgProxyView : UserControl
 
             Status.Text = done + (byWindow
                 ? " Прокси перезапущен."
-                : byEngines ? " Применится после перезапуска движков." : string.Empty);
+                : byEngines ? " Заработает после перезапуска движков." : string.Empty);
 
             if (byEngines)
                 (Window.GetWindow(this) as MainWindow)?.OfferRestart("Прокси Telegram — пути");
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
 
         ShowState();
@@ -428,14 +434,14 @@ public partial class TgProxyView : UserControl
             EngineControl.SyncTelegramProxy();
 
             Status.Text = on
-                ? "Прокси включён: поднимется после перезапуска движков. Потом — «Подключить Telegram»."
-                : "Прокси выключен. Выключите его и в Telegram («Тип подключения» → «Без прокси»), иначе он не подключится.";
+                ? "Прокси включён: запустится после перезапуска движков. Потом нажмите «Подключить Telegram»."
+                : "Прокси выключен. Отключите его и в Telegram («Тип подключения» → «Без прокси»), иначе Telegram не подключится.";
 
             (Window.GetWindow(this) as MainWindow)?.OfferRestart(on ? "Прокси Telegram включён" : "Прокси Telegram выключен");
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
 
         ShowState();
@@ -458,11 +464,11 @@ public partial class TgProxyView : UserControl
         try
         {
             Process.Start(new ProcessStartInfo { FileName = link, UseShellExecute = true });
-            Status.Text = "Ссылка отправлена Telegram — подтвердите подключение в нём.";
+            Status.Text = "Ссылка отправлена в Telegram: подтвердите подключение там.";
         }
         catch (Exception)
         {
-            Status.Text = "Telegram не открыл ссылку — скопируйте её и нажмите в «Избранном».";
+            Status.Text = "Telegram не открыл ссылку: скопируйте её и откройте в «Избранном».";
         }
     }
 
@@ -472,7 +478,7 @@ public partial class TgProxyView : UserControl
             Copy(link, "Ссылка скопирована.");
     }
 
-    private void OnCopyServer(object sender, RoutedEventArgs e) => Copy("127.0.0.1", "Сервер скопирован.");
+    private void OnCopyServer(object sender, RoutedEventArgs e) => Copy("127.0.0.1", "Адрес сервера скопирован.");
 
     private void OnCopyPort(object sender, RoutedEventArgs e) => Copy(PortText.Text, "Порт скопирован.");
 
@@ -485,7 +491,7 @@ public partial class TgProxyView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не скопировалось: " + ex.GetBaseException().Message;
+            Status.Text = "Скопировать не удалось: " + ex.GetBaseException().Message;
         }
     }
 }

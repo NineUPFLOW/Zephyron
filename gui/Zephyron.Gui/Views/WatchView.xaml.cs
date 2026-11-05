@@ -253,11 +253,11 @@ public partial class WatchView : UserControl
     /// <summary>Подпись и значок кнопки по тому, идёт ли наблюдение.</summary>
     private void ShowPower(bool running)
     {
-        PowerButton.Content = running ? "Остановить" : "Начать";
+        PowerButton.Content = running ? "Остановить" : "Запустить";
         ButtonGlyph.SetLead(PowerButton, running ? Glyph.Stop : Glyph.Play);
     }
 
-    private void OnPower(object sender, RoutedEventArgs e)
+    private async void OnPower(object sender, RoutedEventArgs e)
     {
         // Нажатое человеком — его: остановка по выходу программы такой сеанс не тронет.
         _auto = null;
@@ -270,10 +270,27 @@ public partial class WatchView : UserControl
             return;
         }
 
+        if (_starting)
+            return;
+
         // Кисти — здесь, в потоке окна: строки собираются в фоне.
         _brushes = Palette();
 
-        if (!StartSession())
+        // Правила со всеми списками читаются в фоне: прямо из кнопки это стоило
+        // потоку окна те же 0,54–0,64 с, что при запуске окна (StartSessionAsync).
+        PowerButton.IsEnabled = false;
+        bool started;
+
+        try
+        {
+            started = await StartSessionAsync();
+        }
+        finally
+        {
+            PowerButton.IsEnabled = true;
+        }
+
+        if (!started || _watch is not { } watch)
         {
             Say(_note);
             return;
@@ -282,36 +299,7 @@ public partial class WatchView : UserControl
         ShowPower(true);
         // Строкой под кнопками это отъедало у таблицы высоту — в подсказку.
         Say(null);
-        ClockText.ToolTip = $"Правил {_watch!.RuleCount}, режим «{_watch.Mode}». Журнал — {ConnectionWatch.DefaultJournal}.";
-    }
-
-    /// <summary>
-    /// Начинает наблюдение, если оно ещё не идёт, — и без открытого раздела.
-    /// </summary>
-    /// <remarks>
-    /// Нужно автопополнению маршрутов программ (13.10): оно видит соединения
-    /// только через наблюдение, и ждать, пока человек нажмёт «Начать»,
-    /// значило бы молча не пополнять. Зовётся при запуске окна, если у какой-то
-    /// программы пополнение включено, и при включении выключателя.
-    /// </remarks>
-    /// <returns><c>false</c> — не началось; причина в <see cref="_note"/>.</returns>
-    internal static bool StartSession()
-    {
-        // Начинается в фоне (StartSessionAsync) — второй сеанс ETW с тем же
-        // именем не создался бы, а этот вот-вот будет.
-        if (_watch is not null || _starting)
-            return true;
-
-        try
-        {
-            Begin(Create());
-            return true;
-        }
-        catch (Exception ex)
-        {
-            Failed(ex);
-            return false;
-        }
+        ClockText.ToolTip = $"Правил {watch.RuleCount}, режим «{watch.Mode}». Журнал — {ConnectionWatch.DefaultJournal}.";
     }
 
     /// <summary>Наблюдение начинается в фоне.</summary>
@@ -330,7 +318,7 @@ public partial class WatchView : UserControl
     private static string? _auto;
 
     private static string? AutoNote() => _auto is { } program
-        ? $"Начато само: запущена {program}, у её маршрута включено автопополнение. Остановится через полминуты после её выхода."
+        ? $"Начато само: запущена {program}, у её маршруты включено автопополнение. Остановится через полминуты после её выхода."
         : null;
 
     /// <summary>Начинает наблюдение ради запущенной программы — если его ещё нет.</summary>
@@ -380,14 +368,23 @@ public partial class WatchView : UserControl
     }
 
     /// <summary>
-    /// То же, что <see cref="StartSession"/>, но правила и сессия ETW — в фоне.
+    /// Начинает наблюдение, если оно ещё не идёт, — и без открытого раздела;
+    /// правила и сессия ETW — в фоне.
     /// </summary>
     /// <remarks>
-    /// Для запуска окна (автопополнение маршрутов программ): ConnectionWatch.Start
-    /// читает правила со всеми списками, и в потоке окна это стоило 0,54–0,64 с
-    /// замирания «Главной» на каждом запуске (журнал сторожа владельца 13.10,
-    /// секунда в секунду с «наблюдение начато»).
+    /// <para>
+    /// Нужно автопополнению маршрутов программ (13.10): оно видит соединения
+    /// только через наблюдение, и ждать, пока человек нажмёт «Начать»,
+    /// значило бы молча не пополнять.
+    /// </para>
+    /// <para>
+    /// В фоне — потому что ConnectionWatch.Start читает правила со всеми
+    /// списками, и в потоке окна это стоило 0,54–0,64 с замирания «Главной»
+    /// на каждом запуске (журнал сторожа владельца 13.10, секунда в секунду
+    /// с «наблюдение начато»).
+    /// </para>
     /// </remarks>
+    /// <returns><c>false</c> — не началось; причина в <see cref="_note"/>.</returns>
     internal static async Task<bool> StartSessionAsync()
     {
         if (_watch is not null || _starting)
@@ -397,7 +394,14 @@ public partial class WatchView : UserControl
 
         try
         {
-            var watch = await Task.Run(Create);
+            // Прежний сеанс гасится в фоне (StopSession) — имя сессии ETW одно
+            // на машину, и новый ждёт, пока старый уйдёт.
+            var stopping = _stopping;
+            var watch = await Task.Run(async () =>
+            {
+                await stopping;
+                return Create();
+            });
             Begin(watch);
             return true;
         }
@@ -427,7 +431,7 @@ public partial class WatchView : UserControl
     {
         StopSession();
 
-        _note = "Не удалось начать: " + ex.GetBaseException().Message
+        _note = "Запустить не удалось: " + ex.GetBaseException().Message
             + ". Сессия ETW требует прав администратора — окно их запрашивает при запуске.";
     }
 
@@ -448,13 +452,19 @@ public partial class WatchView : UserControl
         // остановить, раз раздел этого больше не делает.
         if (!_exitHooked && Application.Current is { } app)
         {
-            app.Exit += (_, _) => StopSession();
+            app.Exit += (_, _) => StopSession(wait: true);
             _exitHooked = true;
         }
 
         _work = new CancellationTokenSource();
-        _ = ReadAsync(_watch, _work.Token);
 
+        // Task.Run, а не прямой вызов: Begin идёт в потоке окна, и await внутри
+        // чтения возвращался бы туда же — на каждое соединение решение правил,
+        // строка журнала наблюдения (запись на диск) и пополнение списков
+        // программ шли в потоке окна. Всё, что чтение трогает, — под замком
+        // Gate или через диспетчер.
+        var token = _work.Token;
+        _ = Task.Run(() => ReadAsync(watch, token));
         if (_open is { } open)
             open.Dispatcher.BeginInvoke(() => open.ShowPower(true));
     }
@@ -515,8 +525,8 @@ public partial class WatchView : UserControl
             colour,
             entry.Certain ? colour : Brushes.Transparent,
             entry.Certain
-                ? "Известно точно: подставной адрес движка, сам движок или домашняя сеть"
-                : "Так сказали бы правила — движок не спрашивали",
+                ? "Известно точно: подставной адрес движки, сама движок или домашняя сеть"
+                : "Так решили бы правила, движок не спрашивали",
             entry.Process,
             entry.Endpoint,
             named ? entry.Address : string.Empty,
@@ -552,7 +562,7 @@ public partial class WatchView : UserControl
         Application.Current?.Dispatcher.Invoke(() =>
         {
             StopSession();
-            _note = "Наблюдение прервалось: " + why + ".";
+            _note = "Запись прервалась: " + why + ".";
 
             if (_open is { } view)
             {
@@ -677,7 +687,7 @@ public partial class WatchView : UserControl
         else
         {
             ClockText.Text = "—";
-            ClockCaption.Text = "выключено";
+            ClockCaption.Text = "не включено";
         }
 
         lock (Gate)
@@ -827,7 +837,7 @@ public partial class WatchView : UserControl
     private void ShowSummary()
     {
         SideHost.Visibility = !_narrow || _summaryOpen ? Visibility.Visible : Visibility.Collapsed;
-        Mark(SummaryButton, _summaryOpen ? "Скрыть сводку" : "Сводка", _summaryOpen);
+        Mark(SummaryButton, _summaryOpen ? "Свернуть итоги" : "Итоги", _summaryOpen);
     }
 
     private void OnSummary(object sender, RoutedEventArgs e)
@@ -856,10 +866,10 @@ public partial class WatchView : UserControl
         var menu = Menu(ProcessButton);
 
         if (_process is not null)
-            menu.Items.Add(MenuEntry("", "Все программы", () => Filter(() => _process = null)));
+            menu.Items.Add(MenuEntry("", "Все приложения", () => Filter(() => _process = null)));
 
-        menu.Items.Add(MenuEntry("", "Из запущенных…", PickRunning));
-        menu.Items.Add(MenuEntry("", "Выбрать файл…", PickFile));
+        menu.Items.Add(MenuEntry("", "Среди запущенных…", PickRunning));
+        menu.Items.Add(MenuEntry("", "Указать файл…", PickFile));
 
         List<KeyValuePair<string, int>> seen;
 
@@ -1002,11 +1012,11 @@ public partial class WatchView : UserControl
 
         if (outside)
         {
-            menu.Items.Add(MenuEntry(Glyph.Search, entry.Host is null ? "Проверить этот адрес" : "Проверить это имя",
+            menu.Items.Add(MenuEntry(Glyph.Search, entry.Host is null ? "Проверить адрес" : "Проверить имя",
                 () => _ = CheckAsync(entry)));
         }
 
-        menu.Items.Add(MenuEntry(Glyph.Info, "Почему так", () => _ = WhyAsync(target)));
+        menu.Items.Add(MenuEntry(Glyph.Info, "Почему так решено", () => _ = WhyAsync(target)));
 
         if (outside && entry.Rule != WatchEntry.FakeRule)
         {
@@ -1027,9 +1037,9 @@ public partial class WatchView : UserControl
         menu.Items.Add(new Separator());
 
         if (entry.Host is { } name)
-            menu.Items.Add(MenuEntry(Glyph.Copy, "Скопировать имя", () => CopyText(name)));
+            menu.Items.Add(MenuEntry(Glyph.Copy, "Копировать имя", () => CopyText(name)));
 
-        menu.Items.Add(MenuEntry(Glyph.Copy, "Скопировать адрес", () => CopyText(entry.Ip)));
+        menu.Items.Add(MenuEntry(Glyph.Copy, "Копировать адрес", () => CopyText(entry.Ip)));
         menu.Items.Add(MenuEntry(Glyph.Filter, $"Показать только {entry.Process}", () => Filter(() => _process = entry.Process)));
 
         menu.IsOpen = true;
@@ -1072,7 +1082,7 @@ public partial class WatchView : UserControl
         }
         catch (Exception ex)
         {
-            ShowDetails($"Почему так: {target}", "Не вышло: " + ex.GetBaseException().Message);
+            ShowDetails($"Почему так: {target}", "Не получилось: " + ex.GetBaseException().Message);
         }
     }
 
@@ -1112,7 +1122,7 @@ public partial class WatchView : UserControl
         }
         catch (Exception ex)
         {
-            ShowDetails(title, "Не вышло: " + ex.GetBaseException().Message);
+            ShowDetails(title, "Не получилось: " + ex.GetBaseException().Message);
         }
     }
 
@@ -1122,7 +1132,7 @@ public partial class WatchView : UserControl
 
         if (!System.IO.File.Exists(path))
         {
-            Answer(JournalButton, "Открыть журнал", "Журнала ещё нет");
+            Answer(JournalButton, "Журнал", "Записей пока нет");
             return;
         }
 
@@ -1132,7 +1142,7 @@ public partial class WatchView : UserControl
         }
         catch (Exception)
         {
-            Answer(JournalButton, "Открыть журнал", "Не открылся");
+            Answer(JournalButton, "Журнал", "Не открыть");
         }
     }
 
@@ -1151,11 +1161,11 @@ public partial class WatchView : UserControl
         var menu = Menu(CopyButton);
 
         menu.Items.Add(MenuEntry(string.Empty, $"Сайты — {WatchEntry.SitesOf(shown).Count}",
-            () => Copy(CopyButton, "Скопировать", WatchEntry.SitesOf)));
+            () => Copy(CopyButton, "Копировать", WatchEntry.SitesOf)));
         menu.Items.Add(MenuEntry(string.Empty, $"Домены целиком — {WatchEntry.HostsOf(shown).Count}",
-            () => Copy(CopyButton, "Скопировать", WatchEntry.HostsOf)));
+            () => Copy(CopyButton, "Копировать", WatchEntry.HostsOf)));
         menu.Items.Add(MenuEntry(string.Empty, $"IP-адреса — {WatchEntry.AddressesOf(shown).Count}",
-            () => Copy(CopyButton, "Скопировать", WatchEntry.AddressesOf)));
+            () => Copy(CopyButton, "Копировать", WatchEntry.AddressesOf)));
 
         menu.IsOpen = true;
     }
@@ -1173,7 +1183,7 @@ public partial class WatchView : UserControl
 
         if (values.Count == 0)
         {
-            Answer(button, caption, "Нечего копировать");
+            Answer(button, caption, "Копировать нечего");
             return;
         }
 
@@ -1184,7 +1194,7 @@ public partial class WatchView : UserControl
         }
         catch (Exception)
         {
-            Answer(button, caption, "Буфер занят — ещё раз");
+            Answer(button, caption, "Буфер занят, повторите");
         }
     }
 
@@ -1202,22 +1212,46 @@ public partial class WatchView : UserControl
         back.Start();
     }
 
-    /// <summary>Останавливает сеанс — кнопкой или с выходом из программы.</summary>
-    private static void StopSession()
+    /// <summary>Сеанс, который гасится в фоне; следующий ждёт его конца.</summary>
+    private static Task _stopping = Task.CompletedTask;
+
+    /// <summary>Останавливает сеанс — кнопкой, с выходом программы или из программы.</summary>
+    /// <remarks>
+    /// Остановка сессии ETW ждёт поток-насос до 3 с (EtwConnectionSource), и прежде
+    /// её ждал поток окна — на кнопке и на выходе игры с автопополнением.
+    /// Теперь — в фоне, а до конца ждёт только выход из программы (<paramref name="wait"/>).
+    /// </remarks>
+    private static void StopSession(bool wait = false)
     {
         _work?.Cancel();
         _work = null;
 
-        if (_watch is not null)
+        if (_watch is { } watch)
         {
-            // Синхронно и до конца: сессия ETW переживает процесс, и брошенная
-            // она останется в системе именем Zephyron до перезагрузки.
-            _watch.DisposeAsync().AsTask().GetAwaiter().GetResult();
             _watch = null;
+            var before = _stopping;
+
+            _stopping = Task.Run(async () =>
+            {
+                try
+                {
+                    await before;
+                    await watch.DisposeAsync();
+                }
+                catch (Exception ex)
+                {
+                    Journal.Write("наблюдение", "сеанс не остановился чисто: " + ex.GetBaseException().Message);
+                }
+            });
         }
 
         lock (Gate)
             _pending.Clear();
+
+        // Синхронно и до конца: сессия ETW переживает процесс, и брошенная
+        // она останется в системе именем Zephyron до перезагрузки.
+        if (wait)
+            _stopping.Wait(TimeSpan.FromSeconds(5));
     }
 
     /// <summary>

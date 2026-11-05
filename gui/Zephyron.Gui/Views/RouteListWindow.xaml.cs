@@ -77,7 +77,7 @@ public partial class RouteListWindow : Window
         var lines = new List<string>();
 
         lines.Add(plan.Count == 0
-            ? "Добавлять нечего."
+            ? "Добавить нечего."
             : $"Добавится: {plan.Count}"
                 + (plan.Overrides.Count > 0
                     ? $" — из них {plan.Overrides.Count} сейчас идут другим путём по маршруту сервиса, своё правило его перекроет ({Some(plan.Overrides)})"
@@ -99,7 +99,7 @@ public partial class RouteListWindow : Window
         // Десинк без рецепта решает пресет: имя, которого нет в его списках,
         // не трогает никто (подсказка «Маршрутов», 19.10 — 7tv так и стоял).
         if (mode == RoutingMode.Desync && plan.Count > 0)
-            lines.Add("Десинк без рецепта: сайт, которого нет в списках пресета, он не трогает. Рецепт выбирается потом в строке сайта.");
+            lines.Add("Десинк без рецепта: сайт, которого нет в списках пресета, он не трогает. Рецепт выбирается позже в строке сайта.");
 
         Summary.Text = string.Join("\n", lines);
         Confirm.Content = plan.Count > 0 ? $"Добавить {plan.Count}" : "Добавить";
@@ -113,7 +113,7 @@ public partial class RouteListWindow : Window
     private static string Word(RoutingMode mode) => mode switch
     {
         RoutingMode.Proxy => "через VPN",
-        RoutingMode.Desync => "десинком",
+        RoutingMode.Desync => "через десинк",
         _ => "напрямую",
     };
 
@@ -129,7 +129,7 @@ public partial class RouteListWindow : Window
 
         if (_reserved.Contains(folder, StringComparer.OrdinalIgnoreCase))
         {
-            Summary.Text = $"«{folder}» — папка программы, в неё кладутся только её домены и адреса. Выберите другое название.";
+            Summary.Text = $"«{folder}» — это папка программы, в неё попадают только её домены и адреса. Выберите другое название.";
             return;
         }
 

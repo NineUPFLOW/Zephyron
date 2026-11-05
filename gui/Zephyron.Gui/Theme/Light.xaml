@@ -99,7 +99,7 @@
         <GradientStop Color="#FF0B6BCB" Offset="0" />
         <GradientStop Color="#FF6B10C6" Offset="1" />
     </LinearGradientBrush>
-    <sys:Double x:Key="Decor">1</sys:Double>
+    <sys:Double x:Key="Decor">0.6</sys:Double>
 
     <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI</FontFamily>
     <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas</FontFamily>

@@ -58,9 +58,9 @@ public sealed record DoctorTile(string Title, string Glyph, DoctorLevel Level, I
 
             return Level switch
             {
-                DoctorLevel.Bad => count > 1 ? $"Поломок: {count}" : "Поломка",
-                DoctorLevel.Warn => count > 1 ? $"Оговорок: {count}" : "Оговорка",
-                _ => "В порядке",
+                DoctorLevel.Bad => count > 1 ? $"Поломок: {count}" : "Ошибка",
+                DoctorLevel.Warn => count > 1 ? $"Оговорок: {count}" : "Предупреждение",
+                _ => "Всё хорошо",
             };
         }
     }
@@ -175,7 +175,7 @@ public partial class DoctorView : UserControl
         catch (Exception ex)
         {
             Status.Visibility = Visibility.Visible;
-            Status.Text = "Диагностика сорвалась: " + ex.GetBaseException().Message;
+            Status.Text = "Диагностика оборвалась: " + ex.GetBaseException().Message;
         }
         finally
         {
@@ -486,7 +486,7 @@ public partial class DoctorView : UserControl
     {
         ReportButton.IsEnabled = false;
         ReportValue.Visibility = Visibility.Visible;
-        ReportValue.Text = "Собираю отчёт…";
+        ReportValue.Text = "Создаю отчёт…";
 
         try
         {
@@ -506,7 +506,7 @@ public partial class DoctorView : UserControl
         }
         catch (Exception ex)
         {
-            ReportValue.Text = "Отчёт не собрался: " + ex.Message;
+            ReportValue.Text = "Отчёт создать не удалось: " + ex.Message;
         }
         finally
         {
@@ -536,7 +536,7 @@ public partial class DoctorView : UserControl
 
         if (host.Length == 0 && exe.Length == 0 && addressText.Length == 0)
         {
-            Refuse("Нечего спрашивать", "Задайте хотя бы одно: имя, программу или адрес.");
+            Refuse("Нечего проверять", "Укажите хотя бы одно: имя, программу или адрес.");
             return;
         }
 
@@ -544,7 +544,7 @@ public partial class DoctorView : UserControl
         // лишь процессом или адресом пустое имя — законный случай.
         if (host.Length > 0 && !host.Contains('.'))
         {
-            Refuse("Это не похоже на имя сайта", "Нужно что-то вроде web.whatsapp.com.");
+            Refuse("Это не имя сайта", "Нужно что-то вроде web.whatsapp.com.");
             return;
         }
 
@@ -552,7 +552,7 @@ public partial class DoctorView : UserControl
 
         if (addressText.Length > 0 && !IPAddress.TryParse(addressText, out address))
         {
-            Refuse("Это не похоже на адрес", $"«{addressText}» не разбирается как IP-адрес.");
+            Refuse("Это не адрес", $"«{addressText}» не разбирается как IP-адрес.");
             return;
         }
 
@@ -560,7 +560,7 @@ public partial class DoctorView : UserControl
 
         if (Port.Text.Trim().Length > 0 && !ushort.TryParse(Port.Text.Trim(), out port))
         {
-            Refuse("Это не похоже на порт", $"«{Port.Text.Trim()}» не разбирается как номер порта.");
+            Refuse("Это не порт", $"«{Port.Text.Trim()}» не разбирается как номер порта.");
             return;
         }
 
@@ -603,7 +603,7 @@ public partial class DoctorView : UserControl
 
             var source = rule?.Source switch
             {
-                null => "ни одно не подошло",
+                null => "ничего не подошло",
                 RuleSource.User => "ваше правило",
                 RuleSource.Setting => "«Прятать VPN»",
                 RuleSource.Fallback => "российские зоны",
@@ -617,7 +617,7 @@ public partial class DoctorView : UserControl
                 new RouteLink("\uE8FD", "Правило", source,
                     rule is null ? "по умолчанию" : $"{rule.Match.ToString().ToLowerInvariant()} «{rule.Value}»", "Muted"),
                 new RouteLink(glyph, "Путь", mode, null, kind),
-                new RouteLink("\uE909", "Назначение", target,
+                new RouteLink("\uE909", "Куда", target,
                     host.Length > 0 && address is not null ? address.ToString() : null, "Muted"));
 
             AnswerWhy.Text = rule is not null
@@ -639,7 +639,7 @@ public partial class DoctorView : UserControl
         }
         catch (Exception ex)
         {
-            Refuse("Правила не читаются", ex.GetBaseException().Message, "Danger");
+            Refuse("Правила не прочитались", ex.GetBaseException().Message, "Danger");
         }
     }
 

@@ -110,7 +110,7 @@ internal static class StartupSweep
                 }
 
                 await ServerSweep.ThroughEngineAsync(Warp.Exits(), health, cancellationToken, settings);
-                Journal.Write("замер", "при запуске: WARP " + (health.Find(Warp.Exits()[0].Tag) is { Success: true } ? "отвечает" : "не отвечает"));
+                Journal.Write("замер", "при запуске: WARP " + (health.Find(Warp.Exits()[0].Tag) is { Success: true } ? "откликается" : "не откликается"));
                 return;
             }
 

@@ -227,6 +227,9 @@ public partial class App : Application
         DiscordVoiceWatch.Start(Dispatcher);
         RobloxServerWatch.Start();
 
+        // Пины к посредникам: плановая проверка раз в 6 часов при работающих движках.
+        PinRefreshWatch.Start();
+
         // «Маршруты» читаются заранее: первый заход иначе стоял пустым секунды (13.10).
         Views.RoutesView.Prepare();
 
@@ -561,7 +564,7 @@ public partial class App : Application
             var log = Path.Combine("logs", "gui.log");
             Directory.CreateDirectory("logs");
 
-            File.AppendAllText(log, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {error}\n\n");
+            File.AppendAllText(log, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {Supervisor.LogSecrets.Scrub(error.ToString())}\n\n");
             text += $"\n\nЗаписано в {Path.GetFullPath(log)}";
         }
         catch (Exception)

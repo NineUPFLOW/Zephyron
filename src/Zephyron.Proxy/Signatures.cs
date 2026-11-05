@@ -323,7 +323,7 @@ public static class Signatures
     private static IEnumerable<SignatureFinding> SharedNodes(List<TargetReport> reports, HashSet<string> taken)
     {
         var groups = reports
-            .Where(r => r.Kind is BlockKind.Full or BlockKind.HttpsPort or BlockKind.TlsDpi or BlockKind.Stall
+            .Where(r => r.Kind is BlockKind.Full or BlockKind.HttpsPort or BlockKind.TlsDpi or BlockKind.Stall or BlockKind.LongHello
                 && !taken.Contains(r.Host))
             .Select(r => (Node: r.Answered ?? r.Addresses.FirstOrDefault(), Report: r))
             .Where(x => x.Node is not null)

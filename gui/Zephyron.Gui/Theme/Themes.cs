@@ -207,7 +207,7 @@ public static class Themes
 
         // Сетка и свечения фона — только на сплошной подложке: поверх
         // картинки темы они спорили бы с ней.
-        dictionary["Decor"] = theme.Background is not null && look.Background ? 0.0 : 1.0;
+        dictionary["Decor"] = theme.Background is not null && look.Background ? 0.0 : 0.6;
 
         if (theme.Background is { } background && look.Background)
         {

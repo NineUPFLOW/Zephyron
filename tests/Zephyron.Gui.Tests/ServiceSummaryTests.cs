@@ -44,7 +44,7 @@ public sealed class ServiceSummaryTests
             Part(1, "десинк"),
         ]);
 
-        Assert.Equal("всё десинк", discord.Summary);
+        Assert.Equal("везде: десинк", discord.Summary);
     }
 
     [Fact]
@@ -73,6 +73,6 @@ public sealed class ServiceSummaryTests
             Part(0, "напрямую"),
         ]);
 
-        Assert.Equal("1 прибит в hosts · 1 напрямую", service.Summary);
+        Assert.Equal("1 пин в hosts · 1 напрямую", service.Summary);
     }
 }

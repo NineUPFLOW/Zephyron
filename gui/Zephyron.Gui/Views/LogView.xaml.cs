@@ -70,12 +70,12 @@ public partial class LogView : UserControl
             var next = settings with { LogsEnabled = LogsSwitch.IsChecked == true };
 
             next.Save(Core.AppSettings.DefaultPath);
-            this.Offer(next.LogsEnabled ? "Журнал включён" : "Журнал выключен");
+            this.Offer(next.LogsEnabled ? "Запись журнала включена" : "Запись журнала выключена");
         }
         catch (Exception ex)
         {
             LogsSwitch.IsChecked = !LogsSwitch.IsChecked;
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -149,7 +149,7 @@ public partial class LogView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Журнал не читается: " + ex.GetBaseException().Message;
+            Status.Text = "Не удалось прочитать журнал: " + ex.GetBaseException().Message;
         }
     }
 
@@ -235,7 +235,7 @@ public partial class LogView : UserControl
     private void OnErrors(object sender, RoutedEventArgs e)
     {
         _errorsOnly = !_errorsOnly;
-        ErrorsButton.Content = _errorsOnly ? "Все строки" : "Только ошибки";
+        ErrorsButton.Content = _errorsOnly ? "Показать всё" : "Только ошибки";
 
         Reload();
     }

@@ -71,12 +71,12 @@ public partial class UpdateWindow : Window
 
         if (!_newer)
         {
-            Title = "Обновлений нет";
-            Heading.Text = "Установлена последняя версия";
+            Title = "Новых версий нет";
+            Heading.Text = "У вас последняя версия";
             InstallButton.IsEnabled = false;
-            InstallButton.ToolTip = "Ставить нечего: новее этой версии на GitHub нет.";
+            InstallButton.ToolTip = "Ставить нечего: версии новее на GitHub нет.";
             SkipButton.Visibility = Visibility.Collapsed;
-            LaterButton.Content = "Закрыть";
+            LaterButton.Content = "Закрыть окно";
         }
 
         BadgeVersion.Text = "v" + latest.Version;
@@ -179,7 +179,7 @@ public partial class UpdateWindow : Window
 
         if (sections.Count == 0)
         {
-            var none = new TextBlock { Text = "Примечаний к этой версии нет.", TextWrapping = TextWrapping.Wrap };
+            var none = new TextBlock { Text = "К этой версии нет описания.", TextWrapping = TextWrapping.Wrap };
             none.SetResourceReference(StyleProperty, "Caption");
             Notes.Children.Add(none);
         }
@@ -417,7 +417,7 @@ public partial class UpdateWindow : Window
             top.Children.Add(number);
 
             if (found || installed)
-                top.Children.Add(Pill(found ? "Новая" : "Установлена", accent: found));
+                top.Children.Add(Pill(found ? "Свежая" : "Стоит сейчас", accent: found));
 
             text.Children.Add(top);
 
@@ -453,7 +453,7 @@ public partial class UpdateWindow : Window
                 BorderBrush = Brushes.Transparent,
                 BorderThickness = new Thickness(1.5),
                 Cursor = System.Windows.Input.Cursors.Hand,
-                ToolTip = "Читать чейнджлог этой версии",
+                ToolTip = "Открыть список изменений этой версии",
             };
 
             var version = release.Version;
@@ -739,28 +739,28 @@ public partial class UpdateWindow : Window
             Details.Children.Add(row);
         }
 
-        Line("Установлена", UpdateCheck.Current);
-        Line(_newer ? "Новая" : "Последняя на GitHub", _latest.Version
+        Line("Стоит сейчас", UpdateCheck.Current);
+        Line(_newer ? "Свежая" : "Свежая версия на GitHub", _latest.Version
             + (_latest.Published is { } when ? ", вышла " + when.ToLocalTime().ToString("d MMMM yyyy", Russian) : string.Empty));
 
         var archive = Uri.TryCreate(_latest.ArchiveUrl, UriKind.Absolute, out var url)
             ? Uri.UnescapeDataString(url.Segments[^1])
             : "архив выпуска";
 
-        Line("Архив", _latest.ArchiveSize > 0
+        Line("Файл архива", _latest.ArchiveSize > 0
             ? $"{archive}, {_latest.ArchiveSize / 1024.0 / 1024.0:0} МБ"
             : archive);
 
-        Line("Источник", $"GitHub, {UpdateCheck.Repository}");
+        Line("Откуда", $"GitHub, {UpdateCheck.Repository}");
 
-        Line("Как пройдёт", "Сперва скачается архив — обход в это время работает, а если поднят туннель, "
+        Line("Как это пройдёт", "Сперва скачается архив — обход в это время работает, а если поднят туннель, "
             + "архив идёт через него. Потом движки остановятся, программа закроется, файлы заменятся, "
             + "и она откроется снова. Соединения оборвутся на эти секунды.");
 
-        Line("Что сохранится", "Настройки и подписки, свои маршруты, подставленные адреса (addresses.yaml), "
+        Line("Что останется", "Настройки и подписки, свои маршруты, подставленные адреса (addresses.yaml), "
             + "свой каталог адресов (catalog.yaml). Строки, дописанные вами в списки, переносятся в новые списки.");
 
-        Line("Что заменится", "Программа, движки, пресеты, списки, базовые правила, снимок каталога Zapret "
+        Line("Что будет заменено", "Программа, движки, пресеты, списки, базовые правила, снимок каталога Zapret "
             + "и пины напрямую.");
     }
 

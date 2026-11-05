@@ -57,7 +57,7 @@ public partial class MoreView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось открыть мастер: " + ex.GetBaseException().Message;
+            Status.Text = "Мастер открыть не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -71,8 +71,7 @@ public partial class MoreView : UserControl
 
         RootValue.Text = Path.GetFullPath(".");
 
-        Status.Text = "Изменения записываются сразу, а действовать начинают при следующем "
-            + "запуске движков.";
+        Status.Text = "Изменения сохраняются сразу, а вступают в силу после следующего запуска движков.";
 
         StartDefenderCheck();
     }
@@ -86,7 +85,7 @@ public partial class MoreView : UserControl
     /// </remarks>
     private void StartDefenderCheck()
     {
-        DefenderValue.Text = "спрашиваю…";
+        DefenderValue.Text = "идёт проверка…";
         DefenderButton.IsEnabled = false;
 
         var path = Path.GetFullPath(".");
@@ -104,7 +103,7 @@ public partial class MoreView : UserControl
                 if (!weak.TryGetTarget(out var view))
                     return;
 
-                view.DefenderValue.Text = excluded ? "есть" : "нет";
+                view.DefenderValue.Text = excluded ? "добавлена" : "нет";
                 view.DefenderButton.IsEnabled = !excluded;
             });
         });
@@ -129,16 +128,16 @@ public partial class MoreView : UserControl
 
             Dispatcher.Invoke(() =>
             {
-                DefenderValue.Text = excluded ? "есть" : "нет";
+                DefenderValue.Text = excluded ? "добавлена" : "нет";
                 DefenderButton.IsEnabled = !excluded;
 
                 Status.Text = excluded
-                    ? $"В исключениях: {path}"
+                    ? $"В исключениях: "
                     : code == 0
                         ? "Команда прошла, а исключение не появилось — включена защита от "
                           + "изменений. Добавьте вручную: Безопасность Windows → Защита от "
                           + "вирусов → Исключения."
-                        : $"Не вышло, код {code}.";
+                        : $"Не получилось, код {code}.";
             });
         });
     }
@@ -180,7 +179,7 @@ public partial class MoreView : UserControl
             var count = UserRulesFile.Load(UserRulesFile.DefaultPath).Entries.Count;
 
             RoutesValue.Text = count == 0
-                ? "Своих маршрутов нет — судьбу соединений решают общие правила."
+                ? "Своих маршрутов нет: соединения идут по общим правилам."
                 : $"Своих маршрутов: {count}. Это выборы «напрямую», «десинк» и «через VPN», "
                   + "сделанные руками поверх общих правил.";
 
@@ -188,7 +187,7 @@ public partial class MoreView : UserControl
         }
         catch (Exception ex)
         {
-            RoutesValue.Text = "Файл своих маршрутов не читается: " + ex.GetBaseException().Message;
+            RoutesValue.Text = "Не удалось прочитать файл своих маршрутов: " + ex.GetBaseException().Message;
             ForgetRoutesButton.IsEnabled = false;
         }
     }
@@ -243,7 +242,7 @@ public partial class MoreView : UserControl
     private void ShowUpdates(AppSettings settings)
     {
         UpdatesSwitch.IsChecked = settings.CheckForUpdates;
-        UpdatesWord.Text = settings.CheckForUpdates ? "вкл." : "выкл.";
+        UpdatesWord.Text = settings.CheckForUpdates ? "включено" : "не включено";
     }
 
     private void OnUpdatesSwitch(object sender, RoutedEventArgs e)
@@ -257,12 +256,12 @@ public partial class MoreView : UserControl
 
             // Движкам безразлично: читается окном при его запуске.
             Status.Text = next.CheckForUpdates
-                ? "Записано: обновления будут искаться при запуске программы."
-                : "Записано: при запуске обновления не ищутся — проверить можно кнопкой на «Главной».";
+                ? "Сохранено: обновления будут проверяться при запуске программы."
+                : "Сохранено: при запуске обновления не проверяются, это можно сделать кнопкой на «Главной».";
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
             ShowUpdates(AppSettings.Load(AppSettings.DefaultPath));
         }
     }
@@ -271,8 +270,7 @@ public partial class MoreView : UserControl
     {
         if (EnginesRunning())
         {
-            Status.Text = "Сначала остановите движки: под ними лежит состояние супервизора, "
-                + "и без него остановить их станет нечем.";
+            Status.Text = "Сначала остановите движки: под ними лежит состояние супервизора, и без него их будет нечем остановить.";
 
             return;
         }
@@ -300,11 +298,11 @@ public partial class MoreView : UserControl
             (AppSettings.Fresh with { SubscriptionUrl = subscription }).Save(AppSettings.DefaultPath);
 
             Reload();
-            Status.Text = "Настройки сброшены, подписка сохранена. Прежние лежат рядом с .bak.";
+            Status.Text = "Настройки сброшены, подписка осталась. Прежние сохранены рядом с расширением .bak.";
         }
         catch (Exception ex)
         {
-            Status.Text = "Не вышло: " + ex.GetBaseException().Message;
+            Status.Text = "Не получилось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -324,16 +322,16 @@ public partial class MoreView : UserControl
             SetAside(UserRulesFile.DefaultPath);
 
             ShowRoutes();
-            Status.Text = "Свои маршруты забыты. Прежний файл лежит рядом с .bak.";
+            Status.Text = "Выбор по сайтам сброшен. Прежний файл лежит рядом с расширением .bak.";
 
             // В отличие от сброса настроек, здесь движки могли остаться
             // работать — и работают они по прежним маршрутам, пока их
             // не перезапустить.
-            this.Offer("свои маршруты");
+            this.Offer("выбор по сайтам");
         }
         catch (Exception ex)
         {
-            Status.Text = "Не вышло: " + ex.GetBaseException().Message;
+            Status.Text = "Не получилось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -400,7 +398,7 @@ public partial class MoreView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не вышло: " + ex.GetBaseException().Message;
+            Status.Text = "Не получилось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -531,7 +529,7 @@ public partial class MoreView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось открыть ссылку: " + ex.GetBaseException().Message;
+            Status.Text = "Ссылку открыть не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -544,7 +542,7 @@ public partial class MoreView : UserControl
 
         if (!Directory.Exists(target))
         {
-            Status.Text = $"Папки ещё нет: {target}. Она заводится, когда в ней появляется первый файл.";
+            Status.Text = $"Папки пока нет: {target}. Она появится вместе с первым файлом.";
             return;
         }
 
@@ -554,7 +552,7 @@ public partial class MoreView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось открыть: " + ex.GetBaseException().Message;
+            Status.Text = "Открыть не удалось: " + ex.GetBaseException().Message;
         }
     }
 

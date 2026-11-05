@@ -93,7 +93,7 @@
         <StackPanel Grid.Row="0">
             <TextBlock Style="{StaticResource Title}" FontSize="20" Text="Автоподбор маршрутов" />
             <TextBlock Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap"
-                       Text="Проверяет каждый сервис и ваши маршруты и подбирает, как их открывать: напрямую, десинком, пином в hosts или через VPN. Без VPN, если сайт открывается без него. Меняет только маршруты и пины — пресет и подписка не трогаются." />
+                       Text="Проверяет каждый сервис и ваши маршруты и подбирает, как их открывать: напрямую, десинком, пином в hosts или через туннель. Без VPN, если сайт открывается без него. Меняет только маршруты и пины — пресет и подписка не трогаются." />
 
             <!-- Свой сайт: подбор для одного имени — по ссылке или домену. -->
             <Grid x:Name="SiteRow" Margin="0,12,0,0">
@@ -272,7 +272,7 @@
             <ContentControl x:Name="EmptyFilter" Style="{StaticResource EmptyState}" Visibility="Collapsed"
                             local:PageHead.Title="Здесь пусто"
                             local:PageHead.Subtitle="Под этот отбор имён нет.">
-                <Button Style="{StaticResource Ghost}" Content="Показать все" Click="OnShowAll" />
+                <Button Style="{StaticResource Ghost}" Content="Раскрыть все" Click="OnShowAll" />
             </ContentControl>
 
             <ContentControl x:Name="LoadError" Style="{StaticResource ErrorState}" Visibility="Collapsed"
@@ -291,7 +291,7 @@
                        TextWrapping="Wrap" Margin="0,0,16,0" />
 
             <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button x:Name="StartButton" Style="{StaticResource Primary}" Content="Начать"
+                <Button x:Name="StartButton" Style="{StaticResource Primary}" Content="Запустить"
                         Click="OnStart" Margin="0,0,8,0" IsDefault="True" />
 
                 <Button x:Name="StopButton" Style="{StaticResource Ghost}" Content="Стоп" Click="OnStop"
@@ -311,7 +311,7 @@
                 <Button x:Name="UndoButton" Style="{StaticResource Ghost}" Content="Вернуть всё"
                         Click="OnUndo" Margin="0,0,8,0" Visibility="Collapsed" />
 
-                <Button x:Name="CloseButton" Style="{StaticResource Ghost}" Content="Закрыть"
+                <Button x:Name="CloseButton" Style="{StaticResource Ghost}" Content="Закрыть окно"
                         Click="OnClose" IsCancel="True" />
             </StackPanel>
         </Grid>

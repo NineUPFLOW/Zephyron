@@ -65,8 +65,8 @@
             <TextBlock Style="{StaticResource Caption}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,16,0"
                        Text="Действует со следующего запуска движков. Обновление пресета выбор не стирает." />
 
-            <Button Grid.Column="1" Style="{StaticResource Ghost}" Content="Отмена" IsCancel="True" Margin="0,0,8,0" Click="OnCancel" />
-            <Button Grid.Column="2" Style="{StaticResource Primary}" Content="Сохранить" IsDefault="True" Click="OnSave" />
+            <Button Grid.Column="1" Style="{StaticResource Ghost}" Content="Не сохранять" IsCancel="True" Margin="0,0,8,0" Click="OnCancel" />
+            <Button Grid.Column="2" Style="{StaticResource Primary}" Content="Сохранить выбор" IsDefault="True" Click="OnSave" />
         </Grid>
     </Grid>
 </Window>

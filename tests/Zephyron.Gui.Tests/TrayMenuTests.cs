@@ -34,7 +34,7 @@ public sealed class TrayMenuTests
             var toggle = (Button)menu.FindName("Toggle");
 
             Assert.Equal("Running", mark.Tag);
-            Assert.Equal("Остановить", toggle.Content);
+            Assert.Equal("Выключить", toggle.Content);
             Assert.Equal("работает", ((TextBlock)menu.FindName("Tunnel")).Text);
 
             menu.Render(new TrayStatus(
@@ -46,7 +46,7 @@ public sealed class TrayMenuTests
                 Stopping: true));
 
             Assert.Equal("Starting", mark.Tag);
-            Assert.Equal("Останавливаю…", toggle.Content);
+            Assert.Equal("Выключаю…", toggle.Content);
             Assert.False(toggle.IsEnabled);
 
             // Службы нет в состоянии — её выключили, а не остановили.
@@ -61,14 +61,14 @@ public sealed class TrayMenuTests
     {
         var status = new TrayStatus(false, false, null, null, Busy: false);
 
-        Assert.Equal("Остановлено", status.Headline);
+        Assert.Equal("Выключено", status.Headline);
 
         Sta.Run(() =>
         {
             var menu = new TrayMenu(() => { }, _ => { }, () => { }, _ => { });
             menu.Render(status);
 
-            Assert.Equal("Запустить", ((Button)menu.FindName("Toggle")).Content);
+            Assert.Equal("Включить", ((Button)menu.FindName("Toggle")).Content);
             Assert.Equal("—", ((TextBlock)menu.FindName("Tunnel")).Text);
 
             menu.Close();
@@ -84,9 +84,9 @@ public sealed class TrayMenuTests
     {
         var status = new TrayStatus(Running: false, AllHealthy: false, Tunnel: null, Desync: null, Busy: false, Starting: true);
 
-        Assert.Equal("Запускается…", status.Headline);
-        Assert.Equal("Перезапускается…", (status with { Running = true, Busy = true, Starting = false }).Headline);
-        Assert.Equal("Останавливается…", (status with { Running = true, Busy = true, Stopping = true }).Headline);
+        Assert.Equal("Стартует…", status.Headline);
+        Assert.Equal("Стартует заново…", (status with { Running = true, Busy = true, Starting = false }).Headline);
+        Assert.Equal("Выключается…", (status with { Running = true, Busy = true, Stopping = true }).Headline);
 
         Sta.Run(() =>
         {
@@ -95,12 +95,12 @@ public sealed class TrayMenuTests
 
             var toggle = (Button)menu.FindName("Toggle");
 
-            Assert.Equal("Остановить", toggle.Content);
+            Assert.Equal("Выключить", toggle.Content);
             Assert.True(toggle.IsEnabled);
             Assert.Equal("запускается", ((TextBlock)menu.FindName("Tunnel")).Text);
 
             menu.Render(status with { Busy = true });
-            Assert.Equal("Запускаю…", toggle.Content);
+            Assert.Equal("Включаю…", toggle.Content);
             Assert.False(toggle.IsEnabled);
 
             menu.Close();
@@ -140,8 +140,8 @@ public sealed class TrayDeadExitsTests
             Desync: ServiceHealth.Healthy,
             Busy: false);
 
-        Assert.Equal("Выходы VPN не отвечают", status.Headline);
-        Assert.Equal("выходы VPN не отвечают", TrayStatus.Describe(status.Tunnel, tunnel: true));
-        Assert.Equal("не отвечает", TrayStatus.Describe(ServiceHealth.Degraded));
+        Assert.Equal("Выходы VPN молчат", status.Headline);
+        Assert.Equal("выходы VPN молчат", TrayStatus.Describe(status.Tunnel, tunnel: true));
+        Assert.Equal("не откликается", TrayStatus.Describe(ServiceHealth.Degraded));
     }
 }

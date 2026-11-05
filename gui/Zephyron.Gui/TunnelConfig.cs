@@ -44,8 +44,8 @@ internal static class TunnelConfig
         if (!settings.HasTunnelExit)
         {
             return new BuildOutcome(false,
-                "Ни подписки, ни WARP — заворачивать трафик некуда. "
-                + "Добавьте ссылку в разделе «VPN» либо включите там же бесплатный WARP.");
+                "Нет ни подписки, ни WARP: заворачивать трафик некуда. "
+                + "Добавьте ссылку в разделе «VPN» или включите там бесплатный WARP.");
         }
 
         try
@@ -92,7 +92,7 @@ internal static class TunnelConfig
                 // не ссылки: ссылка — пароль.
                 if ((sources.Count > 0 || book.PoolKeys.Count > 0) && fromSubscription.Count == 0)
                 {
-                    return new BuildOutcome(false, "Конфиг не собрался: ни подписки, ни ключи не дали серверов: "
+                    return new BuildOutcome(false, "Конфиг не создан: ни подписки, ни ключи не дали серверов: "
                         + string.Join("; ", pool.Parts.Select(p => $"«{p.Source.Name}» — {p.Error ?? "пусто"}")) + ".");
                 }
 
@@ -297,13 +297,13 @@ internal static class TunnelConfig
             RouterDnsBuildState.Save(settings.ProxyConfigPath, requestedDns, routerDns.Warning);
 
             var note = settings.WarpEnabled
-                ? "Конфиг собран: туннель через WARP, подписки на паузе"
+                ? "Конфиг создан: туннель через WARP, подписки приостановлены"
                 : $"Конфиг собран: {result.UsedServers.Count} серверов"
                     + (sourceCount > 1 ? $" из {sourceCount} подписок" : string.Empty)
                     + (keyCount > 0 ? $" и {keyCount} ключей" : string.Empty);
 
             if (reserved > 0)
-                note += $", {reserved} из запаса — " + (PhysicalNetwork.Up() ? "панель не ответила" : "нет сети");
+                note += $", {reserved} из запаса — " + (PhysicalNetwork.Up() ? "панель молчит" : "сеть недоступна");
 
             // Про мёртвых говорим вслух. Молча выведенный из автоподбора
             // сервер — это сервер, который человек считает рабочим, а он
@@ -324,7 +324,7 @@ internal static class TunnelConfig
         }
         catch (Exception ex)
         {
-            return new BuildOutcome(false, "Конфиг не собрался: " + ex.GetBaseException().Message);
+            return new BuildOutcome(false, "Конфиг не создан: " + ex.GetBaseException().Message);
         }
     }
 
@@ -363,7 +363,7 @@ internal static class TunnelConfig
         }
         catch (Exception ex)
         {
-            return new BuildOutcome(false, "DNS через движок не поднят: " + ex.GetBaseException().Message);
+            return new BuildOutcome(false, "DNS через движок не запущен: " + ex.GetBaseException().Message);
         }
     }
 
@@ -436,7 +436,7 @@ internal static class TunnelConfig
         }
         catch (Exception ex)
         {
-            return new BuildOutcome(false, "Списки десинка не собрались: " + ex.GetBaseException().Message);
+            return new BuildOutcome(false, "Списки десинка не созданы: " + ex.GetBaseException().Message);
         }
     }
 

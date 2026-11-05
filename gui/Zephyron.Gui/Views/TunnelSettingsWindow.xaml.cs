@@ -83,7 +83,7 @@ public partial class TunnelSettingsWindow : Window
 
         Line(RussianLine, engines.Tunnel
             ? string.Empty
-            : "Действует, когда туннель включён.");
+            : "Работает, пока туннель включён.");
 
         Status.Text = engines.Complaint ?? string.Empty;
 
@@ -93,9 +93,9 @@ public partial class TunnelSettingsWindow : Window
         // Сказать, когда включённое ничего не делает: «без исключений»
         // отбрасывает все правила «напрямую», а без туннеля прятать не от чего.
         Line(HideVpnLine, !engines.Tunnel
-            ? "Действует, когда туннель включён."
+            ? "Работает, пока туннель включён."
             : engines.IgnoreExclusions && settings.HideVpnFromRussianApps
-                ? "Сейчас не действует: включено «Игнорировать исключения»."
+                ? "Сейчас не работает: включено «Без исключений»."
                 : string.Empty);
 
 
@@ -109,9 +109,9 @@ public partial class TunnelSettingsWindow : Window
         // об этом надо здесь же, иначе включённая настройка не делает ничего
         // и не объясняет почему (у владельца 30.09 стояло «не проверять»).
         ReplaceLine.Text = settings.ExitCheckSeconds <= 0
-            ? "Проверка подключённого сервера выключена — замену искать некому. Включите её ниже."
+            ? "Проверка текущего сервера выключена, замену искать некому. Включите её ниже."
             : string.IsNullOrWhiteSpace(settings.PreferredServer)
-            ? "Сейчас сервер не выбран — работает автоподбор, он ищет замену сам."
+            ? "Сервер не выбран: замену подбирает автоподбор."
             : settings.ReplaceSilentServer
                 ? $"Пока «{settings.PreferredServer}» молчит, трафик пойдёт через другой сервер."
                 : $"Пока «{settings.PreferredServer}» молчит, туннель ждёт его.";
@@ -123,7 +123,7 @@ public partial class TunnelSettingsWindow : Window
         // Как у прочих строк — сказать, когда настройка ничего не делает:
         // пулы при WARP и заведённые пулы при выключенной.
         Line(SelectiveLine, selective
-            ? settings.WarpEnabled ? "Сейчас не действует: туннель идёт через WARP." : string.Empty
+            ? settings.WarpEnabled ? "Сейчас не работает: туннель идёт через WARP." : string.Empty
             : settings.Pools.Count > 0
                 ? $"Заведённые пулы ({settings.Pools.Count}) сохранены, но не действуют: их маршруты идут через любые серверы."
                 : string.Empty);
@@ -138,7 +138,7 @@ public partial class TunnelSettingsWindow : Window
         DeadPoolLine.Text = !selective
             ? "Действует, когда включён Selective Routing."
             : settings.Pools.Count == 0
-            ? "Своих пулов пока нет — все серверы в пуле по умолчанию."
+            ? "Своих пулов пока нет, все серверы лежат в общем пуле."
             : settings.DeadPoolToDefault
                 ? "Маршруты молчащего пула пойдут через любые серверы."
                 : "Маршруты молчащего пула ждут его и не открываются.";
@@ -227,7 +227,7 @@ public partial class TunnelSettingsWindow : Window
 
         MemoryLine.Text = memory.OldestCheck() is { } oldest
             ? $"Серверов в памяти: {memory.Count}, самая давняя проверка — {oldest.ToLocalTime():dd.MM в HH:mm}."
-            : "Пусто: серверы ещё не проверялись.";
+            : "Пока пусто: серверы ещё не проверялись.";
     }
 
     /// <summary>«Очистить» — вся память замеров разом.</summary>
@@ -239,12 +239,12 @@ public partial class TunnelSettingsWindow : Window
             ShowMemory();
 
             Changed = true;
-            Status.Text = "Память замеров очищена: задержки появятся со следующим замером, "
-                + "нестабильные вернутся в автоподбор при следующем запуске движков.";
+            Status.Text = "Память замеров очищена: задержки появятся после следующего замера, "
+                + "нестабильные серверы вернутся в автоподбор после следующего запуска движков.";
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось очистить: " + ex.GetBaseException().Message;
+            Status.Text = "Очистить не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -259,7 +259,7 @@ public partial class TunnelSettingsWindow : Window
     /// «Вкл.» или «Выкл.».
     /// </remarks>
     private static void Word(System.Windows.Controls.TextBlock where, bool on) =>
-        where.Text = on ? "вкл." : "выкл.";
+        where.Text = on ? "включено" : "не включено";
 
     private void ShowBypass(bool on)
     {
@@ -267,15 +267,15 @@ public partial class TunnelSettingsWindow : Window
         BypassLine.Text = on && AppSettings.Load(AppSettings.DefaultPath).KillSwitch
             ? "Не действует: включён kill switch на вкладке VPN — мимо туннеля не уводится ничего."
             : on
-            ? "При мёртвых выходах трафик пойдёт открыто и с домашнего адреса."
-            : "При мёртвых выходах сеть не работает, но мимо туннеля не идёт ничего.";
+            ? "Если выходы не работают, трафик пойдёт открыто, с домашнего адреса."
+            : "Если выходы не работают, сеть отключится, но ничего не пойдёт мимо туннеля.";
 
         BypassInfo.Content = on
             ? "Если выход не ответит три проверки подряд, трафик пойдёт мимо туннеля, "
               + "чтобы не легла вся сеть. Вернётся в туннель сам, как только выход оживёт.\n\n"
-              + "Десинк при этом работает как обычно: обход касается только того, "
-              + "что шло через туннель, и закрытые сайты на это время останутся закрытыми."
-            : "При мёртвых выходах трафик так и будет уходить в туннель — то есть в никуда. "
+              + "Десинк при этом работает как обычно: он затрагивает только то, "
+              + "что шло через туннель, а закрытые сайты на это время останутся закрытыми."
+            : "Если выходы не работают, трафик по-прежнему уходит в туннель, то есть в никуда. "
               + "Это выбор в пользу скрытности: ничего не пойдёт мимо туннеля даже ценой "
               + "неработающей сети.\n\nВключайте, если пользуетесь программой ради обхода "
               + "блокировок, а не ради скрытности.";
@@ -298,26 +298,26 @@ public partial class TunnelSettingsWindow : Window
     private void OnRussian(object sender, RoutedEventArgs e) =>
         Choose(c => c with { IgnoreExclusions = Russian.IsChecked == true },
             Russian.IsChecked == true
-                ? "Всё пойдёт через туннель, исключения не действуют."
-                : "Исключения снова действуют: «напрямую» и «десинк» — мимо туннеля.");
+                ? "Всё пойдёт через туннель, исключения не работают."
+                : "Исключения снова работают: «напрямую» и «десинк» идут мимо туннеля.");
 
     private void OnHideVpn(object sender, RoutedEventArgs e) =>
         Save(s => s with { HideVpnFromRussianApps = HideVpn.IsChecked == true },
             HideVpn.IsChecked == true
-                ? "Адрес у российских приложений будет домашним: двенадцать имён пойдут напрямую."
+                ? "У российских приложений будет домашний адрес: двенадцать имён пойдут напрямую."
                 : "Имена, по которым приложения узнают адрес, снова идут по общим правилам.");
 
     private void OnReplace(object sender, RoutedEventArgs e) =>
         Save(s => s with { ReplaceSilentServer = Replace.IsChecked == true },
             Replace.IsChecked == true
-                ? "Выбранному серверу будет искаться замена, пока он молчит."
-                : "Выбранный сервер не подменяется: молчит — туннель ждёт его.");
+                ? "Для выбранного сервера будет искаться замена, пока он молчит."
+                : "Выбранный сервер не заменяется: пока он молчит, туннель ждёт его.");
 
     private void OnFakeIpMemory(object sender, RoutedEventArgs e) =>
         Save(s => s with { FakeIpMemory = FakeIpMemory.IsChecked == true },
             FakeIpMemory.IsChecked == true
-                ? "Подставные адреса имён через VPN переживут перезапуск движков."
-                : "После перезапуска движков подставные адреса раздаются заново, как было до 20.10.");
+                ? "Подставные адреса имён «через VPN» сохранятся после перезапуска движков."
+                : "После перезапуска движков подставные адреса выдаются заново, как до 20.10.");
 
     private void OnSelective(object sender, RoutedEventArgs e) =>
         Save(s => s with { SelectiveRouting = Selective.IsChecked == true },
@@ -328,7 +328,7 @@ public partial class TunnelSettingsWindow : Window
     private void OnDeadPool(object sender, RoutedEventArgs e) =>
         Save(s => s with { DeadPoolToDefault = DeadPool.IsChecked == true },
             DeadPool.IsChecked == true
-                ? "Молчащий пул уведёт свои маршруты в пул по умолчанию."
+                ? "Молчащий пул передаст свои маршруты общему пулу."
                 : "Молчащий пул ждёт: его маршруты не открываются, пока он молчит.");
 
     private void OnVerify(object sender, RoutedEventArgs e)
@@ -337,8 +337,8 @@ public partial class TunnelSettingsWindow : Window
 
         Save(s => s with { VerifyTraffic = on },
             on
-                ? "Проверка прохода включена: молчащий туннель будет виден."
-                : "Проверка прохода выключена: туннель судится по открытому порту.");
+                ? "Проверка трафика включена: молчащий туннель будет заметен."
+                : "Проверка трафика выключена: о туннеле судят по открытому порту.");
     }
 
     private void OnFragment(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -353,9 +353,9 @@ public partial class TunnelSettingsWindow : Window
         Save(s => s with { TlsFragment = mode },
             mode switch
             {
-                TlsFragment.Records => "Приветствие TLS серверу пойдёт несколькими записями.",
-                TlsFragment.Packets => "Приветствие TLS серверу пойдёт несколькими пакетами — подключение станет медленнее.",
-                _ => "Фрагментация выключена: рукопожатие с сервером как есть.",
+                TlsFragment.Records => "Начало TLS-соединения с сервером будет разбито на несколько записей.",
+                TlsFragment.Packets => "Начало TLS-соединения с сервером будет разбито на несколько пакетов, подключение станет медленнее.",
+                _ => "Дробление выключено: соединение с сервером начинается напрямую.",
             });
     }
 
@@ -369,7 +369,7 @@ public partial class TunnelSettingsWindow : Window
         {
             PingOwnRow.Visibility = Visibility.Visible;
             PingOwn.Focus();
-            Status.Text = "Введите адрес и нажмите «Сохранить».";
+            Status.Text = "Введите адрес и нажмите «Запомнить».";
             return;
         }
 
@@ -406,7 +406,7 @@ public partial class TunnelSettingsWindow : Window
         Save(s => s with { MeasureOnStart = on },
             on
                 ? "Серверы будут замеряться сами через минуту после запуска программы."
-                : "Серверы замеряются только кнопкой «Замерить все».");
+                : "Серверы замеряются только кнопкой «Замерить все серверы».");
     }
 
     private void OnBypass(object sender, RoutedEventArgs e)
@@ -417,8 +417,8 @@ public partial class TunnelSettingsWindow : Window
 
         Save(s => s with { BypassWhenTunnelDead = on },
             on
-                ? "Обход включён: при мёртвых выходах сеть продолжит работать мимо туннеля."
-                : "Обход выключен: при мёртвых выходах ничего не пойдёт мимо туннеля.");
+                ? "Обход включён: если выходы не работают, сеть продолжит работать мимо туннеля."
+                : "Обход выключен: если выходы не работают, ничего не пойдёт мимо туннеля.");
     }
 
     /// <summary>
@@ -440,11 +440,11 @@ public partial class TunnelSettingsWindow : Window
             Show(next);
 
             Changed = true;
-            Status.Text = said + " Применится при следующем запуске движков.";
+            Status.Text = said + " Вступит в силу после следующего запуска движков.";
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -456,8 +456,8 @@ public partial class TunnelSettingsWindow : Window
 
         Save(s => s with { RefreshSubscriptionWhenNoLiveExits = on },
             on
-                ? "Когда живых серверов не останется, подписка перечитается сама — не чаще раза в 30 минут."
-                : "Подписка перечитывается как прежде: при запуске движков, во вкладке VPN и кнопкой «Обновить».");
+                ? "Когда живых серверов не останется, подписка перечитается сама, но не чаще раза в 30 минут."
+                : "Подписка перечитывается как раньше: при запуске движков, во вкладке VPN и по кнопке «Перечитать».");
     }
 
     private void OnClose(object sender, RoutedEventArgs e) => Close();

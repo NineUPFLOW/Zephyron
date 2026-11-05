@@ -82,7 +82,7 @@ public sealed class LogViewTests : IDisposable
             view.Journal = 0;
             view.ErrorsOnly = true;
             Assert.Equal("ERROR [1] outbound/vless: dial tcp: i/o timeout", view.Text.Text);
-            Assert.Equal("Все строки", view.ErrorsButton.Content);
+            Assert.Equal("Показать всё", view.ErrorsButton.Content);
 
             // Супервизор пишет по-русски — его сбой тоже ошибка.
             view.Journal = 2;

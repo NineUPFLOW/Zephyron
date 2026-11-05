@@ -82,7 +82,7 @@ public partial class UpdateApplyWindow : Window
         NotesTitle.Text = $"Что нового в {options.To}";
         RollBackButton.Content = $"Вернуть {options.From}";
 
-        string[] titles = ["Скачано", "Движки остановлены", "Программа закрыта", "Замена файлов", "Запуск новой версии"];
+        string[] titles = ["Загрузка завершена", "Движки остановлены", "Программа остановлена", "Копирование новых файлов", "Старт новой версии"];
 
         for (int i = 0; i < titles.Length; i++)
             _steps.Add(StepRow.Add(Steps, $"{i + 1}. {titles[i]}", withProgress: i == 3));
@@ -106,15 +106,15 @@ public partial class UpdateApplyWindow : Window
 
         _steps[0].Show(StepState.Done, _options.Downloaded);
         _steps[1].Show(StepState.Done, "sing-box, winws2");
-        _steps[2].Show(StepState.Running, "Жду, пока программа отпустит свои файлы");
+        _steps[2].Show(StepState.Running, "Жду, пока программа освободит свои файлы");
 
         bool exited = await UpdateApplier.WaitForExitAsync(_options.ProcessId, TimeSpan.FromMinutes(1), CancellationToken.None);
 
         if (!exited)
         {
             _busy = false;
-            _steps[2].Show(StepState.Failed, "Не закрылась за минуту");
-            ShowError("Программа не закрылась",
+            _steps[2].Show(StepState.Failed, "Не закрылась в течение минуты");
+            ShowError("Программа не остановилась",
                 "Zephyron всё ещё работает — заменить его файлы нельзя.",
                 "Закройте его через трей («Выход») и нажмите «Повторить». Файлы ещё не тронуты.",
                 retry: true, rollBack: false, asIs: false, retryWait: true);
@@ -122,7 +122,7 @@ public partial class UpdateApplyWindow : Window
         }
 
         await Task.Run(_applier.StopLeftovers);
-        _steps[2].Show(StepState.Done, "Все файлы освобождены");
+        _steps[2].Show(StepState.Done, "Файлы свободны");
 
         await CopyAsync();
     }
@@ -130,7 +130,7 @@ public partial class UpdateApplyWindow : Window
     private async Task CopyAsync()
     {
         _busy = true;
-        ShowInfo("Не закрывайте окно — это займёт несколько секунд.");
+        ShowInfo("Не закрывайте окно: это займёт несколько секунд.");
         _steps[3].Show(StepState.Running, null);
         _steps[3].Progress(_applier.Done, _applier.Total);
 
@@ -152,7 +152,7 @@ public partial class UpdateApplyWindow : Window
                 ? "его держит другая программа: " + string.Join(", ", failure.Lockers.Select(FileLockers.Describe)) + "."
                 : failure.Reason;
 
-            ShowError("Не удалось заменить файл",
+            ShowError("Не получилось заменить файл",
                 $"Не заменился файл {failure.File} — {who}",
                 $"Новые файлы уже на месте ({_applier.Done} из {_applier.Total}), этот остался прежним. "
                     + (failure.Lockers.Count > 0
@@ -164,9 +164,9 @@ public partial class UpdateApplyWindow : Window
 
         _steps[3].Show(StepState.Done, null);
         _steps[3].Progress(_applier.Total, _applier.Total);
-        _steps[4].Show(StepState.Done, "Подготовка завершена");
+        _steps[4].Show(StepState.Done, "Всё подготовлено");
 
-        ShowDone($"Обновлено до {_options.To}", "Запускаю программу…", success: true);
+        ShowDone($"Обновлено до {_options.To}", "Открываю программу…", success: true);
     }
 
     private async void OnRetry(object sender, RoutedEventArgs e)
@@ -268,7 +268,7 @@ public partial class UpdateApplyWindow : Window
         }
         catch (Exception ex)
         {
-            ShowError("Программа не запустилась", ex.GetBaseException().Message,
+            ShowError("Программа не стартовала", ex.GetBaseException().Message,
                 $"Запустите её сами: {_options.Target}\\Zephyron.exe.", retry: false, rollBack: false, asIs: false);
             return;
         }
@@ -347,7 +347,7 @@ public partial class UpdateApplyWindow : Window
 
         if (sections.Count == 0)
         {
-            var none = new TextBlock { Text = "Чейнджлог — по ссылке ниже.", TextWrapping = TextWrapping.Wrap };
+            var none = new TextBlock { Text = "Список изменений доступен по ссылке ниже.", TextWrapping = TextWrapping.Wrap };
             none.SetResourceReference(StyleProperty, "Caption");
             Notes.Children.Add(none);
         }

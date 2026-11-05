@@ -195,6 +195,12 @@ public static class DnsSurvey
             Note: "российский посредник: закрытые сайты — через свои прокси",
             ForTunnel: false,
             Group: DnsGroup.Intermediary),
+        // Замер 05.11: DoH на этом адресе Cloudflare по имени dns.zapret.moe отвечает,
+        // chatgpt.com даёт посредника. UDP 38.180.241.191 здесь молчал, адрес — из вики проекта.
+        new("Zapret DNS", ["38.180.241.191"], "172.67.164.60", "dns.zapret.moe",
+            Note: "посредник проекта Zapret: ChatGPT, Gemini, Claude, Spotify",
+            ForTunnel: false,
+            Group: DnsGroup.Intermediary),
         // Семейный AdGuard и Control D «без рекламы» — публичные профили тех же сервисов (DoH).
         new("AdGuard Семейный", ["94.140.14.15", "94.140.15.16"], "94.140.14.15", "family.adguard-dns.com",
             Note: "отсекает взрослое и рекламу", Group: DnsGroup.Filtering),
@@ -448,7 +454,7 @@ public static class DnsSurvey
     /// HTTP/2 — Quad9 отвечал на HTTP/1.1 кодом 505, Mullvad и Alibaba рвали
     /// рукопожатие, не найдя h2 в ALPN.
     /// </remarks>
-    private static HttpClient DohClient(string address, int? nic) =>
+    internal static HttpClient DohClient(string address, int? nic) =>
         new(new SocketsHttpHandler
         {
             ConnectTimeout = Timeout,
@@ -524,6 +530,61 @@ public static class DnsSurvey
         }
 
         return (best, string.Empty);
+    }
+
+    /// <summary>
+    /// Один вопрос по DoH к названному адресу сервера; ответ или <c>null</c>,
+    /// если сервер не ответил или ответил не DNS.
+    /// </summary>
+    /// <remarks>
+    /// По HTTP/2, как <see cref="DohAsync"/>: DNS-AI и dns.malw.link на HTTP/1.1
+    /// отвечают кодом 505 (замер 03.11).
+    /// </remarks>
+    public static async Task<DnsWire.Answer?> DohQueryAsync(
+        string address, string tlsName, string path, string name, ushort type, int? nic, CancellationToken cancellationToken)
+    {
+        using var http = DohClient(address, nic);
+
+        return await DohQueryAsync(http, tlsName, path, name, type, cancellationToken);
+    }
+
+    /// <summary>
+    /// Тот же вопрос через готовый клиент (<see cref="DohClient"/>): многие вопросы
+    /// к одному серверу идут одним соединением HTTP/2, а не рукопожатием на каждый.
+    /// </summary>
+    /// <remarks>
+    /// Ради автозамены пинов (05.11): она спрашивает сервер посредника о каждом
+    /// имени блока, и по клиенту на вопрос это были бы сотни соединений TLS к одному
+    /// имени за секунды — по «июньской» схеме ТСПУ (больше трёх сессий к имени за
+    /// 60 с) это повод заморозить само имя DoH.
+    /// </remarks>
+    internal static async Task<DnsWire.Answer?> DohQueryAsync(
+        HttpClient http, string tlsName, string path, string name, ushort type, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var content = new ByteArrayContent(DnsWire.Query(name, type));
+            content.Headers.ContentType = new("application/dns-message");
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"https://{tlsName}{path}")
+            {
+                Content = content,
+                Version = HttpVersion.Version20,
+                VersionPolicy = HttpVersionPolicy.RequestVersionOrLower,
+            };
+            request.Headers.Accept.Add(new("application/dns-message"));
+
+            using var response = await http.SendAsync(request, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            return DnsWire.Parse(await response.Content.ReadAsByteArrayAsync(cancellationToken));
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
     }
 
     /// <summary>Отказ словами таблицы: соединение, рукопожатие или молчание.</summary>

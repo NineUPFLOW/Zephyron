@@ -45,29 +45,29 @@ public partial class ThemeEditorWindow : Window
     /// <summary>Подписи слотов словами — как их видит человек, а не как они зовутся в файле.</summary>
     private static readonly (string Slot, string Label, string Note)[] Slots =
     [
-        (ThemeSlots.Backdrop, "Фон окна", "под всем; им же затемняется картинка"),
-        (ThemeSlots.Surface, "Карточки", "строки, группы, меню"),
-        (ThemeSlots.Raised, "Кнопки и поля", "то, что нажимают и во что пишут"),
-        (ThemeSlots.Border, "Рамки", "обводки и разделители"),
-        (ThemeSlots.Text, "Текст", "основной"),
-        (ThemeSlots.Muted, "Пояснения и меню", "второй план"),
-        (ThemeSlots.Faint, "Третий план", "необязательные подписи"),
-        (ThemeSlots.AccentFill, "Главная кнопка", "заливка; надпись на ней подберётся сама"),
-        (ThemeSlots.OnAccent, "Надпись на главной кнопке", "чёрная или белая — что читается"),
+        (ThemeSlots.Backdrop, "Задний фон окна", "лежит под всем, им же затемняется картинка"),
+        (ThemeSlots.Surface, "Блоки", "строки, блоки, меню"),
+        (ThemeSlots.Raised, "Кнопки и поля ввода", "то, что нажимают и куда вводят текст"),
+        (ThemeSlots.Border, "Контуры", "линии и разделители"),
+        (ThemeSlots.Text, "Шрифт и текст", "главный"),
+        (ThemeSlots.Muted, "Подписи и меню", "вторичный план"),
+        (ThemeSlots.Faint, "Дальний план", "дополнительные подписи"),
+        (ThemeSlots.AccentFill, "Основная кнопка", "заливка; цвет надписи на ней подбирается сам"),
+        (ThemeSlots.OnAccent, "Надпись на основной кнопке", "чёрная или белая, смотря что читается"),
         (ThemeSlots.Accent, "Акцент", "выбранное, вкладки, графики"),
         (ThemeSlots.Success, "«Работает»", "точки, дорожки и слово на «Главной»; пока не задан — как акцент"),
         (ThemeSlots.Window, "Рамка окна Windows", "обводка окна и диалогов; пока не задана — как акцент"),
-        (ThemeSlots.Danger, "«Закрыто»", "красный по смыслу"),
-        (ThemeSlots.Warn, "«Внимание»", "жёлтый по смыслу"),
-        (ThemeSlots.WarnFill, "Точки «внимание»", "мелкие метки"),
-        (ThemeSlots.AccentDim, "Выделение в поле", "фон выделенного текста"),
+        (ThemeSlots.Danger, "«Закрыто»", "красный — по смыслу"),
+        (ThemeSlots.Warn, "«Внимание»", "жёлтый — по смыслу"),
+        (ThemeSlots.WarnFill, "Метки предупреждения", "небольшие метки"),
+        (ThemeSlots.AccentDim, "Подсветка текста в поле", "цвет подложки у выделенного текста"),
     ];
 
     private static readonly double[] Dims = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
     private static readonly double[] Blurs = [0, 12, 24, 40];
     private static readonly double[] Alphas = [1, 0.9, 0.8, 0.7, 0.6];
 
-    private const string BaseFont = "как в основе";
+    private const string BaseFont = "по образцу основы";
 
     private readonly Theme _from;
     private readonly Dictionary<string, ThemeColor> _colors;
@@ -145,12 +145,12 @@ public partial class ThemeEditorWindow : Window
             Changed();
         };
 
-        Heading.Text = editing is null ? "Своя тема" : $"Правка темы «{from.Name}»";
+        Heading.Text = editing is null ? "Собственная тема" : $"Правка темы «{from.Name}»";
         Title = Heading.Text;
         NameField.Text = editing is null ? from.Name + " — моя" : from.Name;
 
         DimChoice.ItemsSource = Dims.Select(d => $"{d * 100:0} %").ToList();
-        AlphaChoice.ItemsSource = Alphas.Select(a => a >= 1 ? "непрозрачные" : $"{a * 100:0} %").ToList();
+        AlphaChoice.ItemsSource = Alphas.Select(a => a >= 1 ? "плотные" : $"{a * 100:0} %").ToList();
 
         var background = from.Background;
         FitChoice.SelectedIndex = (int)(background?.Fit ?? BackgroundFit.Cover);
@@ -260,7 +260,7 @@ public partial class ThemeEditorWindow : Window
 
     private void ShowImage()
     {
-        ImageName.Text = _image is null ? "нет — фон сплошной, цветом «Фон окна»" : Path.GetFileName(_image);
+        ImageName.Text = _image is null ? "нет: фон сплошной, цвет «Фон окна»" : Path.GetFileName(_image);
         ClearImage.IsEnabled = _image is not null;
         ImageSettings.Visibility = _image is null ? Visibility.Collapsed : Visibility.Visible;
 
@@ -379,7 +379,7 @@ public partial class ThemeEditorWindow : Window
         _ready = false;
         SizeSlider.Value = Math.Clamp(size, SizeSlider.Minimum, SizeSlider.Maximum);
         _ready = was;
-        SizeText.Text = _placed ? $"{size * 100:0} %" : "как было";
+        SizeText.Text = _placed ? $"{size * 100:0} %" : "без изменений";
 
         if (_poster is null)
         {
@@ -600,7 +600,7 @@ public partial class ThemeEditorWindow : Window
     {
         var dialog = new OpenFileDialog
         {
-            Title = "Картинка или видео фона",
+            Title = "Картинка или видео для фона",
 
             // Видео — живой фон по кругу (07.10); стекла под карточками у него нет.
             Filter = "Картинки и видео (PNG, JPG, MP4)|*.png;*.jpg;*.jpeg;*.mp4|Картинки (PNG, JPG)|*.png;*.jpg;*.jpeg|Видео (MP4)|*.mp4",
@@ -614,7 +614,7 @@ public partial class ThemeEditorWindow : Window
 
         if (new FileInfo(dialog.FileName).Length > limit)
         {
-            Say($"{(video ? "Видео" : "Картинка")} больше {limit / 1024 / 1024} МБ — возьмите поменьше.");
+            Say($"{(video ? "Видео" : "Изображение")} больше {limit / 1024 / 1024} МБ — возьмите поменьше.");
             return;
         }
 
@@ -654,7 +654,7 @@ public partial class ThemeEditorWindow : Window
 
         if (name.Length == 0)
         {
-            Say("Нужно название.");
+            Say("Введите название.");
             return;
         }
 
@@ -715,7 +715,7 @@ public partial class ThemeEditorWindow : Window
         }
         catch (Exception ex)
         {
-            Say("Не удалось сохранить: " + ex.GetBaseException().Message);
+            Say("Сохранить не удалось: " + ex.GetBaseException().Message);
         }
     }
 

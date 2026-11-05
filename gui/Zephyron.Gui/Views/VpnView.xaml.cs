@@ -78,7 +78,7 @@ public sealed record ServerRow(
     Visibility ExcludedShown = Visibility.Collapsed,
 
     /// <summary>Подпись метки: «вне подбора» и коротко почему.</summary>
-    string SkipLabel = "вне подбора",
+    string SkipLabel = "исключён из выбора",
 
     /// <summary>Почему автоподбор не берёт этот сервер — подсказкой к метке.</summary>
     string? SkipWhy = null,
@@ -176,7 +176,7 @@ public sealed class SubRow : System.ComponentModel.INotifyPropertyChanged
 
     public bool Active { get; set; }
 
-    public string Detail { get; set; } = "читаю…";
+    public string Detail { get; set; } = "загружаю…";
 
     /// <summary>
     /// Что поставщик шлёт заголовками сверх квоты и срока (15.10, как в Happ):
@@ -230,8 +230,8 @@ public sealed class SubRow : System.ComponentModel.INotifyPropertyChanged
             + (usage.Warning is { } warning ? "\n\n" + warning : string.Empty);
 
     public string SupportTip => SupportUrl is { } url && url.Contains("t.me/", StringComparison.OrdinalIgnoreCase)
-        ? "Поддержка поставщика в Telegram"
-        : "Поддержка поставщика";
+        ? "Связаться с поставщиком в Telegram"
+        : "Связаться с поставщиком";
 
     public IReadOnlyList<ServerRow> Servers { get; set; } = [];
 
@@ -260,7 +260,7 @@ public sealed class SubRow : System.ComponentModel.INotifyPropertyChanged
     /// <summary>Занят ли замер вообще — хоть этой подпиской, хоть соседней.</summary>
     public bool Busy { get; set; }
 
-    public string CheckLabel => Checking ? "Тест пинга: замеряю…" : "Тест пинга: замерить серверы подписки";
+    public string CheckLabel => Checking ? "Тест пинга: идёт замер…" : "Тест пинга: замерить серверы подписки";
 
     /// <summary>
     /// Пока идёт один замер, второй не начинают: каждый поднимает по пять
@@ -588,7 +588,7 @@ public partial class VpnView : UserControl
         CurrentCaption.Text = running
             ? "Сейчас трафик идёт через"
             : desyncOnly
-                ? "Режим «Десинк» — туннель не поднимается"
+                ? "В режиме «Десинк» туннель не запускается"
                 : pinned ? "Закреплён — поднимется вместе с движками" : "Движки не запущены";
 
         // Где сервер лежит: подписка пула или выход WARP.
@@ -600,12 +600,12 @@ public partial class VpnView : UserControl
 
         if (tag is null)
         {
-            CurrentName.Text = choosing ? "Автоподбор выбирает…" : running ? "Выход не назван" : "Выберет автоподбор";
+            CurrentName.Text = choosing ? "Автоподбор выбирает…" : running ? "Выход без названия" : "Выберется автоматически";
             CurrentDetail.Text = choosing
-                ? "Движок меряет серверы пула и возьмёт быстрейший из живых — обычно это секунды."
+                ? "Движок замеряет серверы пула и возьмёт самый быстрый из живых, обычно это секунды."
                 : running
-                    ? "Движок не ответил, какой выход держит."
-                    : "При запуске движков — быстрейший из живых серверов всех подписок в работе.";
+                    ? "Движок не сообщил, какой выход держит."
+                    : "При запуске движков берётся самый быстрый из живых серверов всех используемых подписок.";
             ShowFlag(string.Empty);
             ShowStats(null, null, null);
         }
@@ -630,11 +630,11 @@ public partial class VpnView : UserControl
                 ? string.Empty
                 : TunnelStatus.Standing(tag, preferred) switch
                 {
-                    ExitStanding.Pinned => tag == Warp.MasqueTag ? "Включён WARP." : "Закреплён вами.",
+                    ExitStanding.Pinned => tag == Warp.MasqueTag ? "WARP включён." : "Закреплён вручную.",
                     ExitStanding.Other => StandInRemark() is { } remark
                         ? char.ToUpper(remark[0]) + remark[1..] + "."
-                        : "Выбор в настройках ещё не применён — перезапустите движки.",
-                    _ => "Выбран автоподбором.",
+                        : "Выбор в параметрах ещё не вступил в силу: перезапустите движки.",
+                    _ => "Выбран автоматически.",
                 };
         }
 
@@ -655,9 +655,9 @@ public partial class VpnView : UserControl
         CurrentState.Text = probe switch
         {
             { Ok: true, Ms: { } ms } => $"Отвечает · {ms:0} мс",
-            { Ok: true } => "Отвечает",
-            { Ok: false } => "Не отвечает",
-            _ => running ? "В работе" : desyncOnly ? "Туннель выключен" : "Движки остановлены",
+            { Ok: true } => "Откликается",
+            { Ok: false } => "Не откликается",
+            _ => running ? "В работе" : desyncOnly ? "Туннель не включён" : "Движки остановлены",
         };
 
         ShowStats(tag, found.Owner, found.Server);
@@ -792,8 +792,7 @@ public partial class VpnView : UserControl
 
         if (_rows.Count == 0)
         {
-            Status.Text = "Подписок нет. Без них серверов нет, а VPN недоступен — "
-                + "десинк при этом работает.";
+            Status.Text = "Подписок нет. Без них нет серверов и VPN недоступен, а десинк при этом работает.";
 
             return;
         }
@@ -870,12 +869,12 @@ public partial class VpnView : UserControl
 
             // Числа — в сводке у заголовка; здесь только беда.
             Status.Text = servers == 0 && _rows.Count > 0
-                ? "Ни одна подписка не отдала серверов."
+                ? "Ни одна подписка не вернула серверов."
                 : string.Empty;
         }
         catch (OperationCanceledException)
         {
-            Status.Text = "Чтение прервано.";
+            Status.Text = "Чтение остановлено.";
         }
         finally
         {
@@ -928,7 +927,7 @@ public partial class VpnView : UserControl
                 () => SubscriptionPool.ReadOneAsync(row.Entry.Url, force, cancellationToken), cancellationToken);
 
             if (read.Info is not { } info)
-                throw new SubscriptionUnreadException(read.Error ?? "панель не ответила");
+                throw new SubscriptionUnreadException(read.Error ?? "панель молчит");
 
             var (usable, skipped) = Take(row, info, settings);
             var when = When(read.At ?? DateTimeOffset.Now);
@@ -938,7 +937,7 @@ public partial class VpnView : UserControl
             var parts = new List<string>
             {
                 read.Source == SubscriptionReadSource.Reserve
-                    ? $"{read.Error ?? "панель подвела"} — серверы из запаса {when}"
+                    ? $"{read.Error ?? "панель не отозвалась"} — серверы из запаса {when}"
                     : $"обновлена {when}",
                 $"{usable} серверов",
             };
@@ -963,7 +962,7 @@ public partial class VpnView : UserControl
             // а не подписка, было нечем.
             if (usable == 0 && info.Errors.Count > 0)
             {
-                parts.Add("не разобралась: " + info.Errors[0]);
+                parts.Add("не удалось разобрать: " + info.Errors[0]);
                 Journal.Write("подписка", $"«{row.Entry.Name}» ответила, но серверов 0: "
                     + string.Join("; ", info.Errors.Take(3)));
             }
@@ -972,7 +971,7 @@ public partial class VpnView : UserControl
             Redraw();
 
             if (read.Source == SubscriptionReadSource.Reserve)
-                Journal.Write("подписка", $"«{row.Entry.Name}»: {read.Error ?? "панель подвела"}, взят запас {when}");
+                Journal.Write("подписка", $"«{row.Entry.Name}»: {read.Error ?? "панель не отозвалась"}, взят запас {when}");
 
             // Ответила, но не разобралась — не прочиталась: её серверы
             // никуда не делись, и их замеры трогать нельзя. Запас — тоже
@@ -1149,7 +1148,7 @@ public partial class VpnView : UserControl
                 $"{server.Host}:{server.Port}",
                 string.Empty,
                 Brushes.Transparent,
-                "выбрать",
+                "взять",
                 true,
                 server.IsMeasurable,
                 Chip: chip,
@@ -1178,14 +1177,14 @@ public partial class VpnView : UserControl
         bool chosen = server.Tag == settings.PreferredServer;
         bool excluded = settings.AutoPickExcluded.Contains(server.Tag, StringComparer.Ordinal);
         (string? Label, string? Why) skip = excluded
-            ? ("вне подбора", "Убран из автоподбора руками. Выбрать его можно; вернуть — в «⋯».")
+            ? ("исключён из выбора", "Убран из автоподбора руками. Выбрать его можно; вернуть — в «⋯».")
             : _skips.TryGetValue(server.Tag, out var why) ? why : default;
         bool known = server.Measurable || Seen(server.Tag) is not null;
 
         // Незамеряемого пробником меряет сам движок — и тогда у него обычный
         // замер, как у всех. «Только в работе» остаётся лишь на то время,
         // пока движки стоят и спросить некого.
-        var latency = known ? Latency(server.Tag) : "только в работе";
+        var latency = known ? Latency(server.Tag) : "только если подписка используется";
 
         var (reliability, tip, color, bars) = ReliabilityOf(server.Tag);
         var empty = (Brush)FindResource("Border");
@@ -1197,7 +1196,7 @@ public partial class VpnView : UserControl
         {
             Color = (Brush)FindResource(known ? Key(server.Tag) : "Faint"),
             Latency = latency,
-            ChooseLabel = chosen ? "выбран" : "выбрать",
+            ChooseLabel = chosen ? "текущий" : "взять",
             CanChoose = !chosen,
             AutoPickLabel = excluded ? "Вернуть в автоподбор" : "Не брать в автоподбор",
             Measured = Measured(server.Tag),
@@ -1213,7 +1212,7 @@ public partial class VpnView : UserControl
             Edge = (Brush)FindResource(chosen ? "AccentLine" : "Border"),
             Fade = _paused ? 0.55 : 1,
             ExcludedShown = skip.Label is null ? Visibility.Collapsed : Visibility.Visible,
-            SkipLabel = skip.Label ?? "вне подбора",
+            SkipLabel = skip.Label ?? "исключён из выбора",
             SkipWhy = skip.Why,
         };
     }
@@ -1466,7 +1465,7 @@ public partial class VpnView : UserControl
         // Надпись — по тому, что раскрыто, а не по прошлому нажатию: вкладка
         // пересоздаётся при каждом заходе, а раскрытые папки хранятся в книге
         // (владелец, 01.10: «багается при переходе между страницами»).
-        ShowAllButton.Content = _rows.Count > 0 && _rows.All(r => r.Open) ? "Скрыть все" : "Показать все";
+        ShowAllButton.Content = _rows.Count > 0 && _rows.All(r => r.Open) ? "Свернуть все" : "Раскрыть все";
     }
 
     private DispatcherTimer? _reshowTimer;
@@ -1690,12 +1689,12 @@ public partial class VpnView : UserControl
     private string Latency(string tag) => Seen(tag) switch
     {
         { Flaky: true, LatencyMs: { } flaky } => $"{flaky:0} мс · через раз",
-        { Flaky: true } => "через раз",
+        { Flaky: true } => "с перебоями",
         { Success: true, LatencyMs: { } ms } => $"{ms:0} мс",
-        { Success: true } => "отвечает",
-        { Success: false, Reliability: >= 80 } => "промах последней",
-        { Success: false } => "не отвечает",
-        _ => "не замерян",
+        { Success: true } => "откликается",
+        { Success: false, Reliability: >= 80 } => "последняя не удалась",
+        { Success: false } => "не откликается",
+        _ => "не замерялся",
     };
 
     /// <summary>
@@ -1717,9 +1716,9 @@ public partial class VpnView : UserControl
         // Коротко, одной строкой (владелец, 01.10: длинная подпись меняла
         // высоту карточки). Имя закреплённого — без флага-букв из тега.
         _pickBase = settings.WarpEnabled
-            ? "На паузе: туннель идёт через WARP."
+            ? "Подписки приостановлены: туннель идёт через WARP."
             : auto
-                ? "Автоподбор: быстрейший из живых."
+                ? "Автоподбор: самый быстрый из живых."
                 : $"Закреплён: {CountryTag.Split(pinned!).Name}. «Авто» вернёт автоподбор.";
 
         // Сторож выключен настройкой — сказать здесь, а не только в окне настроек.
@@ -1757,17 +1756,17 @@ public partial class VpnView : UserControl
         var measured = Seen(exit.Tag) is { Success: true, LatencyMs: { } ms } ? $" · {ms:0} мс" : string.Empty;
 
         WarpLine.Text = on
-            ? $"Туннель идёт только через WARP, подписки на паузе. Выход в Москве{measured}."
-            : "Бесплатный выход через сеть Cloudflare. Включите — и туннель пойдёт через него вместо подписок.";
+            ? $"Туннель идёт только через WARP, подписки приостановлены. Выход в Москве{measured}."
+            : "Бесплатный выход через сеть Cloudflare. Включите WARP, и туннель пойдёт через него вместо подписок.";
 
         // Замер — руками движка, а он знает WARP, только когда тот в конфиге.
         // Кнопка на месте всегда: пропадая, она не говорила, почему её нет.
         WarpCheckButton.IsEnabled = on && EnginesRunning;
         WarpCheckButton.ToolTip = !on
-            ? "Замер пинга WARP — когда он включён и движки работают"
+            ? "Замер пинга WARP доступен, когда он включён и движки работают"
             : EnginesRunning
-                ? "Замерить пинг WARP"
-                : "Замер пинга WARP — когда движки работают";
+                ? "Проверить отклик WARP"
+                : "Замер пинга WARP доступен, когда движки работают";
 
         // Подписки и лента на паузе — видно сразу, а не только в подписи.
         PausedLine.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
@@ -1824,9 +1823,9 @@ public partial class VpnView : UserControl
             ShowWarp(next);
 
             Status.Text = next.WarpEnabled
-                ? "WARP включён: туннель пойдёт только через него, подписки на паузе. "
-                  + "Применится при следующем запуске движков."
-                : "WARP выключен: туннель вернётся к подпискам. Применится при следующем запуске движков.";
+                ? "WARP включён: туннель пойдёт только через него, подписки приостановлены. Вступит в силу после следующего запуска движков."
+                  + "Вступит в силу после следующего запуска движков."
+                : "WARP выключен: туннель вернётся к подпискам. Вступит в силу после следующего запуска движков.";
 
             ShowPick(next);
             ShowQuick(next);
@@ -1835,7 +1834,7 @@ public partial class VpnView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось переключить: " + ex.GetBaseException().Message;
+            Status.Text = "Переключить не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -1845,7 +1844,7 @@ public partial class VpnView : UserControl
         // надо знать какой. Говорим, где это делается.
         if (string.IsNullOrWhiteSpace(AppSettings.Load(AppSettings.DefaultPath).PreferredServer))
         {
-            Status.Text = "Автоподбор уже включён. Закрепить сервер — плиткой этого сервера или «выбрать» в списке.";
+            Status.Text = "Автоподбор уже включён. Чтобы закрепить сервер, нажмите его плитку или «выбрать» в списке.";
             return;
         }
 
@@ -1857,8 +1856,8 @@ public partial class VpnView : UserControl
             Reshow();
             ShowPick(settings);
 
-            Status.Text = "Сервер больше не закреплён — выбирается автоподбором по задержке.";
-            this.Offer("Выбор сервера изменён");
+            Status.Text = "Сервер откреплён: снова выбирается самый быстрый по задержке.";
+            this.Offer("Сервер выбран");
         }
         catch (Exception ex)
         {
@@ -1879,7 +1878,7 @@ public partial class VpnView : UserControl
 
             Status.Text = (settings.ForeignExitsOnly
                 ? "Автоподбор берёт только зарубежные выходы."
-                : "Автоподбор берёт любые выходы, включая отечественные.")
+                : "Автоподбор берёт любые выходы, в том числе российские.")
                 + (EngineControl.IsRunning ? " Подействует после перезапуска движков." : string.Empty);
 
             this.Offer("Отбор серверов изменён");
@@ -1968,7 +1967,7 @@ public partial class VpnView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось добавить: " + ex.GetBaseException().Message;
+            Status.Text = "Добавить не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2014,18 +2013,18 @@ public partial class VpnView : UserControl
 
             Status.Text = working
                 ? $"«{name}» в работе: её серверы идут в общий автоподбор. В работе подписок: {inPool}. "
-                  + "Применится при следующем запуске движков."
+                  + "Вступит в силу после следующего запуска движков."
                 : inPool == 0
                     ? $"«{name}» выведена из работы, и в работе не осталось ни одной — VPN будет "
                       + (AppSettings.Load(AppSettings.DefaultPath).WarpEnabled ? "только через WARP." : "недоступен.")
                     : $"«{name}» выведена из работы. В работе подписок: {inPool}. "
-                      + "Применится при следующем запуске движков.";
+                      + "Вступит в силу после следующего запуска движков.";
 
             this.Offer(working ? $"Подписка «{name}» в работе" : $"Подписка «{name}» выведена из работы");
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось переключить: " + ex.GetBaseException().Message;
+            Status.Text = "Переключить не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2076,7 +2075,7 @@ public partial class VpnView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось убрать ключ: " + ex.GetBaseException().Message;
+            Status.Text = "Ключ убрать не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2100,7 +2099,7 @@ public partial class VpnView : UserControl
 
         if (parsed.Count == 0)
         {
-            Status.Text = "Ключ не разбирается: " + errors[0];
+            Status.Text = "Не удалось разобрать ключ: " + errors[0];
             return;
         }
 
@@ -2118,7 +2117,7 @@ public partial class VpnView : UserControl
             _ = LoadAsync();
 
             Status.Text = added.Count == 0
-                ? "Эти ключи уже есть."
+                ? "Такие ключи уже есть."
                 : $"Добавлено: {Count(added.Count, "ключ", "ключа", "ключей")} — в папке «{KeyRing.Name}»."
                   + (errors.Count > 0 ? $" Не разобрались: {errors.Count}." : string.Empty);
 
@@ -2127,7 +2126,7 @@ public partial class VpnView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось добавить ключи: " + ex.GetBaseException().Message;
+            Status.Text = "Добавить ключи не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2189,7 +2188,7 @@ public partial class VpnView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Ссылку открыть не вышло: " + ex.GetBaseException().Message;
+            Status.Text = "Ссылку открыть не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2208,7 +2207,7 @@ public partial class VpnView : UserControl
         if (row is null)
             return;
 
-        row.Detail = "читаю…";
+        row.Detail = "загружаю…";
         Redraw();
 
         var settings = AppSettings.Load(AppSettings.DefaultPath);
@@ -2251,26 +2250,26 @@ public partial class VpnView : UserControl
         if (row.IsKeys)
         {
             var keysMenu = new ContextMenu { PlacementTarget = anchor, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
-            keysMenu.Items.Add(Item("\uE72C", "Обновить", async () => await RefreshOneAsync(name)));
-            keysMenu.Items.Add(Item("\uEC4A", "Тест пинга", async () => await MeasureAsync([row]), row.CanCheck));
-            keysMenu.Items.Add(Item("", "Очистить память замеров", () => ForgetMeasures(row)));
+            keysMenu.Items.Add(Item("\uE72C", "Перечитать", async () => await RefreshOneAsync(name)));
+            keysMenu.Items.Add(Item("\uEC4A", "Проверить отклик", async () => await MeasureAsync([row]), row.CanCheck));
+            keysMenu.Items.Add(Item("", "Забыть результаты замеров", () => ForgetMeasures(row)));
             keysMenu.Items.Add(new Separator { Style = (Style)FindResource("MenuLine") });
-            keysMenu.Items.Add(Item("\uE74D", "Удалить все ключи…", ConfirmRemoveKeys));
+            keysMenu.Items.Add(Item("\uE74D", "Стереть все ключи…", ConfirmRemoveKeys));
             keysMenu.IsOpen = true;
             return;
         }
 
         var menu = new ContextMenu { PlacementTarget = anchor, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
 
-        menu.Items.Add(Item("", "Обновить", async () => await RefreshOneAsync(name)));
-        menu.Items.Add(Item("", "Тест пинга", async () => await MeasureAsync([row]), row.CanCheck));
-        menu.Items.Add(Item("", "Очистить память замеров", () => ForgetMeasures(row)));
+        menu.Items.Add(Item("", "Перечитать", async () => await RefreshOneAsync(name)));
+        menu.Items.Add(Item("", "Проверить отклик", async () => await MeasureAsync([row]), row.CanCheck));
+        menu.Items.Add(Item("", "Забыть результаты замеров", () => ForgetMeasures(row)));
         menu.Items.Add(new Separator { Style = (Style)FindResource("MenuLine") });
-        menu.Items.Add(Item("", first ? "Уже первая" : "Закрепить наверху", () => MoveToTop(name), !first));
-        menu.Items.Add(Item("", "Копировать ссылку", () => CopyUrl(row)));
-        menu.Items.Add(Item("", "Изменить…", () => Edit(row)));
+        menu.Items.Add(Item("", first ? "Уже на первом месте" : "Поднять наверх", () => MoveToTop(name), !first));
+        menu.Items.Add(Item("", "Скопировать ссылку", () => CopyUrl(row)));
+        menu.Items.Add(Item("", "Править…", () => Edit(row)));
         menu.Items.Add(new Separator { Style = (Style)FindResource("MenuLine") });
-        menu.Items.Add(Item("", "Удалить…", () => ConfirmRemove(name)));
+        menu.Items.Add(Item("", "Убрать…", () => ConfirmRemove(name)));
 
         menu.IsOpen = true;
     }
@@ -2287,7 +2286,7 @@ public partial class VpnView : UserControl
     {
         if (_sweeping)
         {
-            Status.Text = "Идёт замер — дождитесь его или остановите.";
+            Status.Text = "Идёт замер: дождитесь конца или остановите его.";
             return;
         }
 
@@ -2300,12 +2299,12 @@ public partial class VpnView : UserControl
 
             Status.Text = forgotten > 0
                 ? $"Память замеров «{row.Entry.Name}» очищена: серверов {forgotten}. Задержки появятся со следующим замером, "
-                  + "нестабильные вернутся в автоподбор при следующем запуске движков."
+                  + "нестабильные вернутся в автоподбор после следующего запуска движков."
                 : $"У «{row.Entry.Name}» в памяти замеров ничего нет.";
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось очистить: " + ex.GetBaseException().Message;
+            Status.Text = "Очистить не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2346,7 +2345,7 @@ public partial class VpnView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось переставить: " + ex.GetBaseException().Message;
+            Status.Text = "Переставить не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2368,7 +2367,7 @@ public partial class VpnView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось скопировать: " + ex.GetBaseException().Message;
+            Status.Text = "Скопировать не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2411,7 +2410,7 @@ public partial class VpnView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось сохранить: " + ex.GetBaseException().Message;
+            Status.Text = "Сохранить не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2419,7 +2418,7 @@ public partial class VpnView : UserControl
     {
         var answer = MessageBox.Show(
             $"Удалить все отдельные ключи ({_book.Keys.Count})? Их серверы уйдут из пула, а ключи придётся вставлять заново.",
-            "Удалить ключи",
+            "Стереть ключи",
             MessageBoxButton.OKCancel,
             MessageBoxImage.Question);
 
@@ -2436,7 +2435,7 @@ public partial class VpnView : UserControl
     {
         var answer = MessageBox.Show(
             $"Удалить подписку «{name}»? Её серверы уйдут из пула, а ссылку придётся вставлять заново.",
-            "Удалить подписку",
+            "Отключить подписку",
             MessageBoxButton.OKCancel,
             MessageBoxImage.Question);
 
@@ -2485,7 +2484,7 @@ public partial class VpnView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось убрать: " + ex.GetBaseException().Message;
+            Status.Text = "Убрать не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2513,8 +2512,8 @@ public partial class VpnView : UserControl
     {
         var menu = new ContextMenu { PlacementTarget = SortButton, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
 
-        menu.Items.Add(Item(_byLatency ? "\uE73E" : string.Empty, "По задержке", () => Sort(byLatency: true)));
-        menu.Items.Add(Item(_byLatency ? string.Empty : "\uE73E", "По порядку подписки", () => Sort(byLatency: false)));
+        menu.Items.Add(Item(_byLatency ? "\uE73E" : string.Empty, "По отклику", () => Sort(byLatency: true)));
+        menu.Items.Add(Item(_byLatency ? string.Empty : "\uE73E", "В порядке подписки", () => Sort(byLatency: false)));
 
         menu.IsOpen = true;
     }
@@ -2522,7 +2521,7 @@ public partial class VpnView : UserControl
     private void Sort(bool byLatency)
     {
         _byLatency = byLatency;
-        SortButton.Content = byLatency ? "По задержке" : "По порядку подписки";
+        SortButton.Content = byLatency ? "По отклику" : "В порядке подписки";
 
         Reshow();
     }
@@ -2555,10 +2554,10 @@ public partial class VpnView : UserControl
         autoPick.Click += OnAutoPickToggle;
         menu.Items.Add(autoPick);
 
-        menu.Items.Add(Item("\uEC4A", "Замерить этот", async () => await MeasureAsync([owner], onlyTag: tag),
+        menu.Items.Add(Item("\uEC4A", "Замерить этот сервер", async () => await MeasureAsync([owner], onlyTag: tag),
             server.Measurable && !_sweeping));
 
-        menu.Items.Add(Item("\uE8C8", "Скопировать адрес", () =>
+        menu.Items.Add(Item("\uE8C8", "Копировать адрес", () =>
         {
             try
             {
@@ -2567,7 +2566,7 @@ public partial class VpnView : UserControl
             }
             catch (Exception ex)
             {
-                Status.Text = "Не скопировалось: " + ex.GetBaseException().Message;
+                Status.Text = "Скопировать не удалось: " + ex.GetBaseException().Message;
             }
         }));
 
@@ -2577,7 +2576,7 @@ public partial class VpnView : UserControl
         {
             menu.Items.Add(new Separator { Style = (Style)FindResource("MenuLine") });
 
-            var remove = Item("\uE74D", "Убрать ключ", () => { });
+            var remove = Item("\uE74D", "Стереть ключ", () => { });
             remove.Tag = tag;
             remove.Click += OnRemoveKey;
             menu.Items.Add(remove);
@@ -2664,7 +2663,7 @@ public partial class VpnView : UserControl
         // Тест пинга одной подписки посреди общего замера оборвал бы его.
         if (_sweeping)
         {
-            Status.Text = "Идёт замер — дождитесь его или остановите.";
+            Status.Text = "Идёт замер: дождитесь конца или остановите его.";
             return;
         }
 
@@ -2793,7 +2792,7 @@ public partial class VpnView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Замер не удался: " + ex.GetBaseException().Message;
+            Status.Text = "Замер не получился: " + ex.GetBaseException().Message;
         }
         finally
         {
@@ -2801,7 +2800,7 @@ public partial class VpnView : UserControl
             _stoppedByHand = false;
 
             MeasureButton.IsEnabled = true;
-            MeasureButton.Content = "Замерить все";
+            MeasureButton.Content = "Замерить все серверы";
 
             Progress.Visibility = Visibility.Collapsed;
 
@@ -2867,7 +2866,7 @@ public partial class VpnView : UserControl
     private async void OnCheckWarp(object sender, RoutedEventArgs e)
     {
         WarpCheckButton.IsEnabled = false;
-        Status.Text = "Спрашиваю движок о задержке WARP…";
+        Status.Text = "Запрашиваю у движка отклик WARP…";
 
         try
         {
@@ -2983,18 +2982,18 @@ public partial class VpnView : UserControl
             // от того, как пройдёт перерисовка. Стояло последним, и любая
             // её заминка съедала уведомление целиком: настройка менялась
             // молча, а человек узнавал об этом в следующий раз.
-            this.Offer($"Выбран {tag}");
+            this.Offer($"Теперь используется {tag}");
 
             Reshow();
 
             Status.Text = switched
                 ? $"Выбран {tag}, и подписка «{row.Owner}» поставлена в работу — иначе "
-                  + "его не было бы в конфиге. Применится при следующем запуске движков."
-                : $"Выбран {tag}. Применится при следующем запуске движков.";
+                  + "его не было бы в конфиге. Вступит в силу после следующего запуска движков."
+                : $"Выбран {tag}. Вступит в силу после следующего запуска движков.";
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать выбор: " + ex.GetBaseException().Message;
+            Status.Text = "Выбор не записался: " + ex.GetBaseException().Message;
         }
     }
 
@@ -3034,14 +3033,14 @@ public partial class VpnView : UserControl
             Reshow();
 
             Status.Text = remove
-                ? $"«{tag}» снова в автоподборе. Применится при следующем запуске движков."
-                : $"«{tag}» убран из автоподбора — выбрать его руками по-прежнему можно. Применится при следующем запуске движков.";
+                ? $"«{tag}» снова в автоподборе. Вступит в силу после следующего запуска движков."
+                : $"«{tag}» убран из автоподбора — выбрать его руками по-прежнему можно. Вступит в силу после следующего запуска движков.";
 
             this.Offer("Автоподбор изменён");
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -3059,7 +3058,7 @@ public partial class VpnView : UserControl
 
         var tiles = new List<QuickTile>
         {
-            new(null, "Авто", "быстрейший", (Brush)FindResource("Muted"),
+            new(null, "Авто", "самый быстрый", (Brush)FindResource("Muted"),
                 null, Visibility.Collapsed, "", icons, Visibility.Visible,
                 Edge(auto), Fill(auto), "Автоподбор: быстрейший из живых", auto),
         };
@@ -3248,7 +3247,7 @@ public partial class VpnView : UserControl
         int servers = _rows.Sum(r => r.Servers.Count);
 
         SubsSummary.Text = _rows.Count == 0
-            ? "нет подписок"
+            ? "подписок нет"
             : $"{working} в работе · {servers} {Plural(servers, "сервер", "сервера", "серверов")}";
     }
 
@@ -3275,7 +3274,7 @@ public partial class VpnView : UserControl
             // выключено» — разницы не было, пока не перезапустили).
             Status.Text = (settings.StableFirst
                 ? "Сначала стабильные: мигающие серверы — мимо автоподбора и после стабильных в ленте."
-                : "Только по задержке: мигающие серверы — наравне со всеми.")
+                : "Только по отклику: нестабильные серверы наравне с остальными.")
                 + (EngineControl.IsRunning ? " Подействует после перезапуска движков." : string.Empty);
 
             this.Offer("Отбор серверов изменён");

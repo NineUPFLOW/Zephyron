@@ -32,7 +32,7 @@ public partial class UpdatePanel : UserControl
 
     public void ShowVersion(AppSettings settings)
     {
-        VersionValue.Text = "Текущая версия: " + UpdateCheck.Current;
+        VersionValue.Text = "Версия сейчас: " + UpdateCheck.Current;
 
         // Найденное при запуске окна (UpdateNotice) показывается сразу —
         // вместе с кнопкой установки, без повторного вопроса GitHub.
@@ -45,8 +45,8 @@ public partial class UpdatePanel : UserControl
         else
         {
             UpdateValue.Text = settings.CheckForUpdates
-                ? "Проверяется при запуске программы."
-                : "Проверка при запуске выключена.";
+                ? "Проверка идёт при запуске программы."
+                : "Проверка при запуске отключена.";
         }
     }
 
@@ -100,7 +100,7 @@ public partial class UpdatePanel : UserControl
         _work = new CancellationTokenSource();
 
         UpdateButton.IsEnabled = false;
-        Say("Спрашиваю GitHub…");
+        Say("Запрашиваю GitHub…");
 
         ReleaseInfo? found = null;
 
@@ -118,18 +118,18 @@ public partial class UpdatePanel : UserControl
             InstallButton.Visibility = _release is null ? Visibility.Collapsed : Visibility.Visible;
 
             UpdateValue.Text = release is null
-                ? "Не удалось узнать: GitHub не ответил."
+                ? "Узнать не удалось: GitHub не ответил."
                 : _release is not null
                     ? $"Есть новее: {release.Version}."
-                    : "Установлена последняя.";
+                    : "Стоит последняя версия.";
         }
         catch (OperationCanceledException)
         {
-            UpdateValue.Text = "Проверка прервана.";
+            UpdateValue.Text = "Проверка остановлена.";
         }
         catch (Exception ex)
         {
-            Say("Не удалось узнать: " + ex.GetBaseException().Message, failed: true);
+            Say("Узнать не удалось: " + ex.GetBaseException().Message, failed: true);
         }
         finally
         {
@@ -195,7 +195,7 @@ public partial class UpdatePanel : UserControl
         {
             var answer = MessageBox.Show(
                 $"Обновить до {_release.Version}?\n\n"
-                + "Сперва скачается архив — обход в это время работает. Потом движки "
+                + "Сперва скачается архив — десинк в это время работает. Потом движки "
                 + "остановятся, программа закроется, "
                 + "файлы заменятся и она откроется снова.\n\n"
                 + "Настройки, свои маршруты и подставленные адреса сохранятся.",
@@ -268,8 +268,8 @@ public partial class UpdatePanel : UserControl
         }
         catch (Exception ex)
         {
-            Say("Обновиться не вышло: " + ex.GetBaseException().Message, failed: true);
-            InstallButton.Content = "Обновить";
+            Say("Обновить не получилось: " + ex.GetBaseException().Message, failed: true);
+            InstallButton.Content = "Установить";
 
             InstallButton.IsEnabled = true;
             UpdateButton.IsEnabled = true;
@@ -302,7 +302,7 @@ public partial class UpdatePanel : UserControl
                 File.WriteAllText(notes, _release.Notes);
             }
 
-            var size = _release.ArchiveSize > 0 ? $"{_release.ArchiveSize / 1048576.0:0} МБ" : "Архив";
+            var size = _release.ArchiveSize > 0 ? $"{_release.ArchiveSize / 1048576.0:0} МБ" : "Файл архива";
             var downloaded = size + (via.Length > 0 ? via : " напрямую");
 
             var start = new ProcessStartInfo(copy)

@@ -204,6 +204,12 @@ public static class WinwsCommandLine
                 arguments.Add($"--lua-desync={step}");
         }
 
+        // Видео YouTube — только по TCP: его и мерят проверка с автоподбором. Замер 05.11,
+        // новые соединения через десинк: QUIC к зарубежным узлам Google сбоил в 7–12 из 25,
+        // TCP к тому же redirector — 0 из 25. Браузер без QUIC сразу идёт по TCP.
+        if (preset.Sections.Any(s => s.RawArguments.Any(a => a.Contains("googlevideo", StringComparison.OrdinalIgnoreCase))))
+            arguments.AddRange(NoYouTubeQuic);
+
         foreach (var section in preset.Sections)
         {
             arguments.Add("--new");
@@ -243,8 +249,39 @@ public static class WinwsCommandLine
             arguments.AddRange(section.RawArguments);
         }
 
+        // Страховка последним профилем: приветствие Chrome идёт двумя пакетами, и если имя
+        // не собралось, секция по списку доменов пакет пропустит (вики Zapret, 27.10), а адрес
+        // виден сразу. Рецепт — той же секции. Кэши у провайдера в список не входят.
+        if (preset.Sections.FirstOrDefault(IsVideoTcp) is { } video)
+        {
+            arguments.Add("--new");
+            arguments.Add("--name=Zephyron: googlevideo по адресу");
+            arguments.Add("--ipset=lists/ipset-googlevideo.txt");
+            arguments.AddRange(video.RawArguments.Where(a =>
+                !a.StartsWith("--name=", StringComparison.Ordinal)
+                && !a.StartsWith("--hostlist", StringComparison.Ordinal)));
+        }
+
         return arguments;
     }
+
+    private static bool IsVideoTcp(ZapretSection section) =>
+        section.RawArguments.Any(a => a.StartsWith("--hostlist=", StringComparison.Ordinal) && a.Contains("googlevideo", StringComparison.OrdinalIgnoreCase))
+        && section.RawArguments.Any(a => a.StartsWith("--filter-tcp=", StringComparison.Ordinal))
+        && !section.RawArguments.Any(a => a.StartsWith("--filter-udp=", StringComparison.Ordinal));
+
+    private static readonly string[] NoYouTubeQuic =
+    [
+        "--new",
+        "--name=Zephyron: YouTube без QUIC",
+        "--filter-udp=443",
+        "--filter-l7=quic",
+        "--hostlist=lists/googlevideo.txt",
+        "--hostlist=lists/youtube.txt",
+        "--out-range=-n8",
+        "--payload=all",
+        "--lua-desync=drop",
+    ];
 
     /// <summary>
     /// Профиль-щит: имена «не трогать» проходят мимо всего десинка.

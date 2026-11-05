@@ -79,7 +79,7 @@
                                             Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentLine}"
                                             BorderThickness="{StaticResource Stroke}"
                                             Visibility="{Binding ActiveShown}">
-                                        <TextBlock Text="В работе" FontSize="12" Foreground="{DynamicResource Accent}" />
+                                        <TextBlock Text="Используется" FontSize="12" Foreground="{DynamicResource Accent}" />
                                     </Border>
                                 </Grid>
 
@@ -131,7 +131,7 @@
                                 <TextBlock Text="{Binding Announce}" Margin="0,5,0,0" TextWrapping="Wrap"
                                            FontSize="13" Foreground="{DynamicResource Text}"
                                            Visibility="{Binding AnnounceShown}"
-                                           ToolTip="Объявление поставщика подписки" />
+                                           ToolTip="Сообщение от поставщика подписки" />
                             </StackPanel>
 
                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
@@ -143,7 +143,7 @@
                                 <ToggleButton Style="{StaticResource Switch}" Margin="0,0,14,0"
                                               VerticalAlignment="Center"
                                               IsChecked="{Binding Active, Mode=OneWay}"
-                                              ToolTip="В работе: серверы этой подписки идут в пул движка"
+                                              ToolTip="Используется: серверы этой подписки входят в общий пул"
                                               Tag="{Binding Name}" Click="OnActivate" />
 
                                 <!--
@@ -156,18 +156,18 @@
                                     их назвал (support-url, profile-web-page-url).
                                 -->
                                 <Button Style="{StaticResource IconGhost}" Content="&#xE8F2;"
-                                        Margin="0,0,6,0" ToolTip="{Binding SupportTip}" AutomationProperties.Name="Поддержка поставщика"
+                                        Margin="0,0,6,0" ToolTip="{Binding SupportTip}" AutomationProperties.Name="Связаться с поставщиком"
                                         Visibility="{Binding SupportShown}"
                                         Tag="{Binding Name}" Click="OnSupport" />
 
                                 <Button Style="{StaticResource IconGhost}" Content="&#xE8A7;"
-                                        Margin="0,0,6,0" ToolTip="Страница подписки у поставщика: продлить, сменить тариф"
+                                        Margin="0,0,6,0" ToolTip="Страница подписки у поставщика: продлить или сменить тариф"
                                         AutomationProperties.Name="Страница подписки"
                                         Visibility="{Binding WebPageShown}"
                                         Tag="{Binding Name}" Click="OnWebPage" />
 
                                 <Button Style="{StaticResource IconGhost}" Content="&#xE72C;"
-                                        Margin="0,0,6,0" ToolTip="Обновить: перечитать подписку" AutomationProperties.Name="Обновить подписку"
+                                        Margin="0,0,6,0" ToolTip="Обновить: заново прочитать подписку" AutomationProperties.Name="Обновить подписку"
                                         Tag="{Binding Name}" Click="OnRefreshOne" />
 
                                 <Button Style="{StaticResource IconGhost}" Content="&#xEC4A;"
@@ -177,7 +177,7 @@
                             </StackPanel>
 
                             <Button Grid.Column="3" Style="{StaticResource IconGhost}" Content="&#xE712;" VerticalAlignment="Center"
-                                    ToolTip="Ещё: закрепить, скопировать ссылку, изменить, удалить"
+                                    ToolTip="Дополнительно: закрепить, скопировать ссылку, изменить, удалить"
                                     AutomationProperties.Name="Ещё: действия с подпиской"
                                     Tag="{Binding Name}" Click="OnMore" />
                         </Grid>
@@ -237,11 +237,11 @@
                                            Margin="0,0,8,0" />
                                 <ToggleButton Style="{StaticResource Switch}" Margin="0,0,14,0" VerticalAlignment="Center"
                                               IsChecked="{Binding Auto, Mode=OneWay}" IsEnabled="{Binding CanSwitch}"
-                                              ToolTip="Автоподбор внутри пула: берёт быстрейший живой сервер. Выключите — пул держится одного сервера: выбранного прежде или быстрейшего сейчас"
+                                              ToolTip="Автоподбор внутри пула: берётся самый быстрый из живых. Если выключить, пул держится за один сервер: выбранный раньше или самый быстрый."
                                               ToolTipService.ShowOnDisabled="True"
                                               Click="OnPoolAuto" />
                                 <Button Style="{StaticResource IconGhost}" Content="&#xE712;" VerticalAlignment="Center"
-                                        ToolTip="Ещё: переименовать, удалить" AutomationProperties.Name="Ещё: действия с пулом"
+                                        ToolTip="Дополнительно: переименовать, удалить" AutomationProperties.Name="Ещё: действия с пулом"
                                         Click="OnPoolMore" />
                             </StackPanel>
                         </Grid>
@@ -314,8 +314,8 @@
                                                 Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentLine}"
                                                 BorderThickness="{StaticResource Stroke}"
                                                 Visibility="{Binding NowShown}"
-                                                ToolTip="Через этот сервер трафик идёт сейчас">
-                                            <TextBlock Text="Сейчас" FontSize="12" Foreground="{DynamicResource Text}" />
+                                                ToolTip="Сейчас трафик идёт через этот сервер">
+                                            <TextBlock Text="Идёт сейчас" FontSize="12" Foreground="{DynamicResource Text}" />
                                         </Border>
 
                                         <!-- Тот же узел под другим именем в этой подписке: «копия <имя>». -->
@@ -384,10 +384,10 @@
                             </StackPanel>
 
                             <Grid Grid.Column="7" Width="108" Margin="0,0,8,0">
-                                <Button Style="{StaticResource Primary}" Content="Выбран" Padding="14,7"
+                                <Button Style="{StaticResource Primary}" Content="Текущий" Padding="14,7"
                                         IsHitTestVisible="False" Focusable="False"
                                         Visibility="{Binding ChosenShown}" />
-                                <Button Style="{StaticResource Ghost}" Content="Выбрать" Padding="14,7"
+                                <Button Style="{StaticResource Ghost}" Content="Взять" Padding="14,7"
                                         Visibility="{Binding ChooseShown}"
                                         Tag="{Binding Tag}" Click="OnChoose" />
                             </Grid>
@@ -397,7 +397,7 @@
                                 о котором никто не знал (владелец 12.10).
                             -->
                             <Button Grid.Column="8" Style="{StaticResource IconGhost}" Content="&#xE712;"
-                                    ToolTip="Ещё: автоподбор, замер, адрес" AutomationProperties.Name="Ещё: действия с сервером"
+                                    ToolTip="Дополнительно: автоподбор, замер, адрес" AutomationProperties.Name="Ещё: действия с сервером"
                                     VerticalAlignment="Center"
                                     Tag="{Binding Tag}" Click="OnServerMenu" />
                         </Grid>
@@ -417,21 +417,21 @@
 
                 <ContentControl Style="{StaticResource PageHead}"
                                 local:PageHead.Title="VPN"
-                                local:PageHead.Subtitle="Подписки, их серверы и то, через что идёт трафик.">
+                                local:PageHead.Subtitle="Подписки, их серверы и маршрут, по которому идёт трафик.">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="RefreshButton" Style="{StaticResource Ghost}"
-                                Content="Обновить" Click="OnRefresh" Margin="0,0,8,0" />
+                                Content="Перечитать" Click="OnRefresh" Margin="0,0,8,0" />
                         <!--
                             Настройки — отдельным окном. То, что задают
                             однажды, не должно занимать полосу над списком,
                             который смотрят каждый раз.
                         -->
                         <Button x:Name="SettingsButton" Style="{StaticResource Ghost}"
-                                Content="Настройки" Click="OnSettings" Margin="0,0,8,0"
-                                ToolTip="Режим, автоподбор по зарубежным, обход туннеля при мёртвых выходах, проверка серверов." />
+                                Content="Параметры" Click="OnSettings" Margin="0,0,8,0"
+                                ToolTip="Режим, автоподбор по зарубежным, обход туннеля при недоступных выходах, проверка серверов." />
 
                         <Button x:Name="MeasureButton" Style="{StaticResource Primary}"
-                                Content="Замерить все" Click="OnMeasure" />
+                                Content="Замерить все серверы" Click="OnMeasure" />
                     </StackPanel>
                 </ContentControl>
 
@@ -521,19 +521,19 @@
 
                                     <StackPanel Orientation="Horizontal" Margin="0,0,8,0">
                                         <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE71B;" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                        <TextBlock Style="{StaticResource Caption}" Text="Протокол" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                        <TextBlock Style="{StaticResource Caption}" Text="Тип протокола" Margin="0,0,6,0" VerticalAlignment="Center" />
                                         <TextBlock x:Name="StatProtocol" Text="—" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
 
                                     <StackPanel Orientation="Horizontal" Margin="0,0,8,0">
                                         <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE943;" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                        <TextBlock Style="{StaticResource Caption}" Text="Реализация" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                        <TextBlock Style="{StaticResource Caption}" Text="Исполнение" Margin="0,0,6,0" VerticalAlignment="Center" />
                                         <TextBlock x:Name="StatKind" Text="—" VerticalAlignment="Center" />
                                     </StackPanel>
 
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE8B7;" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                        <TextBlock Style="{StaticResource Caption}" Text="Источник" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                        <TextBlock Style="{StaticResource Caption}" Text="Откуда" Margin="0,0,6,0" VerticalAlignment="Center" />
                                         <TextBlock x:Name="StatSource" Text="—" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                 </UniformGrid>
@@ -629,7 +629,7 @@
                                     </StackPanel>
 
                                     <Button Grid.Column="1" x:Name="ShowAllButton" Style="{StaticResource Ghost}"
-                                            Content="Показать все" Click="OnShowAll" VerticalAlignment="Top" />
+                                            Content="Раскрыть все" Click="OnShowAll" VerticalAlignment="Top" />
                                 </Grid>
 
                                 <Grid Margin="0,10,0,0">
@@ -640,7 +640,7 @@
                                     </Grid.ColumnDefinitions>
 
                                     <Button Grid.Column="0" Style="{StaticResource IconGhost}" Content="&#xE76B;"
-                                            VerticalAlignment="Center" ToolTip="Назад" AutomationProperties.Name="Лента серверов: назад" Click="OnQuickLeft" />
+                                            VerticalAlignment="Center" ToolTip="Влево" AutomationProperties.Name="Лента серверов: назад" Click="OnQuickLeft" />
 
                                     <ScrollViewer Grid.Column="1" x:Name="QuickScroll" Margin="6,0"
                                                   HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
@@ -682,7 +682,7 @@
                                     </ScrollViewer>
 
                                     <Button Grid.Column="2" Style="{StaticResource IconGhost}" Content="&#xE76C;"
-                                            VerticalAlignment="Center" ToolTip="Дальше" AutomationProperties.Name="Лента серверов: дальше" Click="OnQuickRight" />
+                                            VerticalAlignment="Center" ToolTip="Вправо" AutomationProperties.Name="Лента серверов: дальше" Click="OnQuickRight" />
                                 </Grid>
 
                                 <Border Height="1" Background="{DynamicResource Border}" Margin="0,10,0,8" />
@@ -697,15 +697,15 @@
                                                       VerticalAlignment="Center" Click="OnForeign" />
                                         <TextBlock Text="Только зарубежные" Margin="10,0,0,0" VerticalAlignment="Center" />
                                         <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                        Content="Автоподбор не берёт отечественные выходы. Подбор идёт по задержке и потому сползает на ближайший сервер — свой же, а через него не работает ровно то, ради чего туннель обычно и нужен: адрес остаётся отечественным, и отказ по стране приходит тот же, что без туннеля.&#x0a;&#x0a;Выбрать отечественный плиткой или в списке это не мешает. Применяется при следующем запуске движков." />
+                                                        Content="Автоподбор не берёт отечественные выходы. Подбор идёт по задержке и потому сползает на ближайший сервер — свой же, а через него не работает ровно то, ради чего туннель обычно и нужен: адрес остаётся отечественным, и отказ по стране приходит тот же, что напрямую.&#x0a;&#x0a;Выбрать отечественный плиткой или в списке это не мешает. Применяется после следующего запуска движков." />
                                     </StackPanel>
 
                                     <StackPanel Orientation="Horizontal" Margin="0,0,32,4">
                                         <ToggleButton x:Name="StableSwitch" Style="{StaticResource Switch}"
                                                       VerticalAlignment="Center" Click="OnStable" />
-                                        <TextBlock Text="Сначала стабильные" Margin="10,0,0,0" VerticalAlignment="Center" />
+                                        <TextBlock Text="Стабильные выше" Margin="10,0,0,0" VerticalAlignment="Center" />
                                         <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                        Content="Нестабильные — серверы, что работают через раз: из последних пяти и больше замеров удачных меньше четырёх из пяти. Они жёлтые в списке.&#x0a;&#x0a;Включено — автоподбор их не берёт, а в ленте и при сортировке по задержке они идут после стабильных. Выключено — только по задержке, как все.&#x0a;&#x0a;Выбрать нестабильный руками можно всегда. Автоподбор меняется при следующем запуске движков." />
+                                                        Content="Нестабильные — серверы, что работают через раз: из последних пяти и больше замеров удачных меньше четырёх из пяти. Они жёлтые в списке.&#x0a;&#x0a;Включено — автоподбор их не берёт, а в ленте и при сортировке по задержке они идут после стабильных. Выключено — только по задержке, как все.&#x0a;&#x0a;Выбрать нестабильный руками можно всегда. Автоподбор меняется после следующего запуска движков." />
                                     </StackPanel>
 
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
@@ -713,7 +713,7 @@
                                                       VerticalAlignment="Center" Click="OnKillSwitch" />
                                         <TextBlock Text="Kill switch" Margin="10,0,0,0" VerticalAlignment="Center" />
                                         <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                        Content="«Туннель»: пока туннель не работает — упал, перезапускается или ждёт сервера, — трафик мимо него с вашего адреса не уходит вовсе: выходить в сеть мимо туннеля могут лишь сам движок, Zephyron и локальная сеть (роутер, принтеры, Radmin и Hamachi). Новый адаптер — второй Wi-Fi, телефон по USB — закрывается сразу, как появится.&#x0a;&#x0a;«Гибрид»: десинк и «напрямую» работают как обычно, а имена «через VPN» не уводятся мимо туннеля, когда выходы подписки молчат, — ждут, пока сервер оживёт. Пока движок туннеля перезапускается, они могут уйти напрямую.&#x0a;&#x0a;В обоих режимах «Обход туннеля» в настройках туннеля не действует.&#x0a;&#x0a;Не включается, если рядом работает другой обход на WinDivert (GoodbyeDPI, Zapret): его пакеты Windows видит без имени программы, и фильтр закрыл бы ими сам туннель.&#x0a;&#x0a;Фильтры Windows держит надзор: остановили движки или закрыли программу — Windows снимает их сама, сеть не остаётся закрытой.&#x0a;&#x0a;По умолчанию выключен. Применяется при следующем запуске движков." />
+                                                        Content="«Туннель»: пока туннель не работает — упал, перезапускается или ждёт сервера, — трафик мимо него с вашего адреса не уходит вовсе: выходить в сеть мимо туннеля могут лишь сам движок, Zephyron и локальная сеть (роутер, принтеры, Radmin и Hamachi). Новый адаптер — второй Wi-Fi, телефон по USB — закрывается сразу, как появится.&#x0a;&#x0a;«Гибрид»: десинк и «напрямую» работают как обычно, а имена «через VPN» не уводятся мимо туннеля, когда выходы подписки молчат, — ждут, пока сервер оживёт. Пока движок туннеля перезапускается, они могут уйти напрямую.&#x0a;&#x0a;В обоих режимах «Обход туннеля» в настройках туннеля не действует.&#x0a;&#x0a;Не включается, если рядом работает другой десинк на WinDivert (GoodbyeDPI, Zapret): его пакеты Windows видит без имени программы, и фильтр закрыл бы ими сам туннель.&#x0a;&#x0a;Фильтры Windows держит надзор: остановили движки или закрыли программу — Windows снимает их сама, сеть не остаётся закрытой.&#x0a;&#x0a;По умолчанию выключен. Применяется после следующего запуска движков." />
                                     </StackPanel>
                                 </WrapPanel>
                             </StackPanel>
@@ -748,7 +748,7 @@
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                     <TextBlock Text="Cloudflare WARP" FontWeight="SemiBold" VerticalAlignment="Center" />
                                     <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                Content="Бесплатный выход Cloudflare: без счёта, без срока, без почты и ключей — учётную запись движок заводит себе сам.&#x0a;&#x0a;Это выбор пути: включённый WARP ставит подписки на паузу, и весь туннель идёт через него. Выключили — туннель вернётся к подпискам и к выбранному там серверу. Применяется при следующем запуске движков.&#x0a;&#x0a;Выпускает трафик в ближайшем городе Cloudflare, из России — в Москве. От блокировок оператора спасает, от отказов по стране — нет: адрес остаётся отечественным.&#x0a;&#x0a;Идёт по MASQUE поверх HTTP/2 на 443 порту. После запуска ему нужно около полуминуты, прежде чем пойдёт трафик." />
+                                                Content="Бесплатный выход Cloudflare: без счёта, без срока, без почты и ключей — учётную запись движок заводит себе сам.&#x0a;&#x0a;Это выбор пути: включённый WARP ставит подписки на паузу, и весь туннель идёт через него. Выключили — туннель вернётся к подпискам и к выбранному там серверу. Применяется после следующего запуска движков.&#x0a;&#x0a;Выпускает трафик в ближайшем городе Cloudflare, из России — в Москве. От блокировок оператора спасает, от отказов по стране — нет: адрес остаётся отечественным.&#x0a;&#x0a;Идёт по MASQUE поверх HTTP/2 на 443 порту. После запуска ему нужно около полуминуты, прежде чем пойдёт трафик." />
                                 </StackPanel>
 
                                 <ToggleButton Grid.Column="2" x:Name="WarpSwitch" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="OnWarp" />
@@ -788,9 +788,9 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Grid.Column="0" Text="Пулы серверов" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="0" Text="Группы серверов" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
 
-                    <Button Grid.Column="2" Style="{StaticResource Ghost}" Content="Новый пул" Click="OnNewPool" />
+                    <Button Grid.Column="2" Style="{StaticResource Ghost}" Content="Создать пул" Click="OnNewPool" />
                 </Grid>
 
                 <TextBlock x:Name="PoolsLine" Style="{StaticResource Caption}" Margin="4,8,0,0" TextWrapping="Wrap" />
@@ -815,9 +815,9 @@
 
                     <StackPanel Grid.Column="3" Orientation="Horizontal">
                         <Button x:Name="SortButton" Style="{StaticResource Ghost}" gui:ButtonGlyph.Menu="True"
-                                Content="По порядку подписки" Click="OnSort" Margin="0,0,8,0" />
+                                Content="В порядке подписки" Click="OnSort" Margin="0,0,8,0" />
                         <Button x:Name="AddToggle" Style="{StaticResource Ghost}"
-                                Content="Добавить подписку" Click="OnAddToggle" />
+                                Content="Подключить подписку" Click="OnAddToggle" />
                     </StackPanel>
                 </Grid>
 
@@ -833,7 +833,7 @@
                         <Control Style="{StaticResource StateMark}" Tag="Degraded" Margin="0,1,10,0" VerticalAlignment="Top" />
                         <TextBlock x:Name="PausedLine" Grid.Column="1" Style="{StaticResource Caption}" TextWrapping="Wrap"
                                    Foreground="{DynamicResource Text}" Visibility="Collapsed"
-                                   Text="На паузе: туннель идёт через WARP. Выключите WARP выше — и он вернётся к подпискам." />
+                                   Text="Подписки приостановлены: туннель идёт через WARP. Выключите WARP выше, и он вернётся к подпискам." />
                     </Grid>
                 </Border>
 
@@ -851,7 +851,7 @@
                         </Grid.ColumnDefinitions>
                         <Control x:Name="StatusMark" Style="{StaticResource StateMark}" Visibility="Collapsed"
                                  VerticalAlignment="Top" Margin="0,1,10,0" />
-                        <TextBlock x:Name="Status" Grid.Column="1" TextWrapping="Wrap" Text="Читаю подписки…">
+                        <TextBlock x:Name="Status" Grid.Column="1" TextWrapping="Wrap" Text="Загружаю подписки…">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock" BasedOn="{StaticResource Caption}">
                                     <Style.Triggers>

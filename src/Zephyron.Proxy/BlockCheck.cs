@@ -215,6 +215,28 @@ public enum BlockKind
     /// решает браузер — открылся там, отказали только пробе.
     /// </remarks>
     Forbidden,
+
+    /// <summary>
+    /// Короткое приветствие проходит, длинное — браузерное, с постквантовым ключом, — нет.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// С ключом ML-KEM приветствие браузера под две тысячи байт и уходит двумя
+    /// пакетами TCP. На ntc.party (тема 17013, 29.10–02.11) у сайтов Cloudflare
+    /// на 188.114.96.0/22, 104.16.0.0/12 и 172.64.0.0/13 такое приветствие резали:
+    /// Chrome 124+, Firefox 132+ и свежий curl не открывали сайт, curl без ключа
+    /// и Chrome 123 открывали. 02.11 блок сняли.
+    /// </para>
+    /// <para>
+    /// Судит чужое имя, а не своё: под десинком своё имя проходит через раз
+    /// (obsidian.md на 104.26.1.147 — длинное 1 из 4, короткое 2 из 4, мимо
+    /// десинка 0 из 4 оба, а example.com — 4 из 4 любой длины). Почерк блока —
+    /// длинное с example.com не проходит, короткое с ним же проходит. Только на
+    /// адресах Cloudflare (<see cref="CloudflareNet"/>): там это видели, а лишнее
+    /// соединение к каждому открытому имени дорого.
+    /// </para>
+    /// </remarks>
+    LongHello,
 }
 
 /// <summary>Исход одной пробы.</summary>
@@ -423,6 +445,15 @@ public sealed record TargetReport
     public bool TunnelMissed => ExpectedTunnel && !Tunnelled;
 
     /// <summary>
+    /// Нейросеть, закрытая по стране (<see cref="CountryClosed"/>), шла мимо туннеля
+    /// и не прибита в hosts: первым советом — пин на посредника, VPN — вторым.
+    /// </summary>
+    /// <remarks>
+    /// Пин дешевле VPN: ни трафика подписки, ни подписки вовсе, а посредник
+    /// отвечает из-за границы.
+    /// </remarks>
+    public bool PinFirst { get; init; }
+    /// <summary>
     /// Общее имя ECH из записи HTTPS; <c>null</c> — ECH у имени нет или не спрашивали.
     /// </summary>
     /// <remarks>
@@ -490,6 +521,7 @@ public sealed record TargetReport
         BlockKind.Dns => "резолвер даёт нерабочий адрес",
         BlockKind.GeoBlock => "сайт отказывает по стране",
         BlockKind.Forbidden => "сайт отказал, причину не назвал",
+        BlockKind.LongHello => "режут длинное приветствие браузера",
         BlockKind.BrokenCname => "оборванный CNAME",
 
         // «Сторона не даёт наш TLS» звучало приговором сайту, а замер
@@ -532,7 +564,7 @@ public sealed record TargetReport
                 // Открытому объяснять нечего — кроме молчащего QUIC: по TCP открыт, а браузер подвиснет.
                 BlockKind.None => Data.QuicSilent == true ? Data : null,
                 BlockKind.GeoBlock or BlockKind.Forbidden or BlockKind.Stall => Data,
-                BlockKind.TlsDpi or BlockKind.Handshake => Tls,
+                BlockKind.TlsDpi or BlockKind.Handshake or BlockKind.LongHello => Tls,
                 BlockKind.HttpsPort or BlockKind.Full or BlockKind.Dns
                     or BlockKind.Sinkhole or BlockKind.BrokenCname => Tcp,
                 BlockKind.TunnelFailed or BlockKind.ForeignFakeIp or BlockKind.RouterFakeIp
@@ -555,27 +587,6 @@ public sealed record TargetReport
                 : detail;
         }
     }
-
-    /// <summary>
-    /// Мог ли этот вердикт возникнуть от тесноты, а не от блокировки.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Различие измеримое, и оно измерено: <c>whatsapp.net</c> в прогоне
-    /// на семьдесят одну цель выходил «закрыт полностью», а он же в прогоне
-    /// на четыре — «доступен». Сеть та же, имя то же, разница только
-    /// в том, сколько проб шло рядом.
-    /// </para>
-    /// <para>
-    /// Сюда попадают вердикты, которые ставятся по неполученному ответу:
-    /// не встало соединение, не прошло рукопожатие, замер поток. Все они
-    /// неотличимы от «нам не хватило полосы». А вот заглушка в DNS,
-    /// оборванный CNAME и отказ по стране получены по ответу, который пришёл,
-    /// — теснота такого не подделает, и перепроверять их незачем.
-    /// </para>
-    /// </remarks>
-    public bool MayBeCrowding => Kind is BlockKind.Full or BlockKind.HttpsPort
-        or BlockKind.TlsDpi or BlockKind.Stall or BlockKind.TunnelFailed;
 
     /// <summary>
     /// Чем лечится.
@@ -602,8 +613,11 @@ public sealed record TargetReport
         // не поможет: в отчёте 27.10 оба таких имени (notion.so, elevenlabs.io)
         // были прибиты.
         BlockKind.Dns => "свой DNS, а прибитое в hosts — снять пин",
+        BlockKind.GeoBlock when PinFirst => "пин на посредника («Маршруты» → сервис → кнопка-булавка), "
+            + "не нашёлся рабочий — VPN с выходом не в России; десинк не поможет",
         BlockKind.GeoBlock => "только VPN — десинк не поможет",
         BlockKind.Forbidden => "открыть в браузере: открывается — ничего не нужно, отказ и там — VPN",
+        BlockKind.LongHello => "десинк или другой адрес Cloudflare в hosts (8.47.69.x, 8.6.112.x не резали), иначе VPN",
         BlockKind.BrokenCname => "подставить адрес",
         // Браузеру этот сайт открывается: у него приветствие TLS другое
         // по составу — с GREASE, с расширениями, которых SChannel не шлёт
@@ -672,6 +686,13 @@ public static class BlockCheck
     /// </remarks>
     private const int EnoughBytes = 256 * 1024;
 
+    /// <summary>Сервер видео YouTube: страницы у него нет, и проба меряет его объёмом.</summary>
+    internal static bool IsVideoNode(string host) =>
+        System.Text.RegularExpressions.Regex.IsMatch(host, @"^(rr\d+---sn-[a-z0-9-]+|redirector)\.googlevideo\.com$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    /// <summary>Сколько прокачать через сервер видео: с запасом выше поздней заморозки.</summary>
+    private const int NodeBytes = 64 * 1024;
+
     /// <summary>
     /// Выясняет, что доступно в принципе.
     /// </summary>
@@ -725,15 +746,15 @@ public static class BlockCheck
     }
 
     /// <summary>
-    /// Проверяет цель, перепроверяя неудачу.
+    /// Проверяет цель одной пробой.
     /// </summary>
     /// <remarks>
-    /// Одиночная проба выносит приговор по одному соединению, а разовый
-    /// таймаут случается и на исправной сети. Проверено на себе:
-    /// <c>updates.discord.com</c> был объявлен закрытым полностью, а при
-    /// повторе оказался доступен по всем протоколам — оба порта открыты,
-    /// имя резолвится. Средству, по которому правят пресет, такое
-    /// непозволительно.
+    /// До 03.11 неудача пробовалась трижды: второй заход здесь же и третий —
+    /// «в тишине», по одному, после всего прогона. Повторы ловили разовый
+    /// таймаут и тесноту, но платили за них закрытые имена, и дорого:
+    /// замер 19.10 на 166 именах — 74 с перепроверки из 178, вердикт сменился
+    /// у одного имени из восьми. Пробы идут по восемь, и решено мерить один раз.
+    /// Цена: разовый таймаут сразу становится вердиктом.
     /// </remarks>
     /// <param name="throughTunnel">
     /// Имя заведено в туннель — тогда вердикты про DPI к нему неприменимы.
@@ -744,63 +765,9 @@ public static class BlockCheck
         CancellationToken cancellationToken,
         bool throughTunnel = false)
     {
-        var first = await ProbeAsync(host, service, cancellationToken, throughTunnel);
-
-        // Отказ самого сайта второй заход не изменит, а время удвоит.
-        if (first.Kind is BlockKind.None or BlockKind.Forbidden)
-            return first;
-
-        // Прерывание проверяется здесь, а не только внутри проб. Первый заход
-        // уже провалился, значит второй пойдёт по всем стадиям с их таймаутами,
-        // и прерывание, поданное между заходами, ждало бы их все. В окне это
-        // выглядело так, будто «Прервать» не работает вовсе.
-        cancellationToken.ThrowIfCancellationRequested();
-
-        // Второй заход только для неудач: подтверждать успех незачем,
-        // а вот обвинять с одного раза нельзя.
-        var second = await ProbeAsync(host, service, cancellationToken, throughTunnel);
-
-        return second.Kind == BlockKind.None ? second : Worse(first, second);
+        return await ProbeAsync(host, service, cancellationToken, throughTunnel);
     }
 
-    /// <summary>
-    /// Из двух неудачных проб берёт ту, что говорит о меньшем.
-    /// </summary>
-    /// <remarks>
-    /// Если один заход показал живой TCP, а другой нет, верить надо первому:
-    /// достучаться до закрытого маршрута нельзя, а не достучаться до живого —
-    /// запросто.
-    /// </remarks>
-    private static TargetReport Worse(TargetReport a, TargetReport b) =>
-        a.Kind == BlockKind.Full && b.Kind != BlockKind.Full ? b : a;
-
-    /// <summary>
-    /// Одна проба без повтора — для перепроверки в тишине.
-    /// </summary>
-    /// <remarks>
-    /// Повтор внутри <see cref="CheckAsync"/> здесь был бы лишним: тот, кто
-    /// зовёт этот метод, сам и есть повтор. Двойная проба удвоила бы ожидание
-    /// ровно там, где его и так больше всего — на именах, которые молчат.
-    /// </remarks>
-    public static Task<TargetReport> ProbeOnceAsync(
-        string host,
-        string? service,
-        CancellationToken cancellationToken,
-        bool throughTunnel = false) =>
-        ProbeAsync(host, service, cancellationToken, throughTunnel);
-
-    /// <summary>
-    /// Сводит вердикт из общего прогона с вердиктом из одиночного.
-    /// </summary>
-    /// <remarks>
-    /// Одиночному верим больше, но только когда он говорит о лучшем.
-    /// Ухудшение при повторе — это разовая неудача второй пробы, и повышать
-    /// по ней приговор значило бы обвинять по слабейшему из двух замеров.
-    /// </remarks>
-    public static TargetReport Reconcile(TargetReport crowded, TargetReport alone) =>
-        alone.Kind == BlockKind.None || (crowded.Kind == BlockKind.Full && alone.Kind != BlockKind.Full)
-            ? alone
-            : crowded;
 
     /// <summary>
     /// Меряет имя нарочно через туннель, чем бы его ни вели правила.
@@ -1182,6 +1149,25 @@ public static class BlockCheck
             ? await CutAsync(answered, cancellationToken)
             : null;
 
+        // Режут адрес по длинному приветствию — а короткое с чужим именем пройдёт?
+        // Тогда режут длину (BlockKind.LongHello), и совет «только VPN» был бы неверен.
+        if (cut == CutBy.Address && CloudflareNet.Contains(answered)
+            && Got(await BrowserHello.AskAsync(answered!, NeutralNames[0], Timeout, cancellationToken, compact: true)))
+        {
+            kind = BlockKind.LongHello;
+            tls = tls with { Detail = Join(tls.Detail, ShortPassed) };
+            cut = null;
+        }
+
+        // Системное приветствие прошло — а браузерное, длинное, пройдёт ли?
+        // Только у Cloudflare: там его и резали.
+        if (kind == BlockKind.None && !viaTunnel && CloudflareNet.Contains(answered)
+            && await LongHelloCutAsync(answered!, cancellationToken) is { } longCut)
+        {
+            kind = BlockKind.LongHello;
+            tls = tls with { Detail = Join(tls.Detail, longCut) };
+        }
+
         // К TLS, а не к данным: «почему» у DPI по TLS читается из стадии TLS (Why).
         if (cut is { } by)
             tls = tls with { Detail = (tls.Detail is { Length: > 0 } said ? said + "; " : string.Empty) + CutText(by) };
@@ -1213,6 +1199,12 @@ public static class BlockCheck
         // на чужой прокси). Это тот же случай, что пин на молчащий адрес.
         (kind, tcp) = WithSpoof(kind, tcp, spoof);
 
+        // Нейросеть, закрытая по стране, мимо туннеля и без пина: страница
+        // могла и открыться (Gemini), но отказ придёт на запрос — вердикт по
+        // списку. С пином имя отвечает посредник из-за границы — его не трогаем.
+        var pinFirst = !viaTunnel && CountryClosed.Covers(host) && PinnedTo(host, real) is null;
+        (kind, data) = ClosedByCountry(kind, data, pinFirst);
+
         return new TargetReport
         {
             Host = host,
@@ -1232,6 +1224,84 @@ public static class BlockCheck
             Answered = answered?.ToString(),
             Tunnelled = viaTunnel,
             ExpectedTunnel = throughTunnel,
+            PinFirst = pinFirst,
+        };
+    }
+
+    /// <summary>«Доступен» у закрытой по стране нейросети без пина — это отказ по стране, по списку.</summary>
+    internal static (BlockKind Kind, ProbeOutcome Data) ClosedByCountry(BlockKind kind, ProbeOutcome data, bool pinFirst) =>
+        pinFirst && kind == BlockKind.None
+            ? (BlockKind.GeoBlock, data with
+            {
+                Detail = "закрыт для России по стране (по списку): страница может открыться, "
+                    + "а отказ придёт на запрос",
+            })
+            : (kind, data);
+
+    private static bool Got(HelloResult answer) => answer.Answer is HelloAnswer.Accepted or HelloAnswer.Refused;
+
+    private const string ShortPassed =
+        "с example.com приветствие без постквантового ключа, одним пакетом, принято, "
+        + "а с ключом, двумя пакетами, — нет: режут длину, а не имя";
+
+    private static string Join(string? before, string said) =>
+        before is { Length: > 0 } ? $"{before}; {said}" : said;
+
+    /// <summary>
+    /// Пройдёт ли браузерное приветствие там, где прошло системное; режут длину — что сказать.
+    /// <c>null</c> — длинное прошло, или режут не длину.
+    /// </summary>
+    /// <remarks>
+    /// Длину судит чужое имя, а не своё: своё под десинком проходит через раз
+    /// (см. <see cref="BlockKind.LongHello"/>).
+    /// </remarks>
+    private static async Task<string?> LongHelloCutAsync(IPAddress via, CancellationToken cancellationToken)
+    {
+        var neutral = NeutralNames[0];
+        var full = await BrowserHello.AskAsync(via, neutral, Timeout, cancellationToken);
+
+        if (Got(full))
+            return null;
+
+        var brief = await BrowserHello.AskAsync(via, neutral, Timeout, cancellationToken, compact: true);
+
+        return Got(brief)
+            ? $"браузерное приветствие с постквантовым ключом не прошло ({full.Detail}); {ShortPassed}"
+            : null;
+    }
+
+    /// <summary>
+    /// Проба имени на заданном адресе — для подбора запасного адреса Cloudflare.
+    /// </summary>
+    /// <remarks>
+    /// Одно соединение: TCP, рукопожатие, ответ. Запасной адрес годится, только
+    /// если открывается и с длинным приветствием браузера.
+    /// </remarks>
+    public static async Task<TargetReport> CheckAtAsync(string host, IPAddress address, CancellationToken cancellationToken)
+    {
+        var walk = await WalkAsync(host, [address], cancellationToken);
+        var tls = walk.Tls;
+        var kind = Classify(walk.Tcp, tls, Failed(null), walk.Data);
+
+        if (kind == BlockKind.None && CloudflareNet.Contains(address)
+            && await LongHelloCutAsync(address, cancellationToken) is { } cut)
+        {
+            kind = BlockKind.LongHello;
+            tls = tls with { Detail = cut };
+        }
+
+        return new TargetReport
+        {
+            Host = host,
+            Tcp = walk.Tcp,
+            Tls = tls,
+            Version = walk.Version,
+            Http = Failed(null),
+            Data = walk.Data,
+            Kind = kind,
+            Spoof = walk.Spoof,
+            Addresses = [address.ToString()],
+            Answered = address.ToString(),
         };
     }
 
@@ -2009,8 +2079,12 @@ public static class BlockCheck
             Tcp = tcp,
             Tls = new ProbeOutcome { Ok = true, Elapsed = handshake.Elapsed },
             Version = Name(ssl.SslProtocol),
-            Spoof = DnsSpoof.Judge(host, real, shown),
-            Data = await ReadBodyAsync(ssl, host, talked, cancellationToken),
+
+            // Без имени в приветствии сертификат и не обязан совпасть с адресом.
+            Spoof = IPAddress.TryParse(host, out _) ? DnsSpoofResult.Unknown : DnsSpoof.Judge(host, real, shown),
+            Data = IsVideoNode(host)
+                ? await WeighNodeAsync(ssl, host, talked, cancellationToken)
+                : await ReadBodyAsync(ssl, host, talked, cancellationToken),
         };
     }
 
@@ -2433,6 +2507,124 @@ public static class BlockCheck
             };
         }
         catch (Exception ex)
+        {
+            return new ProbeOutcome
+            {
+                Ok = false,
+                Reset = IsReset(ex),
+                Started = total > 0,
+                Elapsed = stopwatch.Elapsed,
+                Detail = total > 0
+                    ? $"оборвано на {total} Б: {Explain(ex, dialled, 443)}"
+                    : Explain(ex, dialled, 443),
+                Received = total,
+            };
+        }
+    }
+
+    /// <summary>
+    /// Прокачивает через одно соединение с сервером видео столько, чтобы заморозка показалась.
+    /// </summary>
+    /// <remarks>
+    /// Видео без подписанной ссылки узел не отдаст, а его 404 весит полтора килобайта:
+    /// ниже порога заморозки, и закрытый узел выглядел доступным. ТСПУ считает байты
+    /// соединения, поэтому ответы складываются на одном: замер 05.11 — 40 подряд, 70 КБ.
+    /// </remarks>
+    internal static async Task<ProbeOutcome> WeighNodeAsync(
+        Stream stream,
+        string host,
+        IReadOnlyList<IPAddress>? dialled,
+        CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var request = System.Text.Encoding.ASCII.GetBytes(
+            $"GET / HTTP/1.1\r\nHost: {host}\r\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\r\nAccept: */*\r\n\r\n");
+        var buffer = new byte[16 * 1024];
+        int total = 0;
+
+        try
+        {
+            while (total < NodeBytes)
+            {
+                await stream.WriteAsync(request, cancellationToken);
+
+                var head = new byte[buffer.Length];
+                int got = 0, header = 0, left = 0;
+
+                // Сперва заголовки, потом остаток тела по Content-Length.
+                while (header == 0 || left > 0)
+                {
+                    using var silence = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    silence.CancelAfter(StallWindow);
+
+                    int read;
+
+                    try
+                    {
+                        read = await stream.ReadAsync(buffer, silence.Token);
+                    }
+                    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                    {
+                        return new ProbeOutcome
+                        {
+                            Ok = false,
+                            Started = total > 0,
+                            Elapsed = stopwatch.Elapsed,
+                            Detail = $"поток замер на {total} Б, тишина {StallWindow.TotalSeconds:0} с",
+                            Received = total,
+                        };
+                    }
+
+                    // Узел вправе закрыть: это не блокировка, но и взвесить больше нечем.
+                    if (read == 0)
+                    {
+                        return new ProbeOutcome
+                        {
+                            Ok = true,
+                            Elapsed = stopwatch.Elapsed,
+                            Detail = $"{total} Б, узел закрыл соединение",
+                            Received = total,
+                        };
+                    }
+
+                    total += read;
+
+                    if (header > 0)
+                    {
+                        left -= read;
+                        continue;
+                    }
+
+                    int room = Math.Min(read, head.Length - got);
+                    Array.Copy(buffer, 0, head, got, room);
+                    got += room;
+                    header = HeaderLength(head, got);
+
+                    if (header > 0)
+                    {
+                        var length = System.Text.RegularExpressions.Regex.Match(
+                            System.Text.Encoding.ASCII.GetString(head, 0, header),
+                            @"^Content-Length:\s*(\d+)",
+                            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
+
+                        left = (length.Success && int.TryParse(length.Groups[1].Value, out int size) ? size : 0) - (got - header);
+                    }
+                    else if (got == head.Length)
+                    {
+                        throw new IOException("заголовки ответа не поместились");
+                    }
+                }
+            }
+
+            return new ProbeOutcome
+            {
+                Ok = true,
+                Elapsed = stopwatch.Elapsed,
+                Detail = $"{total} Б",
+                Received = total,
+            };
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return new ProbeOutcome
             {

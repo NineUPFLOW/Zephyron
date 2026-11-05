@@ -180,7 +180,7 @@ public partial class RecipeWindow : Window
         _domain = domain;
         _preset = preset;
 
-        Head.Text = $"Чем чинить {title}";
+        Head.Text = $"Чем открыть {title}";
 
         if (!string.Equals(title, domain, StringComparison.OrdinalIgnoreCase))
             Head.Text += $" — проверяю на {domain}";
@@ -245,14 +245,14 @@ public partial class RecipeWindow : Window
 
         if (_rows.FirstOrDefault(r => r.Current) is { } current)
         {
-            current.Verdict = "сейчас применяется";
+            current.Verdict = "применяется сейчас";
             current.VerdictColour = (Brush)FindResource("Muted");
         }
 
         Recipes.ItemsSource = _rows;
 
         Say(_rows.Count == 0
-            ? "Ни одного рецепта не нашлось — ни в пресете, ни в каталоге."
+            ? "Ни одного рецепта не нашлось ни в пресете, ни в каталоге."
             : $"Рецептов: {_rows.Count} — из пресета «{preset.Name}» и из каталога. "
               + "Проверка подбирает рабочий сама, но требует остановленных движков.");
 
@@ -269,7 +269,7 @@ public partial class RecipeWindow : Window
             }
             else
             {
-                PresetNote.Text = $"«Решает пресет» — имя возьмёт его секция «{already}».";
+                PresetNote.Text = $"«По пресету»: имя возьмёт его секция «{already}».";
             }
         }
 
@@ -305,7 +305,7 @@ public partial class RecipeWindow : Window
     private void OnStop(object sender, RoutedEventArgs e)
     {
         StopButton.IsEnabled = false;
-        Say("Останавливаю: жду, пока закончится текущий рецепт…", "Muted", "⏹");
+        Say("Прерываю: жду, пока закончится текущий рецепт…", "Muted", "⏹");
 
         _work?.Cancel();
     }
@@ -405,7 +405,7 @@ public partial class RecipeWindow : Window
         _work = new CancellationTokenSource();
 
         TestButton.IsEnabled = false;
-        TestButton.Content = "Проверяю…";
+        TestButton.Content = "Идёт проверка…";
         StopButton.IsEnabled = true;
 
         int worked = 0;
@@ -448,7 +448,7 @@ public partial class RecipeWindow : Window
             {
                 Say($"Проверяю {++tried} из {_rows.Count}: {row.Title}…", "Warn", "◐");
 
-                row.Verdict = "проверяю…";
+                row.Verdict = "идёт проверка…";
                 row.VerdictColour = (Brush)FindResource("Muted");
                 row.Took = null;
 
@@ -514,12 +514,12 @@ public partial class RecipeWindow : Window
         }
         catch (Exception ex)
         {
-            Say("Проверка не удалась: " + ex.GetBaseException().Message, "Danger", "✕");
+            Say("Проверить не удалось: " + ex.GetBaseException().Message, "Danger", "✕");
         }
         finally
         {
             TestButton.IsEnabled = true;
-            TestButton.Content = "Проверить все";
+            TestButton.Content = "Проверить каждый";
             StopButton.IsEnabled = false;
         }
     }

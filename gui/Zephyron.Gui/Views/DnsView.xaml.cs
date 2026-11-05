@@ -179,7 +179,7 @@ public partial class DnsView : UserControl
         Survey.ItemsSource = last.Rows.Select(SurveyRow.From).ToList();
         SurveyHead.Visibility = Visibility.Visible;
         SurveyStatus.Text = $"{last.Status} Проверено в {last.At:HH:mm}.";
-        Status.Text = $"Задержка — из обзора в {last.At:HH:mm}.";
+        Status.Text = $"Отклик взят из сводки в {last.At:HH:mm}.";
 
         Redraw();
     }
@@ -282,6 +282,7 @@ public partial class DnsView : UserControl
 
         ShowChosen(settings);
         ShowSystem();
+        ShowPinWatch(settings);
 
         // Те же провайдеры, что в обзоре, — все, кого sing-box может
         // спрашивать по DoH. Прежде список был своим, из шести, и мерился
@@ -306,7 +307,7 @@ public partial class DnsView : UserControl
             }))
             .ToList();
 
-        Status.Text = "Задержку покажет обзор выше.";
+        Status.Text = "Отклик покажет сводка выше.";
 
         ShowLast();
 
@@ -328,7 +329,7 @@ public partial class DnsView : UserControl
         var fallback = RouterDnsConnection.ConfigWarning(settings);
         if (fallback is not null)
         {
-            ChosenName.Text = "Запасной DoH · DNS роутера не применяется в текущем конфиге";
+            ChosenName.Text = "Запасной DoH · DNS роутера в текущем конфиге не используется";
             ShowRouterStatus(fallback, RouterDnsFit.Unknown);
         }
         else if (!settings.UseRouterDns)
@@ -343,7 +344,7 @@ public partial class DnsView : UserControl
         {
             // Включён до этого запуска окна: проверить заново, чтобы предупреждение
             // о подмене не пропадало с перезапуском. Раз на адрес за запуск.
-            ShowRouterStatus("Включён. Действует после перезапуска движков.", null);
+            ShowRouterStatus("Включён. Заработает после перезапуска движков.", null);
             _lastCheck = null;
             if (_recheckedFor != settings.RouterDnsAddress)
             {
@@ -429,14 +430,14 @@ public partial class DnsView : UserControl
             settings.Save(AppSettings.DefaultPath);
             ShowChosen(settings);
             Status.Text = check.Warns
-                ? "DNS роутера включён с предупреждением — смотрите карточку. Перезапустите движки."
+                ? "DNS роутера включён с предупреждением, см. карточку. Перезапустите движки."
                 : "DNS роутера включён. Перезапустите движки.";
             this.Offer("DNS роутера включён");
             return true;
         }
         catch (Exception ex)
         {
-            ShowRouterStatus("Не удалось сохранить: " + ex.GetBaseException().Message, RouterDnsFit.Silent);
+            ShowRouterStatus("Сохранить не удалось: " + ex.GetBaseException().Message, RouterDnsFit.Silent);
             return false;
         }
     }
@@ -456,7 +457,7 @@ public partial class DnsView : UserControl
         }
         catch (Exception ex)
         {
-            ShowRouterStatus("Проверка не выполнена: " + ex.GetBaseException().Message, RouterDnsFit.Silent);
+            ShowRouterStatus("Проверку выполнить не удалось: " + ex.GetBaseException().Message, RouterDnsFit.Silent);
             return null;
         }
         finally
@@ -489,7 +490,7 @@ public partial class DnsView : UserControl
             this.Offer("DNS роутера выключен");
         }
         catch (Exception ex)
-        { RouterDnsSwitch.IsChecked = true; ShowRouterStatus("Не удалось сохранить: " + ex.GetBaseException().Message, RouterDnsFit.Silent); }
+        { RouterDnsSwitch.IsChecked = true; ShowRouterStatus("Сохранить не удалось: " + ex.GetBaseException().Message, RouterDnsFit.Silent); }
     }
 
     private async void OnRouterDnsTest(object sender, RoutedEventArgs e)
@@ -509,12 +510,12 @@ public partial class DnsView : UserControl
             var found = SystemResolvers.Discover();
 
             SystemValue.Text = found.Count == 0
-                ? "не нашлись"
+                ? "не найдены"
                 : string.Join(", ", found);
         }
         catch (Exception ex)
         {
-            SystemValue.Text = "не читаются: " + ex.GetBaseException().Message;
+            SystemValue.Text = "не удалось прочитать: " + ex.GetBaseException().Message;
         }
     }
 
@@ -540,7 +541,7 @@ public partial class DnsView : UserControl
             return;
         }
 
-        row.Latency = result.DohFailure.Length > 0 ? result.DohFailure : "не отвечает";
+        row.Latency = result.DohFailure.Length > 0 ? result.DohFailure : "не откликается";
         row.Key = "Danger";
     }
     private void Redraw()
@@ -578,12 +579,12 @@ public partial class DnsView : UserControl
                 Redraw();
             }
 
-            Status.Text = $"Апстрим: {address}. Применится при следующем запуске движков.";
+            Status.Text = $"Апстрим: {address}. Вступит в силу после следующего запуска движков.";
             this.Offer($"Резолвер сменён на {address}");
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать выбор: " + ex.GetBaseException().Message;
+            Status.Text = "Выбор не записался: " + ex.GetBaseException().Message;
         }
     }
 
@@ -663,7 +664,7 @@ public partial class DnsView : UserControl
         }
         catch (Exception ex)
         {
-            OwnStatus.Text = "Проверка не удалась: " + ex.GetBaseException().Message;
+            OwnStatus.Text = "Проверить не удалось: " + ex.GetBaseException().Message;
         }
         finally
         {
@@ -671,7 +672,7 @@ public partial class DnsView : UserControl
         }
     }
 
-    private static string Why(string failure) => failure.Length > 0 ? failure : "нет ответа";
+    private static string Why(string failure) => failure.Length > 0 ? failure : "без отклика";
 
     private void OnRemoveOwn(object sender, RoutedEventArgs e)
     {
@@ -698,7 +699,7 @@ public partial class DnsView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось убрать: " + ex.GetBaseException().Message;
+            Status.Text = "Удалить не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -720,7 +721,7 @@ public partial class DnsView : UserControl
 
             if (next.DnsAuto)
             {
-                Status.Text = "Автовыбор включён — замеряю резолверы…";
+                Status.Text = "Автоподбор включён, замеряю резолверы…";
                 OnSurvey(sender, e);
             }
             else
@@ -730,7 +731,7 @@ public partial class DnsView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать выбор: " + ex.GetBaseException().Message;
+            Status.Text = "Выбор не записался: " + ex.GetBaseException().Message;
         }
     }
 
@@ -751,13 +752,13 @@ public partial class DnsView : UserControl
 
         if (DnsSurvey.Fastest(all) is not { TlsAddress: { } address } best)
         {
-            Status.Text = "Автовыбор: ни один резолвер для туннеля не ответил по DoH — выбор не менялся.";
+            Status.Text = "Автоподбор: ни один резолвер для туннеля не ответил по DoH, выбор прежний.";
             return;
         }
 
         if (settings.DnsServer == address)
         {
-            Status.Text = $"Автовыбор: быстрейший и так стоит — {best.Name}.";
+            Status.Text = $"Автоподбор: самый быстрый уже выбран — {best.Name}.";
             return;
         }
 
@@ -770,7 +771,7 @@ public partial class DnsView : UserControl
         Redraw();
         ShowChosen(next);
 
-        Status.Text = $"Автовыбор: {best.Name} · {address}. Применится при следующем запуске движков.";
+        Status.Text = $"Автоподбор: {best.Name} · {address}. Вступит в силу после следующего запуска движков.";
         this.Offer($"Резолвер сменён на {best.Name}");
     }
 
@@ -816,14 +817,14 @@ public partial class DnsView : UserControl
                 {
                     DnsRoute.Tunnel => "Имена будут разрешаться внутри туннеля.",
                     DnsRoute.Direct => "Имена будут разрешаться напрямую.",
-                    _ => "Имена — напрямую; откажет DoH — по TCP к тому же резолверу, затем через туннель.",
-                }) + " Применится при следующем запуске движков.";
+                    _ => "Сначала напрямую, при отказе DoH — по TCP к тому же резолверу, затем через туннель.",
+                }) + " Вступит в силу после следующего запуска движков.";
 
             this.Offer($"DNS: {DnsRoutes.Word(route)}");
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать выбор: " + ex.GetBaseException().Message;
+            Status.Text = "Выбор не записался: " + ex.GetBaseException().Message;
         }
     }
 
@@ -877,7 +878,7 @@ public partial class DnsView : UserControl
             var intercepted = all.Where(r => r.Spoofed > 0).Select(r => r.Provider.Name).ToList();
 
             SurveyStatus.Text = intercepted.Count == 0
-                ? "Подмены по UDP не найдено."
+                ? "Подмены по UDP нет."
                 : $"По UDP подменяют ответы: {string.Join(", ", intercepted)}. "
                   + "Обычный DNS к ним перехвачен по дороге — пользуйтесь DoH или DoT.";
 
@@ -885,7 +886,7 @@ public partial class DnsView : UserControl
         }
         catch (OperationCanceledException)
         {
-            SurveyStatus.Text = "Обзор прерван.";
+            SurveyStatus.Text = "Сводка прервана.";
 
             // Прерван уходом с вкладки — что успели, то и запомнили.
             if (done.Count > 0)
@@ -893,7 +894,7 @@ public partial class DnsView : UserControl
         }
         catch (Exception ex)
         {
-            SurveyStatus.Text = "Обзор не удался: " + ex.GetBaseException().Message;
+            SurveyStatus.Text = "Сводку получить не удалось: " + ex.GetBaseException().Message;
         }
         finally
         {
@@ -915,29 +916,21 @@ public partial class DnsView : UserControl
         var state = SupervisorState.Load(SupervisorState.DefaultPath);
         bool engines = state is not null && state.IsSupervisorAlive();
 
-        PinsStatus.Text = "Проверяю: по одному соединению на каждый прибитый адрес…";
+        PinsStatus.Text = "Проверяю: по одному соединению на первый адрес каждого имени и вопрос посредникам…";
 
         try
         {
-            var result = await Task.Run(() => PinRefresh.RunAsync(CancellationToken.None));
+            var result = await Task.Run(() => PinRefresh.RunAsync(CancellationToken.None, byHand: true));
 
-            if (result.Changes.Count > 0)
-                Journal.Write("пин", "адрес умер, заменён живым: " + string.Join("; ", result.Changes)
-                    + (result.Backup is null ? string.Empty : $"; копия hosts: {result.Backup}"));
-
-            if (result.Dead.Count > 0)
-                Journal.Write("пин", $"мёртвые без живой замены: {string.Join(", ", result.Dead.Take(8))}"
-                    + (result.Dead.Count > 8 ? $" и ещё {result.Dead.Count - 8}" : string.Empty));
-
-            if (result.Error is { } error)
-                Journal.Write("пин", "проверка адресов: " + error);
+            PinRefreshWatch.Write("кнопкой", result);
+            ShowPinWatch(AppSettings.Load(AppSettings.DefaultPath));
 
             PinsStatus.Text = Describe(result)
                 + (engines ? string.Empty : " Движки не подняты — часть посредников без десинка не отвечает, и мёртвыми могли показаться живые.");
         }
         catch (Exception ex)
         {
-            PinsStatus.Text = "Проверка не удалась: " + ex.GetBaseException().Message;
+            PinsStatus.Text = "Проверить не удалось: " + ex.GetBaseException().Message;
             Journal.Write("пин", "проверка адресов не удалась: " + ex.GetBaseException().Message);
         }
         finally
@@ -946,11 +939,48 @@ public partial class DnsView : UserControl
         }
     }
 
+    /// <summary>Выключатель плановой проверки; сторож читает его на каждом круге.</summary>
+    private void OnAutoRepin(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var settings = AppSettings.Load(AppSettings.DefaultPath) with { AutoRepin = AutoRepinSwitch.IsChecked == true };
+
+            settings.Save(AppSettings.DefaultPath);
+            ShowPinWatch(settings);
+        }
+        catch (Exception ex)
+        {
+            PinsStatus.Text = "Не удалось сохранить настройку: " + ex.GetBaseException().Message;
+        }
+    }
+
+    /// <summary>Выключатель и строка о том, что под присмотром и когда была проверка.</summary>
+    private void ShowPinWatch(AppSettings settings)
+    {
+        AutoRepinSwitch.IsChecked = settings.AutoRepin;
+
+        var watch = PinRefresh.Watch();
+        var parts = new List<string>();
+
+        if (watch.Watched > 0)
+            parts.Add("под присмотром: " + string.Join(", ", watch.Groups.Select(g => $"{g.Intermediary ?? "без посредника"} — {g.Count}")));
+
+        parts.Add(watch.Last is { } last
+            ? $"последняя проверка {last.ToLocalTime():dd.MM HH:mm}"
+            : "проверок ещё не было");
+
+        if (watch.Suspects.Count > 0)
+            parts.Add($"промолчали в прошлый раз: {watch.Suspects.Count}");
+
+        PinsWatchLine.Text = char.ToUpper(parts[0][0]) + parts[0][1..] + (parts.Count > 1 ? "; " + string.Join("; ", parts.Skip(1)) : string.Empty) + ".";
+    }
+
     /// <summary>Итог проверки словами — что сделано и чего не сделано.</summary>
     internal static string Describe(PinRefreshResult result)
     {
         if (result.Checked == 0 && result.Error is null)
-            return "В hosts нет пинов к адресам посредников — проверять нечего.";
+            return "В hosts нет пинов на адреса посредников — проверять нечего.";
 
         var parts = new List<string>();
 
@@ -960,12 +990,21 @@ public partial class DnsView : UserControl
         if (result.Changes.Count > 0)
             parts.Add($"Заменено: {string.Join("; ", result.Changes)}.");
 
+        if (result.Moved.Count > 0)
+            parts.Add($"Перенесено за посредником: {string.Join("; ", result.Moved)}.");
+
+        if (result.Reordered.Count > 0)
+            parts.Add($"Живой адрес поставлен первым: {string.Join("; ", result.Reordered)}.");
+
         if (result.Dead.Count > 0)
             parts.Add($"Живой замены не нашлось: {string.Join(", ", result.Dead.Take(6))}"
                 + (result.Dead.Count > 6 ? $" и ещё {result.Dead.Count - 6}." : "."));
 
+        if (result.Silent.Count > 0)
+            parts.Add($"По DoH не ответили: {string.Join(", ", result.Silent)}.");
+
         if (parts.Count == 0)
-            parts.Add($"Проверено адресов: {result.Checked}, все отвечают — менять нечего.");
+            parts.Add($"Проверено адресов: {result.Checked}, все отвечают, менять нечего.");
 
         return string.Join(" ", parts);
     }

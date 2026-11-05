@@ -470,7 +470,8 @@ public static class SupportReport
         int pins = kept.Count(line => !line.TrimStart().StartsWith('#'));
 
         return $"Строк с адресами: {pins}. Блок Zephyron — между отметками {HostsEditor.BlockBegin} и {HostsEditor.BlockEnd}; "
-            + $"«# {HostsEditor.DesyncMark}» — пин на адрес самого сервиса, десинк к нему применяется.\n\n"
+            + $"«# {HostsEditor.DesyncMark}» — пин на адрес самого сервиса, десинк к нему применяется; "
+            + $"«{HostsEditor.ViaMark}…» — каким посредником отдан адрес, у него автозамена о пине и спрашивает.\n\n"
             + string.Join('\n', kept) + "\n";
     }
 
@@ -600,36 +601,9 @@ public static class SupportReport
 
     private static readonly Regex Ansi = new(@"\x1B\[[0-9;]*[A-Za-z]", RegexOptions.Compiled);
 
-    /// <summary>Ссылки прокси целиком: в них ключ стоит до адреса.</summary>
-    private static readonly Regex ProxyLink = new(
-        @"\b(?:vless|vmess|trojan|ss|ssr|hysteria2?|hy2|tuic|wireguard|wg|socks5?|anytls|naive\+https)://\S+",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
     /// <summary>Прочие ссылки: имя узла оставляем — по нему и разбирают, — путь и запрос нет.</summary>
-    /// <summary>
-    /// Секрет прокси Telegram: прокси печатает его при запуске («Secret: …»)
-    /// и в ссылке («secret=dd…», в том числе tg://proxy).
-    /// </summary>
-    /// <remarks>
-    /// Снаружи он бесполезен — прокси слушает только 127.0.0.1, — но чужой
-    /// секрет в присланном архиве незачем, а со сменой адреса прослушивания
-    /// он перестал бы быть безобидным.
-    /// </remarks>
-    private static readonly Regex TelegramSecret = new(
-        @"((?:Secret:\s+|secret=)(?:dd|ee)?)[0-9a-fA-F]{32}",
-        RegexOptions.Compiled);
-
     private static readonly Regex WebLink = new(
         @"\b(https?://[^/\s""'<>]+)[/?][^\s""'<>]*",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-    private static readonly Regex Uuid = new(
-        @"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b",
-        RegexOptions.Compiled);
-
-    /// <summary>Поля с ключами в JSON и YAML: значение прячется, имя поля остаётся.</summary>
-    private static readonly Regex KeyField = new(
-        @"(""?(?:password|passwd|private_key|privateKey|public_key|publicKey|pre_shared_key|short_id|shortId|uuid|token|secret|auth_str|obfs_password)""?\s*[:=]\s*)(""[^""]*""|[^\s,}\]]+)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>
@@ -660,11 +634,10 @@ public static class SupportReport
         foreach (var secret in secrets.OrderByDescending(s => s.Length))
             result = result.Replace(secret, "<ссылка подписки скрыта>", StringComparison.OrdinalIgnoreCase);
 
-        result = ProxyLink.Replace(result, "<ссылка прокси скрыта>");
-        result = TelegramSecret.Replace(result, "$1<скрыт>");
+        // Ключи, ссылки прокси, секрет TG Proxy, UUID — те же правила, что при записи
+        // журнала (LogSecrets): старые журналы и чужие файлы чистятся и здесь.
+        result = LogSecrets.Scrub(result);
         result = WebLink.Replace(result, "$1/…");
-        result = KeyField.Replace(result, "$1\"<скрыто>\"");
-        result = Uuid.Replace(result, "<uuid>");
         result = ExitAddress.Replace(result, "$1<адрес скрыт>");
         result = OwnAddress.Mask(result);
 

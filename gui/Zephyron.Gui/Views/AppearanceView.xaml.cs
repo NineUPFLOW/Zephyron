@@ -53,13 +53,13 @@ public partial class AppearanceView : UserControl
         ShowLook(settings, loads.FirstOrDefault(l => l.Id == current)?.Theme);
 
         // У встроенной «Изменить» создаёт новую — подпись говорит это заранее.
-        EditThemeButton.Content = ThemeLoader.Shipped.Contains(current) ? "Изменить копию" : "Изменить";
+        EditThemeButton.Content = ThemeLoader.Shipped.Contains(current) ? "Править копию" : "Изменить";
 
         // Удалить — только свою: встроенные едут с программой, и обновление вернуло бы их.
         DeleteThemeButton.IsEnabled = !ThemeLoader.Shipped.Contains(current);
         DeleteThemeButton.ToolTip = DeleteThemeButton.IsEnabled
             ? "Папка темы уйдёт в корзину Windows — оттуда её можно вернуть"
-            : "Встроенные темы едут с программой и не удаляются";
+            : "Встроенные темы входят в программу и не удаляются";
         ShowFonts(settings);
         ShowTray(settings);
         ShowAnimations(settings);
@@ -124,7 +124,7 @@ public partial class AppearanceView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось сохранить: " + ex.GetBaseException().Message;
+            Status.Text = "Сохранить не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -145,7 +145,7 @@ public partial class AppearanceView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось сохранить: " + ex.GetBaseException().Message;
+            Status.Text = "Сохранить не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -166,7 +166,7 @@ public partial class AppearanceView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось сохранить: " + ex.GetBaseException().Message;
+            Status.Text = "Сохранить не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -182,7 +182,7 @@ public partial class AppearanceView : UserControl
             TrayBlurSwitch.IsChecked = settings.TrayBlur;
 
             TrayDensityChoice.ItemsSource = TrayDensities
-                .Select(d => d == 100 ? "сплошная" : $"{d} %")
+                .Select(d => d == 100 ? "без прозрачности" : $"{d} %")
                 .ToList();
 
             TrayDensityChoice.SelectedIndex = TrayDensities
@@ -219,7 +219,7 @@ public partial class AppearanceView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось сохранить: " + ex.GetBaseException().Message;
+            Status.Text = "Сохранить не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -247,7 +247,7 @@ public partial class AppearanceView : UserControl
         _showingLook = false;
     }
 
-    private const string ThemeFont = "как в теме";
+    private const string ThemeFont = "по образцу темы";
 
     /// <summary>Шрифт в списке: имя и само начертание — выбирают глазами.</summary>
     public sealed record FontItem(string Name, FontFamily Family)
@@ -349,7 +349,7 @@ public partial class AppearanceView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось применить: " + ex.GetBaseException().Message;
+            Status.Text = "Применить не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -388,7 +388,7 @@ public partial class AppearanceView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось сменить тему: " + ex.GetBaseException().Message;
+            Status.Text = "Тема не сменилась: " + ex.GetBaseException().Message;
         }
     }
 
@@ -412,7 +412,7 @@ public partial class AppearanceView : UserControl
     {
         if (CurrentTheme() is not { } theme)
         {
-            Status.Text = "Не нашлось темы, с которой начать: папки themes нет рядом с программой.";
+            Status.Text = "Нет темы, с которой можно начать: папки themes рядом с программой нет.";
             return;
         }
 
@@ -449,7 +449,7 @@ public partial class AppearanceView : UserControl
 
         if (ThemeLoader.Shipped.Contains(id))
         {
-            Status.Text = "Встроенные темы едут с программой и не удаляются.";
+            Status.Text = "Встроенные темы входят в программу и не удаляются.";
             return;
         }
 
@@ -458,7 +458,7 @@ public partial class AppearanceView : UserControl
         var answer = MessageBox.Show(
             Window.GetWindow(this)!,
             $"Удалить тему «{name}»?\n\nПапка themes\\{id} уйдёт в корзину Windows — оттуда её можно вернуть. Вместо неё встанет «Сигнал».",
-            "Удалить тему",
+            "Убрать тему",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question,
             MessageBoxResult.No);
@@ -481,7 +481,7 @@ public partial class AppearanceView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Удалить не вышло: " + ex.GetBaseException().Message;
+            Status.Text = "Удалить не удалось: " + ex.GetBaseException().Message;
         }
 
         ShowTheme(AppSettings.Load(AppSettings.DefaultPath));
@@ -493,7 +493,7 @@ public partial class AppearanceView : UserControl
 
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
-            Title = "Выгрузить тему",
+            Title = "Сохранить тему",
             FileName = $"zephyron-{id}.zip",
             Filter = "Тема Zephyron (*.zip)|*.zip",
         };
@@ -508,7 +508,7 @@ public partial class AppearanceView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось выгрузить: " + ex.GetBaseException().Message;
+            Status.Text = "Сохранить не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -516,7 +516,7 @@ public partial class AppearanceView : UserControl
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "Загрузить тему",
+            Title = "Взять тему",
             Filter = "Тема Zephyron (*.zip)|*.zip",
         };
 
@@ -534,7 +534,7 @@ public partial class AppearanceView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось загрузить: " + ex.GetBaseException().Message;
+            Status.Text = "Загрузить не удалось: " + ex.GetBaseException().Message;
         }
 
         ShowTheme(AppSettings.Load(AppSettings.DefaultPath));
@@ -549,7 +549,7 @@ public partial class AppearanceView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось открыть папку тем: " + ex.GetBaseException().Message;
+            Status.Text = "Папку тем открыть не удалось: " + ex.GetBaseException().Message;
         }
     }
 

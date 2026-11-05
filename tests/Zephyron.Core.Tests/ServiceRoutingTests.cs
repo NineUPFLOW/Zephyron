@@ -52,6 +52,45 @@ public sealed class ServiceRoutingTests : IDisposable
         return engine;
     }
 
+    /// <summary>
+    /// Узкая часть через VPN не перекрашивает широкую: её путь — по своему имени.
+    /// </summary>
+    [Fact]
+    public void ANarrowPartDoesNotRepaintItsWidePart()
+    {
+        Write("discord.txt", "discord.com", "discord.gg", "discordapp.com");
+        Write("discord-api.txt", "discord.com");
+
+        var engine = Load("""
+            mode: selective
+            rules:
+              - match: hostlist
+                value: "config/lists/discord-api.txt"
+                mode: proxy
+              - match: hostlist
+                value: "config/lists/discord.txt"
+                mode: desync
+            default:
+              mode: direct
+            """);
+
+        var service = new ServiceDefinition
+        {
+            Name = "Discord",
+            Parts =
+            [
+                new ServicePart { Name = "Сайт и переписка", List = "config/lists/discord.txt" },
+                new ServicePart { Name = "Квесты и API", List = "config/lists/discord-api.txt", Within = "config/lists/discord.txt" },
+            ],
+        };
+
+        var parts = ServiceRouting.Describe(service, engine, _root, EmptyUserRules());
+
+        Assert.Equal(RoutingMode.Desync, parts[0].Mode);
+        Assert.Equal("discord.gg", parts[0].Example);
+        Assert.Equal(RoutingMode.Proxy, parts[1].Mode);
+    }
+
     private static ConnectionEvent Connection(string host) => new()
     {
         Timestamp = DateTimeOffset.UnixEpoch,

@@ -228,6 +228,17 @@ public sealed record AppSettings
     /// </remarks>
     public string DnsServer { get; init; } = GoogleDns;
 
+    /// <summary>
+    /// Сама раз в 6 часов менять мёртвые пины к посредникам на живые и следовать
+    /// за посредником, переехавшим на новый прокси (<c>PinRefresh</c>).
+    /// </summary>
+    /// <remarks>
+    /// Включено по умолчанию: замена идёт с проверкой — только на второй промах
+    /// подряд, при живой сети и на адрес, который сам ответил. Пин на живой адрес
+    /// посредника остаётся как есть, пока посредник сам его отдаёт. Кнопка «Проверить»
+    /// на вкладке DNS работает и при выключенной автозамене.
+    /// </remarks>
+    public bool AutoRepin { get; init; } = true;
     /// <summary>Для PBR роутер должен получить реальные DNS-запросы, а не только прямой трафик сайта.</summary>
     public bool UseRouterDns { get; init; }
     public string RouterDnsAddress { get; init; } = "192.168.1.1";
