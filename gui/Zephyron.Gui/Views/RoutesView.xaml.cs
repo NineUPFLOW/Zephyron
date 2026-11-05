@@ -101,7 +101,7 @@ public sealed record PartRow : INotifyPropertyChanged
             : Visibility.Hidden;
 
     /// <summary>Подсказка кнопки списка: открыть файл или, у своего домена без файла, завести его.</summary>
-    public string ListHint => ListPath is { } path ? $"Откроется в Блокноте: " : "Создать файл списка, в который можно дописать другие имена";
+    public string ListHint => ListPath is { } path ? $"Откроется в Блокноте: {path}" : "Создать файл списка, в который можно дописать другие имена";
 
     /// <summary>
     /// Настоящее имя из списка — на нём проверяются рецепты.

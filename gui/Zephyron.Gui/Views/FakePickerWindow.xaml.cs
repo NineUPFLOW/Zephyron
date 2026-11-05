@@ -52,7 +52,7 @@ public partial class FakePickerWindow : Window
 
         _rows = FakeChoice.Slots(preset).Select(slot =>
         {
-            var keep = new FakeOption($"Как в пресете: ", null);
+            var keep = new FakeOption($"Как в пресете: {slot.Blob}", null);
             var options = new List<FakeOption> { keep };
             options.AddRange(FakeChoice.Fitting(slot, available).Select(b => new FakeOption(b.Title, b.Id)));
 

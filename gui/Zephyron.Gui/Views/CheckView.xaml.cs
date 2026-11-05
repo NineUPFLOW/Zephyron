@@ -783,7 +783,7 @@ public partial class CheckView : UserControl
 
             KeepRecentReports();
 
-            return $"Отчёт: ";
+            return $"Отчёт: {full}";
         }
         catch (Exception ex)
         {
