@@ -84,7 +84,7 @@ public partial class PathWindow : Window
         _pools = pools ?? [];
         _poolsOn = pools is not null;
 
-        Head.Text = $"Маршрут: ";
+        Head.Text = $"Маршрут: {title}";
         Picked = current;
         Pool = ServerPools.Find(_pools, pool)?.Id;
         _defaultLabel = defaultLabel;

@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using Zephyron.Core;
 using Zephyron.Core.Updates;
+using Zephyron.Supervisor;
 
 namespace Zephyron.Gui.Views;
 
@@ -229,6 +230,10 @@ public partial class UpdatePanel : UserControl
             var note = new Progress<string>(_ => via = " через туннель");
 
             var plan = await UpdateInstaller.StageAsync(_release, progress, CancellationToken.None, TunnelForDownload(), note);
+
+            // Без движков у человека может не быть DNS: новая версия поднимает их сама.
+            if (SupervisorState.Load(SupervisorState.DefaultPath)?.IsSupervisorAlive() == true)
+                File.WriteAllText(App.RestartEnginesMark, string.Empty);
 
             Say("Останавливаю движки…");
             await EngineControl.StopAsync("обновление программы", CancellationToken.None);

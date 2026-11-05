@@ -157,7 +157,7 @@ public partial class PinWindow : Window
         {
             Title = $"{service.Name} · {part.Name}",
             Short = part.Name,
-            Source = $"Список: ",
+            Source = $"Список: {part.List}",
             Zones = HostListReader.Read(part.List, ZapretPaths.Discover()?.Root, out _)
                 .Select(d => d.TrimStart('*', '.'))
                 .Distinct(StringComparer.OrdinalIgnoreCase)

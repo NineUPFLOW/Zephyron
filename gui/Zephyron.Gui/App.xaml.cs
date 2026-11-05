@@ -273,6 +273,12 @@ public partial class App : Application
             return;
         }
 
+        if (File.Exists(RestartEnginesMark))
+        {
+            File.Delete(RestartEnginesMark);
+            _ = StartOnLogonAsync();
+        }
+
         new MainWindow().Show();
     }
 
@@ -305,6 +311,9 @@ public partial class App : Application
     /// не срабатывали ни разу: первая попытка всегда «удавалась».
     /// </para>
     /// </remarks>
+    /// <summary>Движки работали до обновления: первый запуск новой версии поднимает их снова.</summary>
+    internal static string RestartEnginesMark => Path.Combine("runtime", "restart-engines");
+
     private static async Task StartOnLogonAsync()
     {
         TimeSpan[] waits = [TimeSpan.Zero, TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(45)];

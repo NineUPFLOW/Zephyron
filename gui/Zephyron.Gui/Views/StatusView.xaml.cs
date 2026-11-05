@@ -474,7 +474,7 @@ public partial class StatusView : UserControl
         }
         catch (Exception ex)
         {
-            return new Seen(null, $"Не удалось прочитать настройки: ", string.Empty, null, false, false, null);
+            return new Seen(null, $"Не удалось прочитать настройки: {ex.Message}", string.Empty, null, false, false, null);
         }
 
         // Ссылки на подписки — пароли, и в окне им не место. Показываем лишь
@@ -1101,7 +1101,7 @@ public partial class StatusView : UserControl
             : StateLine.Text;
 
         FooterConfig.Text = configBuilt is { } at
-            ? $"Конфиг туннеля создан "
+            ? $"Конфиг туннеля создан {at:dd.MM.yyyy} в {at:HH:mm}"
             : string.Empty;
     }
 

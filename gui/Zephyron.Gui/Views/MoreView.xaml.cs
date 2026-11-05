@@ -132,7 +132,7 @@ public partial class MoreView : UserControl
                 DefenderButton.IsEnabled = !excluded;
 
                 Status.Text = excluded
-                    ? $"В исключениях: "
+                    ? $"В исключениях: {path}"
                     : code == 0
                         ? "Команда прошла, а исключение не появилось — включена защита от "
                           + "изменений. Добавьте вручную: Безопасность Windows → Защита от "

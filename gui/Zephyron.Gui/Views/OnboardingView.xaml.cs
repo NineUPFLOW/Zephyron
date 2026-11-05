@@ -114,7 +114,7 @@ public partial class OnboardingView : UserControl
                 Border.BackgroundProperty, i < step ? "Accent" : "Border");
         }
 
-        PageHead.SetSubtitle(Head, $"Шаг ");
+        PageHead.SetSubtitle(Head, $"Шаг {step} из {LastStep}");
 
         // Подпись меняется по шагу: на последнем «пропустить» пропускать
         // уже нечего, и кнопка честно называется «Готово».
@@ -980,7 +980,7 @@ public partial class OnboardingView : UserControl
             SubLink.Clear();
 
             int usable = info.Servers.Count(s => s.IsUsableOutbound);
-            VpnStatus.Text = $"Подписка подключена, серверов: ";
+            VpnStatus.Text = $"Подписка подключена, серверов: {usable}.";
 
             if (_wantsTunnel)
                 ChooseWantedTunnel();

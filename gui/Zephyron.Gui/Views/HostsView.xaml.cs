@@ -84,7 +84,7 @@ public partial class HostsView : UserControl
         if (HostsEditor.WhoReplaced() is { } who)
         {
             ReplacedCard.Visibility = Visibility.Visible;
-            ReplacedTitle.Text = $"Файл hosts заменён: ";
+            ReplacedTitle.Text = $"Файл hosts заменён: {who}";
         }
         else
         {
