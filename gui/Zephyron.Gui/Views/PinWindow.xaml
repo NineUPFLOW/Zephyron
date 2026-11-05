@@ -47,7 +47,7 @@
                     проверили и почему выбрали этого.
                 -->
                 <StackPanel x:Name="Checks" Visibility="Collapsed" Margin="0,0,0,18">
-                    <TextBlock Text="Проверка адресов" FontWeight="SemiBold" Margin="2,0,0,10" />
+                    <TextBlock Text="Проверка адресов на доступность" FontWeight="SemiBold" Margin="2,0,0,10" />
 
                     <ItemsControl x:Name="CheckList">
                         <ItemsControl.ItemTemplate>
@@ -145,13 +145,13 @@
 
                 <!-- Шаг первый: что вообще сделать с сервисом. -->
                 <StackPanel x:Name="Actions">
-                    <TextBlock Text="Куда направить" FontWeight="SemiBold" Margin="2,0,0,10" />
+                    <TextBlock Text="Куда отправить" FontWeight="SemiBold" Margin="2,0,0,10" />
 
                     <Button Style="{StaticResource Choice}" Tag="direct" Click="OnMode">
                         <StackPanel>
                             <TextBlock Text="Напрямую" FontWeight="SemiBold" />
                             <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="Без вмешательства. Так же нужно для пина: прибитый адрес задаёт куда идти, а не как, и правило поверх него уведёт соединение мимо." />
+                                       Text="Без вмешательства. Нужно и для пина: прибитый адрес задаёт, куда идти, а не как; правило поверх него уведёт соединение мимо." />
                         </StackPanel>
                     </Button>
 
@@ -159,7 +159,7 @@
                         <StackPanel>
                             <TextBlock Text="Десинк" FontWeight="SemiBold" />
                             <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="Пакеты правятся на лету, трафик идёт напрямую." />
+                                       Text="Пакеты меняются на лету, трафик идёт напрямую." />
                         </StackPanel>
                     </Button>
 
@@ -167,7 +167,7 @@
                         <StackPanel>
                             <TextBlock Text="Через VPN" FontWeight="SemiBold" />
                             <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="В туннель. Лечит и то, что закрыто по самому адресу." />
+                                       Text="Через туннель. Помогает и когда закрыт сам адрес." />
                         </StackPanel>
                     </Button>
 
@@ -175,7 +175,7 @@
 
                     <Button x:Name="PinButton" Style="{StaticResource Choice}" Click="OnPin">
                         <StackPanel>
-                            <TextBlock Text="Закрепить адрес в hosts" FontWeight="SemiBold" />
+                            <TextBlock Text="Закрепить в hosts" FontWeight="SemiBold" />
                             <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
                                        Text="Для случая, когда имя не разрешается или резолвер отвечает заглушкой. Правит системный файл: нужны права администратора, и запись переживёт удаление программы." />
                         </StackPanel>
@@ -192,9 +192,9 @@
 
                     <Button Style="{StaticResource Choice}" Tag="reset" Click="OnMode" Margin="0,16,0,0">
                         <StackPanel>
-                            <TextBlock Text="Убрать свой выбор" FontWeight="SemiBold" />
+                            <TextBlock Text="Сбросить мой выбор" FontWeight="SemiBold" />
                             <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="Вернуть как было: правило из поставки снова начнёт действовать." />
+                                       Text="Всё как было: снова действует правило из поставки." />
                         </StackPanel>
                     </Button>
                 </StackPanel>
@@ -221,11 +221,11 @@
         </ScrollViewer>
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-            <Button x:Name="BackButton" Style="{StaticResource Ghost}" Content="Назад"
+            <Button x:Name="BackButton" Style="{StaticResource Ghost}" Content="Вернуться"
                     Click="OnBack" Margin="0,0,8,0" Visibility="Collapsed" />
             <Button x:Name="PinChosenButton" Style="{StaticResource Primary}" Content="Прибить выбранное"
                     Click="OnPinChosen" Margin="0,0,8,0" Visibility="Collapsed" />
-            <Button Style="{StaticResource Ghost}" Content="Закрыть" Click="OnClose" />
+            <Button Style="{StaticResource Ghost}" Content="Закрыть окно" Click="OnClose" />
         </StackPanel>
     </Grid>
 </Window>

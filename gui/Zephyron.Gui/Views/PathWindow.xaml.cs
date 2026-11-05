@@ -84,7 +84,7 @@ public partial class PathWindow : Window
         _pools = pools ?? [];
         _poolsOn = pools is not null;
 
-        Head.Text = $"Путь: {title}";
+        Head.Text = $"Маршрут: ";
         Picked = current;
         Pool = ServerPools.Find(_pools, pool)?.Id;
         _defaultLabel = defaultLabel;
@@ -104,7 +104,7 @@ public partial class PathWindow : Window
                 "Своего правила нет: маршрут идёт, как задано заводскими правилами."));
         }
 
-        Options.Children.Add(Card(PathPick.Direct, "Напрямую", "Мимо VPN и без десинка — как без программы."));
+        Options.Children.Add(Card(PathPick.Direct, "Напрямую", "Напрямую и без десинка — как будто программы нет."));
 
         Options.Children.Add(Card(PathPick.Desync, "Десинк", _desyncNote,
             Picked == PathPick.Desync && _canRecipe ? RecipeButton() : null));
@@ -112,15 +112,15 @@ public partial class PathWindow : Window
         Options.Children.Add(Card(PathPick.Proxy, "Через VPN", ProxyNote(),
             Picked == PathPick.Proxy && _poolsOn ? PoolList() : null));
 
-        Options.Children.Add(Card(PathPick.Off, "Выключено",
-            "Не действует ни этот маршрут, ни заводское правило на тот же список — имена решают другие правила."));
+        Options.Children.Add(Card(PathPick.Off, "Отключено",
+            "Не действует ни этот маршрут, ни заводское правило для того же списка: имена решаются другими правилами."));
     }
 
     private string ProxyNote() => ServerPools.Find(_pools, Pool) is { } pool
         ? $"Пул «{pool.Name}»."
         : _pools.Count == 0
-            ? "Через серверы подписок: автоподбор или выбранный на вкладке VPN."
-            : "Пул по умолчанию — все серверы.";
+            ? "Через серверы подписок: лучший по замеру или выбранный во вкладке VPN."
+            : "Общий пул — все серверы.";
 
     private Button Card(PathPick pick, string head, string note, UIElement? inside = null)
     {
@@ -190,12 +190,12 @@ public partial class PathWindow : Window
     {
         var list = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
 
-        list.Children.Add(PoolCard(null, "Пул по умолчанию", "Все серверы подписок в работе."));
+        list.Children.Add(PoolCard(null, "Общий пул", "Все рабочие серверы подписок."));
 
         foreach (var pool in _pools)
         {
             var note = pool.Servers.Count == 0
-                ? "Пуст — пока в нём нет серверов, маршрут пойдёт в пул по умолчанию."
+                ? "Пусто: пока в пуле нет серверов, маршрут пойдёт через общий пул."
                 : $"{Servers(pool.Servers.Count)} · " + (pool.Preferred is { } pinned ? $"закреплён «{pinned}»" : "автоподбор");
 
             list.Children.Add(PoolCard(pool.Id, pool.Name, note));
@@ -205,7 +205,7 @@ public partial class PathWindow : Window
         {
             var hint = new TextBlock
             {
-                Text = "Свои пулы — папки серверов, например «Россия» или «Скоростной», — заводятся на вкладке VPN.",
+                Text = "Свои пулы — папки с серверами, например «Россия» или «Скоростной» — создаются во вкладке VPN.",
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(2, 2, 0, 0),
             };

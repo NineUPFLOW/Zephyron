@@ -34,12 +34,12 @@ internal sealed record TrayStatus(
     private static readonly TimeSpan StartupPatience = TimeSpan.FromSeconds(90);
 
     public string Headline =>
-        Stopping ? "Останавливается…"
-        : Busy && Running ? "Перезапускается…"
-        : Starting ? "Запускается…"
-        : !Running ? "Остановлено"
+        Stopping ? "Выключается…"
+        : Busy && Running ? "Стартует заново…"
+        : Starting ? "Стартует…"
+        : !Running ? "Выключено"
         : AllHealthy ? "Работает"
-        : Tunnel == ServiceHealth.Degraded ? "Выходы VPN не отвечают" : "Работает с оговорками";
+        : Tunnel == ServiceHealth.Degraded ? "Выходы VPN молчат" : "Работает не полностью";
 
     /// <summary>Из файла состояния надзора — того же, что читает «Главная», — и из живого надзора.</summary>
     public static TrayStatus Read(bool busy, bool stopping = false)
@@ -72,10 +72,10 @@ internal sealed record TrayStatus(
     public static string Describe(ServiceHealth? health, bool tunnel = false) => health switch
     {
         ServiceHealth.Healthy => "работает",
-        ServiceHealth.Degraded => tunnel ? "выходы VPN не отвечают" : "не отвечает",
-        ServiceHealth.Dead => "упал",
+        ServiceHealth.Degraded => tunnel ? "выходы VPN молчат" : "не откликается",
+        ServiceHealth.Dead => "аварийно остановился",
         ServiceHealth.Faulted => "не поднимается",
-        ServiceHealth.Stopped => "остановлен",
+        ServiceHealth.Stopped => "выключен",
 
         // Службы нет в состоянии — её и не поднимали: выключена выключателем
         // на «Главной». «Остановлен» здесь соврал бы, что она была.
@@ -132,8 +132,8 @@ public partial class TrayMenu : Window
         // Пока идёт запуск, кнопка — «Остановить», как на «Главной»: второй
         // «Запустить» тут не нужен, а остановить запуск можно.
         Toggle.Content = status.Busy
-            ? (status.Stopping ? "Останавливаю…" : status.Running ? "Перезапускаю…" : "Запускаю…")
-            : status.Running || status.Starting ? "Остановить" : "Запустить";
+            ? (status.Stopping ? "Выключаю…" : status.Running ? "Запускаю заново…" : "Включаю…")
+            : status.Running || status.Starting ? "Выключить" : "Включить";
         Toggle.IsEnabled = !status.Busy;
 
         ShowModes(status);
@@ -151,7 +151,7 @@ public partial class TrayMenu : Window
         catch (Exception)
         {
             Modes.IsEnabled = false;
-            ModeNote.Text = "Настройки не прочитались — режим выбирается в окне";
+            ModeNote.Text = "Не удалось прочитать настройки: режим выбирается в окне";
             return;
         }
 
@@ -166,10 +166,10 @@ public partial class TrayMenu : Window
         Modes.IsEnabled = !status.Busy;
 
         ModeNote.Text = !settings.HasTunnelExit
-            ? "«Туннелю» нужна подписка или WARP на вкладке VPN"
+            ? "Для режима «Туннель» нужна подписка или WARP во вкладке VPN"
             : status.Running
-                ? "Выбор сразу перезапускает движки"
-                : "Выбор сразу запускает движки";
+                ? "Выбор сразу перезапустит движки"
+                : "Выбор сразу запустит движки";
     }
 
     private void OnMode(object sender, RoutedEventArgs e)

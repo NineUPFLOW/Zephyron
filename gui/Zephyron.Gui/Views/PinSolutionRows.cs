@@ -71,7 +71,7 @@ internal static class PinSolutionRows
                 Title = solution.Name,
                 Caption = caption.Trim(),
                 Info = Describe(solution),
-                Word = !state.On ? "выкл." : state.Partly ? "частично" : "вкл.",
+                Word = !state.On ? "не включено" : state.Partly ? "не полностью" : "включено",
                 On = state.On,
                 Available = available,
                 LineShown = rows.Count == 0 ? Visibility.Collapsed : Visibility.Visible,

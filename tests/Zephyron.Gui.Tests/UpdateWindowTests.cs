@@ -31,7 +31,7 @@ public sealed class UpdateWindowTests
             Assert.NotEmpty(window.Details.Children);
             Assert.True(window.OffersInstall);
             Assert.Equal(System.Windows.Visibility.Visible, window.SkipButton.Visibility);
-            Assert.Equal("Позже", window.LaterButton.Content);
+            Assert.Equal("Не сейчас", window.LaterButton.Content);
 
             window.Close();
         });
@@ -163,12 +163,12 @@ public sealed class UpdateWindowTests
             });
 
             Assert.False(window.OffersInstall);
-            Assert.Equal("Установлена последняя версия", window.Heading.Text);
+            Assert.Equal("У вас последняя версия", window.Heading.Text);
             Assert.NotEmpty(window.Notes.Children);
 
             // Пропускать нечего, напоминать не о чем (владелец, 06.10).
             Assert.Equal(System.Windows.Visibility.Collapsed, window.SkipButton.Visibility);
-            Assert.Equal("Закрыть", window.LaterButton.Content);
+            Assert.Equal("Закрыть окно", window.LaterButton.Content);
 
             window.Close();
         });

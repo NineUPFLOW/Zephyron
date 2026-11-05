@@ -201,6 +201,32 @@ public sealed class RouteConflictTests : IDisposable
     private static Connections.ConnectionEvent To(string host) => Connections.ConnectionEvent.Describe(host);
 
     /// <summary>
+    /// «Квесты и API» через VPN забирают discord.com, но не обновления внутри него
+    /// и не шлюз с картинками: узкие части одной широкой — в порядке каталога,
+    /// как бы ни легли строки в файле.
+    /// </summary>
+    [Fact]
+    public void QuestsThroughVpnLeaveUpdatesAndGatewayAlone()
+    {
+        Write("discord.txt", "discord.com", "discord.gg", "discordapp.com");
+        Write("discord-updates.txt", "updates.discord.com");
+        Write("discord-api.txt", "discord.com", "hcaptcha.com");
+
+        var engine = LoadLayers("rules: []\ndefault:\n  mode: desync\n", file =>
+        {
+            file.Set(MatchKind.HostList, "config/lists/discord.txt", RoutingMode.Desync);
+            file.Set(MatchKind.HostList, "config/lists/discord-api.txt", RoutingMode.Proxy);
+            file.Set(MatchKind.HostList, "config/lists/discord-updates.txt", RoutingMode.Direct);
+        });
+
+        Assert.Equal(RoutingMode.Proxy, engine.Evaluate(To("discord.com")).Mode);
+        Assert.Equal(RoutingMode.Proxy, engine.Evaluate(To("hcaptcha.com")).Mode);
+        Assert.Equal(RoutingMode.Direct, engine.Evaluate(To("updates.discord.com")).Mode);
+        Assert.Equal(RoutingMode.Desync, engine.Evaluate(To("gateway.discord.gg")).Mode);
+        Assert.Equal(RoutingMode.Desync, engine.Evaluate(To("cdn.discordapp.com")).Mode);
+    }
+
+    /// <summary>
     /// Узкая часть, записанная в файл после широкой, всё равно решает свои имена
     /// (14.10: «Обновления Discord → напрямую» стояло после «Сайт и переписка → десинк»
     /// и было мертво — след слияния и раздела частей Discord).

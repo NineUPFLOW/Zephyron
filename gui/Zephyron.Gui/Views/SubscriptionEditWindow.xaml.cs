@@ -40,7 +40,7 @@ public partial class SubscriptionEditWindow : Window
 
         if (name.Length == 0)
         {
-            Say("Имя не может быть пустым.");
+            Say("Название не может быть пустым.");
             return;
         }
 

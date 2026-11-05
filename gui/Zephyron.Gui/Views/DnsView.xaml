@@ -67,13 +67,13 @@
 
                         <StackPanel Grid.Column="1" Margin="0,0,12,0">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Обзор резолверов" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <TextBlock Text="Сводка по резолверам" FontWeight="SemiBold" VerticalAlignment="Center" />
                                 <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                                 Content="Задержка по DoH, DoT и обычному UDP — лучшая из трёх.&#x0a;&#x0a;«Кто отвечает» — адрес, с которого на самом деле ходит наружу тот, кто ответил на UDP, и его сеть. Если спрашивали 8.8.8.8, а ответил резолвер российской сети, запрос перехвачен по дороге.&#x0a;&#x0a;«Подмена» — сколько из пяти давно закрытых имён резолвер по UDP разрешил не туда: в заглушку, в пустоту или в один адрес на всех. Одно расхождение адресов подменой не считается — у сетей доставки узлов десятки.&#x0a;&#x0a;Мерится сеть провайдера: запросы идут через адаптер мимо нашего туннеля." />
                             </StackPanel>
                             <TextBlock x:Name="SurveyStatus" Style="{StaticResource Caption}" Margin="0,5,0,0"
                                        TextWrapping="Wrap"
-                                       Text="Кто на самом деле отвечает на DNS и подменяет ли ответы." />
+                                       Text="Кто на самом деле отвечает на DNS-запросы и не подменяет ли ответы." />
                         </StackPanel>
 
                         <Button Grid.Column="2" x:Name="SurveyButton" Style="{StaticResource Primary}" Padding="16,6"
@@ -102,18 +102,29 @@
 
                         <StackPanel Grid.Column="1" Margin="0,0,12,0">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Адреса в hosts" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <TextBlock Text="Адреса из hosts" FontWeight="SemiBold" VerticalAlignment="Center" />
                                 <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                Content="Посредники — XBOX DNS, Comss, AstraCat, GeoHide — время от времени меняют адреса, и пин на умерший адрес кладёт сайт целиком: 28.09 так легли Claude и ChatGPT.&#x0a;&#x0a;Проверка стучится в каждый прибитый адрес одним соединением. Умерший заменяется живым, который посредник отдаёт сейчас; перед записью hosts сохраняется копия. Работающие пины не трогаются.&#x0a;&#x0a;Если не ответило больше половины адресов разом — это сбой сети, а не смерть адресов, и ничего не меняется.&#x0a;&#x0a;С поднятыми движками точнее: часть посредников без десинка не отвечает." />
+                                                Content="Посредники — XBOX DNS, Comss, AstraCat, GeoHide — время от времени меняют адреса, и пин на умерший адрес кладёт сайт целиком: 28.09 так легли Claude и ChatGPT.&#x0a;&#x0a;Проверка стучится в первый адрес каждого имени и спрашивает посредника по DoH, что он отдаёт сейчас. Если посредник перешёл на другие прокси, пин переносится на них. Адрес, промолчавший два раза подряд (или при запуске кнопкой), заменяется живым; перед записью hosts сохраняется копия. Работающие пины не трогаются.&#x0a;&#x0a;Если молчит больше половины адресов или нет связи с контрольными адресами — это сбой сети, и ничего не меняется.&#x0a;&#x0a;С поднятыми движками точнее: часть посредников без десинка не отвечает." />
                             </StackPanel>
                             <TextBlock x:Name="PinsStatus" Style="{StaticResource Caption}" Margin="0,5,0,0"
                                        TextWrapping="Wrap"
-                                       Text="Живы ли адреса, к которым прибиты имена, и что посредники отдают сейчас." />
+                                       Text="Живы ли адреса, к которым прибиты имена, и что сейчас отвечают посредники." />
+                            <TextBlock x:Name="PinsWatchLine" Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap" />
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Следить за пинами самой" VerticalAlignment="Center" />
+                                <ToggleButton Grid.Column="1" x:Name="AutoRepinSwitch" Style="{StaticResource Switch}"
+                                              Click="OnAutoRepin" VerticalAlignment="Center"
+                                              ToolTip="Раз в 6 часов, пока движки работают: проверять пины и переносить их за посредником" />
+                            </Grid>
                         </StackPanel>
 
                         <Button Grid.Column="2" x:Name="PinsButton" Style="{StaticResource Ghost}" Padding="16,6"
                                 Content="Проверить" Click="OnPins" VerticalAlignment="Top"
-                                ToolTip="Проверить актуальные адреса посредников и заменить умершие пины" />
+                                ToolTip="Проверить свежие адреса посредников и заменить умершие пины" />
                     </Grid>
                 </Border>
 
@@ -130,7 +141,7 @@
 
                         <StackPanel Grid.Column="1">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Апстрим туннеля" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <TextBlock Text="Резолвер для туннеля" FontWeight="SemiBold" VerticalAlignment="Center" />
                                 <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                                 Content="Речь только о резолвере, которого спрашивает sing-box. Настройки DNS самой Windows не трогаются ни здесь, ни где-либо ещё.&#x0a;&#x0a;ЧЕРЕЗ ТУННЕЛЬ — запрос уходит внутри зашифрованного потока к серверу подписки. Оператору он неотличим от прочего трафика, перекрыть его отдельно нельзя. Цена: пока туннель не поднялся, имена не разрешаются вовсе — включая те, что открывались одним десинком.&#x0a;&#x0a;НАПРЯМУЮ — запрос уходит к выбранному резолверу своим соединением, по DoH. Работает независимо от туннеля, но виден оператору как обращение к известному резолверу, и его можно перекрыть. В августе 2026 несколько российских операторов так и сделали." />
                             </StackPanel>
@@ -148,7 +159,7 @@
                             -->
                             <ComboBox x:Name="TunnelMode" Margin="0,10,0,0" HorizontalAlignment="Stretch"
                                       SelectionChanged="OnThroughTunnel">
-                                <ComboBoxItem Content="авто: напрямую, при отказе DoH — по TCP, затем туннель" Tag="Auto" />
+                                <ComboBoxItem Content="авто: сначала напрямую, при отказе DoH — по TCP, затем через туннель" Tag="Auto" />
                                 <ComboBoxItem Content="спрашивать напрямую" Tag="Direct" />
                                 <ComboBoxItem Content="спрашивать через туннель" Tag="Tunnel" />
                             </ComboBox>
@@ -177,9 +188,9 @@
 
                         <StackPanel Grid.Column="1">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Резолверы системы" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <TextBlock Text="Системные резолверы" FontWeight="SemiBold" VerticalAlignment="Center" />
                                 <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                Content="Кому Windows отдаёт запросы всего, что идёт мимо туннеля. Их выдаёт сеть или задаёт адаптер." />
+                                                Content="Куда Windows отправляет запросы всего, что идёт мимо туннеля. Их выдаёт сеть или задаёт адаптер." />
                             </StackPanel>
 
                             <Border Margin="0,10,0,0" CornerRadius="{StaticResource RMd}" Padding="10,7"
@@ -262,7 +273,7 @@
                     </Border>
 
                     <StackPanel Grid.Column="1" Margin="0,0,16,0" VerticalAlignment="Center">
-                        <TextBlock Text="Автовыбор по задержке" FontWeight="SemiBold" />
+                        <TextBlock Text="Автоподбор по отклику" FontWeight="SemiBold" />
                         <TextBlock x:Name="AutoDnsLine" Style="{StaticResource Caption}" Margin="0,3,0,0"
                                    TextWrapping="Wrap"
                                    Text="Программа сама замерит резолверы из вашего места и поставит самый быстрый по DoH. Замер повторяется при каждой проверке выше; выбор строкой ниже автовыбор выключает." />
@@ -289,17 +300,17 @@
                     <WrapPanel Margin="0,14,0,0">
                         <TextBox x:Name="RouterDnsIp" Width="170" Margin="0,0,8,6" VerticalContentAlignment="Center"
                                  ToolTip="LAN IPv4 роутера, например 192.168.1.1" />
-                        <Button x:Name="RouterDnsUse" Style="{StaticResource Ghost}" Content="Использовать" Click="OnRouterDnsUse" Margin="0,0,8,6" />
-                        <Button x:Name="RouterDnsTest" Style="{StaticResource Ghost}" Content="Проверить роутер" Click="OnRouterDnsTest" Margin="0,0,0,6" />
+                        <Button x:Name="RouterDnsUse" Style="{StaticResource Ghost}" Content="Включить" Click="OnRouterDnsUse" Margin="0,0,8,6" />
+                        <Button x:Name="RouterDnsTest" Style="{StaticResource Ghost}" Content="Опросить роутер" Click="OnRouterDnsTest" Margin="0,0,0,6" />
                     </WrapPanel>
                     <TextBlock x:Name="RouterDnsStatus" Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
                                Text="Перед включением программа проверит роутер: отвечает ли он и не подменяет ли заблокированные имена." />
                 </StackPanel>
             </Border>
 
-            <TextBlock Text="Резолверы туннеля" FontWeight="SemiBold" FontSize="16" Margin="2,22,0,0" />
+            <TextBlock Text="Резолверы для туннеля" FontWeight="SemiBold" FontSize="16" Margin="2,22,0,0" />
             <TextBlock Style="{StaticResource Caption}" Margin="2,4,0,0" TextWrapping="Wrap"
-                       Text="Задержка — по DoH из обзора выше. Нажмите на строку, чтобы туннель спрашивал этого резолвера." />
+                       Text="Отклик — по DoH из сводки выше. Нажмите на строку, и туннель будет спрашивать этот резолвер." />
 
             <ItemsControl x:Name="Resolvers" Margin="0,10,0,0">
                 <ItemsControl.ItemTemplate>
@@ -364,7 +375,7 @@
                                 </ItemsControl>
 
                                 <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="12,0,0,0" MinWidth="92">
-                                    <TextBlock Text="Задержка" Style="{StaticResource Caption}" FontSize="11"
+                                    <TextBlock Text="Отклик" Style="{StaticResource Caption}" FontSize="11"
                                                HorizontalAlignment="Right" />
                                     <TextBlock Text="{Binding Latency}" Style="{StaticResource Mono}"
                                                Foreground="{Binding Color}" HorizontalAlignment="Right"
@@ -375,7 +386,7 @@
 
                                 <!-- Только у своих: встроенные убирать нечем и незачем. -->
                                 <Button Grid.Column="5" Style="{StaticResource Ghost}"
-                                        Content="убрать" Padding="12,5" Margin="12,0,0,0"
+                                        Content="удалить" Padding="12,5" Margin="12,0,0,0"
                                         Foreground="{DynamicResource Danger}"
                                         Visibility="{Binding RemoveShown}"
                                         Tag="{Binding Udp}" Click="OnRemoveOwn" />
@@ -416,7 +427,7 @@
                     </Border>
 
                     <StackPanel Grid.Column="1">
-                        <TextBlock Text="Свой резолвер" FontWeight="SemiBold" />
+                        <TextBlock Text="Другой резолвер" FontWeight="SemiBold" />
                         <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
                                    Text="Адрес цифрами. Имя для DoH — если резолвер его умеет: без него туннелю такой резолвер не выбрать, его можно только измерить в обзоре." />
 
@@ -429,7 +440,7 @@
                             <TextBox Grid.Column="0" x:Name="OwnName" Margin="0,0,8,0"
                                      gui:Hint.Text="Название, например XBOX DNS" />
                             <TextBox Grid.Column="1" x:Name="OwnAddress"
-                                     gui:Hint.Text="Адрес, 111.88.96.50" />
+                                     gui:Hint.Text="Адрес, например 111.88.96.50" />
                         </Grid>
 
                         <Grid Margin="0,8,0,0">
@@ -440,11 +451,11 @@
                             </Grid.ColumnDefinitions>
 
                             <TextBox Grid.Column="0" x:Name="OwnSecondary" Margin="0,0,8,0"
-                                     gui:Hint.Text="Второй адрес — необязательно" />
+                                     gui:Hint.Text="Второй адрес (по желанию)" />
                             <TextBox Grid.Column="1" x:Name="OwnDoh" Margin="0,0,8,0"
-                                     gui:Hint.Text="Имя DoH, dns.example.com — необязательно" />
+                                     gui:Hint.Text="Имя DoH, например dns.example.com (по желанию)" />
                             <Button Grid.Column="2" x:Name="OwnAddButton" Style="{StaticResource Primary}"
-                                    Content="Проверить и добавить" Click="OnAddOwn" />
+                                    Content="Проверить, затем добавить" Click="OnAddOwn" />
                         </Grid>
 
                         <Border x:Name="OwnStatusBox" Margin="0,8,0,0">

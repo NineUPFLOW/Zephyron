@@ -145,13 +145,13 @@ public partial class VpnView
 
             detail += routed > 0
                 ? $" · маршрутов сюда: {routed}"
-                : " · маршрутов пока нет — пул выбирается в пути маршрута «через VPN»";
+                : " · маршрутов пока нет: пул выбирается в маршруты сайта «через VPN»";
 
             if (missing > 0)
                 detail += $" · нет в подписках в работе: {missing}";
 
             if (pool.Servers.Count == 0)
-                detail = "Пусто — перетащите сюда строку сервера из подписки или добавьте его через «⋯» строки.";
+                detail = "Пусто: перетащите сюда строку сервера из подписки или добавьте его через «⋯» в строке.";
 
             row.Detail = detail;
             rows.Add(row);
@@ -160,15 +160,15 @@ public partial class VpnView
         _poolRows = rows;
 
         PoolsLine.Text = settings.Pools.Count == 0
-            ? "Пока все серверы в одном пуле — по умолчанию, и туда идут все маршруты «через VPN». "
+            ? "Пока все серверы в одном пуле, общем для всех, и все маршруты «через VPN» идут через него. "
                 + "Свой пул — папка серверов для части маршрутов: «Россия» для госуслуг, «Скоростной» для загрузок."
-            : "Сервер кладут в пул, перетащив его строку на папку пула, или через «⋯» строки; "
-                + "«Выбрать» в папке пула закрепляет его в этом пуле и выключает автоподбор пула; "
-                + "тумблер «автоподбор» возвращает его, а выключенный — закрепляет прежний сервер или быстрейший. "
-                + "Пул по умолчанию — все серверы. "
+            : "Сервер попадает в пул, если перетащить его строку на папку пула или выбрать «⋯» в строке; "
+                + "«Выбрать» в папке закрепляет сервер в этом пуле и выключает для пула автоподбор; "
+                + "тумблер «автоподбор» возвращает его, а выключенный закрепляет прежний или самый быстрый. "
+                + "Общий пул — все серверы. "
                 + (settings.DeadPoolToDefault
-                    ? "Пул, где никто не отвечает, уводит свои маршруты в пул по умолчанию."
-                    : "Пул, где никто не отвечает, ждёт — его маршруты не открываются, пока он молчит.");
+                    ? "Если в пуле никто не отвечает, его маршруты переходят в общий пул."
+                    : "Если в пуле никто не отвечает, его маршруты не открываются, пока он молчит.");
     }
 
     /// <summary>Строка сервера в папке пула: «Выбран» — закреплённый в пуле.</summary>
@@ -180,7 +180,7 @@ public partial class VpnView
         {
             PoolId = pool.Id,
             CanChoose = !pinned,
-            ChooseLabel = pinned ? "выбран" : "выбрать",
+            ChooseLabel = pinned ? "текущий" : "взять",
             Edge = (Brush)FindResource(pinned ? "AccentLine" : "Border"),
 
             // «Сейчас» — про выход пула по умолчанию: в пуле он значил бы не то.
@@ -209,14 +209,14 @@ public partial class VpnView
 
             bool routed = poolId is not null && PoolRoutes().TryGetValue(poolId, out var n) && n > 0;
 
-            Status.Text = routed ? done + " Применится при следующем запуске движков." : done;
+            Status.Text = routed ? done + " Вступит в силу после следующего запуска движков." : done;
 
             if (routed)
-                this.Offer("Пул изменён");
+                this.Offer("Пул обновлён");
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать пулы: " + ex.GetBaseException().Message;
+            Status.Text = "Пулы не записались: " + ex.GetBaseException().Message;
         }
     }
 
@@ -227,7 +227,7 @@ public partial class VpnView
     {
         var settings = AppSettings.Load(AppSettings.DefaultPath);
 
-        var window = new FolderNameWindow("Новый пул серверов", [.. settings.Pools.Select(p => p.Name)], pool: true)
+        var window = new FolderNameWindow("Пул серверов без названия", [.. settings.Pools.Select(p => p.Name)], pool: true)
         {
             Owner = Window.GetWindow(this),
         };
@@ -276,9 +276,9 @@ public partial class VpnView
         var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom };
 
         // Автоподбор — тумблером в шапке папки (20.10), не пунктом меню.
-        menu.Items.Add(Item("", "Переименовать…", () => RenamePool(pool)));
+        menu.Items.Add(Item("", "Задать другое имя…", () => RenamePool(pool)));
         menu.Items.Add(new Separator { Style = (Style)FindResource("MenuLine") });
-        menu.Items.Add(Item("", "Удалить пул…", () => RemovePool(pool)));
+        menu.Items.Add(Item("", "Убрать пул…", () => RemovePool(pool)));
 
         menu.IsOpen = true;
     }
@@ -290,7 +290,7 @@ public partial class VpnView
             .Select(p => p.Name)
             .ToList();
 
-        var window = new FolderNameWindow($"Переименовать «{pool.Name}»", others, pool.Name, "Переименовать", pool: true)
+        var window = new FolderNameWindow($"Переименовать «{pool.Name}»", others, pool.Name, "Сохранить имя", pool: true)
         {
             Owner = Window.GetWindow(this),
         };
@@ -317,7 +317,7 @@ public partial class VpnView
             routed > 0
                 ? $"Удалить пул «{pool.Name}»? Маршруты, ведущие в него ({routed}), пойдут в пул по умолчанию. Серверы останутся в своих подписках."
                 : $"Удалить пул «{pool.Name}»? Серверы останутся в своих подписках.",
-            "Удалить пул",
+            "Убрать пул",
             MessageBoxButton.OKCancel,
             MessageBoxImage.Question);
 
@@ -351,7 +351,7 @@ public partial class VpnView
         SavePools(pools => [.. pools.Where(p => p.Id != pool.Id)], $"Пул «{pool.Name}» удалён.", poolId: null);
 
         if (routed > 0)
-            this.Offer("Пул удалён");
+            this.Offer("Пул убран");
     }
 
     /// <summary>Пункты пулов в меню строки сервера.</summary>
@@ -394,11 +394,11 @@ public partial class VpnView
             var target = pool;
 
             menu.Items.Add(inside
-                ? Item("", $"Уже в пуле «{pool.Name}»", () => { }, enabled: false)
-                : Item("", $"В пул «{pool.Name}»", () => PutIntoPool(target, row)));
+                ? Item("", $"Этот сервер уже в пуле «{pool.Name}»", () => { }, enabled: false)
+                : Item("", $"Добавить в пул «{pool.Name}»", () => PutIntoPool(target, row)));
         }
 
-        menu.Items.Add(Item("", "В новый пул…", () => NewPool(row)));
+        menu.Items.Add(Item("", "Создать пул с этим сервером…", () => NewPool(row)));
     }
 
     /// <summary>Кладёт сервер в пул; подписку вне работы ставит в работу — иначе его нет в конфиге.</summary>
@@ -417,7 +417,7 @@ public partial class VpnView
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось: " + ex.GetBaseException().Message;
+            Status.Text = "Не получилось: " + ex.GetBaseException().Message;
         }
     }
 

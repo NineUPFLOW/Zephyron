@@ -170,7 +170,7 @@ public sealed class SubscriptionBook
         {
             book.Entries.Insert(0, new SubscriptionEntry
             {
-                Name = book.Entries.Count == 0 ? "Основная" : "Перенесённая",
+                Name = book.Entries.Count == 0 ? "Основная" : "Из прежней версии",
                 Url = active,
             });
         }

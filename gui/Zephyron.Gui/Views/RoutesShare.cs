@@ -51,7 +51,7 @@ public partial class RoutesView
         }
         catch (Exception ex)
         {
-            ExportButton.ToolTip = "Маршруты не прочитались: " + ex.GetBaseException().Message;
+            ExportButton.ToolTip = "Не удалось прочитать маршруты: " + ex.GetBaseException().Message;
             ClashesBox.Visibility = Visibility.Collapsed;
         }
     }
@@ -62,7 +62,7 @@ public partial class RoutesView
 
         if (!File.Exists(source))
         {
-            Status.Text = "Своих маршрутов нет — сохранять нечего.";
+            Status.Text = "Своих маршрутов нет, выгружать нечего.";
             return;
         }
 
@@ -92,7 +92,7 @@ public partial class RoutesView
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось сохранить: " + ex.GetBaseException().Message;
+            Status.Text = "Сохранить не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -135,7 +135,7 @@ public partial class RoutesView
 
         if (incoming.Count == 0)
         {
-            Status.Text = "В файле нет ни одного маршрута — загружать нечего.";
+            Status.Text = "В файле нет маршрутов, загружать нечего.";
             return;
         }
 
@@ -147,7 +147,7 @@ public partial class RoutesView
             // Те же правила, но в наборе есть новый список: его всё равно надо завести.
             if (diff.Same && RouteBundle.ListNames(dialog.FileName).All(n => OwnLists.Exists(n)))
             {
-                Status.Text = "Маршруты в файле совпадают с вашими — менять нечего.";
+                Status.Text = "Маршруты в файле совпадают с вашими, менять нечего.";
                 return;
             }
 
@@ -184,7 +184,7 @@ public partial class RoutesView
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось загрузить: " + ex.GetBaseException().Message;
+            Status.Text = "Загрузить не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -195,9 +195,9 @@ public partial class RoutesView
 
         text.AppendLine($"Добавится {diff.Added.Count}, уйдёт {diff.Removed.Count}, изменится {diff.Changed.Count}.");
 
-        Listed(text, "Добавится", diff.Added.Select(RulesShare.Describe).ToList());
-        Listed(text, "Уйдёт", diff.Removed.Select(RulesShare.Describe).ToList());
-        Listed(text, "Изменится", diff.Changed.Select(c => RulesShare.Describe(c.Before, c.After)).ToList());
+        Listed(text, "Будет добавлено", diff.Added.Select(RulesShare.Describe).ToList());
+        Listed(text, "Исчезнет", diff.Removed.Select(RulesShare.Describe).ToList());
+        Listed(text, "Будет изменено", diff.Changed.Select(c => RulesShare.Describe(c.Before, c.After)).ToList());
 
         int fresh = bundled.Count(n => !OwnLists.Exists(n));
 

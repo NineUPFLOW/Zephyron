@@ -41,10 +41,10 @@ public sealed class HostsLine(HostsRow row) : INotifyPropertyChanged
 
     public string Address => Row.Address;
 
-    public string Source => Row.Source ?? "неизвестно";
+    public string Source => Row.Source ?? "не определено";
 
     public string SourceHint => Row.Source is null
-        ? "Строка вне всех блоков: её поставил кто-то без подписи — вы сами, антивирус или программа, которой уже нет."
+        ? "Строка вне блоков программ: её добавил кто-то без подписи — вы сами, антивирус или программа, которой уже нет."
         : Row.Ours
         ? "Наш блок: эти записи поставила Zephyron."
         : $"Строка лежит в блоке «{Row.Source}» — его ведёт эта программа и может вернуть записи при следующей своей правке.";
@@ -59,27 +59,34 @@ public sealed class HostsLine(HostsRow row) : INotifyPropertyChanged
     public string KindHint => Row.Kind switch
     {
         HostsPinKind.Service =>
-            "Адрес самого сервиса: пин только выбирает незакрытый адрес, а имя провайдер режет и там. "
+            "Адрес самого сервиса: пин лишь подбирает незакрытый адрес, а имя провайдер режет и там. "
             + "Щит десинка такое имя не берёт — его обрабатывает рецепт.",
         HostsPinKind.Stub =>
-            "Петля или нули: имя закрыто намеренно, открываться оно не должно.",
+            "Петля или нули: это заглушка, имя нарочно не должно открываться.",
         _ when Row.Ours =>
-            "Посредник — чужой узел, через который ходит имя (XBOX DNS, Comss, GeoHide). "
-            + "Щит десинка пропускает такое имя без обработки: рецепт, выверенный на настоящем сервисе, "
-            + "рвёт соединение с посредником. Если адрес — сам сервис, смените вид в меню строки.",
+            "Посредник — через него ходит имя (XBOX DNS, Comss, GeoHide). "
+            + "Щит десинка пропускает такое имя без обработки: рецепт, настроенный на настоящий сервис, "
+            + "рвёт соединение с посредником. Если адрес ведёт на сам сервис, смените вид в меню строки.",
         _ =>
-            "Чужую строку щит десинка считает посредником и пропускает без обработки: пометку "
-            + "«адрес сервиса» ставит только Zephyron, своей записью.",
+            "Чужую строку щит десинка считает посредником и пропускает без обработки: "
+            + "пометку «адрес сервиса» ставит только Zephyron, своей записью.",
     };
 
     /// <summary>Строка под именем: почему запись не действует либо её подпись.</summary>
     public string Sub =>
-        Row.Repeat ? "повтор — действует запись выше"
+        Row.Repeat ? "повтор: действует запись выше"
         : Note is { Length: > 0 } note ? note
         : string.Empty;
 
     /// <summary>Подпись строки без нашей служебной пометки — та видна колонкой «Вид».</summary>
-    public string? Note => Row.Note?.Replace(HostsEditor.DesyncMark, string.Empty, StringComparison.OrdinalIgnoreCase).Trim(' ', ',', ';');
+    public string? Note => Row.Note is null
+        ? null
+        : System.Text.RegularExpressions.Regex.Replace(
+                Row.Note.Replace(HostsEditor.DesyncMark, string.Empty, StringComparison.OrdinalIgnoreCase),
+                System.Text.RegularExpressions.Regex.Escape(HostsEditor.ViaMark) + @"\S*",
+                string.Empty,
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+            .Trim(' ', ',', ';');
 
     public bool HasSub => Sub.Length > 0;
 
@@ -125,10 +132,10 @@ public sealed class HostsLine(HostsRow row) : INotifyPropertyChanged
     {
         "Off" => "Запись выключена: строка в файле под решёткой, Windows её не читает.",
         "Stub" => "Заглушка — проверять нечего.",
-        nameof(HostsHealth.Alive) => "Адрес отвечает на 443.",
-        nameof(HostsHealth.Dead) => "Адрес молчит на 443: пин ведёт в никуда и выглядит блокировкой.",
-        nameof(HostsHealth.Untested) => "Не проверялся: в этой сети нет IPv6.",
-        _ => "Не проверен — «Проверить адреса».",
+        nameof(HostsHealth.Alive) => "Адрес отвечает по 443.",
+        nameof(HostsHealth.Dead) => "Адрес не отвечает по 443: пин ведёт в никуда и выглядит как блокировка.",
+        nameof(HostsHealth.Untested) => "Не проверено: в этой сети нет IPv6.",
+        _ => "Ещё не проверено: нажмите «Проверить доступность».",
     };
 
     private void Changed(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
@@ -197,12 +204,12 @@ internal static class HostsFilter
 
     public static string Word(HostsShow show) => show switch
     {
-        HostsShow.Ours => "Наши",
-        HostsShow.Foreign => "Чужие",
-        HostsShow.Off => "Отключённые",
-        HostsShow.Dead => "Молчат",
-        HostsShow.Repeats => "Повторы",
-        _ => "Все записи",
+        HostsShow.Ours => "От Zephyron",
+        HostsShow.Foreign => "Сторонние",
+        HostsShow.Off => "Выключенные",
+        HostsShow.Dead => "Не отвечают",
+        HostsShow.Repeats => "Дубли",
+        _ => "Показать всё",
     };
 
     /// <summary>

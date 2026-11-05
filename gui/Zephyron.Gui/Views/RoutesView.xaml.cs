@@ -101,7 +101,7 @@ public sealed record PartRow : INotifyPropertyChanged
             : Visibility.Hidden;
 
     /// <summary>Подсказка кнопки списка: открыть файл или, у своего домена без файла, завести его.</summary>
-    public string ListHint => ListPath is { } path ? $"Открыть список в Блокноте: {path}" : "Завести файл списка — к нему можно дописать другие имена";
+    public string ListHint => ListPath is { } path ? $"Откроется в Блокноте: " : "Создать файл списка, в который можно дописать другие имена";
 
     /// <summary>
     /// Настоящее имя из списка — на нём проверяются рецепты.
@@ -150,7 +150,7 @@ public sealed record PartRow : INotifyPropertyChanged
     /// </remarks>
     public string Route => Applied switch
     {
-        0 => HasPin ? "прибит в hosts" : "напрямую",
+        0 => HasPin ? "пин в hosts" : "напрямую",
         1 => "десинк",
         Off => "выключено",
         _ => "VPN",
@@ -221,9 +221,9 @@ public sealed record PartRow : INotifyPropertyChanged
     /// его как было.
     /// </remarks>
     public string PinHint => HasPin
-        ? "Снять пин: адрес перестанет быть прибитым в hosts. Маршрут не тронем."
-        : "Прибить адрес в hosts. Маршрут при этом уйдёт напрямую — иначе правило "
-            + "сработает поверх адреса и уведёт соединение мимо него.";
+        ? "Снять пин: адрес перестанет быть прибитым в hosts. Маршрут сайта не изменится."
+        : "Прибить адрес в hosts. Маршрут сайта при этом станет «напрямую»: иначе правило сработает поверх адреса и уведёт соединение мимо него."
+            + "";
 
     /// <summary>
     /// Цвет значка: прибитое выделено, остальное обычным.
@@ -466,12 +466,12 @@ public sealed record ServiceRow(string Name, IReadOnlyList<PartRow> Parts) : INo
     public Visibility AddShown => IsFolder && Open && !_forced && Program is null ? Visibility.Visible : Visibility.Collapsed;
 
     /// <summary>Под именем папки: сколько маршрутов и куда идут.</summary>
-    public string Subtitle => Parts.Count == 0 ? "пусто" : $"{Count} · {Summary}";
+    public string Subtitle => Parts.Count == 0 ? "ничего нет" : $"{Count} · {Summary}";
 
     public string AutoFillHint =>
-        "Автопополнение: пока программа запущена, идёт «Наблюдение», и всё, что она открывает, дописывается — "
-        + "имена в «Домены», сети /24 в «Адреса». Закрылась — наблюдение через полминуты останавливается. "
-        + "Маршруты сами не включаются: путь выбираете вы.";
+        "Автодобавление: пока программа запущена, идёт запись соединений, и всё открытое ею дописывается: имена в «Домены», сети /24 в «Адреса». После закрытия программы запись останавливается через полминуты. Маршруты сами не включаются: их выбираете вы."
+        + ""
+        + "";
 
     /// <summary>
     /// Разворачивать нечего: часть одна, и она же вся строка.
@@ -549,7 +549,7 @@ public sealed record ServiceRow(string Name, IReadOnlyList<PartRow> Parts) : INo
             return modes.Count switch
             {
                 0 => string.Empty,
-                1 => "всё " + modes[0].Key,
+                1 => "везде: " + modes[0].Key,
                 _ => string.Join(" · ", modes.Select(g => $"{g.Count()} {g.Key}")),
             };
         }
@@ -571,7 +571,7 @@ public sealed record ServiceRow(string Name, IReadOnlyList<PartRow> Parts) : INo
         return (count % 10) switch
         {
             1 => "маршрут",
-            2 or 3 or 4 => "маршрута",
+            2 or 3 or 4 => "пути",
             _ => "маршрутов",
         };
     }
@@ -784,7 +784,7 @@ public partial class RoutesView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Правила не читаются: " + ex.GetBaseException().Message;
+            Status.Text = "Не удалось прочитать правила: " + ex.GetBaseException().Message;
         }
         finally
         {
@@ -978,14 +978,14 @@ public partial class RoutesView : UserControl
         Order.ItemsSource = rows;
 
         OrderSummary.Text = $"{ruleSet.Rules.Count} правил, порядок: process → domain → ip → default. "
-            + "Побеждает то, до которого очередь доходит раньше. Свои правила с ручкой ⠿ "
-            + "перетаскиваются внутри своей группы.";
+            + "Побеждает то правило, до которого очередь дойдёт раньше. Свои правила с ручкой ⠿ можно переставлять в пределах их группы."
+            + "";
 
         OrderNote.Text = ruleSet.Operating != OperatingMode.Selective
-            ? "В этом режиме правила не вычисляются — они показаны для справки."
+            ? "В этом режиме правила не применяются, они показаны для справки."
             : engine.RequiresHostnames
-                ? "Доменные правила требуют источника имён — его даёт fakeip, "
-                  + "поднимаемый вместе с туннелем."
+                ? "Для доменных правил нужен источник имён: его даёт fakeip, который поднимается вместе с туннелем."
+                  + ""
                 : string.Empty;
     }
 
@@ -1060,9 +1060,9 @@ public partial class RoutesView : UserControl
         if (!CanDrop(e, out var source, out var target))
         {
             if (source is not null && target is not null && source != target)
-                Status.Text = "Переставить можно только внутри своей группы: правило по процессу "
-                    + "проверяется раньше доменного, доменное — раньше адресного, а ваше — раньше "
-                    + "заводского, куда бы его ни поставить.";
+                Status.Text = "Переставлять можно лишь внутри группы: правило по процессу проверяется раньше доменного, доменное раньше адресного, а ваше раньше заводского, куда бы вы его ни поставили."
+                    + ""
+                    + "";
 
             return;
         }
@@ -1082,12 +1082,12 @@ public partial class RoutesView : UserControl
             OrderPanel.Visibility = Visibility.Visible;
             Chevrons.Turn(OrderChevron, true);
 
-            Status.Text = $"Порядок сохранён: {source.Value} встал на место {target.Value}. "
-                + "Применится при следующем запуске движков.";
+            Status.Text = $"Порядок записан: {source.Value} встал на место {target.Value}. Вступит в силу после следующего запуска движков."
+                + "Вступит в силу после следующего запуска движков.";
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось сохранить порядок: " + ex.GetBaseException().Message;
+            Status.Text = "Порядок записать не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -1225,7 +1225,7 @@ public partial class RoutesView : UserControl
             // и когда он однажды протухнет, искать причину будут где угодно,
             // только не в hosts.
             if (part.HasPin && part.Choice == 0)
-                part.Mode = "прибит в hosts";
+                part.Mode = "пин в hosts";
         }
     }
 
@@ -1278,7 +1278,7 @@ public partial class RoutesView : UserControl
             // выбранный однажды, он иначе пропадал бы из виду, и понять, чем
             // чинится имя, можно было бы только заглянув в yaml.
             var (mode, tip) = entry.Off
-                ? ("выключено — правило не действует", null)
+                ? ("отключено, правило не действует", null)
                 : entry.Mode == RoutingMode.Desync && !string.IsNullOrWhiteSpace(entry.Recipe)
                     ? RecipeLabel(entry.Recipe)
                     : (Describe(entry.Mode), (string?)null);
@@ -1293,7 +1293,7 @@ public partial class RoutesView : UserControl
                 Detail = listed
                     ? "свой список · " + Count(count, "домен", "домена", "доменов")
                         + (addresses > 0 ? " · " + Count(addresses, "адрес", "адреса", "адресов") : string.Empty)
-                    : "свой домен",
+                    : "домен от вас",
 
                 Example = domain,
 
@@ -1333,9 +1333,9 @@ public partial class RoutesView : UserControl
                 Key = RouteKeys.Make(RouteKeys.Program, entry.Value),
                 Title = entry.Value,
                 Detail = entry.Mode == RoutingMode.Proxy
-                    ? "программа · пока правило стоит, туннель забирает весь трафик машины: всё без маршрута идёт мимо VPN, но через движок туннеля. Сети Riot остаются мимо него"
+                    ? "программа · пока правило включено, туннель забирает весь трафик компьютера: всё без выбранного маршруты идёт мимо VPN, но через движок туннеля. Сети Riot остаются мимо него"
                     : "программа",
-                Mode = entry.Off ? "выключено — правило не действует" : Describe(entry.Mode),
+                Mode = entry.Off ? "отключено, правило не действует" : Describe(entry.Mode),
                 Color = (Brush)Application.Current.FindResource(color),
                 Choice = choice,
                 Applied = choice,
@@ -1365,9 +1365,9 @@ public partial class RoutesView : UserControl
             {
                 Key = RouteKeys.Make(RouteKeys.Subnet, entry.Value),
                 Title = entry.Value,
-                Detail = entry.Value.Contains('/') ? "своя подсеть" : "свой адрес",
+                Detail = entry.Value.Contains('/') ? "подсеть от вас" : "адрес от вас",
                 Example = entry.Value,
-                Mode = entry.Off ? "выключено — правило не действует" : Describe(entry.Mode),
+                Mode = entry.Off ? "отключено, правило не действует" : Describe(entry.Mode),
                 Color = (Brush)Application.Current.FindResource(color),
                 Choice = choice,
                 Applied = choice,
@@ -1492,12 +1492,12 @@ public partial class RoutesView : UserControl
         };
 
         var detail = lines.Count == 0
-            ? domains ? "пусто — сюда лягут имена, которые открывает программа" : "пусто — сюда лягут сети серверов без имени"
+            ? domains ? "пусто: сюда попадут имена, которые открывает программа" : "пусто — сюда лягут сети серверов без имени"
             : (domains ? Count(lines.Count, "домен", "домена", "доменов") : Count(lines.Count, "сеть", "сети", "сетей"))
                 + ": " + string.Join(", ", lines.Take(3)) + (lines.Count > 3 ? " …" : string.Empty);
 
         var (mode, tip) = entry is null || entry.Off
-            ? ("выключено — маршрут не действует", null)
+            ? ("отключено, маршрут не действует", null)
             : entry.Mode == RoutingMode.Desync && !string.IsNullOrWhiteSpace(entry.Recipe)
                 ? RecipeLabel(entry.Recipe)
                 : (Describe(entry.Mode), (string?)null);
@@ -1843,7 +1843,7 @@ public partial class RoutesView : UserControl
                 return;
 
             var result = HostsEditor.Unpin(ours);
-            HostsEditor.FlushDns();
+            _ = HostsEditor.FlushDnsAsync();
 
             Reload();
 
@@ -1854,7 +1854,7 @@ public partial class RoutesView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось снять пин: " + ex.GetBaseException().Message;
+            Status.Text = "Снять пин не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -1983,7 +1983,7 @@ public partial class RoutesView : UserControl
                 service.Open = open;
         }
 
-        ExpandButton.Content = open ? "Свернуть всё" : "Раскрыть всё";
+        ExpandButton.Content = open ? "Свернуть все" : "Раскрыть всё";
         Redraw();
     }
 
@@ -2269,11 +2269,11 @@ public partial class RoutesView : UserControl
             }
 
             Status.Text = $"Заведён список «{name}» с {domain}. Допишите {(address ? "адреса, подсети или имена" : "имена")} и сохраните — "
-                + "применится при следующем запуске движков.";
+                + "вступит в силу после следующего запуска движков.";
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось завести список: " + ex.GetBaseException().Message;
+            Status.Text = "Список создать не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2386,12 +2386,12 @@ public partial class RoutesView : UserControl
                 UseShellExecute = true,
             })?.Dispose();
 
-            Status.Text = $"Открыт {System.IO.Path.GetFileName(path)}. Правка применится при следующем запуске движков; "
+            Status.Text = $"Открыт {System.IO.Path.GetFileName(path)}. Правка вступит в силу после следующего запуска движков; "
                 + "раздел покажет её, когда откроете его заново.";
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось открыть список: " + ex.GetBaseException().Message;
+            Status.Text = "Список открыть не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2429,7 +2429,7 @@ public partial class RoutesView : UserControl
             ? "Впишите сайт в поле ниже: если его нет в списке, появится «Добавить»."
             : $"Своих правил: {own.Count} — {string.Join(", ", own.Take(3))}"
               + (own.Count > 3 ? $" и ещё {own.Count - 3}" : string.Empty)
-              + ". Они в списке ниже вместе с сервисами; строки и папки перетаскиваются мышью.";
+              + ". Они в списке ниже вместе с сервисами; строки и папки можно перетаскивать.";
 
         // Снятые правила по программе (Rules.ProgramRulesOff, 04.10) — словами,
         // а не молча: человек ставил игру «через VPN», и правило пропало.
@@ -2451,16 +2451,16 @@ public partial class RoutesView : UserControl
             Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
         };
 
-        menu.Items.Add(MenuEntry("", "Сайт, адрес или подсеть…", () =>
+        menu.Items.Add(MenuEntry("", "Сайт, адрес или сеть…", () =>
         {
             Search.Text = string.Empty;
             Search.Focus();
             Status.Text = "Впишите сайт (example.com), адрес или подсеть в поле поиска — если такого нет, появится «Добавить».";
         }));
-        menu.Items.Add(MenuEntry("", "Списком…", () => AddList(string.Empty)));
+        menu.Items.Add(MenuEntry("", "Много строк сразу…", () => AddList(string.Empty)));
         menu.Items.Add(new Separator { Style = (Style)FindResource("MenuLine") });
-        menu.Items.Add(MenuEntry("", "Программа из запущенных…", PickRunningProgram));
-        menu.Items.Add(MenuEntry("", "Программа файлом…", PickProgramFile));
+        menu.Items.Add(MenuEntry("", "Программа среди запущенных…", PickRunningProgram));
+        menu.Items.Add(MenuEntry("", "Программа из файла…", PickProgramFile));
         menu.IsOpen = true;
     }
 
@@ -2532,7 +2532,7 @@ public partial class RoutesView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2554,7 +2554,7 @@ public partial class RoutesView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2579,12 +2579,12 @@ public partial class RoutesView : UserControl
             ProgramRoutes.Remove(program, AppSettings.DefaultPath, UserRulesFile.DefaultPath);
             Reload();
 
-            Status.Text = $"Убрана «{program}». Применится при следующем запуске движков.";
+            Status.Text = $"Убрана «{program}». Вступит в силу после следующего запуска движков.";
             this.Offer($"Убран маршрут: {program}");
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось убрать: " + ex.GetBaseException().Message;
+            Status.Text = "Не удалилось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2608,7 +2608,7 @@ public partial class RoutesView : UserControl
         // делает»), а список из двадцати папок в меню и не нужен.
         var menu = new ContextMenu { PlacementTarget = anchor, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
 
-        menu.Items.Add(MenuEntry("", "В новую папку…", () =>
+        menu.Items.Add(MenuEntry("", "Переложить в новую папку…", () =>
         {
             var window = new FolderNameWindow($"Новая папка для «{part.Title}»", ProgramNames()) { Owner = Window.GetWindow(this) };
 
@@ -2617,11 +2617,11 @@ public partial class RoutesView : UserControl
         }));
 
         if (part.Folder is not null)
-            menu.Items.Add(MenuEntry("", "Вынуть из папки", () => MoveRoute(part, string.Empty)));
+            menu.Items.Add(MenuEntry("", "Достать из папки", () => MoveRoute(part, string.Empty)));
 
         if (!string.Equals(part.Folder ?? string.Empty, part.HomeFolder ?? string.Empty, StringComparison.OrdinalIgnoreCase))
         {
-            menu.Items.Add(MenuEntry("", part.HomeFolder is { } home ? $"Вернуть в «{home}»" : "Вернуть на место",
+            menu.Items.Add(MenuEntry("", part.HomeFolder is { } home ? $"Вернуть в папку «{home}»" : "Вернуть назад",
                 () => MoveRoute(part, part.HomeFolder ?? string.Empty)));
         }
 
@@ -2629,7 +2629,7 @@ public partial class RoutesView : UserControl
         if (part.Own)
         {
             menu.Items.Add(new Separator { Style = (Style)FindResource("MenuLine") });
-            menu.Items.Add(MenuEntry(string.Empty, "Убрать маршрут", () => RemoveOwn(part.Key)));
+            menu.Items.Add(MenuEntry(string.Empty, "Удалить маршрут", () => RemoveOwn(part.Key)));
         }
 
         menu.IsOpen = true;
@@ -2649,12 +2649,12 @@ public partial class RoutesView : UserControl
             Reload();
 
             Status.Text = folder.Length == 0
-                ? $"«{part.Title}» — вне папки. Путь маршрута не менялся."
-                : $"«{part.Title}» — в папке «{folder.Trim()}». Путь маршрута не менялся.";
+                ? $"«{part.Title}» — вне папки. Маршрут не менялся."
+                : $"«{part.Title}» — в папке «{folder.Trim()}». Маршрут не менялся.";
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось переложить: " + ex.GetBaseException().Message;
+            Status.Text = "Переложить не получилось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2694,7 +2694,7 @@ public partial class RoutesView : UserControl
 
         if (name is null)
         {
-            Status.Text = "Это не похоже на имя сайта. Нужно что-то вроде example.com.";
+            Status.Text = "Это не имя сайта. Нужно что-то вроде example.com.";
             return;
         }
 
@@ -2719,13 +2719,13 @@ public partial class RoutesView : UserControl
             Reload();
 
             Status.Text = $"Записано: {name} → напрямую. Режим меняется в его строке ниже. "
-                + "Применится при следующем запуске движков.";
+                + "Вступит в силу после следующего запуска движков.";
 
             this.Offer($"Добавлен маршрут: {name}");
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2816,13 +2816,13 @@ public partial class RoutesView : UserControl
             Reload();
 
             Status.Text = $"Записано: {subnet} → напрямую. Режим меняется в его строке ниже. "
-                + "Применится при следующем запуске движков.";
+                + "Вступит в силу после следующего запуска движков.";
 
             this.Offer($"Добавлен маршрут: {subnet}");
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2919,7 +2919,7 @@ public partial class RoutesView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось убрать: " + ex.GetBaseException().Message;
+            Status.Text = "Не удалилось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -3042,12 +3042,12 @@ public partial class RoutesView : UserControl
 
             Reload();
 
-            Status.Text = $"«{row.Title}» — по умолчанию: {row.DefaultLabel}. Применится при следующем запуске движков.";
+            Status.Text = $"«{row.Title}» — по умолчанию: {row.DefaultLabel}. Вступит в силу после следующего запуска движков.";
             this.Offer("Маршрут изменён");
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -3175,11 +3175,11 @@ public partial class RoutesView : UserControl
             var pool = ServerPools.Find(_pools ?? [], ServerPools.IdOf(server));
 
             Status.Text = pool is not null
-                ? $"Записано: {parts[1]} → через VPN, пул «{pool.Name}». Применится при следующем запуске движков."
+                ? $"Записано: {parts[1]} → через туннель, пул «{pool.Name}». Вступит в силу после следующего запуска движков."
                 : string.IsNullOrEmpty(recipe)
-                ? $"Записано: {parts[1]} → {Describe(mode)}. Применится при следующем запуске движков."
+                ? $"Записано: {parts[1]} → {Describe(mode)}. Вступит в силу после следующего запуска движков."
                 : $"Записано: {parts[1]} → десинк рецептом «{recipe}». "
-                  + "Применится при следующем запуске движков.";
+                  + "Вступит в силу после следующего запуска движков.";
 
             // VPN выбран, а имена прибиты — пин перебьёт маршрут (PinConflict).
             if (mode == RoutingMode.Proxy
@@ -3192,7 +3192,7 @@ public partial class RoutesView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -3220,13 +3220,13 @@ public partial class RoutesView : UserControl
             Reload();
 
             Status.Text = $"Выключено: {parts[1]}. Его имена теперь решают другие правила, "
-                + "а нет таких — умолчание режима. Применится при следующем запуске движков.";
+                + "а нет таких — умолчание режима. Вступит в силу после следующего запуска движков.";
 
             this.Offer("Маршрут изменён");
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
     }
 

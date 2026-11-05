@@ -319,6 +319,6 @@ public sealed class TunnelConfigTests : IDisposable
             CancellationToken.None);
 
         Assert.False(outcome.Ok);
-        Assert.Contains("не собрался", outcome.Message, StringComparison.Ordinal);
+        Assert.Contains("не создан", outcome.Message, StringComparison.Ordinal);
     }
 }

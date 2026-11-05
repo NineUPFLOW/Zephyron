@@ -278,7 +278,7 @@ public partial class StatusView : UserControl
         }
         catch (Exception ex)
         {
-            ShowProblem("Проводник не открылся: " + ex.GetBaseException().Message);
+            ShowProblem("Не получилось открыть проводник: " + ex.GetBaseException().Message);
         }
     }
 
@@ -295,7 +295,7 @@ public partial class StatusView : UserControl
             // пояснение «Гибрида» и «Туннеля», а ShowModes зовётся не по времени.
             ShowModes(AppSettings.Load(AppSettings.DefaultPath));
             Update();
-            this.Offer("Настройки туннеля изменены");
+            this.Offer("Параметры туннеля обновлены");
         }
     }
 
@@ -405,7 +405,7 @@ public partial class StatusView : UserControl
 
         UpdateWhat.Text = highlights.Count > 0
             ? string.Join(" · ", highlights) + "."
-            : "Установлена " + UpdateCheck.Current + ".";
+            : "Сейчас стоит " + UpdateCheck.Current + ".";
 
         UpdateCard.Visibility = Visibility.Visible;
     }
@@ -461,7 +461,8 @@ public partial class StatusView : UserControl
         bool Running,
         bool SingBoxUp,
         DateTime? ConfigBuilt,
-        bool Coming = false);
+        bool Coming = false,
+        string PresetNote = "");
 
     private static Seen Read(bool starting)
     {
@@ -473,7 +474,7 @@ public partial class StatusView : UserControl
         }
         catch (Exception ex)
         {
-            return new Seen(null, $"Настройки не читаются: {ex.Message}", string.Empty, null, false, false, null);
+            return new Seen(null, $"Не удалось прочитать настройки: ", string.Empty, null, false, false, null);
         }
 
         // Ссылки на подписки — пароли, и в окне им не место. Показываем лишь
@@ -509,7 +510,7 @@ public partial class StatusView : UserControl
         }
 
         return new Seen(settings, null, subscriptions, state, running, starting && !running && IsRunning("sing-box"), built,
-            !running && EngineControl.Coming);
+            !running && EngineControl.Coming, PresetNoteOf(settings.PresetName));
     }
 
     private bool _updating;
@@ -571,7 +572,7 @@ public partial class StatusView : UserControl
         Problem.Visibility = Visibility.Collapsed;
 
         PresetValue.Text = settings.DescribePreset();
-        ShowPresetNote(settings.PresetName);
+        PresetNote.Text = seen.PresetNote;
         ServerValue.Text = TunnelStatus.ServerLine(settings, _exit);
         DnsValue.Text = settings.UseRouterDns
             ? RouterDnsConnection.ConfigWarning(settings) is not null
@@ -672,15 +673,15 @@ public partial class StatusView : UserControl
         if (!running)
         {
             ShowHero(HomeState.Off, settings.NeedsProxy || settings.NeedsDesync
-                ? "Обход не работает: трафик идёт напрямую."
-                : "В этом режиме запускать нечего: VPN выключен, пресет не выбран.");
+                ? "Обход выключен: трафик идёт без изменений."
+                : "Запускать нечего: VPN выключен и пресет десинка не выбран.");
 
             StartButton.IsEnabled = settings.NeedsProxy || settings.NeedsDesync;
 
             // Движки остаются на виду и выключенными, просто серыми. Пустое
             // место на их месте читается как «их нет вовсе», тогда как раздел
             // отвечает на другой вопрос: что должно работать и работает ли.
-            SetEngines(Planned(settings, "остановлен", HomeState.Off));
+            SetEngines(Planned(settings, "выключен", HomeState.Off));
             SetDnsWarning(null);
 
             return;
@@ -711,8 +712,8 @@ public partial class StatusView : UserControl
                 : broken
                     ? BrokenHint(services)
                     : dnsDown
-                        ? "Резолвер движка не отвечает — сайты открываются с задержкой или не открываются. Подробности ниже."
-                        : "Часть движков не в порядке — подробности ниже.");
+                        ? "Резолвер движка молчит: сайты открываются с задержкой или совсем не открываются. Подробности ниже."
+                        : "Часть движков работает с ошибками. Подробности ниже.");
 
         // Причина упавшего движка — целиком строкой ниже, а не только подсказкой
         // его строки: та в одну строку и обрезается. 22.10 у знакомого владельца
@@ -814,23 +815,23 @@ public partial class StatusView : UserControl
         if (!running)
         {
             if (!singBoxUp)
-                return "Собираем конфиг и поднимаем супервизор";
+                return "Готовим конфиг и запускаем супервизор";
 
             // Проверка прохода трафика уходит в сеть и занимает основную часть
             // ожидания, поэтому названа отдельно: иначе эти секунды выглядят
             // как необъяснённая пауза.
             return settings.VerifyTraffic
-                ? "Туннель поднимается, проверяем проход трафика"
-                : "Туннель поднимается";
+                ? "Туннель запускается, проверяем, идёт ли трафик"
+                : "Туннель запускается";
         }
 
         var singBox = services.FirstOrDefault(s => s.Name == "sing-box");
 
         return singBox?.Health switch
         {
-            ServiceHealth.Degraded => "Туннель поднят, проверка ещё не прошла",
-            ServiceHealth.Dead => "Туннель не поднялся, идёт перезапуск",
-            _ => "Движки поднимаются",
+            ServiceHealth.Degraded => "Туннель запущен, проверка пока не пройдена",
+            ServiceHealth.Dead => "Туннель не запустился, пробуем ещё раз",
+            _ => "Движки запускаются",
         };
     }
 
@@ -1100,7 +1101,7 @@ public partial class StatusView : UserControl
             : StateLine.Text;
 
         FooterConfig.Text = configBuilt is { } at
-            ? $"Конфиг туннеля собран {at:dd.MM.yyyy} в {at:HH:mm}"
+            ? $"Конфиг туннеля создан "
             : string.Empty;
     }
 
@@ -1133,42 +1134,43 @@ public partial class StatusView : UserControl
         };
     }
 
-    /// <summary>Пресет, описание которого уже показано, — чтобы не читать файл на каждом тике.</summary>
-    private string? _notedPreset = "\0";
+    /// <summary>Описание пресета, уже прочитанное: файл со временем записи и первая фраза.</summary>
+    private sealed record PresetNoteRead(string Key, string Note);
+
+    private static PresetNoteRead? _presetNote;
 
     /// <summary>
-    /// Первая фраза описания пресета — из его же файла.
+    /// Первая фраза описания пресета — из его же файла; зовётся в пуле (<see cref="Read"/>).
     /// </summary>
     /// <remarks>
-    /// Читается при смене пресета, а не каждые две секунды: разбор файла —
-    /// сотни строк, а меняется выбор раз в неделю.
+    /// Разбор файла — сотни строк, а меняется выбор раз в неделю: файл читается
+    /// один раз, пока не изменится. Раздел создаётся заново на каждый заход, поэтому
+    /// память о прочитанном — в статическом поле, а не в разделе, и не в потоке окна.
     /// </remarks>
-    private void ShowPresetNote(string? preset)
+    private static string PresetNoteOf(string? preset)
     {
-        if (preset == _notedPreset)
-            return;
-
-        _notedPreset = preset;
-        PresetNote.Text = preset is null ? "Десинк без пресета не поднимается." : string.Empty;
-
         if (preset is null)
-            return;
+            return "Без пресета десинк не запустится.";
 
         try
         {
             if (Zephyron.Zapret.ZapretPaths.FindPreset(preset) is not { } file)
-            {
-                PresetNote.Text = "Файла пресета нет в папке presets.";
-                return;
-            }
+                return "В папке presets нет файла этого пресета.";
+
+            var key = $"{file}|{File.GetLastWriteTimeUtc(file).Ticks}";
+
+            if (_presetNote is { } known && known.Key == key)
+                return known.Note;
 
             var description = new Zephyron.Zapret.PresetReader().Read([file]).FirstOrDefault()?.Description;
+            var note = FirstSentence(description) ?? "В файле пресета нет описания.";
 
-            PresetNote.Text = FirstSentence(description) ?? "Описания в файле пресета нет.";
+            _presetNote = new PresetNoteRead(key, note);
+            return note;
         }
         catch (Exception)
         {
-            PresetNote.Text = string.Empty;
+            return string.Empty;
         }
     }
 
@@ -1228,13 +1230,13 @@ public partial class StatusView : UserControl
         }
         catch (Exception ex)
         {
-            ShowProblem("Пресеты не читаются: " + ex.GetBaseException().Message);
+            ShowProblem("Не удалось прочитать пресеты: " + ex.GetBaseException().Message);
             return;
         }
 
         menu.Items.Add(new Separator { Style = (Style)FindResource("MenuLine") });
 
-        var all = new MenuItem { Header = "Все пресеты — раздел «Десинк»" };
+        var all = new MenuItem { Header = "Все пресеты" };
         all.Click += (_, _) => Open("desync");
         menu.Items.Add(all);
 
@@ -1257,7 +1259,7 @@ public partial class StatusView : UserControl
         }
         catch (Exception ex)
         {
-            ShowProblem("Не удалось записать выбор: " + ex.GetBaseException().Message);
+            ShowProblem("Выбор не записался: " + ex.GetBaseException().Message);
         }
     }
 
@@ -1394,7 +1396,7 @@ public partial class StatusView : UserControl
         {
             mark.Tag = nameof(HomeState.Off);
             state.Text = idle is null ? "выключен" : "не нужен";
-            pid.Text = idle is null ? string.Empty : "всё через VPN";
+            pid.Text = idle is null ? string.Empty : "всё через туннель";
             pid.ToolTip = idle;
             return;
         }
@@ -1479,10 +1481,10 @@ public partial class StatusView : UserControl
 
         return service.DnsDown
             ? new WarningRow("Резолвер движка не отвечает",
-                char.ToUpper(notice[0]) + notice[1..] + ". Выберите другой резолвер на вкладке DNS и перезапустите движки.")
-            : new WarningRow("Резолвер движка не отвечает — работает запасной путь",
-                char.ToUpper(notice[0]) + notice[1..] + ". Сайты открываются; вернётся сам, как только резолвер ответит. "
-                + "Чтобы не зависеть от него, выберите другой на вкладке DNS.");
+                char.ToUpper(notice[0]) + notice[1..] + ". Выберите другой резолвер во вкладке DNS и перезапустите движки.")
+            : new WarningRow("Резолвер движка молчит, включён запасной путь",
+                char.ToUpper(notice[0]) + notice[1..] + ". Сайты открываются, основной путь вернётся сам, когда резолвер заговорит. "
+                + "Чтобы не зависеть от него, выберите другой резолвер во вкладке DNS.");
     }
 
     private static IReadOnlyList<WarningRow> CollectWarnings(bool needsDesync, bool hybrid)
@@ -1500,7 +1502,7 @@ public partial class StatusView : UserControl
             {
                 rows.Add(new WarningRow(
                     $"{browser.Browser} спрашивает имена сам, мимо системы",
-                    "В «Гибриде» путь имени (через VPN или напрямую) решает наш резолвер, "
+                    "В «Гибриде» маршрут имени (через туннель или напрямую) решает наш резолвер, "
                     + "а такой браузер его не спрашивает: сайт, которому нужен туннель, "
                     + "пойдёт напрямую и не откроется. Выключите свой DNS в браузере: "
                     + browser.Setting + "."));
@@ -1513,7 +1515,7 @@ public partial class StatusView : UserControl
         {
             rows.Add(new WarningRow(
                 $"Работает {string.Join(", ", guards.Select(g => g.Name))}",
-                "Его сетевой фильтр встаёт на тот же слой, что и наш, проверка защищённых "
+                "Его сетевой фильтр занимает тот же слой, что и наш, а проверка защищённых "
                 + "соединений переустанавливает TLS своим клиентом, а WinDivert он помечает "
                 + "как RiskTool и может увезти в карантин. Мы этого отсюда не видим; если "
                 + "обход не помогает без внятной причины — отключите защиту на десять минут "
@@ -1576,12 +1578,12 @@ public partial class StatusView : UserControl
         // У «Гибрида» она отменяет само пояснение: маршруты не решают ничего,
         // всё уходит в VPN, а десинк не поднимается (EngineChoice.DesyncRuns).
         ModeText.Text = mode is not { } chosen
-            ? "Режим не выбран — движки не поднимутся."
+            ? "Режим не выбран, движки не запустятся."
             : chosen == WorkMode.Route && engines.IgnoreExclusions
-                ? "Сейчас без исключений: всё идёт через VPN, маршруты и десинк не действуют."
+                ? "Включено «Без исключений»: всё идёт через туннель, выбор по сайтам и десинк не действуют."
                 : WorkModes.Explain(chosen)
                     + (chosen == WorkMode.Tunnel && engines.IgnoreExclusions
-                        ? " Сейчас без исключений: в VPN идёт и «напрямую»."
+                        ? " Включено «Без исключений»: в туннель уходит и то, что помечено «напрямую»."
                         : string.Empty);
         ModeText.ToolTip = ModeText.Text;
 
@@ -1596,8 +1598,8 @@ public partial class StatusView : UserControl
         };
 
         _desyncIdle = engines.Desync && !engines.DesyncRuns
-            ? "Включено «Игнорировать исключения» в настройках туннеля: всё идёт через VPN, "
-                + "и десинку чинить нечего. Выключите его — заработают маршруты и десинк."
+            ? "Включено «Игнорировать исключения» в параметрах туннеля: всё идёт через туннель, и десинку нечего чинить. "
+                + "Выключите его, и заработают десинк и выбор по сайтам."
             : null;
 
         if (_engines is { } shown)
@@ -1649,11 +1651,11 @@ public partial class StatusView : UserControl
             ShowModes(next);
             Update();
 
-            this.Offer("Режим: " + next.Engines.Describe());
+            this.Offer("Выбран режим: " + next.Engines.Describe());
         }
         catch (Exception ex)
         {
-            ShowProblem("Не удалось записать: " + ex.GetBaseException().Message);
+            ShowProblem("Не записалось: " + ex.GetBaseException().Message);
         }
     }
 
@@ -1681,7 +1683,7 @@ public partial class StatusView : UserControl
         }
         else
         {
-            AutostartValue.Text = "Задача планировщика: проверяю…";
+            AutostartValue.Text = "Задача планировщика: смотрю…";
             AutostartValue.Visibility = Visibility.Visible;
             AutostartSwitch.IsEnabled = false;
         }
@@ -1699,10 +1701,10 @@ public partial class StatusView : UserControl
         }
         catch (Exception ex)
         {
-            AutostartValue.Text = "Задача планировщика не читается.";
+            AutostartValue.Text = "Не удалось прочитать задачу планировщика.";
             AutostartValue.Visibility = Visibility.Visible;
             AutostartSwitch.IsEnabled = false;
-            ShowProblem("Планировщик не отвечает: " + ex.GetBaseException().Message);
+            ShowProblem("Планировщик не ответил: " + ex.GetBaseException().Message);
         }
     }
 
@@ -1716,13 +1718,13 @@ public partial class StatusView : UserControl
 
         if (state.Stale)
         {
-            AutostartValue.Text = "Задача устарела — выключите и включите снова.";
+            AutostartValue.Text = "Задача старая: выключите автозапуск и включите снова.";
             AutostartValue.Visibility = Visibility.Visible;
 
             ShowProblem(
-                "Задача автозапуска осталась от прежней версии и запускает не то, "
-                + "что нужно: до 0.5.0 это была консольная программа, которой в поставке "
-                + "больше нет. Выключите автозапуск и включите снова — это два щелчка.");
+                "Задача автозапуска осталась от старой версии и запускает не то: до 0.5.0 это была консольная программа, а в сборке её больше нет. "
+                + ""
+                + "Выключите автозапуск и включите снова: хватит двух щелчков.");
         }
     }
 
@@ -1790,7 +1792,7 @@ public partial class StatusView : UserControl
 
         if (exe is null)
         {
-            ShowProblem("Не удалось определить путь к программе — задача не заведена.");
+            ShowProblem("Путь к программе не определён, задача не создана.");
             return;
         }
 
@@ -1801,7 +1803,7 @@ public partial class StatusView : UserControl
                 var (removed, output) = AutostartTask.Remove(AutostartTask.DefaultTaskName);
 
                 if (!removed)
-                    ShowProblem("Не удалось убрать автозапуск: " + output);
+                    ShowProblem("Автозапуск не убрался: " + output);
             }
             else
             {
@@ -1822,12 +1824,12 @@ public partial class StatusView : UserControl
                 });
 
                 if (!ok)
-                    ShowProblem("Не удалось завести автозапуск: " + output);
+                    ShowProblem("Автозапуск не создался: " + output);
             }
         }
         catch (Exception ex)
         {
-            ShowProblem("Планировщик отказал: " + ex.GetBaseException().Message);
+            ShowProblem("Планировщик отклонил запрос: " + ex.GetBaseException().Message);
         }
 
         // Задачу только что завели или убрали — запомненный ответ устарел.

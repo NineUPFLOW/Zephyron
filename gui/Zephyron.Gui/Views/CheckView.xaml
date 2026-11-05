@@ -16,20 +16,28 @@
 
                 <ContentControl Style="{StaticResource PageHead}"
                                 local:PageHead.Title="Проверка блокировок"
-                                local:PageHead.Subtitle="Что закрыто в этой сети и чем это лечится.">
+                                local:PageHead.Subtitle="Что закрыто в этой сети и как это исправить.">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <!--
                             Что проверять. Полная проверка берёт по имени
                             с каждой части всего справочника и идёт минуты;
-                            точечная — один сервис, но вчетверо глубже.
+                            один сервис — вчетверо глубже.
                             Когда чинят Discord, ответ нужен про Discord,
                             а не про сорок имён, из которых он одно.
+
+                            Своё имя — полем рядом с кнопкой, а не окном из списка:
+                            05.11 пользователь не нашёл его за «Точечной».
                         -->
-                        <ComboBox x:Name="Scope" AutomationProperties.Name="Что проверять" Width="164" Margin="0,0,8,0"
+                        <TextBox x:Name="Address" AutomationProperties.Name="Сайт или адрес" Width="190" Margin="0,0,8,0"
+                                 VerticalContentAlignment="Center" FontFamily="{DynamicResource MonoFont}"
+                                 gui:Hint.Text="сайт или адрес"
+                                 TextChanged="OnAddress" KeyDown="OnAddressKey" />
+
+                        <ComboBox x:Name="Scope" AutomationProperties.Name="Что проверять" Width="136" Margin="0,0,8,0"
                                   SelectionChanged="OnScope" />
 
                         <Button x:Name="StopButton" Style="{StaticResource Ghost}"
-                                Content="Прервать" Click="OnStop" Margin="0,0,8,0" IsEnabled="False" />
+                                Content="Остановить" Click="OnStop" Margin="0,0,8,0" IsEnabled="False" />
                         <Button x:Name="RunButton" Style="{StaticResource Primary}"
                                 Content="Проверить" Click="OnRun" />
                     </StackPanel>
@@ -192,7 +200,7 @@
                                                Visibility="{Binding BypassShown}" />
 
                                     <!-- Починка из строки — автоподбор на это имя: VPN последним (OnFixRow). -->
-                                    <Button Style="{StaticResource Ghost}" Content="Починить" HorizontalAlignment="Left"
+                                    <Button Style="{StaticResource Ghost}" Content="Исправить" HorizontalAlignment="Left"
                                             Margin="0,8,0,0" Padding="12,4" Click="OnFixRow"
                                             Visibility="{Binding FixShown}" IsEnabled="{Binding FixIdle}"
                                             ToolTip="Автоподбор для этого имени: напрямую, десинк пресета, рецепты, пин в hosts — и только если не помогло ничего, VPN"

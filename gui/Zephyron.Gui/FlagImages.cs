@@ -72,7 +72,11 @@ public static class FlagImages
                 // Читаем в память целиком: иначе файл остаётся открытым,
                 // и папку с флагами нельзя будет обновить, пока окно живо.
                 image.CacheOption = BitmapCacheOption.OnLoad;
-                image.UriSource = new Uri(path);
+
+                // Байтами, а не адресом файла: по адресу WPF сперва спрашивает у Windows
+                // зону безопасности (MapUrlToZone, вызов COM) — на каждую картинку,
+                // и в потоке окна. Замер, 60 флагов: адресом 1,1–1,2 мс на флаг, байтами 0,6.
+                image.StreamSource = new MemoryStream(File.ReadAllBytes(path));
                 image.EndInit();
                 image.Freeze();
 

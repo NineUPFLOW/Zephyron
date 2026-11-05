@@ -3,7 +3,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:gui="clr-namespace:Zephyron.Gui"
-        Title="Настройки туннеля"
+        Title="Параметры туннеля"
         Width="620" SizeToContent="Height" MaxHeight="820"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource Backdrop}"
@@ -35,9 +35,9 @@
 
     <ScrollViewer Grid.Row="0" Style="{StaticResource PageScroll}" Padding="22,20,22,0">
         <StackPanel>
-            <TextBlock Text="Настройки туннеля" Style="{StaticResource Title}" />
+            <TextBlock Text="Параметры туннеля" Style="{StaticResource Title}" />
             <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
-                       Text="Всё здесь применяется при следующем запуске движков. Подписки и серверы остались на вкладке «VPN»." />
+                       Text="Всё здесь вступает в силу после следующего запуска движков. Подписки и серверы остались во вкладке «VPN»." />
 
             <TextBlock Text="Куда идёт трафик" Style="{StaticResource GroupHead}" Margin="4,22,0,7" />
 
@@ -60,7 +60,7 @@
 
                         <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Игнорировать исключения" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                <TextBlock Text="Без исключений" VerticalAlignment="Center" TextWrapping="Wrap" />
 
                                 <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                                 Content="Всё идёт через туннель: и «напрямую», и «десинк», и «через VPN». Остаётся снаружи только домашняя сеть — роутер, принтер, сетевой диск.&#x0a;&#x0a;Российские сервисы увидят зарубежный адрес: банки и госуслуги потребуют подтверждений, часть откажет.&#x0a;&#x0a;Десинку при этом чинить нечего, и он не поднимается, даже если включён.&#x0a;&#x0a;Действует, только когда туннель включён." />
@@ -92,11 +92,11 @@
 
                         <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Прятать VPN от российских приложений" VerticalAlignment="Center"
+                                <TextBlock Text="Скрывать VPN от российских приложений" VerticalAlignment="Center"
                                            TextWrapping="Wrap" />
 
                                 <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                Content="Приложения Яндекса, VK, MAX и 2ГИС узнают свой адрес у нескольких сервисов — ifconfig.me, api.ipify.org, проверок Яндекса и своих счётчиков. С включённым выключателем эти двенадцать имён всегда идут напрямую, и приложения видят домашний адрес, а не зарубежный.&#x0a;&#x0a;Блокировать их, как делают другие клиенты, мы не стали: среди них адрес входа в Яндекс, и блокировка могла бы его сломать.&#x0a;&#x0a;Заметно в режиме «всё через VPN»: проверка своего адреса на ifconfig.me покажет домашний, хотя туннель работает. Не действует при «Игнорировать исключения»." />
+                                                Content="Приложения Яндекса, VK, MAX и 2ГИС узнают свой адрес у нескольких сервисов — ifconfig.me, api.ipify.org, проверок Яндекса и своих счётчиков. С включённым выключателем эти двенадцать имён всегда идут напрямую, и приложения видят домашний адрес, а не зарубежный.&#x0a;&#x0a;Блокировать их, как делают другие клиенты, мы не стали: среди них адрес входа в Яндекс, и блокировка могла бы его сломать.&#x0a;&#x0a;Заметно в режиме «всё через туннель»: проверка своего адреса на ifconfig.me покажет домашний, хотя туннель работает. Не действует при «Игнорировать исключения»." />
                             </StackPanel>
 
                             <TextBlock x:Name="HideVpnLine" Style="{StaticResource Caption}"
@@ -127,10 +127,10 @@
 
                         <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Включить Selective Routing" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                <TextBlock Text="Использовать Selective Routing" VerticalAlignment="Center" TextWrapping="Wrap" />
 
                                 <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                Content="Пулы серверов: папки серверов из любых подписок, и каждый маршрут «через VPN» идёт через свой пул — госуслуги через «Россию», загрузки через «Скоростной». Пулы заводятся на вкладке VPN, над подписками, а пул маршрута выбирается в его пути в «Маршрутах».&#x0a;&#x0a;Выключено — пулов на вкладке нет, и все маршруты «через VPN» идут через любые серверы: автоподбор или выбранный на вкладке. Заведённые пулы и выбор пула в маршрутах сохраняются и вернутся, когда включите снова.&#x0a;&#x0a;При WARP пулы не действуют: подписки на паузе." />
+                                                Content="Пулы серверов: папки серверов из любых подписок, и каждый маршрут «через VPN» идёт через свой пул — госуслуги через «Россию», загрузки через «Скоростной». Пулы заводятся на вкладке VPN, над подписками, а пул маршруты выбирается в его маршруты в «Маршрутах».&#x0a;&#x0a;Выключено — пулов на вкладке нет, и все маршруты «через VPN» идут через любые серверы: автоподбор или выбранный на вкладке. Заведённые пулы и выбор пула в маршрутах сохраняются и вернутся, когда включите снова.&#x0a;&#x0a;При WARP пулы не действуют: подписки на паузе." />
                             </StackPanel>
 
                             <TextBlock x:Name="SelectiveLine" Style="{StaticResource Caption}"
@@ -166,7 +166,7 @@
 
                         <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Замена выбранному серверу" VerticalAlignment="Center" />
+                                <TextBlock Text="Замена выбранного сервера" VerticalAlignment="Center" />
 
                                 <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                                 Content="Сервер, выбранный руками, не ответил дважды подряд — трафик временно переходит на первый ответивший сервер автоподбора: они проверяются по одному, начиная с быстрейших. Выбранный проверяется дальше и возвращается, когда ответит дважды подряд.&#x0a;&#x0a;Замена может оказаться в другой стране.&#x0a;&#x0a;Как быстро это сработает, решает «Проверять подключённый сервер» ниже: при проверке каждые 30 с — до 40 секунд, каждые 15 с — до 25.&#x0a;&#x0a;При автоподборе замена ищется всегда, без этой настройки." />
@@ -195,7 +195,7 @@
 
                         <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Молчащий пул — в пул по умолчанию" VerticalAlignment="Center" />
+                                <TextBlock Text="Молчащий пул переходит в общий" VerticalAlignment="Center" />
 
                                 <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                                 Content="Ни один сервер пула не ответил — его маршруты уходят в пул по умолчанию, то есть на любые серверы, и возвращаются, как только пул ответит.&#x0a;&#x0a;Выключено — пул ждёт: его маршруты не открываются, пока молчит. Так стоит делать, когда пул заведён ради страны и другой выход хуже, чем никакого.&#x0a;&#x0a;Пулы заводятся на вкладке VPN." />
@@ -223,7 +223,7 @@
 
                         <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Обход туннеля" VerticalAlignment="Center" />
+                                <TextBlock Text="Работа мимо туннеля" VerticalAlignment="Center" />
 
                                 <ContentControl x:Name="BypassInfo" Style="{StaticResource Info}"
                                                 Margin="2,0,0,0" />
@@ -273,18 +273,18 @@
 
                     <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Фрагментация рукопожатия" VerticalAlignment="Center" />
+                            <TextBlock Text="Дробление рукопожатия" VerticalAlignment="Center" />
 
                             <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                            Content="Режет приветствие TLS, с которого начинается соединение с VPN-сервером, чтобы фильтр оператора не узнал сервер по имени в нём. Нужна, когда оператор закрывает соединение именно с сервером — серверы перестали подключаться, а подписка и ключи те же.&#x0a;&#x0a;«Записями TLS» — дешевле, пробовать первым. «Пакетами TCP» — сильнее, но каждое новое соединение с сервером медленнее.&#x0a;&#x0a;Действует на VLESS, VMess, Trojan и AnyTLS с TLS; у Hysteria, TUIC и WireGuard резать нечего. С REALITY не проверялась. Включайте, если серверы режут: на работающих она только замедляет подключение. Применяется при следующем запуске движков." />
+                                            Content="Режет приветствие TLS, с которого начинается соединение с VPN-сервером, чтобы фильтр оператора не узнал сервер по имени в нём. Нужна, когда оператор закрывает соединение именно с сервером — серверы перестали подключаться, а подписка и ключи те же.&#x0a;&#x0a;«Записями TLS» — дешевле, пробовать первым. «Пакетами TCP» — сильнее, но каждое новое соединение с сервером медленнее.&#x0a;&#x0a;Действует на VLESS, VMess, Trojan и AnyTLS с TLS; у Hysteria, TUIC и WireGuard резать нечего. С REALITY не проверялась. Включайте, если серверы режут: на работающих она только замедляет подключение. Применяется после следующего запуска движков." />
                         </StackPanel>
 
                         <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                   Text="Когда оператор режет соединение с самим сервером." />
+                                   Text="Если оператор режет соединение с самим сервером." />
                     </StackPanel>
 
                     <ComboBox Grid.Column="1" x:Name="FragmentChoice" Width="180" SelectionChanged="OnFragment">
-                        <ComboBoxItem Content="выключена" Tag="Off" />
+                        <ComboBoxItem Content="не включено" Tag="Off" />
                         <ComboBoxItem Content="записями TLS" Tag="Records" />
                         <ComboBoxItem Content="пакетами TCP" Tag="Packets" />
                     </ComboBox>
@@ -309,14 +309,14 @@
 
                     <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Помнить подставные адреса" VerticalAlignment="Center" />
+                            <TextBlock Text="Запоминать подставные адреса" VerticalAlignment="Center" />
 
                             <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                            Content="Именам «через VPN» движок отдаёт не настоящий адрес, а подставной из 198.18.x, и помнит, какому имени какой достался. При перезапуске движков эта память стиралась, адреса раздавались заново, а браузер ещё с минуту ходил по старым — и часть сайтов через VPN не открывалась.&#x0a;&#x0a;С этой настройкой таблица адресов хранится в файле кэша движка (runtime\engine-cache.db) и после перезапуска имена получают те же адреса.&#x0a;&#x0a;Выключите, если после перезапуска движков сайты через VPN стали вести себя хуже, чем прежде. Применяется при следующем запуске движков." />
+                                            Content="Именам «через VPN» движок отдаёт не настоящий адрес, а подставной из 198.18.x, и помнит, какому имени какой достался. При перезапуске движков эта память стиралась, адреса раздавались заново, а браузер ещё с минуту ходил по старым — и часть сайтов через туннель не открывалась.&#x0a;&#x0a;С этой настройкой таблица адресов хранится в файле кэша движка (runtime\engine-cache.db) и после перезапуска имена получают те же адреса.&#x0a;&#x0a;Выключите, если после перезапуска движков сайты через туннель стали вести себя хуже, чем прежде. Применяется после следующего запуска движков." />
                         </StackPanel>
 
                         <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                   Text="После перезапуска движков имена через VPN получают те же адреса, что и до него." />
+                                   Text="После перезапуска движков имена «через VPN» получают те же адреса, что были раньше." />
                     </StackPanel>
 
                     <TextBlock Grid.Column="1" x:Name="FakeIpMemoryWord" Style="{StaticResource Caption}"
@@ -345,14 +345,14 @@
 
                         <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Проверять проход трафика" VerticalAlignment="Center" />
+                                <TextBlock Text="Проверять, идёт ли трафик" VerticalAlignment="Center" />
 
                                 <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                                 Content="Не только открытость порта, но и то, что через туннель что-то проходит. Без неё молчащий сервер выглядит живым: «Главная» пишет «Работает», а обход при мёртвом туннеле не включается." />
                             </StackPanel>
 
                             <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="Дороже по времени, зато ловит молчащую трубу." />
+                                       Text="Дольше, зато находит сервер, который открыт, но молчит." />
                         </StackPanel>
 
                         <TextBlock Grid.Column="1" x:Name="VerifyWord" Style="{StaticResource Caption}"
@@ -371,18 +371,18 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                            <TextBlock Text="Проверять подключённый сервер" VerticalAlignment="Center" />
+                            <TextBlock Text="Проверять текущий сервер" VerticalAlignment="Center" />
 
                             <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                             Content="Одно соединение через сервер, через который идёт трафик. Не ответил дважды подряд — серверы автоподбора проверяются строго по одному, начиная с быстрейших по прошлым замерам, и ставится первый ответивший." />
                         </StackPanel>
 
                         <ComboBox Grid.Column="1" x:Name="ExitCheckChoice" Width="180" SelectionChanged="OnCheckSetting">
-                            <ComboBoxItem Content="не проверять" Tag="0" />
-                            <ComboBoxItem Content="каждые 15 с" Tag="15" />
-                            <ComboBoxItem Content="каждые 30 с" Tag="30" />
-                            <ComboBoxItem Content="каждую минуту" Tag="60" />
-                            <ComboBoxItem Content="каждые 2 минуты" Tag="120" />
+                            <ComboBoxItem Content="без проверки" Tag="0" />
+                            <ComboBoxItem Content="раз в 15 с" Tag="15" />
+                            <ComboBoxItem Content="раз в 30 с" Tag="30" />
+                            <ComboBoxItem Content="раз в минуту" Tag="60" />
+                            <ComboBoxItem Content="раз в 2 минуты" Tag="120" />
                         </ComboBox>
                     </Grid>
 
@@ -395,18 +395,18 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                            <TextBlock Text="Общий замер всех серверов" VerticalAlignment="Center" />
+                            <TextBlock Text="Общий замер серверов" VerticalAlignment="Center" />
 
                             <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                             Content="Движок перемеряет всех участников автоподбора разом, чтобы знать, кто быстрее. Чем реже — тем меньше нагрузки на продавцов, но тем дольше автоподбор не заметит, что появился сервер быстрее." />
                         </StackPanel>
 
                         <ComboBox Grid.Column="1" x:Name="FullCheckChoice" Width="180" SelectionChanged="OnCheckSetting">
-                            <ComboBoxItem Content="каждую минуту" Tag="1" />
-                            <ComboBoxItem Content="каждые 5 минут" Tag="5" />
-                            <ComboBoxItem Content="каждые 15 минут" Tag="15" />
-                            <ComboBoxItem Content="каждые 30 минут" Tag="30" />
-                            <ComboBoxItem Content="раз в час" Tag="60" />
+                            <ComboBoxItem Content="раз в минуту" Tag="1" />
+                            <ComboBoxItem Content="раз в 5 минут" Tag="5" />
+                            <ComboBoxItem Content="раз в 15 минут" Tag="15" />
+                            <ComboBoxItem Content="раз в 30 минут" Tag="30" />
+                            <ComboBoxItem Content="ежечасно" Tag="60" />
                         </ComboBox>
                     </Grid>
 
@@ -419,14 +419,14 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                            <TextBlock Text="Серверов с одного входа" VerticalAlignment="Center" />
+                            <TextBlock Text="Серверов на один вход" VerticalAlignment="Center" />
 
                             <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                             Content="У части продавцов много стран сидят на одном адресе — у Trust все. Автоподбор берёт с такого входа только быстрейших, чтобы не бить по нему пачкой проверок. Остальные страны по-прежнему выбираются руками в списке." />
                         </StackPanel>
 
                         <ComboBox Grid.Column="1" x:Name="PerEntryChoice" Width="180" SelectionChanged="OnCheckSetting">
-                            <ComboBoxItem Content="один" Tag="1" />
+                            <ComboBoxItem Content="только один" Tag="1" />
                             <ComboBoxItem Content="два" Tag="2" />
                             <ComboBoxItem Content="три" Tag="3" />
                             <ComboBoxItem Content="все" Tag="0" />
@@ -449,16 +449,16 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                                <TextBlock Text="Адрес проверки" VerticalAlignment="Center" />
+                                <TextBlock Text="Адрес для проверки" VerticalAlignment="Center" />
 
                                 <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                Content="Куда уходит запрос через сервер при каждом замере — автоподбора, сторожа, «Замерить все». Нужен адрес, отдающий пустой ответ быстро: сервер меряется, а не сайт.&#x0a;&#x0a;Cloudflare — узел рядом с выходом сервера. Google — адрес, которым меряет Happ. Свой — если оба через ваши серверы не отвечают.&#x0a;&#x0a;Автоподбор и сторож возьмут его при следующем запуске движков, «Замерить все» — сразу." />
+                                                Content="Куда уходит запрос через сервер при каждом замере — автоподбора, сторожа, «Замерить все». Нужен адрес, отдающий пустой ответ быстро: сервер меряется, а не сайт.&#x0a;&#x0a;Cloudflare — сервер рядом с выходом сервера. Google — адрес, которым меряет Happ. Свой — если оба через ваши серверы не отвечают.&#x0a;&#x0a;Автоподбор и сторож возьмут его после следующего запуска движков, «Замерить все» — сразу." />
                             </StackPanel>
 
                             <ComboBox Grid.Column="1" x:Name="PingChoice" Width="180" SelectionChanged="OnPingChoice">
                                 <ComboBoxItem Content="Cloudflare" Tag="cloudflare" />
                                 <ComboBoxItem Content="Google" Tag="google" />
-                                <ComboBoxItem Content="свой адрес" Tag="own" />
+                                <ComboBoxItem Content="другой адрес" Tag="own" />
                             </ComboBox>
                         </Grid>
 
@@ -469,7 +469,7 @@
                             </Grid.ColumnDefinitions>
 
                             <TextBox x:Name="PingOwn" gui:Hint.Text="http://адрес/generate_204" KeyDown="OnPingOwnKey" />
-                            <Button Grid.Column="1" Style="{StaticResource Ghost}" Content="Сохранить"
+                            <Button Grid.Column="1" Style="{StaticResource Ghost}" Content="Запомнить"
                                     Click="OnPingOwn" Margin="8,0,0,0" />
                         </Grid>
                     </StackPanel>
@@ -487,7 +487,7 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                            <TextBlock Text="Ждать ответа сервера" VerticalAlignment="Center" />
+                            <TextBlock Text="Сколько ждать ответа сервера" VerticalAlignment="Center" />
 
                             <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                             Content="Потолок замера: не ответил за это время — «не отвечает». Касается «Замерить все», теста пинга и замера при запуске. Чем меньше, тем быстрее идёт замер со множеством неработающих серверов, но далёкий медленный сервер может попасть в неработающие. При остановленных движках к потолку прибавляется до 4 с — на запуск проверочного sing-box.&#x0a;&#x0a;Сторожа подключённого сервера не касается: он ждёт 3 с, и от этого зависит, как быстро туннель уйдёт с мёртвого сервера. Автоподбор движка ждёт по своему сроку." />
@@ -517,14 +517,14 @@
 
                         <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Замерять все серверы при запуске" VerticalAlignment="Center" />
+                                <TextBlock Text="Замерять серверы при запуске" VerticalAlignment="Center" />
 
                                 <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                                 Content="То же, что «Замерить все» на вкладке VPN, но само: через минуту после запуска программы, когда движки поднялись. Меряются серверы подписок в работе и отдельные ключи, при WARP — WARP. Выключенные из работы подписки — только кнопкой.&#x0a;&#x0a;Серверы, которые уже в движке, он меряет сам — не больше двух проверок на один вход разом: у Trust все страны на одном адресе, и пачка проверок разом закрывала его на минуту. Остальные — до восьми разом. Результат пишется в журнал и виден в списке серверов." />
                             </StackPanel>
 
                             <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="Список серверов на вкладке VPN — со свежими задержками, без нажатия кнопки." />
+                                       Text="Во вкладке VPN сразу будет список с свежими замерами, нажимать ничего не нужно." />
                         </StackPanel>
 
                         <TextBlock Grid.Column="1" x:Name="MeasureOnStartWord" Style="{StaticResource Caption}"
@@ -549,14 +549,14 @@
 
                         <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Перечитывать подписку, когда живых серверов нет" VerticalAlignment="Center" />
+                                <TextBlock Text="Перечитывать подписку, если живых серверов нет" VerticalAlignment="Center" />
 
                                 <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                                 Content="Поставщик мог сменить адреса или ключи, а у программы остался старый список. Когда проверка выхода прошла по всем серверам и не нашла ни одного живого, подписка перечитывается — одна за раз, не чаще раза в 30 минут; если панель не ответила, пауза растёт до двух часов.&#x0a;&#x0a;Серверы сверх обычного не проверяются. Если список изменился, программа предложит перезапустить движки — сама их не перезапускает." />
                             </StackPanel>
 
                             <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="Новый список подписки — без нажатия «Обновить», когда старый весь умер." />
+                                       Text="Свежий список подписки появится сам, когда старый перестанет работать." />
                         </StackPanel>
 
                         <TextBlock Grid.Column="1" x:Name="RefreshNoLiveWord" Style="{StaticResource Caption}"
@@ -582,16 +582,16 @@
 
                         <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Память замеров" VerticalAlignment="Center" />
+                                <TextBlock Text="Хранилище замеров" VerticalAlignment="Center" />
 
                                 <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                Content="Задержки серверов и исходы их последних десяти проверок. По ним сервер становится «нестабильным» (жёлтым) и уходит из автоподбора, а не ответивший трижды подряд — «мёртвым». Починившийся сервер сам оттуда почти не выбирается: мимо автоподбора его проверяют редко.&#x0a;&#x0a;Старые проверки забываются сами — срок ниже. «Очистить» стирает всё разом: в списке вкладки VPN серверы будут без задержек до следующего замера, а в автоподбор вернутся при следующем запуске движков." />
+                                                Content="Задержки серверов и исходы их последних десяти проверок. По ним сервер становится «нестабильным» (жёлтым) и уходит из автоподбора, а не ответивший трижды подряд — «мёртвым». Починившийся сервер сам оттуда почти не выбирается: мимо автоподбора его проверяют редко.&#x0a;&#x0a;Старые проверки забываются сами — срок ниже. «Очистить» стирает всё разом: в списке вкладки VPN серверы будут без задержек до следующего замера, а в автоподбор вернутся после следующего запуска движков." />
                             </StackPanel>
 
                             <TextBlock x:Name="MemoryLine" Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap" />
                         </StackPanel>
 
-                        <Button Grid.Column="1" Style="{StaticResource Ghost}" Content="Очистить"
+                        <Button Grid.Column="1" Style="{StaticResource Ghost}" Content="Стереть"
                                 Click="OnClearMemory" VerticalAlignment="Center" MinWidth="110" />
                     </Grid>
 
@@ -604,7 +604,7 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                            <TextBlock Text="Забывать проверки старше" VerticalAlignment="Center" />
+                            <TextBlock Text="Помнить проверки не дольше" VerticalAlignment="Center" />
 
                             <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
                                             Content="Проверки старше срока забываются по одной, свежие у сервера остаются. Давние промахи перестают держать сервер «нестабильным» или «мёртвым», а память не пустеет разом. Сервер, у которого не осталось ни одной свежей проверки, забывается целиком.&#x0a;&#x0a;Срок проверяется при запуске программы и раз в час, пока она работает." />
@@ -614,7 +614,7 @@
                             <ComboBoxItem Content="суток" Tag="1" />
                             <ComboBoxItem Content="недели" Tag="7" />
                             <ComboBoxItem Content="месяца" Tag="30" />
-                            <ComboBoxItem Content="не забывать" Tag="0" />
+                            <ComboBoxItem Content="помнить всегда" Tag="0" />
                         </ComboBox>
                     </Grid>
                 </StackPanel>
@@ -636,7 +636,7 @@
                 </Grid>
             </Border>
 
-            <Button Style="{StaticResource Ghost}" Content="Закрыть" Click="OnClose"
+            <Button Style="{StaticResource Ghost}" Content="Закрыть окно" Click="OnClose"
                     HorizontalAlignment="Right" Margin="0,12,0,0" MinWidth="110" />
         </StackPanel>
     </Grid>

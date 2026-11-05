@@ -24,7 +24,7 @@
                     выше») и отдельно от «Обслуживания»: там необратимое. Отчёт
                     для разбора отсюда переехал в «Диагностику» (владелец 03.10).
                 -->
-                <TextBlock Text="Разбор неисправностей" FontWeight="SemiBold" FontSize="15" Margin="4,22,0,10" />
+                <TextBlock Text="Если что-то не работает" FontWeight="SemiBold" FontSize="15" Margin="4,22,0,10" />
 
                 <!--
                     «Сайт не открывается» — в «Ещё», пока в тестовом режиме
@@ -36,7 +36,7 @@
                     <StackPanel>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Сайт не открывается?" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Text="· проверка, тестовый режим" Style="{StaticResource Caption}"
+                            <TextBlock Text="· проверка и пробный запуск" Style="{StaticResource Caption}"
                                        VerticalAlignment="Center" Margin="6,0,0,0" />
                         </StackPanel>
 
@@ -53,7 +53,7 @@
                                      gui:Hint.Text="https://aternos.org/go/ или просто aternos.org" />
 
                             <Button Grid.Column="1" x:Name="FixButton" Style="{StaticResource Ghost}"
-                                    Content="Починить" Click="OnFix" MinWidth="110" />
+                                    Content="Исправить" Click="OnFix" MinWidth="110" />
                         </Grid>
 
                         <TextBlock x:Name="FixResult" Style="{StaticResource Caption}" Margin="0,8,0,0"
@@ -61,7 +61,7 @@
                     </StackPanel>
                 </Border>
 
-                <TextBlock Text="Первый запуск" FontWeight="SemiBold" FontSize="15" Margin="4,22,0,10" />
+                <TextBlock Text="Первое знакомство" FontWeight="SemiBold" FontSize="15" Margin="4,22,0,10" />
 
                 <Border Style="{StaticResource Card}">
                     <Grid>
@@ -71,13 +71,13 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                            <TextBlock Text="Мастер первого запуска" FontWeight="SemiBold" />
+                            <TextBlock Text="Первоначальная настройка" FontWeight="SemiBold" />
                             <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,0" TextWrapping="Wrap"
                                        Text="Знакомство, выбор темы, режим работы и подписка на VPN — показывается один раз при первом открытии. Ничего из настроенного он не сбрасывает." />
                         </StackPanel>
 
                         <Button Grid.Column="1" Style="{StaticResource Ghost}"
-                                Content="Повторить" Click="OnRestartOnboarding" VerticalAlignment="Center" />
+                                Content="Пройти снова" Click="OnRestartOnboarding" VerticalAlignment="Center" />
                     </Grid>
                 </Border>
 
@@ -106,18 +106,18 @@
                 </Border>
 
 
-                <TextBlock Text="Папки" FontWeight="SemiBold" FontSize="15" Margin="4,22,0,10" />
+                <TextBlock Text="Каталоги" FontWeight="SemiBold" FontSize="15" Margin="4,22,0,10" />
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
                         <WrapPanel>
                             <Button Style="{StaticResource Ghost}" Content="Программа" Tag="."
                                     Click="OnOpen" Margin="0,0,8,8" />
-                            <Button Style="{StaticResource Ghost}" Content="Настройки" Tag="config"
+                            <Button Style="{StaticResource Ghost}" Content="Параметры" Tag="config"
                                     Click="OnOpen" Margin="0,0,8,8" />
-                            <Button Style="{StaticResource Ghost}" Content="Отчёты" Tag="reports"
+                            <Button Style="{StaticResource Ghost}" Content="Файлы отчётов" Tag="reports"
                                     Click="OnOpen" Margin="0,0,8,8" />
-                            <Button Style="{StaticResource Ghost}" Content="Журналы" Tag="runtime"
+                            <Button Style="{StaticResource Ghost}" Content="Файлы журналов" Tag="runtime"
                                     Click="OnOpen" Margin="0,0,8,8" />
                             <Button Style="{StaticResource Ghost}" Content="Пресеты" Tag="presets"
                                     Click="OnOpen" Margin="0,0,8,8" />
@@ -153,17 +153,17 @@
                             <Button x:Name="RepositoryLink" Style="{StaticResource Ghost}" Click="OnLink" Margin="0,0,8,8">
                                 <StackPanel Orientation="Horizontal">
                                     <Path Style="{StaticResource LineShape}" Data="{StaticResource GitHubMark}" />
-                                    <TextBlock Text="Репозиторий" VerticalAlignment="Center" />
+                                    <TextBlock Text="Исходный код" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
-                            <Button x:Name="IssuesLink" Style="{StaticResource Ghost}" Content="Сообщить о проблеме"
+                            <Button x:Name="IssuesLink" Style="{StaticResource Ghost}" Content="Написать об ошибке"
                                     Click="OnLink" Margin="0,0,8,8" />
                             <Button x:Name="DiscussionsLink" Style="{StaticResource Ghost}" Content="Обсуждения"
                                     Click="OnLink" Margin="0,0,8,8" />
                             <Button x:Name="TelegramLink" Style="{StaticResource Ghost}" Click="OnLink" Margin="0,0,8,8">
                                 <StackPanel Orientation="Horizontal">
                                     <Path Style="{StaticResource LineShape}" Data="{StaticResource TelegramPlane}" />
-                                    <TextBlock Text="Телеграм-канал" VerticalAlignment="Center" />
+                                    <TextBlock Text="Канал в Telegram" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
                             <Button Style="{StaticResource Ghost}" Content="Поддержать"
@@ -172,9 +172,9 @@
 
                         <Border Height="1" Background="{DynamicResource Border}" Margin="0,8,0,14" />
 
-                        <TextBlock Text="В составе" FontWeight="SemiBold" />
+                        <TextBlock Text="Что внутри" FontWeight="SemiBold" />
                         <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,4" TextWrapping="Wrap"
-                                   Text="Чужие движки едут в архиве как есть и запускаются отдельными процессами. Условия каждого — в docs/THIRD-PARTY.md в репозитории." />
+                                   Text="Чужие движки едут в архиве напрямую и запускаются отдельными процессами. Условия каждого — в docs/THIRD-PARTY.md в репозитории." />
 
                         <ItemsControl x:Name="Components">
                             <ItemsControl.ItemTemplate>
@@ -199,7 +199,7 @@
                                                 просил ссылку на автора, а его дом —
                                                 wiki.zapret.moe, не только репозиторий.
                                             -->
-                                            <Button Content="Сайт" Tag="{Binding Site}" Click="OnLink" Margin="0,0,8,0">
+                                            <Button Content="Страница" Tag="{Binding Site}" Click="OnLink" Margin="0,0,8,0">
                                                 <Button.Style>
                                                     <Style TargetType="Button" BasedOn="{StaticResource Ghost}">
                                                         <Style.Triggers>
@@ -211,7 +211,7 @@
                                                 </Button.Style>
                                             </Button>
 
-                                            <Button Style="{StaticResource Ghost}" Content="Исходники"
+                                            <Button Style="{StaticResource Ghost}" Content="Код"
                                                     Tag="{Binding Source}" Click="OnLink" />
                                         </StackPanel>
                                     </Grid>
@@ -226,7 +226,7 @@
                     и три из четырёх необратимы. Соседство с переключателями,
                     которые нажимают мимоходом, им противопоказано.
                 -->
-                <TextBlock Text="Обслуживание" FontWeight="SemiBold" FontSize="15" Margin="4,22,0,10" />
+                <TextBlock Text="Уход за программой" FontWeight="SemiBold" FontSize="15" Margin="4,22,0,10" />
 
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
@@ -245,7 +245,7 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                                <TextBlock Text="Искать обновления при запуске" FontWeight="SemiBold" />
+                                <TextBlock Text="Проверять обновления при запуске" FontWeight="SemiBold" />
                                 <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,0" TextWrapping="Wrap"
                                            Text="Только искать. Установка остаётся отдельным действием с отдельным согласием — кнопкой в карточке «Обновление» на «Главной»." />
                             </StackPanel>
@@ -254,7 +254,7 @@
                                        VerticalAlignment="Center" Margin="0,0,10,0" />
 
                             <ToggleButton Grid.Column="2" x:Name="UpdatesSwitch" Style="{StaticResource Switch}"
-                                          AutomationProperties.Name="Искать обновления при запуске"
+                                          AutomationProperties.Name="Проверять обновления при запуске"
                                           Click="OnUpdatesSwitch" VerticalAlignment="Center" />
                         </Grid>
 
@@ -267,13 +267,13 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                                <TextBlock Text="Сбросить настройки до заводских" FontWeight="SemiBold" />
+                                <TextBlock Text="Вернуть заводские настройки" FontWeight="SemiBold" />
                                 <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,0" TextWrapping="Wrap"
                                            Text="Режим, пресет, выбранный сервер, свои маршруты и рабочие файлы. Ссылка подписки остаётся: её выдаёт поставщик, и восстановить её программа не может." />
                             </StackPanel>
 
                             <Button Grid.Column="1" x:Name="ResetSettingsButton" Style="{StaticResource Destructive}"
-                                    Content="Сбросить" Click="OnResetSettings" VerticalAlignment="Center" />
+                                    Content="Вернуть исходное" Click="OnResetSettings" VerticalAlignment="Center" />
                         </Grid>
 
                         <Border Height="1" Background="{DynamicResource Border}" Margin="0,16,0,16" />
@@ -291,7 +291,7 @@
                             </StackPanel>
 
                             <Button Grid.Column="1" x:Name="ForgetRoutesButton" Style="{StaticResource Destructive}"
-                                    Content="Забыть" Click="OnForgetRoutes" VerticalAlignment="Center" />
+                                    Content="Вернуть исходное" Click="OnForgetRoutes" VerticalAlignment="Center" />
                         </Grid>
 
                         <Border Height="1" Background="{DynamicResource Border}" Margin="0,16,0,16" />
@@ -303,13 +303,13 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                                <TextBlock Text="Очистить рабочие файлы" FontWeight="SemiBold" />
+                                <TextBlock Text="Удалить рабочие файлы" FontWeight="SemiBold" />
                                 <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,0" TextWrapping="Wrap"
                                            Text="Журналы и конфиги от прошлых запусков из runtime. В собранных конфигах лежат пароли серверов открытым текстом — держать прошлогодние незачем. Действующий конфиг остаётся." />
                             </StackPanel>
 
                             <Button Grid.Column="1" x:Name="CleanButton" Style="{StaticResource Ghost}"
-                                    Content="Очистить" Click="OnClean" VerticalAlignment="Center" />
+                                    Content="Удалить" Click="OnClean" VerticalAlignment="Center" />
                         </Grid>
 
                         <Border Height="1" Background="{DynamicResource Border}" Margin="0,16,0,16" />
@@ -327,7 +327,7 @@
                             </StackPanel>
 
                             <Button Grid.Column="1" x:Name="ResetNetworkButton" Style="{StaticResource Destructive}"
-                                    Content="Сбросить" Click="OnResetNetwork" VerticalAlignment="Center" />
+                                    Content="Вернуть исходное" Click="OnResetNetwork" VerticalAlignment="Center" />
                         </Grid>
 
                     </StackPanel>

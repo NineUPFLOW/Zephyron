@@ -114,11 +114,11 @@ public partial class OnboardingView : UserControl
                 Border.BackgroundProperty, i < step ? "Accent" : "Border");
         }
 
-        PageHead.SetSubtitle(Head, $"Шаг {step} из {LastStep}");
+        PageHead.SetSubtitle(Head, $"Шаг ");
 
         // Подпись меняется по шагу: на последнем «пропустить» пропускать
         // уже нечего, и кнопка честно называется «Готово».
-        HeaderSkip.Content = step == LastStep ? "Готово" : "Пропустить";
+        HeaderSkip.Content = step == LastStep ? "Готово" : "Пропустить мастер";
 
         Arrive(Panel(step));
 
@@ -215,13 +215,13 @@ public partial class OnboardingView : UserControl
         HeroLane[] lanes =
         [
             new(HeroWay.Direct, "Muted", "Напрямую", "Zephyron его не трогает",
-                Glyph(0xE825), "Обычные сайты", "банки, игры, Рунет"),
-            new(HeroWay.Desync, "Accent", "Десинк", "разрезан — ТСПУ не узнаёт",
-                Glyph(0xE774), "Под блокировкой", "YouTube, Discord"),
-            new(HeroWay.Tunnel, "Text", "VPN", "в шифрованном туннеле",
-                Glyph(0xE774), "Бан по IP", "Telegram, Instagram"),
+                Glyph(0xE825), "Большинство сайтов", "банки, игры, российские сайты"),
+            new(HeroWay.Desync, "Accent", "Десинк", "пакеты разрезаны, ТСПУ не узнаёт сайт",
+                Glyph(0xE774), "Заблокированные", "YouTube, Discord"),
+            new(HeroWay.Tunnel, "Text", "VPN", "внутри шифрованного туннеля",
+                Glyph(0xE774), "Закрыто по IP", "Telegram, Instagram"),
             new(HeroWay.Pin, "Warn", "Пин", "hosts ведёт к посреднику",
-                Glyph(0xE774), "Закрыт по стране", "ChatGPT, Claude"),
+                Glyph(0xE774), "Закрыто по стране", "ChatGPT, Claude"),
         ];
 
         // Ствол: от компьютера до «Маршрутов» пакеты идут вперемешку.
@@ -249,7 +249,7 @@ public partial class OnboardingView : UserControl
 
                     Stroke(new Point(relayX + 18, y), new Point(siteX - 25, y), way.Color, 1.5, opacity: 0.45);
                     Box(new Point(relayX, y), 36, 36, way.Color, Glyph(0xE72E), 14, round: true);
-                    Label("сервер VPN", relayX, y + 22, "Muted", size: 11);
+                    Label("VPN-сервер", relayX, y + 22, "Muted", size: 11);
                     break;
                 }
 
@@ -282,7 +282,7 @@ public partial class OnboardingView : UserControl
         }
 
         Box(new Point(pcX, mid), 64, 56, "Border", Glyph(0xE7F8), 24, glyphColor: "Text");
-        Label("Компьютер", pcX, mid + 33, "Text", bold: true);
+        Label("Ваш компьютер", pcX, mid + 33, "Text", bold: true);
 
         // «Маршруты» — раскладка по правилам; гнёзда окрашены цветом своей дороги.
         var sorter = new Border { Width = 34, Height = 244, CornerRadius = new CornerRadius(17), BorderThickness = new Thickness(1.5) };
@@ -691,7 +691,7 @@ public partial class OnboardingView : UserControl
         }
         catch (Exception ex)
         {
-            ThemeStatus.Text = "Темы не читаются: " + ex.GetBaseException().Message;
+            ThemeStatus.Text = "Не удалось прочитать темы: " + ex.GetBaseException().Message;
         }
     }
 
@@ -719,7 +719,7 @@ public partial class OnboardingView : UserControl
         }
         catch (Exception ex)
         {
-            ThemeStatus.Text = "Не удалось сменить тему: " + ex.GetBaseException().Message;
+            ThemeStatus.Text = "Тема не сменилась: " + ex.GetBaseException().Message;
         }
     }
 
@@ -777,7 +777,7 @@ public partial class OnboardingView : UserControl
         TgPick.IsEnabled = settings.TelegramProxy || System.IO.File.Exists(TgWsProxy.Executable());
 
         if (!TgPick.IsEnabled)
-            TgPick.ToolTip = "Прокси Telegram нет в этой сборке.";
+            TgPick.ToolTip = "В этой сборке нет прокси для Telegram.";
 
         ShowTgState();
         ShowDnsHint();
@@ -785,9 +785,9 @@ public partial class OnboardingView : UserControl
 
     /// <summary>Подпись на подложке выключателя прокси — что сейчас выбрано.</summary>
     private void ShowTgState() =>
-        TgPickState.Text = !TgPick.IsEnabled ? "нет в этой сборке"
-            : TgPick.IsChecked == true ? "включён"
-            : "выключен";
+        TgPickState.Text = !TgPick.IsEnabled ? "в этой сборке отсутствует"
+            : TgPick.IsChecked == true ? "включено"
+            : "не включено";
 
     // Поднимается и при разборе разметки, когда подписи ещё нет.
     private void OnTgPicked(object sender, RoutedEventArgs e)
@@ -947,7 +947,7 @@ public partial class OnboardingView : UserControl
 
         if (!Uri.TryCreate(raw, UriKind.Absolute, out var parsed))
         {
-            VpnStatus.Text = "Это не похоже на ссылку.";
+            VpnStatus.Text = "Здесь нет похожего на адрес.";
             return;
         }
 
@@ -955,14 +955,14 @@ public partial class OnboardingView : UserControl
 
         if (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps)
         {
-            VpnStatus.Text = "Это не похоже на ссылку подписки: нужна http, https "
+            VpnStatus.Text = "Это не адрес подписки: нужен http или https "
                 + "либо обёртка happ, clash или sn.";
 
             return;
         }
 
         VpnLoad.IsEnabled = false;
-        VpnStatus.Text = "Загружаю список серверов…";
+        VpnStatus.Text = "Получаю список серверов…";
 
         try
         {
@@ -980,7 +980,7 @@ public partial class OnboardingView : UserControl
             SubLink.Clear();
 
             int usable = info.Servers.Count(s => s.IsUsableOutbound);
-            VpnStatus.Text = $"Подписка подключена: серверов {usable}.";
+            VpnStatus.Text = $"Подписка подключена, серверов: ";
 
             if (_wantsTunnel)
                 ChooseWantedTunnel();
@@ -989,7 +989,7 @@ public partial class OnboardingView : UserControl
         }
         catch (Exception ex)
         {
-            VpnStatus.Text = "Не удалось загрузить: " + ex.GetBaseException().Message;
+            VpnStatus.Text = "Загрузить не вышло: " + ex.GetBaseException().Message;
         }
         finally
         {

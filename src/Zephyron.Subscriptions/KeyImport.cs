@@ -94,7 +94,7 @@ public static class KeyImport
     {
         var notes = keys
             .Select(k => ProxyUriParser.TryParse(k, out var server, out _) && server!.Protocol == ProxyProtocol.Wireguard
-                ? AmneziaSettings.Note(server.Extra)
+                ? AmneziaSettings.Note(server.Extra, server.AmneziaOptions)
                 : null)
             .OfType<string>()
             .Distinct(StringComparer.Ordinal)

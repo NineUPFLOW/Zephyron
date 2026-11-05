@@ -58,9 +58,9 @@
         <StackPanel Grid.Row="0">
             <ContentControl Style="{StaticResource PageHead}"
                             local:PageHead.Title="Наблюдение"
-                            local:PageHead.Subtitle="Соединения по мере появления и правило, которое к каждому применилось бы. Ничего не меняет — только смотрит.">
+                            local:PageHead.Subtitle="Соединения по мере появления и правило, которое сработало бы для каждого. Раздел только показывает и ничего не меняет.">
                 <ContentControl Style="{StaticResource Info}"
-                                Content="Источник — события ядра Windows (ETW): каждое новое соединение и программа, которая его открыла.&#x0a;&#x0a;«Куда» — что сказали бы правила для этого имени или адреса. Точно известно только про подставные адреса движка, сам движок и домашнюю сеть — это залитый кружок.&#x0a;&#x0a;Всё, и прямое тоже, пишется в runtime\watch.log и едет в отчёт." />
+                                Content="Источник: события ядра Windows (ETW) о каждом новом соединении и открывшей его программе.&#x0a;&#x0a;«Куда» показывает, что решили бы правила для этого имени или адреса. Точно известно лишь про подставные адреса движки, саму движок и домашнюю сеть: это залитый кружок.&#x0a;&#x0a;Всё, в том числе прямое, пишется в runtime\watch.log и попадает в отчёт." />
             </ContentControl>
 
             <!--
@@ -76,27 +76,27 @@
                     </Style>
                 </WrapPanel.Resources>
                 <Button x:Name="PowerButton" Style="{StaticResource Primary}" Padding="16,6"
-                        Content="Начать" Click="OnPower" MinWidth="110" Margin="0,0,8,8"
+                        Content="Запустить" Click="OnPower" MinWidth="110" Margin="0,0,8,8"
                         gui:ButtonGlyph.Lead="&#xE768;" />
                 <Button x:Name="ProcessButton" MinWidth="150"
                         Content="Программа: все" Click="OnProcessMenu" Margin="0,0,8,8" gui:ButtonGlyph.Menu="True"
-                        ToolTip="Показывать соединения одной программы" />
+                        ToolTip="Только соединения одной программы" />
                 <Button x:Name="RouteButton" MinWidth="110"
                         Content="Куда: все" Click="OnRouteMenu" Margin="0,0,8,8" gui:ButtonGlyph.Menu="True" />
                 <Button x:Name="RuleButton" MinWidth="120"
                         Content="Правило: все" Click="OnRuleMenu" Margin="0,0,8,8" gui:ButtonGlyph.Menu="True" />
                 <Button x:Name="ClearButton"
-                        Content="Очистить" Click="OnClear" Margin="0,0,8,8" gui:ButtonGlyph.Lead="&#xE74D;" />
+                        Content="Стереть список" Click="OnClear" Margin="0,0,8,8" gui:ButtonGlyph.Lead="&#xE74D;" />
                 <Button x:Name="CopyButton"
-                        Content="Скопировать" Click="OnCopyMenu" Margin="0,0,8,8"
+                        Content="Копировать" Click="OnCopyMenu" Margin="0,0,8,8"
                         gui:ButtonGlyph.Lead="&#xE8C8;" gui:ButtonGlyph.Menu="True"
-                        ToolTip="Сайты, домены или адреса по нынешнему отбору — по строке, без повторов. Локальное и соединения движка не берутся." />
+                        ToolTip="Сайты, домены или адреса из текущего отбора, по одному в строке, без повторов. Локальные и служебные соединения не копируются." />
                 <Button x:Name="SummaryButton" Visibility="Collapsed"
-                        Content="Сводка" Click="OnSummary" Margin="0,0,8,8" gui:ButtonGlyph.Lead="&#xEB05;"
-                        ToolTip="Кольцо долей, кто шумит и сайты — на узком окне скрыты, чтобы таблице хватило места" />
+                        Content="Итоги" Click="OnSummary" Margin="0,0,8,8" gui:ButtonGlyph.Lead="&#xEB05;"
+                        ToolTip="Кольцо долей, самые шумные и сайты скрываются на узком окне, чтобы таблице хватило места" />
                 <Button x:Name="JournalButton"
-                        Content="Открыть журнал" Click="OnJournal" Margin="0,0,8,8" gui:ButtonGlyph.Lead="&#xE8FD;"
-                        ToolTip="runtime\watch.log — каждое соединение всех сеансов, и прямое тоже" />
+                        Content="Журнал" Click="OnJournal" Margin="0,0,8,8" gui:ButtonGlyph.Lead="&#xE8FD;"
+                        ToolTip="runtime\watch.log: все соединения всех сеансов, включая прямые" />
             </WrapPanel>
         </StackPanel>
 
@@ -116,7 +116,7 @@
                         <TextBlock x:Name="DetailsText" Style="{StaticResource Mono}" FontSize="12"
                                    Margin="0,8,0,0" TextWrapping="Wrap" />
                     </StackPanel>
-                    <Button Grid.Column="1" Style="{StaticResource Ghost}" Content="Закрыть"
+                    <Button Grid.Column="1" Style="{StaticResource Ghost}" Content="Свернуть"
                             VerticalAlignment="Top" Margin="12,0,0,0" Click="OnDetailsClose" />
                 </Grid>
             </Border>
@@ -152,7 +152,7 @@
                 -->
                 <Grid Grid.Row="0">
                     <TextBox x:Name="Search" TextChanged="OnSearch" Padding="34,7,11,7"
-                             gui:Hint.Text="Поиск по имени, адресу, программе, правилу" />
+                             gui:Hint.Text="Искать по имени, адресу, программе, правилу" />
                     <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE721;" FontSize="14"
                                HorizontalAlignment="Left" Margin="14,0,0,0" IsHitTestVisible="False" />
                 </Grid>
@@ -168,7 +168,7 @@
                             <TextBlock Style="{StaticResource StatGlyph}" Text="&#xE8AB;" />
                             <StackPanel Grid.Column="1">
                                 <TextBlock x:Name="TotalText" Text="0" Style="{StaticResource StatNumber}" />
-                                <TextBlock Text="соединений" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="всего соединений" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -181,7 +181,7 @@
                             <TextBlock Style="{StaticResource StatGlyph}" Text="&#xE816;" />
                             <StackPanel Grid.Column="1">
                                 <TextBlock x:Name="MatchedText" Text="0" Style="{StaticResource StatNumber}" />
-                                <TextBlock Text="под правило" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="по правилам" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -194,7 +194,7 @@
                             <TextBlock Style="{StaticResource StatGlyph}" Text="&#xE8EC;" />
                             <StackPanel Grid.Column="1">
                                 <TextBlock x:Name="NamesText" Text="0" Style="{StaticResource StatNumber}" />
-                                <TextBlock Text="имён узнано" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="имён известно" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -220,7 +220,7 @@
                             <TextBlock Style="{StaticResource StatGlyph}" Text="&#xE916;" />
                             <StackPanel Grid.Column="1">
                                 <TextBlock x:Name="ClockText" Text="—" Style="{StaticResource StatNumber}" />
-                                <TextBlock x:Name="ClockCaption" Text="выключено" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock x:Name="ClockCaption" Text="не идёт" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -240,10 +240,10 @@
                         <ColumnDefinition Width="36" />
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Grid.Column="0" Text="Время" Style="{StaticResource Caption}" />
+                    <TextBlock Grid.Column="0" Text="Когда" Style="{StaticResource Caption}" />
                     <TextBlock Grid.Column="1" Text="Куда" Style="{StaticResource Caption}" />
-                    <TextBlock Grid.Column="2" Text="Программа" Style="{StaticResource Caption}" />
-                    <TextBlock Grid.Column="3" Text="Назначение" Style="{StaticResource Caption}" />
+                    <TextBlock Grid.Column="2" Text="Приложение" Style="{StaticResource Caption}" />
+                    <TextBlock Grid.Column="3" Text="Куда" Style="{StaticResource Caption}" />
                     <TextBlock Grid.Column="4" Text="Правило" Style="{StaticResource Caption}" />
                 </Grid>
 
@@ -313,7 +313,7 @@
 
                                         <TextBlock Grid.Column="2" Text="{Binding Process}" VerticalAlignment="Center"
                                                    TextTrimming="CharacterEllipsis" Margin="0,0,10,0"
-                                                   Cursor="Hand" ToolTip="Только эта программа"
+                                                   Cursor="Hand" ToolTip="Только это приложение"
                                                    MouseLeftButtonUp="OnProcessClick" />
 
                                         <StackPanel Grid.Column="3" Margin="0,0,10,0" VerticalAlignment="Center">
@@ -330,7 +330,7 @@
                                         <Button Grid.Column="5" Style="{StaticResource Ghost}" Content="⋮"
                                                 Padding="0,2" MinWidth="28" HorizontalAlignment="Right"
                                                 VerticalAlignment="Center" Click="OnRowMenu"
-                                                ToolTip="Что сделать с этим соединением"
+                                                ToolTip="Действия с этим соединением"
                                                 AutomationProperties.Name="Действия с соединением" />
                                     </Grid>
                                 </DataTemplate>
@@ -340,7 +340,7 @@
                 </Border>
 
                 <TextBlock Grid.Row="4" Style="{StaticResource Caption}" Margin="4,8,0,0" TextWrapping="Wrap"
-                           Text="● — известно точно: подставной адрес движка, сам движок, домашняя сеть · ○ — так сказали бы правила, движок не спрашивали" />
+                           Text="● — известно точно: подставной адрес движки, сама движок, домашняя сеть · ○ — так решили бы правила, движок не спрашивали" />
             </Grid>
 
             <!--
@@ -380,22 +380,22 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,10" Grid.ColumnSpan="2">
-                            <TextBlock Text="Куда уходит" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Text="Куда идёт трафик" FontWeight="SemiBold" VerticalAlignment="Center" />
                             <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                            Content="Доли соединений сеанса по пути. При «Куда: наружу» — только туннель, десинк и напрямую, при «Куда: всё» — ещё локально (домашняя сеть и мультикаст) и движок (соединения самого sing-box: к серверу VPN, к DNS).&#x0a;&#x0a;Щелчок по строке — показать в таблице только её." />
+                                            Content="Доля соединений сеанса по каждому пути. При «Куда: наружу» считаются только туннель, десинк и «напрямую», при «Куда: всё» добавляются локальные (домашняя сеть, мультикаст) и служебные (соединения самого sing-box: к VPN-серверу и DNS).&#x0a;&#x0a;Щёлкните строку, и в таблице останется только она." />
                         </StackPanel>
                         <Grid x:Name="RingBox" Grid.Row="1" Width="116" Height="116" VerticalAlignment="Center">
                             <views:WatchRing x:Name="Ring" />
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                                 <TextBlock x:Name="RingTotal" Text="0" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                                <TextBlock x:Name="RingCaption" Text="соединений" Style="{StaticResource Caption}" HorizontalAlignment="Center" />
+                                <TextBlock x:Name="RingCaption" Text="всего соединений" Style="{StaticResource Caption}" HorizontalAlignment="Center" />
                             </StackPanel>
                         </Grid>
                         <ItemsControl x:Name="RingLegend" Grid.Row="1" Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Grid Margin="0,2" Cursor="Hand" Background="Transparent"
-                                          MouseLeftButtonUp="OnLegendClick" ToolTip="Показать только это">
+                                          MouseLeftButtonUp="OnLegendClick" ToolTip="Оставить только это">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
@@ -421,9 +421,9 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                            <TextBlock Text="Шумят больше всех" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Text="Самые шумные" FontWeight="SemiBold" VerticalAlignment="Center" />
                             <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                            Content="Программы с наибольшим числом соединений за сеанс. При «Куда: наружу» локальные соединения и соединения движка не считаются.&#x0a;&#x0a;Щелчок — показать в таблице только эту программу." />
+                                            Content="Программы с самым большим числом соединений за сеанс. При «Куда: наружу» локальные и служебные соединения не считаются.&#x0a;&#x0a;Щёлкните строку, чтобы в таблице осталась только эта программа." />
                         </StackPanel>
                         <ItemsControl x:Name="TopPrograms" Grid.Row="1" ItemTemplate="{StaticResource WatchTopLine}">
                             <ItemsControl.ItemsPanel>
@@ -444,7 +444,7 @@
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                             <TextBlock Text="Сайты" FontWeight="SemiBold" VerticalAlignment="Center" />
                             <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                            Content="Сайты по числу соединений: имена сведены к сайту — www.youtube.com и m.youtube.com считаются вместе. Строк столько, сколько влезает по высоте.&#x0a;&#x0a;Щелчок — найти сайт в таблице." />
+                                            Content="Сайты по числу соединений. Имена сведены к сайту: www.youtube.com и m.youtube.com считаются вместе. Строк столько, сколько помещается по высоте.&#x0a;&#x0a;Щёлкните строку, чтобы найти сайт в таблице." />
                         </StackPanel>
                         <ItemsControl x:Name="TopSites" Grid.Row="1" ItemTemplate="{StaticResource WatchTopLine}">
                             <ItemsControl.ItemsPanel>

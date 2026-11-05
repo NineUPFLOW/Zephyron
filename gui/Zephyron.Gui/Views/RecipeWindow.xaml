@@ -2,7 +2,7 @@
         Style="{StaticResource Dialog}"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Чем чинить имя" Height="620" Width="720"
+        Title="Чем открыть имя" Height="620" Width="720"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource Backdrop}"
         ResizeMode="CanResize">
@@ -18,7 +18,7 @@
         <StackPanel Grid.Row="0">
             <TextBlock x:Name="Head" Style="{StaticResource Title}" FontSize="20" />
             <TextBlock Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap"
-                       Text="Рецепт — это то, что winws2 сделает с рукопожатием: подделает пакет, порежет его, переставит куски. Наборы взяты из вашего пресета: там они подобраны под живые блокировки, а не выдуманы нами." />
+                       Text="Рецепт — это то, что winws2 делает с рукопожатием: подделывает пакет, режет его или переставляет куски. Наборы взяты из вашего пресета, где они подобраны под реальные блокировки, а не придуманы нами." />
         </StackPanel>
 
         <!--
@@ -105,7 +105,7 @@
                                                Foreground="{Binding VerdictColour}" />
 
                                     <Button Grid.Column="2" Style="{StaticResource Ghost}"
-                                            Content="выбрать" Padding="14,7"
+                                            Content="взять" Padding="14,7"
                                             Tag="{Binding Name}" Click="OnPick" />
                                 </Grid>
                             </Border>
@@ -123,11 +123,11 @@
 
             <TextBlock x:Name="PresetNote" Grid.Column="0" Style="{StaticResource Caption}" VerticalAlignment="Center"
                        TextWrapping="Wrap" Margin="0,0,16,0"
-                       Text="«Решает пресет» — прежнее поведение: имя выпускается напрямую, а что с ним делать, решают его списки. Если имя в них не попало, не делается ничего." />
+                       Text="«По пресету» — как было раньше: имя идёт напрямую, а что с ним делать, решают списки пресета. Если имени в них нет, с ним ничего не происходит." />
 
             <StackPanel Grid.Column="1" Orientation="Horizontal">
                 <Button x:Name="TestButton" Style="{StaticResource Ghost}"
-                        Content="Проверить все" Click="OnTest" Margin="0,0,8,0" />
+                        Content="Проверить каждый" Click="OnTest" Margin="0,0,8,0" />
 
                 <!--
                     Остановка. Перебор идёт до сорока секунд, и до неё прервать
@@ -135,12 +135,12 @@
                     полученные ответы.
                 -->
                 <Button x:Name="StopButton" Style="{StaticResource Ghost}"
-                        Content="Остановить" Click="OnStop" Margin="0,0,8,0"
+                        Content="Прекратить" Click="OnStop" Margin="0,0,8,0"
                         IsEnabled="False" />
 
-                <Button x:Name="PresetButton" Style="{StaticResource Ghost}" Content="Решает пресет"
+                <Button x:Name="PresetButton" Style="{StaticResource Ghost}" Content="По пресету"
                         Click="OnPreset" Margin="0,0,8,0" />
-                <Button Style="{StaticResource Ghost}" Content="Отмена" Click="OnCancel" />
+                <Button Style="{StaticResource Ghost}" Content="Отменить" Click="OnCancel" />
             </StackPanel>
         </Grid>
     </Grid>

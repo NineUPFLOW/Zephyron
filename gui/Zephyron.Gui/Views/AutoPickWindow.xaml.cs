@@ -684,7 +684,7 @@ public partial class AutoPickWindow : Window
 
         // После записи можно начать заново, не переоткрывая окно.
         StartButton.Visibility = V(_phase is Phase.Idle or Phase.Written);
-        StartButton.Content = engines ? "Остановить движки и начать" : "Начать";
+        StartButton.Content = engines ? "Остановить движки и начать" : "Запустить";
         StopButton.Visibility = V(busy);
         WriteButton.Visibility = V(_phase == Phase.Done);
         EnginesButton.Visibility = V((_phase is Phase.Done or Phase.Written || _phase == Phase.Idle && _stoppedEngines) && !engines);
@@ -1375,7 +1375,7 @@ public partial class AutoPickWindow : Window
         }
         catch (Exception ex)
         {
-            Say("Проверка не удалась: " + ex.GetBaseException().Message, "Danger");
+            Say("Проверить не удалось: " + ex.GetBaseException().Message, "Danger");
         }
         finally
         {

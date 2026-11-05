@@ -43,7 +43,7 @@ internal static class UiStallWatch
         _thread = new Thread(() => Watch(dispatcher))
         {
             IsBackground = true,
-            Name = "Сторож подвисаний",
+            Name = "Контроль зависаний окна",
         };
 
         _thread.Start();

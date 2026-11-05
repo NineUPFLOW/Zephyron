@@ -84,13 +84,13 @@ public partial class RoutesView
 
             Status.Text = $"Записано {plan.Count} → {path}"
                 + (window.Folder is { } shown ? $", в папке «{shown}»" : string.Empty)
-                + ". Путь отдельного сайта меняется в его строке. Применится при следующем запуске движков.";
+                + ". Маршрут отдельного сайта меняется в его строке. Вступит в силу после следующего запуска движков.";
 
             this.Offer($"Добавлено маршрутов: {plan.Count}");
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
     }
 }

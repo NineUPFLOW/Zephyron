@@ -89,7 +89,7 @@ public sealed class HostsFilterTests
     public void The_source_is_searchable()
     {
         Assert.Single(HostsFilter.Apply(Rows, "zapret gui"));
-        Assert.Single(HostsFilter.Apply(Rows, "неизвестно"));
+        Assert.Single(HostsFilter.Apply(Rows, "не определено"));
     }
 
     [Fact]

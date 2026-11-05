@@ -173,7 +173,7 @@ public partial class RoutesView
         catch (Exception ex)
         {
             if (reading == _reading)
-                Status.Text = "Правила не читаются: " + ex.GetBaseException().Message;
+                Status.Text = "Не удалось прочитать правила: " + ex.GetBaseException().Message;
 
             return;
         }

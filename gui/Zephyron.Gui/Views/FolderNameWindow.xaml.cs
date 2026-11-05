@@ -24,7 +24,7 @@ public partial class FolderNameWindow : Window
     /// <param name="initial">Что стоит в поле сразу — у переименования прежнее имя.</param>
     /// <param name="action">Подпись кнопки.</param>
     /// <param name="pool">Имя пула серверов, а не папки маршрутов: у пула свои пояснения.</param>
-    public FolderNameWindow(string head, IReadOnlyCollection<string> reserved, string? initial = null, string action = "Создать",
+    public FolderNameWindow(string head, IReadOnlyCollection<string> reserved, string? initial = null, string action = "Сделать",
         bool pool = false)
     {
         InitializeComponent();
@@ -38,8 +38,8 @@ public partial class FolderNameWindow : Window
         if (pool)
         {
             Title = "Пул серверов";
-            Note.Text = "Пул — папка серверов из любых подписок. Маршрут «через VPN», направленный в пул, идёт только через его серверы.";
-            NameLabel.Text = "Название пула";
+            Note.Text = "Пул — это папка с серверами из любых подписок. Маршрут «через VPN», направленный в пул, идёт только через его серверы.";
+            NameLabel.Text = "Имя пула";
             NameBox.SetValue(Hint.TextProperty, "например, Россия");
         }
 

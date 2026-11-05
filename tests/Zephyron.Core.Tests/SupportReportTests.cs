@@ -334,6 +334,33 @@ public sealed class SupportReportTests : IDisposable
         Assert.Equal(3, redacted.Split("%USERPROFILE%").Length - 1);
     }
 
+    /// <summary>
+    /// Дамп WireGuard в журнале движка: ключи скрыты, структура для разбора на месте.
+    /// </summary>
+    [Fact]
+    public void AWireGuardDumpKeepsItsShapeButNotItsKeys()
+    {
+        var keys = Enumerable.Range(1, 4).Select(i => new string((char)('a' + i), 64)).ToArray();
+        var log = string.Join('\n',
+            $"private_key={keys[0]}",
+            "jc=4",
+            "s3=5",
+            $"header_protection_key={keys[1]}",
+            $"public_key={keys[2]}",
+            "endpoint=203.0.113.7:51820",
+            $"preshared_key={keys[3]}",
+            "allowed_ip=0.0.0.0/0: IPC error -22: S3 must be more then 12 to use headerProtection",
+            $"PresharedKey = {keys[3]}");
+
+        var redacted = SupportReport.Redact(log, []);
+
+        foreach (var key in keys)
+            Assert.DoesNotContain(key, redacted);
+
+        foreach (var shape in new[] { "private_key=", "header_protection_key=", "PresharedKey = ", "jc=4", "s3=5", "endpoint=203.0.113.7:51820", "S3 must be more then 12" })
+            Assert.Contains(shape, redacted);
+    }
+
     [Fact]
     public void ALongLogKeepsItsBeginningAndEnd()
     {

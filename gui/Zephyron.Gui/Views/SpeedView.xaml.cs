@@ -390,7 +390,7 @@ public partial class SpeedView : UserControl
             if (tunnel && result.Problem is { Length: > 0 } problem
                 && TunnelReadiness.Why(SupervisorState.Load(SupervisorState.DefaultPath), DateTimeOffset.Now) is { } why)
             {
-                note = $"Замер не удался: {problem}. {why}";
+                note = $"Замер не получился: {problem}. {why}";
             }
 
             // В журнал — без адреса: он личный, а журнал уходит в отчёты.
@@ -403,7 +403,7 @@ public partial class SpeedView : UserControl
         }
         catch (Exception ex)
         {
-            note = "Замер не удался: " + ex.GetBaseException().Message;
+            note = "Замер не получился: " + ex.GetBaseException().Message;
         }
         finally
         {
@@ -435,7 +435,7 @@ public partial class SpeedView : UserControl
 
         if (_seen?.Address is not { Length: > 0 } address)
         {
-            SeenText.Text = "покажет замер";
+            SeenText.Text = "появится после замера";
             SeenToggle.Visibility = Visibility.Collapsed;
             return;
         }
@@ -498,7 +498,7 @@ public partial class SpeedView : UserControl
 
     private void ShowRunning(bool running)
     {
-        GoText.Text = running ? "Стоп" : "Начать";
+        GoText.Text = running ? "Стоп" : "Запустить";
         GoGlyph.Text = running ? "" : "";
 
         ViaTunnel.IsEnabled = !running;
@@ -530,7 +530,7 @@ public partial class SpeedView : UserControl
                 break;
 
             case SpeedPhase.Ping:
-                _phase = "задержка";
+                _phase = "отклик";
 
                 if (reading.PingMs is { } ms)
                 {
@@ -551,7 +551,7 @@ public partial class SpeedView : UserControl
                 break;
 
             case SpeedPhase.Download:
-                _phase = "скачивание";
+                _phase = "загрузка";
                 _nowNow = _downNow = SpeedVerdict.Number(reading.Mbps);
                 _needleNow = reading.Mbps;
                 _strokeNow = "SpeedArc";
@@ -559,7 +559,7 @@ public partial class SpeedView : UserControl
                 break;
 
             case SpeedPhase.Upload:
-                _phase = "отдача";
+                _phase = "отправка";
                 _nowNow = _upNow = SpeedVerdict.Number(reading.Mbps);
                 _needleNow = reading.Mbps;
                 _strokeNow = "Text";
@@ -605,8 +605,8 @@ public partial class SpeedView : UserControl
             readings is null ? " " : SpeedVerdict.Unevenness(readings) switch
             {
                 null => " ",
-                <= SpeedVerdict.Steady => "стабильно",
-                _ => "неровно",
+                <= SpeedVerdict.Steady => "ровно",
+                _ => "с провалами",
             };
     }
 
@@ -623,8 +623,8 @@ public partial class SpeedView : UserControl
 
         if (history.Count == 0)
         {
-            VerdictTitle.Text = "Пока нечего сказать";
-            VerdictText.Text = "Замерьте оба пути — будет видно, сколько скорости стоит туннель.";
+            VerdictTitle.Text = "Данных пока нет";
+            VerdictText.Text = "Замерьте оба пути, и станет видно, сколько скорости забирает туннель.";
             CopyButton.IsEnabled = false;
             return;
         }
@@ -748,7 +748,7 @@ public partial class SpeedView : UserControl
         catch (Exception)
         {
             // Буфер обмена занят другой программой — бывает, и не наша беда.
-            CopyText.Text = "Буфер занят — ещё раз";
+            CopyText.Text = "Буфер занят, повторите";
         }
     }
 

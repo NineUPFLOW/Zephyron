@@ -221,18 +221,18 @@
                                 AutomationProperties.Name="Закрыть" />
                     </Grid>
                     <TextBlock Style="{StaticResource Caption}" Margin="24,4,0,0" TextWrapping="Wrap"
-                               Text="Если программа помогает — поставьте звезду на GitHub и подпишитесь на канал: так о ней узнают другие, а вы — о новых версиях. Поддержать разработку можно и донатом." />
+                               Text="Программа выручила? Звезда на GitHub и канал помогут другим её найти. Проект можно поддержать деньгами." />
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
                         <Button Style="{StaticResource Quiet}" Margin="0,0,6,0" Click="OnGreetingTelegram"
-                                local:ButtonGlyph.Lead="&#xE724;" Content="Канал"
-                                ToolTip="Новости в телеграм-канале" />
+                                local:ButtonGlyph.Lead="&#xE724;" Content="Новости"
+                                ToolTip="Что вышло и что изменилось, коротко в Telegram" />
                         <Button Style="{StaticResource Ghost}" Margin="0,0,8,0" Click="OnGreetingDonate"
                                 local:ButtonGlyph.Lead="&#xEB51;" Content="Поддержать"
                                 ToolTip="Поддержать разработку донатом" />
                         <Button Style="{StaticResource Primary}" Click="OnGreetingStar"
-                                local:ButtonGlyph.Lead="&#xE734;" Content="Звезда на GitHub"
-                                ToolTip="Страница Zephyron на GitHub — звезда справа вверху" />
+                                local:ButtonGlyph.Lead="&#xE734;" Content="Отметить на GitHub"
+                                ToolTip="Проект на GitHub: звезда в правом верхнем углу" />
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -269,10 +269,10 @@
                                Margin="24,4,0,0" TextWrapping="Wrap" />
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-                        <Button x:Name="ToastLater" Style="{StaticResource Quiet}" Content="Позже"
+                        <Button x:Name="ToastLater" Style="{StaticResource Quiet}" Content="Не сейчас"
                                 Margin="0,0,8,0" Click="OnToastLater" />
                         <Button x:Name="ToastAct" Style="{StaticResource Primary}"
-                                Content="Перезапустить" Click="OnToastRestart" />
+                                Content="Перезапустить сейчас" Click="OnToastRestart" />
                     </StackPanel>
                 </StackPanel>
             </Border>

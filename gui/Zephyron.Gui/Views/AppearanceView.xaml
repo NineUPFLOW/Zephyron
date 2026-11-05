@@ -105,15 +105,15 @@
                             молча вернуло бы свой файл.
                         -->
                         <WrapPanel Margin="0,4,0,4">
-                            <Button Style="{StaticResource Primary}" Content="Создать тему" Click="OnCreateTheme" Margin="0,0,8,8" />
-                            <Button x:Name="EditThemeButton" Style="{StaticResource Ghost}" Content="Изменить" Click="OnEditTheme" Margin="0,0,8,8" />
+                            <Button Style="{StaticResource Primary}" Content="Новая тема" Click="OnCreateTheme" Margin="0,0,8,8" />
+                            <Button x:Name="EditThemeButton" Style="{StaticResource Ghost}" Content="Править" Click="OnEditTheme" Margin="0,0,8,8" />
                             <!-- Своя тема — в корзину Windows; у встроенной кнопка неактивна. -->
                             <Button x:Name="DeleteThemeButton" Style="{StaticResource Ghost}" Content="Удалить" Click="OnDeleteTheme" Margin="0,0,8,8"
                                     ToolTipService.ShowOnDisabled="True" />
-                            <Button Style="{StaticResource Ghost}" Content="Выгрузить в файл…" Click="OnExportTheme" Margin="0,0,8,8" />
-                            <Button Style="{StaticResource Ghost}" Content="Загрузить из файла…" Click="OnImportTheme" Margin="0,0,8,8" />
+                            <Button Style="{StaticResource Ghost}" Content="Сохранить в файл…" Click="OnExportTheme" Margin="0,0,8,8" />
+                            <Button Style="{StaticResource Ghost}" Content="Взять из файла…" Click="OnImportTheme" Margin="0,0,8,8" />
                             <!-- Рядом с прочими действиями над темами (владелец, 05.10), а не отдельно в шапке. -->
-                            <Button Style="{StaticResource Ghost}" Content="Папка тем" Click="OnThemesFolder" Margin="0,0,8,8" />
+                            <Button Style="{StaticResource Ghost}" Content="Каталог тем" Click="OnThemesFolder" Margin="0,0,8,8" />
                         </WrapPanel>
 
                         <!--
@@ -130,9 +130,9 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel>
-                                        <TextBlock Text="Картинка фона" FontWeight="SemiBold" />
+                                        <TextBlock Text="Картинка на фоне" FontWeight="SemiBold" />
                                         <TextBlock Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap"
-                                                   Text="Выключенная — остаются цвета темы, фон сплошной." />
+                                                   Text="Если выключено, остаются цвета темы и фон сплошной." />
                                     </StackPanel>
                                     <ToggleButton Grid.Column="1" x:Name="BackgroundSwitch" Style="{StaticResource Switch}"
                                                   IsHitTestVisible="False" Focusable="False" VerticalAlignment="Center" />
@@ -164,15 +164,15 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="Затемнение фона" FontWeight="SemiBold" />
+                                        <TextBlock Text="Притемнение фона" FontWeight="SemiBold" />
                                         <TextBlock Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap"
-                                                   Text="Только темнее задуманного: затемнение и есть то, чем тема читается." />
+                                                   Text="Только темнее, чем задумано: именно затемнение делает текст читаемым." />
                                     </StackPanel>
                                     <ComboBox Grid.Column="1" x:Name="DimChoice" Width="190" VerticalAlignment="Center"
                                               SelectionChanged="OnDim">
-                                        <ComboBoxItem Content="как задумал автор" />
-                                        <ComboBoxItem Content="темнее" />
-                                        <ComboBoxItem Content="намного темнее" />
+                                        <ComboBoxItem Content="по замыслу автора" />
+                                        <ComboBoxItem Content="чуть темнее" />
+                                        <ComboBoxItem Content="значительно темнее" />
                                     </ComboBox>
                                 </Grid>
                             </Border>
@@ -180,7 +180,7 @@
 
                         <TextBlock x:Name="LookNone" Style="{StaticResource Caption}" Margin="0,8,0,0"
                                    TextWrapping="Wrap" Visibility="Collapsed"
-                                   Text="У этой темы нет картинки фона — размытию и затемнению нечего делать." />
+                                   Text="У этой темы нет картинки фона, поэтому размывать и затемнять нечего." />
 
                         <!--
                             Шрифт и размер — здесь же, в оформлении (владелец,
@@ -196,7 +196,7 @@
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="Шрифт" FontWeight="SemiBold" />
                                 <TextBlock Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap"
-                                           Text="Один на всю программу. Не моноширинный держит цифры в таблицах чуть менее ровно." />
+                                           Text="Один шрифт на всю программу. Не моноширинный немного хуже выравнивает цифры в таблицах." />
                             </StackPanel>
                             <ComboBox Grid.Column="1" x:Name="UiFontChoice" VerticalAlignment="Center"
                                       SelectionChanged="OnFontChoice">
@@ -219,9 +219,9 @@
                                 <ColumnDefinition Width="280" />
                             </Grid.ColumnDefinitions>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="Размер" FontWeight="SemiBold" />
+                                <TextBlock Text="Масштаб" FontWeight="SemiBold" />
                                 <TextBlock Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap"
-                                           Text="Всё окно целиком, как масштаб в Telegram, — вместе со списками, подсказками и окнами." />
+                                           Text="Масштабируется всё окно целиком, как в Telegram: списки, подсказки и диалоги тоже." />
                             </StackPanel>
                             <ComboBox Grid.Column="1" x:Name="ScaleChoice" VerticalAlignment="Center"
                                       SelectionChanged="OnFontChoice" />
@@ -238,7 +238,7 @@
                             Анимации окна (владелец, 28.09: «добавим анимаций
                             по всей программе, с возможностью их выключить»).
                         -->
-                        <TextBlock Text="Движение" FontWeight="SemiBold" Margin="0,18,0,8" />
+                        <TextBlock Text="Динамика" FontWeight="SemiBold" Margin="0,18,0,8" />
 
                         <Button Style="{StaticResource Choice}" Click="OnAnimations" Margin="0,0,0,7">
                             <Grid>
@@ -247,7 +247,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock Text="Анимации" FontWeight="SemiBold" />
+                                    <TextBlock Text="Анимация окон" FontWeight="SemiBold" />
                                     <TextBlock x:Name="AnimationsNote" Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap"
                                                Text="Разделы появляются плавно, карточки — по очереди, уведомления выезжают снизу, в мастере бегут точки. Выключенные — всё показывается сразу." />
                                 </StackPanel>
@@ -297,7 +297,7 @@
                             </Grid>
                         </Button>
 
-                        <TextBlock Text="Меню в трее" FontWeight="SemiBold" Margin="0,18,0,8" />
+                        <TextBlock Text="Меню значка в трее" FontWeight="SemiBold" Margin="0,18,0,8" />
 
                         <Button Style="{StaticResource Choice}" Click="OnTrayBlur" Margin="0,0,0,7">
                             <Grid>
@@ -306,7 +306,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock Text="Размытие под меню" FontWeight="SemiBold" />
+                                    <TextBlock Text="Размытие за меню" FontWeight="SemiBold" />
                                     <TextBlock Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap"
                                                Text="Под меню — размытое то, что было на экране. Выключенное — меню прозрачно по плотности ниже, и сквозь него видно окна." />
                                 </StackPanel>
@@ -321,7 +321,7 @@
                                 <ColumnDefinition Width="280" />
                             </Grid.ColumnDefinitions>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="Плотность подложки" FontWeight="SemiBold" />
+                                <TextBlock Text="Прозрачность подложки" FontWeight="SemiBold" />
                                 <TextBlock Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap"
                                            Text="Сколько цвета темы лежит под текстом меню. Меньше — виднее фон, но текст на пёстром читается хуже." />
                             </StackPanel>

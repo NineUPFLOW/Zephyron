@@ -61,18 +61,29 @@ public sealed class AmneziaMaskingTests
     {
         var conf = Conf.Replace(
             "Jc = 4",
-            "Jc = 4\nHeaderProtectionKey = 9Jq3kQp1Zq0sS3m0hYkL3Qe8q1b7m2dQyM0rT4uV5w8=\nRandomTrailers = on\nContentPaddingAddition = 0-64",
+            "Jc = 4\nS3 = 20\nS4 = 20\nHeaderProtectionKey = 9Jq3kQp1Zq0sS3m0hYkL3Qe8q1b7m2dQyM0rT4uV5w8=\nRandomTrailers = on\nContentPaddingAddition = 0-64",
             StringComparison.Ordinal);
 
         var found = KeyImport.FromText(conf, "AWG 3");
 
         var link = Assert.Single(found.Keys);
-        Assert.Contains("headerprotectionkey=", link);
-        Assert.Contains("contentpaddingaddition=", link);
-        Assert.Equal("это AmneziaWG 3 (HeaderProtectionKey, RandomTrailers), а движок говорит только на 2.0 — сервер не ответит", found.Note);
+        Assert.Contains("header_protection_key=", link);
+        Assert.Contains("content_padding_addition=0-64", link);
+        Assert.True(ProxyUriParser.TryParse(link, out var server, out _));
+        Assert.Contains("header_protection_key", server!.AmneziaOptions);
+        Assert.Contains("HeaderProtectionKey", found.Note);
         Assert.Equal(found.Note, KeyImport.FromText(link).Note);
     }
 
+    [Fact]
+    public void Header_protection_needs_S3_and_S4_above_12()
+    {
+        string? Get(string k) => k switch { "HeaderProtectionKey" => "9Jq3kQp1Zq0sS3m0hYkL3Qe8q1b7m2dQyM0rT4uV5w8=", "S3" => "12", "S4" => "20", _ => null };
+
+        Assert.Throws<FormatException>(() => AmneziaSettings.From(Get));
+        Assert.Throws<FormatException>(() => AmneziaSettings.From(k => k == "RekeyTimeout" ? "x" : null));
+        Assert.Contains("\"rekey_timeout\":\"5-10\"", AmneziaSettings.From(k => k == "RekeyTimeout" ? "5 - 10" : null));
+    }
     [Fact]
     public void One_sided_AmneziaWG_3_parameters_give_no_note()
     {
@@ -84,7 +95,7 @@ public sealed class AmneziaMaskingTests
         var found = KeyImport.FromText(conf, "AWG 3");
 
         Assert.Null(found.Note);
-        Assert.Contains("disablecookies=on", Assert.Single(found.Keys));
+        Assert.Contains("disable_cookies=true", Assert.Single(found.Keys));
     }
 
     [Fact]

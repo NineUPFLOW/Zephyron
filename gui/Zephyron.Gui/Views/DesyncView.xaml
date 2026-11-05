@@ -24,66 +24,65 @@
             оставалась бы треть колонки, и оно ломалось бы по слову.
         -->
         <DataTemplate x:Key="PresetItem">
-            <Border Style="{StaticResource Card}" BorderBrush="{Binding Edge}">
+            <Border Style="{StaticResource Card}" BorderBrush="{Binding Edge}" Padding="12,8">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="15"
+                    <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"
                                TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="0,0,10,0" />
 
                     <Border Grid.Column="1" Background="{DynamicResource Raised}" CornerRadius="{StaticResource RMd}"
                             BorderBrush="{DynamicResource Border}" BorderThickness="{StaticResource Stroke}"
                             Padding="8,2" VerticalAlignment="Center"
-                            ToolTip="Версия Zapret GUI, для которой собран пресет"
+                            ToolTip="Для какой версии Zapret GUI собран пресет"
                             Visibility="{Binding VersionShown}">
                         <TextBlock Text="{Binding Version}" Style="{StaticResource Mono}"
                                    Foreground="{DynamicResource Muted}" FontSize="11.5" />
                     </Border>
 
-                    <Button Grid.Column="2" Style="{StaticResource IconGhost}" Content="&#xE712;"
+                    <Button Grid.Column="3" Style="{StaticResource IconGhost}" Content="&#xE712;"
                             Margin="6,0,0,0" VerticalAlignment="Center"
-                            ToolTip="Ещё: открыть в редакторе, показать файл"
-                            AutomationProperties.Name="Ещё: открыть в редакторе, показать файл"
+                            ToolTip="Дополнительно: открыть в редакторе, показать файл"
+                            AutomationProperties.Name="Дополнительно: открыть в редакторе, показать файл"
                             Tag="{Binding File}" Click="OnRowMore" />
 
-                    <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Margin="0,4,0,0">
-                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+                    <WrapPanel Grid.Row="1" Grid.ColumnSpan="4" Margin="0,3,0,0">
+                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,0,10,0" />
 
                         <TextBlock Text="{Binding Fake}" Style="{StaticResource Caption}"
-                                   Foreground="{DynamicResource Warn}"
-                                   Margin="0,3,0,0" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource Warn}" TextWrapping="Wrap"
+                                   ToolTip="Секции с поддельным пакетом под туннелем работают не всегда"
                                    Visibility="{Binding FakeShown}" />
-                    </StackPanel>
+                    </WrapPanel>
 
                     <!--
                         Выбор — кнопкой, а не нажатием на всю строку (макет
                         03.10): в строке есть и меню «…», и промахнуться мимо
                         него в выбор пресета значило бы сменить обход случайно.
                     -->
-                    <Grid Grid.Row="2" Grid.ColumnSpan="3" HorizontalAlignment="Right" Margin="0,10,0,0">
-                        <Button Style="{StaticResource Primary}" Content="Применить"
-                                Padding="16,6" MinWidth="122"
+                    <Grid Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center">
+                        <Button Style="{StaticResource Primary}" Content="Включить"
+                                Padding="10,3"
                                 Tag="{Binding Name}" Click="OnChoose"
                                 Visibility="{Binding ApplyShown}" />
 
-                        <Border MinWidth="122" CornerRadius="{StaticResource RMd}" Padding="18,0"
-                                MinHeight="{StaticResource HControl}"
+                        <Border CornerRadius="{StaticResource RMd}" Padding="10,3"
                                 Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentLine}"
                                 BorderThickness="{StaticResource Stroke}"
                                 Visibility="{Binding MarkShown}">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <Ellipse Width="6" Height="6" Margin="0,0,8,0" VerticalAlignment="Center"
                                          Fill="{DynamicResource Accent}" />
-                                <TextBlock Text="Выбран" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" />
+                                <TextBlock Text="Включён" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" />
                             </StackPanel>
                         </Border>
                     </Grid>
@@ -130,7 +129,7 @@
                         </StackPanel>
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <Button Style="{StaticResource Ghost}" Content="Подключить модуль"
+                            <Button Style="{StaticResource Ghost}" Content="Добавить модуль"
                                     Tag="{Binding Id}" Click="OnConnectModule"
                                     Visibility="{Binding FixShown}" />
                         </StackPanel>
@@ -168,13 +167,13 @@
 
                 <ContentControl Style="{StaticResource PageHead}"
                                 local:PageHead.Title="Десинк"
-                                local:PageHead.Subtitle="Пресет решает, какой приём применяется к какому сервису. Трафик при этом никуда не уходит: пакеты правятся на лету, и сайт открывается напрямую.">
+                                local:PageHead.Subtitle="Пресет определяет, какой рецепт применять к какому сервису. Трафик никуда не уходит: пакеты правятся на лету, и сайт открывается напрямую.">
                     <Button Style="{StaticResource Ghost}" Click="OnOpenFolder"
-                            VerticalAlignment="Center" ToolTip="Папка presets рядом с программой">
+                            VerticalAlignment="Center" ToolTip="Папка presets лежит рядом с программой">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE838;" Margin="0,0,9,0"
                                        Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                            <TextBlock Text="Открыть папку" VerticalAlignment="Center" />
+                            <TextBlock Text="Показать папку" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
                 </ContentControl>
@@ -208,23 +207,15 @@
                     в столбик (OnTopSize). Кнопки «Не запускать десинк» нет (владелец,
                     03.10): десинк выключается выключателем на «Главной».
                 -->
-                <Grid x:Name="TopRow" Margin="0,20,0,0" SizeChanged="OnTopSize">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-
-                    <views:FitWidth x:Name="PresetCell" Grid.Column="0">
-                        <Border Style="{StaticResource Card}">
+                <StackPanel Margin="0,20,0,0">
+                    <views:FitWidth>
+                        <Border Style="{StaticResource Card}" Padding="14,10"
+                                Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentLine}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -236,21 +227,21 @@
                                     на «Главной»), иначе — значок десинка: у встроенных
                                     тем картинки нет, и SideArt там прозрачен.
                                 -->
-                                <Border Grid.Column="0" Width="44" Height="44" CornerRadius="{StaticResource RMd}"
+                                <Border Grid.Column="0" Width="32" Height="32" CornerRadius="{StaticResource RMd}"
                                         Background="{DynamicResource Raised}" BorderBrush="{DynamicResource Border}"
-                                        BorderThickness="{StaticResource Stroke}" Margin="0,0,14,0" VerticalAlignment="Top">
+                                        BorderThickness="{StaticResource Stroke}" Margin="0,0,10,0" VerticalAlignment="Center">
                                     <Grid>
-                                        <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE9E9;" FontSize="20"
+                                        <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE9E9;" FontSize="15"
                                                    Foreground="{DynamicResource Accent}" />
                                         <Border CornerRadius="{StaticResource RSm}" Background="{DynamicResource SideArt}" />
                                     </Grid>
                                 </Border>
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="Текущий пресет" Style="{StaticResource Caption}" />
+                                    <TextBlock Text="Выбранный пресет" Style="{StaticResource Caption}" />
 
-                                    <WrapPanel Margin="0,2,0,0">
-                                        <TextBlock x:Name="ChosenName" FontSize="17" FontWeight="SemiBold"
+                                    <WrapPanel>
+                                        <TextBlock x:Name="ChosenName" FontSize="15" FontWeight="SemiBold"
                                                    TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                                    Margin="0,0,10,0" />
 
@@ -259,44 +250,47 @@
                                                 CornerRadius="{StaticResource RMd}" Padding="8,2"
                                                 Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentLine}"
                                                 BorderThickness="{StaticResource Stroke}"
-                                                ToolTip="Пресет по умолчанию: с ним Zephyron проверяется в первую очередь">
-                                            <TextBlock Text="Рекомендуется" FontSize="12" FontWeight="SemiBold"
+                                                ToolTip="Пресет по умолчанию: Zephyron проверяет его первым">
+                                            <TextBlock Text="Советуем" FontSize="12" FontWeight="SemiBold"
                                                        Foreground="{DynamicResource Accent}" />
                                         </Border>
                                     </WrapPanel>
-
-                                    <TextBlock x:Name="ChosenDetail" Style="{StaticResource Caption}"
-                                               Margin="0,4,0,0" TextWrapping="Wrap" />
                                 </StackPanel>
 
-                                <Button Grid.Row="1" Grid.ColumnSpan="2" x:Name="FakesButton" Style="{StaticResource Ghost}"
-                                        HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,14,190,0"
-                                        Content="Подделки секций…" Click="OnPickFakes"
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                                    <Button x:Name="FakesButton" Style="{StaticResource Ghost}"
+                                        Padding="10,3" Margin="0,0,6,0"
+                                        Content="Подделки…" Click="OnPickFakes"
                                         ToolTip="Выбрать подделку у секции пресета, не правя файл" />
 
-                                <Button Grid.Row="1" Grid.ColumnSpan="2" x:Name="EditButton" Style="{StaticResource Primary}"
-                                        HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,14,0,0"
-                                        Click="OnOpenPreset">
+                                <Button x:Name="EditButton" Style="{StaticResource Primary}"
+                                        Padding="10,3"
+                                        Click="OnOpenPreset" ToolTip="Править в редакторе" AutomationProperties.Name="Править в редакторе">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE70F;" Margin="0,0,9,0"
                                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                        <TextBlock Text="Открыть в редакторе" VerticalAlignment="Center" />
+                                        <TextBlock Text="Править" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </Button>
+                                </StackPanel>
+
+                                <TextBlock x:Name="ChosenDetail" Grid.Row="1" Grid.ColumnSpan="3" Style="{StaticResource Caption}"
+                                           Margin="0,6,0,0" TextWrapping="Wrap" />
                             </Grid>
                         </Border>
                     </views:FitWidth>
 
-                    <views:FitWidth x:Name="ParamsCell" Grid.Column="2">
+                    <views:FitWidth Margin="0,12,0,0">
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
-                                <TextBlock Text="Параметры работы" FontWeight="SemiBold" Margin="2,0,0,10" />
+                                <TextBlock Text="Настройки работы" FontWeight="SemiBold" Margin="2,0,0,10" />
 
                                 <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
 
                                     <!--
                                         Game filter (владелец, 25.09: «делай тумблер на вкладке
@@ -323,10 +317,10 @@
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBlock Text="Game filter" FontWeight="SemiBold" VerticalAlignment="Center" />
                                                     <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                                    Content="Как у Flowseal: к любому пресету дописываются две секции для игр — порты 1024–65535, адреса облаков и хостингов из ipset-all. Трогаются только первые четыре пакета соединения: подделки сбивают фильтр провайдера, дальше игра идёт нетронутой.&#x0a;&#x0a;Может и помешать играм, которые работали: проверяйте игру на клиенте, открытом после перезапуска движков.&#x0a;&#x0a;Секции стоят последними и берут только то, что не взяли секции пресета, щит «напрямую» и свои рецепты. Выключенный не меняет в запуске движка ничего. Действует со следующего запуска движков." />
+                                                                    Content="Как у Flowseal: к любому пресету добавляются две секции для игр: порты 1024–65535, адреса облаков и хостингов из ipset-all. Затрагиваются только первые четыре пакета соединения: подделки сбивает фильтр провайдера, а дальше игра идёт как обычно.&#x0a;&#x0a;Игры, которые работали, могут перестать: проверьте игру в клиенте, запущенном после перезапуска движков.&#x0a;&#x0a;Эти секции идут последними и забирают лишь то, что не забрали секции пресета, защита «напрямую» и ваши рецепты. Выключенный вариант ничего не меняет в запуске. Вступает в силу после следующего запуска." />
                                                 </StackPanel>
                                                 <TextBlock Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap"
-                                                           Text="Экспериментальный: может помочь играм, которые не подключаются или тормозят." />
+                                                           Text="Опыт: может помочь играм, которые не подключаются или тормозят." />
                                             </StackPanel>
 
                                             <ToggleButton Grid.Column="2" x:Name="GameFilterSwitch" Style="{StaticResource Switch}"
@@ -340,7 +334,7 @@
                                         Список, а не выключатель: уровней три, и видно, какой
                                         стоит. Уровни — как режимы WinDivert у Zapret GUI.
                                     -->
-                                    <Border x:Name="CaptureTile" Grid.Row="1" Margin="0,8,0,0" Style="{StaticResource ParamTile}">
+                                    <Border x:Name="CaptureTile" Grid.Column="2" Margin="0" Style="{StaticResource ParamTile}">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto" />
@@ -356,18 +350,18 @@
 
                                             <StackPanel Grid.Column="1" Margin="0,0,14,0" VerticalAlignment="Center">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <TextBlock Text="Перехват" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                    <TextBlock Text="Какой трафик перехватывать" FontWeight="SemiBold" VerticalAlignment="Center" />
                                                     <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                                    Content="Что десинк вообще видит. Всё, что под перехват попало, проходит через winws2 пакет за пакетом — даже если ни одна секция его не тронет, — и каждое новое соединение ему чего-то стоит. Что не попало, идёт обычным путём и не стоит ничего.&#x0a;&#x0a;ТОЛЬКО САЙТЫ — TCP 80 и 443 и QUIC (UDP 443). Игры и голос в других программах десинк не видит вовсе.&#x0a;&#x0a;КАК В ПРЕСЕТЕ — то, что задал его автор.&#x0a;&#x0a;ВСЁ — TCP и UDP на всех портах от 443: для подбора стратегии, когда «аккуратного» не хватает.&#x0a;&#x0a;На любом уровне звонки (STUN), обнаружение адреса Discord и WireGuard ловятся по содержимому. Game filter, если включён, расширяет перехват поверх уровня." />
+                                                                    Content="Что десинк вообще видит. Всё, что попало под перехват, winws2 разбирает пакет за пакетом, даже если ни одна часть пресета его не трогает, и каждое новое соединение чего-то стоит. Что не попало, идёт обычным путём и ничего не стоит.&#x0a;&#x0a;ТОЛЬКО САЙТЫ: TCP 80 и 443 и QUIC (UDP 443). Игры и голос в других программах десинк не замечает совсем.&#x0a;&#x0a;КАК В СПОСОБЕ: то, что выбрал его автор.&#x0a;&#x0a;ВСЁ: TCP и UDP на всех портах от 443, когда для поиска нужен широкий охват, а аккуратного перехвата мало.&#x0a;&#x0a;На любом уровне звонки (STUN), поиск адреса Discord и WireGuard определяются по содержимому. Если включён Game filter, он расширяет перехват поверх выбранного уровня." />
                                                 </StackPanel>
                                                 <TextBlock Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap"
-                                                           Text="Уже — меньше нагрузки и задержек. Действует со следующего запуска движков." />
+                                                           Text="Чем уже, тем меньше нагрузка и задержки. Вступает в силу после следующего запуска." />
                                             </StackPanel>
 
-                                            <ComboBox Grid.Column="2" x:Name="CaptureBox" Width="170"
+                                            <ComboBox Grid.Column="2" x:Name="CaptureBox" Width="140"
                                                       VerticalAlignment="Center"
                                                       SelectionChanged="OnCapture">
-                                                <ComboBoxItem Content="Только сайты" />
+                                                <ComboBoxItem Content="Лишь сайты" />
                                                 <ComboBoxItem Content="Как в пресете" />
                                                 <ComboBoxItem Content="Всё" />
                                             </ComboBox>
@@ -380,7 +374,7 @@
                             </StackPanel>
                         </Border>
                     </views:FitWidth>
-                </Grid>
+                </StackPanel>
 
                 <!-- Строка состояния: ошибка («Пресеты не читаются: …») — панелью ErrorState (StatusLook). -->
                 <Border x:Name="StatusBox" Margin="0,12,0,0">
@@ -476,7 +470,7 @@
                         </TextBlock>
                         <TextBlock x:Name="OwnNote" Style="{StaticResource Caption}" Margin="0,4,0,0"
                                    TextWrapping="Wrap"
-                                   Text="Ведём мы: собраны по замерам и правятся вместе с программой. Новые — сверху." />
+                                   Text="Их ведём мы: собраны по замерам и обновляются вместе с программой. Новые вверху." />
                     </StackPanel>
 
                     <!--
@@ -486,7 +480,7 @@
                     -->
                     <Grid Grid.Column="1" Width="320" VerticalAlignment="Center">
                         <TextBox x:Name="Search" Padding="32,5,11,5" TextChanged="OnSearch"
-                                 gui:Hint.Text="Поиск пресета…" />
+                                 gui:Hint.Text="Найти пресет…" />
                         <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE721;" FontSize="13"
                                    HorizontalAlignment="Left" Margin="13,0,0,0" IsHitTestVisible="False" />
                     </Grid>
@@ -504,7 +498,7 @@
                            FontWeight="SemiBold" FontSize="18" Margin="4,24,0,4" />
                 <TextBlock x:Name="OthersNote" Style="{StaticResource Caption}" Margin="4,0,0,10"
                            TextWrapping="Wrap"
-                           Text="Достались от Zapret или положены вами. Работают, но за их состав мы не отвечаем." />
+                           Text="Пришли из Zapret или добавлены вами. Работают, но за их содержимое мы не отвечаем." />
 
                 <ItemsControl x:Name="Others" ItemTemplate="{StaticResource PresetItem}">
                     <ItemsControl.ItemsPanel>
@@ -524,7 +518,7 @@
                 </StackPanel>
 
                 <TextBlock Style="{StaticResource Caption}" Margin="4,14,0,0" TextWrapping="Wrap"
-                           Text="Пресеты лежат в папке presets рядом с программой и едут в архиве вместе с ней. Свой можно перетащить прямо сюда — файл скопируется в папку и появится в списке." />
+                           Text="Пресеты Zephyron хранятся в папке presets рядом с программой. Свой файл можно перетащить сюда: он скопируется в папку и появится в списке." />
 
             </StackPanel>
         </Grid>
@@ -542,10 +536,10 @@
                 Background="{DynamicResource Backdrop}" BorderBrush="{DynamicResource AccentLine}"
                 BorderThickness="{StaticResource Stroke}" CornerRadius="{StaticResource RXL}" Margin="20">
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                <TextBlock Text="Отпустите — скопирую в папку пресетов"
+                <TextBlock Text="Отпустите файл здесь: он появится в списке пресетов"
                            FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" />
                 <TextBlock Style="{StaticResource Caption}" Margin="0,8,0,0" HorizontalAlignment="Center"
-                           Text="Берутся только файлы .txt формата Zapret 2 GUI." />
+                           Text="Подходят только .txt-файлы формата Zapret 2 GUI." />
             </StackPanel>
         </Border>
     </Grid>

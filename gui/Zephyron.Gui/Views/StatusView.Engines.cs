@@ -109,7 +109,7 @@ public partial class StatusView
 
         // «Убрать окно» и «выключить обход» — разные желания, и ошибка
         // в любую сторону дорогая: оба выхода названы прямо.
-        var keep = new MenuItem { Header = "Выйти, движки остаются работать" };
+        var keep = new MenuItem { Header = "Выйти, движки продолжат работу" };
         keep.Click += (_, _) => TrayIcon.Exit(stopEngines: false);
         menu.Items.Add(keep);
 

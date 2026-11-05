@@ -29,6 +29,9 @@ public sealed class CheckLine(string host, string? address, string source, strin
     public string? Address { get; } = address;
     public string Shown => Address ?? "—";
     public string Source { get; } = source;
+
+    /// <summary>Ключ посредника, отдавшего адрес (<see cref="PinCandidate.Via"/>); <c>null</c> — адрес не от посредника.</summary>
+    public string? Via { get; init; }
     public string Detail { get; set; } = detail;
     public string Time { get; } = time;
     public Brush Brush { get; } = brush;
@@ -59,7 +62,7 @@ public sealed class CheckBlock : INotifyPropertyChanged
     public CheckBlock(string host, Brush brush)
     {
         Host = host;
-        _title = host + " — проверяю…";
+        _title = host + " — идёт проверка…";
         _titleBrush = brush;
     }
 
@@ -154,7 +157,7 @@ public partial class PinWindow : Window
         {
             Title = $"{service.Name} · {part.Name}",
             Short = part.Name,
-            Source = $"Список: {part.List}",
+            Source = $"Список: ",
             Zones = HostListReader.Read(part.List, ZapretPaths.Discover()?.Root, out _)
                 .Select(d => d.TrimStart('*', '.'))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -189,7 +192,7 @@ public partial class PinWindow : Window
         {
             Title = OwnLists.IsOwn(rule) ? OwnLists.NameOf(rule) : rule.TrimStart('*', '.'),
             Short = OwnLists.IsOwn(rule) ? OwnLists.NameOf(rule) : rule.TrimStart('*', '.'),
-            Source = "Свой домен",
+            Source = "Домен от вас",
             Zones = zones,
             Match = OwnLists.IsOwn(rule) ? MatchKind.HostList : MatchKind.Domain,
             Value = rule,
@@ -225,11 +228,11 @@ public partial class PinWindow : Window
 
             return ServiceRouting.Describe(service, engine, root, UserRulesFile.Load())
                 .FirstOrDefault(p => p.Part.List == part.List)?.DescribeMode()
-                ?? "неизвестно";
+                ?? "не определено";
         }
         catch (Exception ex)
         {
-            return "правила не читаются: " + ex.GetBaseException().Message;
+            return "не удалось прочитать правила: " + ex.GetBaseException().Message;
         }
     }
 
@@ -258,7 +261,7 @@ public partial class PinWindow : Window
         }
         catch (Exception ex)
         {
-            return "правила не читаются: " + ex.GetBaseException().Message;
+            return "не удалось прочитать правила: " + ex.GetBaseException().Message;
         }
     }
 
@@ -339,9 +342,9 @@ public partial class PinWindow : Window
 
             Status.Text = what == "reset"
                 ? "Свой выбор убран: снова действует правило из поставки. "
-                  + "Применится при следующем запуске движков."
+                  + "Вступит в силу после следующего запуска движков."
                 : $"Записано: «{_target.Short}» → {Describe(Mode(what))}. "
-                  + "Применится при следующем запуске движков.";
+                  + "Вступит в силу после следующего запуска движков.";
 
             // Здесь чаще всего и прибито: окно пина то же самое.
             if (what == "proxy" && PinConflict.Offer(this, _target.Zones) is { } pinNote)
@@ -352,7 +355,7 @@ public partial class PinWindow : Window
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -392,15 +395,15 @@ public partial class PinWindow : Window
             // на вопрос, который прежде задавался человеку, — какой из
             // источников сейчас жив и не отказывает по стране.
             new("auto",
-                "Подобрать автоматически",
+                "Выбрать автоматически",
                 "Проверяет настоящий адрес, свой каталог и посредников Zapret живым запросом "
                 + "и берёт для каждого имени того, кто отвечает сам и не отказывает по стране. "
-                + "Настоящий адрес — первым, если он работает."),
+                + "Настоящий адрес идёт первым, если он работает."),
 
             new("honest",
                 "Спросить честный резолвер сейчас",
-                "Настоящий адрес по DoH, взятый на этой машине в момент закрепления, "
-                + "а не в день сборки. Каждый найденный адрес проверяется рукопожатием — "
+                "Настоящий адрес по DoH, полученный на этом компьютере в момент пина, "
+                + "а не при сборке. Каждый найденный адрес проверяется рукопожатием; "
                 + "ответ-петля отбрасывается."),
         };
 
@@ -429,7 +432,7 @@ public partial class PinWindow : Window
 
         if (rows.Count == 1 && _catalog is null)
         {
-            Status.Text = "Каталог адресов Zapret не найден — остаётся честный резолвер.";
+            Status.Text = "Каталога адресов Zapret нет, остаётся честный резолвер.";
         }
 
         SourceList.ItemsSource = rows;
@@ -453,7 +456,7 @@ public partial class PinWindow : Window
             return;
 
         IsEnabled = false;
-        Status.Text = "Спрашиваю адреса и проверяю каждый…";
+        Status.Text = "Запрашиваю адреса и проверяю каждый…";
         _autoReport = null;
 
         try
@@ -486,7 +489,7 @@ public partial class PinWindow : Window
                 // адреса из России не достучаться. Пин тут бессилен по
                 // существу — он задаёт адрес, а не дорогу к нему.
                 Status.Text = id.StartsWith("set:", StringComparison.Ordinal)
-                    ? "Этот набор не покрывает ни одного имени сервиса."
+                    ? "Набор не покрывает ни одного имени сервиса."
                     : "Ни один адрес не ответил. Похоже, сервис закрыт по самому адресу, "
                       + "а не по имени: пин тут не поможет — нужен туннель либо набор "
                       + "с чужим прокси.";
@@ -500,7 +503,7 @@ public partial class PinWindow : Window
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось закрепить: " + ex.GetBaseException().Message;
+            Status.Text = "Не удалось прибить: " + ex.GetBaseException().Message;
             OnBack(sender, e);
         }
         finally
@@ -517,21 +520,28 @@ public partial class PinWindow : Window
             .Where(l => l?.Address is not null)
             .ToDictionary(l => l!.Host, l => l!.Address!, StringComparer.OrdinalIgnoreCase);
 
+        // Посредник, отдавший выбранный адрес, записывается в метку пина: по ней автозамена
+        // знает, у кого спрашивать о нём.
+        var via = _blocks
+            .Select(b => b.Lines.FirstOrDefault(l => l.IsSelected))
+            .Where(l => l?.Address is not null && l.Via is not null)
+            .ToDictionary(l => l!.Host, l => l!.Via!, StringComparer.OrdinalIgnoreCase);
+
         if (answers.Count == 0)
         {
-            Status.Text = "Ни для одного имени не выбран адрес — прибивать нечего.";
+            Status.Text = "Ни для одного имени не выбран адрес: прибивать нечего.";
             return;
         }
 
         try
         {
-            Pin(answers, "автоподбор");
+            Pin(answers, "автоподбор", via);
             PinChosenButton.Visibility = Visibility.Collapsed;
             OnBack(sender, e);
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось закрепить: " + ex.GetBaseException().Message;
+            Status.Text = "Не удалось прибить: " + ex.GetBaseException().Message;
         }
     }
 
@@ -554,9 +564,9 @@ public partial class PinWindow : Window
     }
 
     /// <summary>Пишет пин и уводит маршрут части напрямую.</summary>
-    private void Pin(Dictionary<string, string> answers, string source)
+    private void Pin(Dictionary<string, string> answers, string source, IReadOnlyDictionary<string, string>? via = null)
     {
-        var result = HostsEditor.Pin(answers, note: $"{_target.Short} — {source}");
+        var result = HostsEditor.Pin(answers, note: $"{_target.Short} — {source}", via: via);
 
         // Маршрут уводится напрямую тем же движением. Это не довесок,
         // а условие работы пина: доменное правило срабатывает поверх
@@ -564,7 +574,7 @@ public partial class PinWindow : Window
         var file = UserRulesFile.Load();
         file.Set(_target.Match, _target.Value, RoutingMode.Direct);
         file.Save();
-        HostsEditor.FlushDns();
+        _ = HostsEditor.FlushDnsAsync();
 
         Changed = true;
         ShowPins();
@@ -768,7 +778,7 @@ public partial class PinWindow : Window
         try
         {
             var state = Zephyron.Supervisor.SupervisorState.Load(Zephyron.Supervisor.SupervisorState.DefaultPath);
-            return state is not null && state.IsSupervisorAlive() ? "подняты" : "не подняты";
+            return state is not null && state.IsSupervisorAlive() ? "запущены" : "не запущены";
         }
         catch (Exception)
         {
@@ -799,7 +809,10 @@ public partial class PinWindow : Window
             PinVerdict.Refused => "Danger",
             _ => "Muted",
         }),
-        selectable: true);
+        selectable: true)
+    {
+        Via = probe.Candidate.Via,
+    };
 
     /// <summary>
     /// Спрашивает адрес у честного резолвера и проверяет каждый ответ.
@@ -871,7 +884,7 @@ public partial class PinWindow : Window
                 return;
 
             var result = HostsEditor.Unpin(ours);
-            HostsEditor.FlushDns();
+            _ = HostsEditor.FlushDnsAsync();
 
             Changed = true;
             ShowPins();
@@ -881,7 +894,7 @@ public partial class PinWindow : Window
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось снять: " + ex.GetBaseException().Message;
+            Status.Text = "Снять пин не удалось: " + ex.GetBaseException().Message;
         }
     }
 

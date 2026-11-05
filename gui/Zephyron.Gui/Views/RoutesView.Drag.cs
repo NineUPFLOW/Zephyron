@@ -317,11 +317,11 @@ public partial class RoutesView
             (settings with { RouteFolders = folders, RouteOrder = order.ToList() }).Save(AppSettings.DefaultPath);
             Reload();
 
-            Status.Text = done + " Путь маршрутов не менялся.";
+            Status.Text = done + " Маршрут не менялся.";
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось переложить: " + ex.GetBaseException().Message;
+            Status.Text = "Переложить не получилось: " + ex.GetBaseException().Message;
         }
     }
 

@@ -69,7 +69,7 @@ public sealed class PinSolutionRowsTests
 
         Assert.True(rows[0].Available);
         Assert.True(rows[0].On);
-        Assert.Equal("вкл.", rows[0].Word);
+        Assert.Equal("включено", rows[0].Word);
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed class PinSolutionRowsTests
 
         var rows = PinSolutionRows.Build([solution], haveIpV6: true, s => new PinSolutionState(2, 3, 1));
 
-        Assert.Equal("частично", rows[0].Word);
+        Assert.Equal("не полностью", rows[0].Word);
         Assert.Contains("Прибито 2 из 3 имён.", rows[0].Caption);
         Assert.Contains("Своих пинов на его имена: 1", rows[0].Caption);
     }

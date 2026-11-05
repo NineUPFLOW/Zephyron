@@ -22,7 +22,7 @@ public partial class RoutesView
     /// <summary>«Добавить папку»: пустая папка, куда перетаскивают маршруты.</summary>
     private void OnAddFolder(object sender, RoutedEventArgs e)
     {
-        var window = new FolderNameWindow("Новая папка", Taken()) { Owner = Window.GetWindow(this) };
+        var window = new FolderNameWindow("Папка без названия", Taken()) { Owner = Window.GetWindow(this) };
 
         if (window.ShowDialog() != true || window.Chosen is not { } name)
             return;
@@ -40,7 +40,7 @@ public partial class RoutesView
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -94,17 +94,17 @@ public partial class RoutesView
 
         if (folder.Program is { } program)
         {
-            menu.Items.Add(MenuEntry("", "Убрать программу…", () => RemoveProgram(program)));
+            menu.Items.Add(MenuEntry("", "Удалить программу…", () => RemoveProgram(program)));
             menu.IsOpen = true;
             return;
         }
 
         menu.Items.Add(MenuEntry("", "Проверить автоподбором", () => PickFolder(folder)));
         menu.Items.Add(new Separator { Style = (Style)FindResource("MenuLine") });
-        menu.Items.Add(MenuEntry("", "Переименовать…", () => Rename(folder)));
+        menu.Items.Add(MenuEntry("", "Задать другое имя…", () => Rename(folder)));
         menu.Items.Add(MenuEntry("", "Добавить маршрут…", () => OnAddIntoFolder(anchor, e)));
         menu.Items.Add(new Separator { Style = (Style)FindResource("MenuLine") });
-        menu.Items.Add(MenuEntry("", folder.Made ? "Удалить папку" : "Распустить папку", () => Dissolve(folder)));
+        menu.Items.Add(MenuEntry("", folder.Made ? "Убрать папку" : "Разобрать папку", () => Dissolve(folder)));
 
         menu.IsOpen = true;
     }
@@ -156,7 +156,7 @@ public partial class RoutesView
 
     private void Rename(ServiceRow folder)
     {
-        var window = new FolderNameWindow($"Переименовать «{folder.Shown}»", Taken(except: folder.Name), folder.Shown, "Переименовать")
+        var window = new FolderNameWindow($"Переименовать «{folder.Shown}»", Taken(except: folder.Name), folder.Shown, "Сохранить имя")
         {
             Owner = Window.GetWindow(this),
         };
@@ -181,7 +181,7 @@ public partial class RoutesView
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -222,7 +222,7 @@ public partial class RoutesView
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать: " + ex.GetBaseException().Message;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
     }
 

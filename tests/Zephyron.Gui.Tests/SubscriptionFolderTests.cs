@@ -36,14 +36,14 @@ public sealed class SubscriptionFolderTests
             text.DataContext = row;
             Pump();
 
-            Assert.Equal("читаю…", text.Text);
+            Assert.Equal("загружаю…", text.Text);
 
             row.Detail = "11 серверов";
             text.DataContext = row;
             Pump();
 
             // Тот же объект заново ничего не меняет — отсюда и «читаю…».
-            Assert.Equal("читаю…", text.Text);
+            Assert.Equal("загружаю…", text.Text);
 
             row.Refresh();
             Pump();

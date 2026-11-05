@@ -166,14 +166,14 @@ public partial class DesyncView : UserControl
             ShowCapture(next);
 
             Status.Text = next.GameFilter
-                ? "Game filter включён. Проверьте игру на клиенте, открытом после перезапуска движков."
+                ? "Game filter включён. Проверьте игру в клиенте, запущенном после перезапуска движков."
                 : "Game filter выключен.";
 
             this.Offer(next.GameFilter ? "Game filter включён" : "Game filter выключен");
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать выбор: " + ex.GetBaseException().Message;
+            Status.Text = "Выбор не записался: " + ex.GetBaseException().Message;
         }
     }
 
@@ -216,13 +216,13 @@ public partial class DesyncView : UserControl
             Redraw();
 
             Status.Text = $"Пресетов: {rows.Count}, из них наших {rows.Count(r => r.Official)}. "
-                + "Выбор применяется при следующем запуске движков.";
+                + "Выбор вступит в силу при следующем запуске движков.";
 
             StartCounting(rows);
         }
         catch (Exception ex)
         {
-            Status.Text = "Пресеты не читаются: " + ex.GetBaseException().Message;
+            Status.Text = "Не удалось прочитать пресеты: " + ex.GetBaseException().Message;
         }
     }
 
@@ -242,7 +242,7 @@ public partial class DesyncView : UserControl
         // и поиск при запуске расходились на ровном месте.
         var name = Path.GetFileNameWithoutExtension(file);
 
-        var detail = $"{preset.Sections.Count} {Ending(preset.Sections.Count, "секция", "секции", "секций")}: "
+        var detail = $"{preset.Sections.Count} {Ending(preset.Sections.Count, "часть", "части", "частей")}: "
             + $"{active} с десинком, {pass} нетронутыми";
 
         // Название изнутри показывается, когда расходится с именем файла:
@@ -262,7 +262,7 @@ public partial class DesyncView : UserControl
             // Замер 2026-08-23; чистые split и disorder его переживают.
             fake == 0
                 ? string.Empty
-                : $"{fake} с поддельным пакетом — под туннелем такие секции работают не всегда")
+                : $"{fake} с подделкой")
         {
             File = file,
             Detail = detail,
@@ -414,27 +414,6 @@ public partial class DesyncView : UserControl
 
     private void OnSearch(object sender, TextChangedEventArgs e) => Redraw();
 
-    /// <summary>Ширина, ниже которой «Текущий пресет» и «Параметры работы» встают друг под друга.</summary>
-    private const double TopSideBySide = 860;
-
-    /// <summary>
-    /// Пресет и параметры — рядом или друг под другом.
-    /// </summary>
-    /// <remarks>
-    /// По ширине самого ряда, а не окна: окно масштабируется («Шрифт и размер»),
-    /// и считать надо в тех точках, в которых плитки и раскладываются.
-    /// </remarks>
-    private void OnTopSize(object sender, SizeChangedEventArgs e)
-    {
-        bool side = TopRow.ActualWidth >= TopSideBySide;
-
-        Grid.SetColumnSpan(PresetCell, side ? 1 : 3);
-        Grid.SetRow(ParamsCell, side ? 0 : 1);
-        Grid.SetColumn(ParamsCell, side ? 2 : 0);
-        Grid.SetColumnSpan(ParamsCell, side ? 1 : 3);
-        ParamsCell.Margin = new Thickness(0, side ? 0 : 12, 0, 0);
-    }
-
     private static void Show(UIElement header, UIElement note, bool visible)
     {
         header.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
@@ -537,7 +516,7 @@ public partial class DesyncView : UserControl
         var answer = MessageBox.Show(
             $"Дописать в пресет «{settings.DescribePreset()}» строку подключения модуля {module}?\n\n"
                 + "Меняется одна строка в шапке файла, остальное остаётся как есть. "
-                + "Новые рецепты станут доступны при следующем запуске движков.",
+                + "Новые рецепты появятся после следующего запуска движков.",
             "Подключить модуль",
             MessageBoxButton.OKCancel,
             MessageBoxImage.Question);
@@ -552,7 +531,7 @@ public partial class DesyncView : UserControl
                 PresetModules.Result.Connected =>
                     $"Модуль {module} подключён. Рецепты из него заработают после перезапуска движков.",
                 PresetModules.Result.Already =>
-                    $"Модуль {module} и так подключён — файл не тронут.",
+                    $"Модуль {module} уже подключён, файл не тронут.",
                 _ =>
                     $"В пресете нет ни одной строки --lua-init, дописывать не к чему. "
                         + "Откройте его в редакторе.",
@@ -573,7 +552,7 @@ public partial class DesyncView : UserControl
         ChosenDetail.Text = settings.Mode == OperatingMode.Off
             ? "Режим «выключено»: десинк не запустится, какой бы пресет ни стоял."
             : settings.PresetName is null
-                ? "Пакеты не правятся. Всё, что закрыто по имени, останется закрытым — кроме того, что уведено через VPN."
+                ? "Пакеты не меняются. Всё, что закрыто по имени, останется закрытым, кроме того, что идёт через туннель."
                 : "Применяется при запуске движков на «Главной».";
 
         Recommended.Visibility = string.Equals(settings.PresetName, AppSettings.DefaultPresetName,
@@ -616,12 +595,12 @@ public partial class DesyncView : UserControl
             next.Save(AppSettings.DefaultPath);
             ShowCapture(next);
 
-            Status.Text = $"Перехват: {PresetCapture.Word(width)}. Действует со следующего запуска движков.";
+            Status.Text = $"Перехват: {PresetCapture.Word(width)}. Вступит в силу со следующего запуска движков.";
             this.Offer($"Перехват: {PresetCapture.Word(width)}");
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать выбор: " + ex.GetBaseException().Message;
+            Status.Text = "Выбор не записался: " + ex.GetBaseException().Message;
         }
     }
 
@@ -648,7 +627,7 @@ public partial class DesyncView : UserControl
     private static string DescribeCapture(AppSettings settings)
     {
         if (settings.PresetName is not { } name)
-            return "Пресет не выбран — десинк не запускается.";
+            return "Пресет не выбран, десинк не запущен.";
 
         if (ZapretPaths.FindPreset(name) is not { } path)
             return $"Пресет «{name}» не найден в папке пресетов — что выйдет с перехватом, сказать нечем.";
@@ -700,7 +679,7 @@ public partial class DesyncView : UserControl
         MissingTitle.Text = "Движок десинка не найден";
 
         MissingBody.Text = paths is null
-            ? "Установка Zapret не обнаружена. Пресет выберется и сохранится, но применять его нечем: "
+            ? "Установка Zapret не найдена. Пресет выберется и сохранится, но применить его нечем: "
               + "winws2.exe и списки доменов лежат в ней."
             : $"Каталог найден ({paths.Root}), а winws2.exe в нём нет — ожидался в подпапке exe. "
               + "Возможно, антивирус увёз его в карантин: WinDivert рядом с ним помечается как RiskTool.";
@@ -717,25 +696,25 @@ public partial class DesyncView : UserControl
         var path = Path.Combine(ZapretPaths.PresetDirectory, file);
         var menu = new ContextMenu { PlacementTarget = anchor, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
 
-        menu.Items.Add(MenuEntry("", "Открыть в редакторе", () =>
+        menu.Items.Add(MenuEntry("", "Править в редакторе", () =>
         {
             Open(path);
             Status.Text = $"Открыт {file}. Правка подействует после перезапуска движков.";
         }));
 
-        menu.Items.Add(MenuEntry("", "Показать файл в папке", () =>
+        menu.Items.Add(MenuEntry("", "Показать файл в каталоге", () =>
             Process.Start(new ProcessStartInfo { FileName = "explorer.exe", Arguments = $"/select,\"{path}\"" })));
 
         menu.Items.Add(new Separator());
-        menu.Items.Add(MenuEntry("", "Дублировать…", () => DuplicatePreset(file)));
+        menu.Items.Add(MenuEntry("", "Сделать копию…", () => DuplicatePreset(file)));
 
         // Пресет программы обновление вернёт под прежним именем — переименовывается его копия.
-        var rename = MenuEntry("", "Переименовать…", () => RenamePreset(file));
+        var rename = MenuEntry("", "Задать другое имя…", () => RenamePreset(file));
 
         if (PresetCopies.Shipped(path))
         {
             rename.IsEnabled = false;
-            rename.ToolTip = "Пресет программы возвращается с каждым обновлением — переименуйте его копию.";
+            rename.ToolTip = "Пресет из программы возвращается при каждом обновлении, поэтому переименуйте его копию.";
             ToolTipService.SetShowOnDisabled(rename, true);
         }
 
@@ -752,7 +731,7 @@ public partial class DesyncView : UserControl
 
             if (settings.PresetName is not { } name || ZapretPaths.FindPreset(name) is not { } file)
             {
-                Status.Text = "Пресет не выбран или его файла нет — подделки выбирать не у чего.";
+                Status.Text = "Пресет не выбран или его файла нет — подделки выбирать не из чего.";
                 return;
             }
 
@@ -768,7 +747,7 @@ public partial class DesyncView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не вышло: " + ex.GetBaseException().Message;
+            Status.Text = "Не получилось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -780,7 +759,7 @@ public partial class DesyncView : UserControl
 
         var window = new PresetNameWindow($"Дублировать «{name}»",
             "Копия — ваш пресет: её можно править и переименовывать, обновление программы её не тронет.",
-            "Создать", PresetCopies.CopyName(directory, name), directory)
+            "Создать копию", PresetCopies.CopyName(directory, name), directory)
         { Owner = Window.GetWindow(this) };
 
         if (window.ShowDialog() != true || window.Chosen is not { } chosen)
@@ -800,7 +779,7 @@ public partial class DesyncView : UserControl
 
         var window = new PresetNameWindow($"Переименовать «{name}»",
             "Если пресет выбран, выбор перейдёт на новое имя; движки подхватят его при следующем запуске.",
-            "Переименовать", name, directory, except: file)
+            "Сохранить имя", name, directory, except: file)
         { Owner = Window.GetWindow(this) };
 
         if (window.ShowDialog() != true || window.Chosen is not { } chosen || chosen == name)
@@ -828,7 +807,7 @@ public partial class DesyncView : UserControl
             }
             catch (Exception ex)
             {
-                Status.Text = "Не вышло: " + ex.GetBaseException().Message;
+                Status.Text = "Не получилось: " + ex.GetBaseException().Message;
             }
         };
 
@@ -849,7 +828,7 @@ public partial class DesyncView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось открыть папку: " + ex.GetBaseException().Message;
+            Status.Text = "Папку открыть не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -878,7 +857,7 @@ public partial class DesyncView : UserControl
 
             if (name is null)
             {
-                Status.Text = "Пресет не выбран — открывать нечего.";
+                Status.Text = "Пресет не выбран, открывать нечего.";
                 return;
             }
 
@@ -900,7 +879,7 @@ public partial class DesyncView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось открыть пресет: " + ex.GetBaseException().Message;
+            Status.Text = "Пресет открыть не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -1015,7 +994,7 @@ public partial class DesyncView : UserControl
         {
             (0, 0) => Status.Text,
             (_, 0) => $"Добавлено: {string.Join(", ", taken)}.",
-            (0, _) => "Не взято: " + string.Join("; ", refused),
+            (0, _) => "Не принято: " + string.Join("; ", refused),
             _ => $"Добавлено: {string.Join(", ", taken)}. Не взято: {string.Join("; ", refused)}",
         };
     }
@@ -1063,7 +1042,7 @@ public partial class DesyncView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Не удалось записать выбор: " + ex.GetBaseException().Message;
+            Status.Text = "Выбор не записался: " + ex.GetBaseException().Message;
         }
     }
 

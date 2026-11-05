@@ -1,7 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using Zephyron.Core.Rules;
 using Zephyron.Core.Services;
 
 namespace Zephyron.Gui.Views;
@@ -34,23 +33,8 @@ public partial class TargetPicker : Window
         Services.ItemsSource = ServiceCatalog.All.Select(s => s.Name).ToList();
     }
 
-    private void OnOwnChanged(object sender, TextChangedEventArgs e)
-    {
-        // Своё имя и сервис исключают друг друга: набранное вручную снимает
-        // выбор в списке, иначе непонятно, что именно поедет в проверку.
-        if (Own.Text.Trim().Length > 0)
-            Services.SelectedItem = null;
-
-        UpdateAccept();
-    }
-
-    private void OnServiceChosen(object sender, SelectionChangedEventArgs e)
-    {
-        if (Services.SelectedItem is not null)
-            Own.Clear();
-
-        UpdateAccept();
-    }
+    private void OnServiceChosen(object sender, SelectionChangedEventArgs e) =>
+        Accept.IsEnabled = Services.SelectedItem is not null;
 
     private void OnServiceConfirmed(object sender, MouseButtonEventArgs e)
     {
@@ -58,22 +42,9 @@ public partial class TargetPicker : Window
             OnAccept(sender, e);
     }
 
-    private void UpdateAccept() =>
-        Accept.IsEnabled = Services.SelectedItem is not null || Own.Text.Trim().Length > 0;
-
     private void OnAccept(object sender, RoutedEventArgs e)
     {
-        // Имя, а не строка как есть: 19.10 владелец вставил ссылку
-        // «https://www.star-history.com/», проба искала адрес у неё целиком
-        // и получила «нет адреса у имени» — а итог при этом «всё открыто».
-        // Разбор тот же, что у поля «Маршрутов»; не похожее на имя (адрес)
-        // уходит как было.
-        var own = DomainInput.Normalize(Own.Text) ?? Own.Text.Trim();
-
-        Chosen = Services.SelectedItem is string service
-            ? new CheckTarget(service, null)
-            : own.Length > 0 ? new CheckTarget(null, own) : null;
-
+        Chosen = Services.SelectedItem is string service ? new CheckTarget(service, null) : null;
         DialogResult = Chosen is not null;
     }
 

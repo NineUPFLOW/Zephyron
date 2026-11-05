@@ -73,7 +73,7 @@ public partial class SubscriptionAddWindow : Window
     }
 
     private void OnInPool(object sender, RoutedEventArgs e) =>
-        InPoolWord.Text = InPool.IsChecked == true ? "вкл." : "выкл.";
+        InPoolWord.Text = InPool.IsChecked == true ? "включено" : "не включено";
 
     private void OnFromClipboard(object sender, RoutedEventArgs e) => FromClipboard();
 
@@ -93,7 +93,7 @@ public partial class SubscriptionAddWindow : Window
 
                 if (text is null)
                 {
-                    Say("В буфере картинка, но QR-кода на ней не нашлось.");
+                    Say("В буфере изображение, но QR-кода на нём не нашлось.");
                     return;
                 }
             }
@@ -104,24 +104,24 @@ public partial class SubscriptionAddWindow : Window
             }
             else
             {
-                Say("В буфере ничего: скопируйте ключ, ссылку подписки или картинку с QR-кодом.");
+                Say("В буфере пусто: скопируйте ключ, ссылку подписки или картинку с QR-кодом.");
                 return;
             }
         }
         catch (Exception ex)
         {
-            Say("Буфер не читается: " + ex.GetBaseException().Message);
+            Say("Не удалось прочитать буфер: " + ex.GetBaseException().Message);
             return;
         }
 
-        Fill(text, name: null, where: "В буфере");
+        Fill(text, name: null, where: "Из буфера");
     }
 
     private void OnFromFile(object sender, RoutedEventArgs e)
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "Ключ из файла",
+            Title = "Файл с ключом",
             Filter = "Ключ или QR-код|*.conf;*.txt;*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp|Все файлы|*.*",
         };
 
@@ -147,11 +147,11 @@ public partial class SubscriptionAddWindow : Window
 
                 if (text is null)
                 {
-                    Say("На картинке QR-кода не нашлось.");
+                    Say("На картинке нет QR-кода.");
                     return;
                 }
 
-                Fill(text, name: null, where: "В QR-коде");
+                Fill(text, name: null, where: "Из QR-кода");
                 return;
             }
 
@@ -163,11 +163,11 @@ public partial class SubscriptionAddWindow : Window
                 return;
             }
 
-            Fill(File.ReadAllText(path), Path.GetFileNameWithoutExtension(path), "В файле");
+            Fill(File.ReadAllText(path), Path.GetFileNameWithoutExtension(path), "Из файла на диске");
         }
         catch (Exception ex)
         {
-            Say("Файл не читается: " + ex.GetBaseException().Message);
+            Say("Не удалось прочитать файл: " + ex.GetBaseException().Message);
         }
     }
 
@@ -315,7 +315,7 @@ public partial class SubscriptionAddWindow : Window
 
             if (parsed.Count == 0)
             {
-                Say("Ключ не разбирается: " + errors[0]);
+                Say("Не удалось разобрать ключ: " + errors[0]);
                 return;
             }
 

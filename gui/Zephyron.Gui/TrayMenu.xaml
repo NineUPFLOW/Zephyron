@@ -202,9 +202,9 @@
                             <ColumnDefinition Width="8" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <Button x:Name="Toggle" Style="{StaticResource Primary}" Content="Запустить"
+                        <Button x:Name="Toggle" Style="{StaticResource Primary}" Content="Включить"
                                 Padding="12,8" Click="OnToggle" />
-                        <Button Grid.Column="2" Style="{StaticResource Ghost}" Content="Открыть окно"
+                        <Button Grid.Column="2" Style="{StaticResource Ghost}" Content="Показать окно"
                                 local:ButtonGlyph.Lead="&#xE8A7;" Padding="12,8" Click="OnShowWindow" />
                     </Grid>
 
@@ -215,7 +215,7 @@
                         обход» — разные желания, и ошибка в любую сторону дорогая.
                     -->
                     <Button Style="{StaticResource MenuRow}" Margin="-6,0" Click="OnQuitKeep" Tag="&#xE8BB;"
-                            Content="Выйти, движки остаются работать" />
+                            Content="Выйти, движки продолжат работу" />
                     <Button Style="{StaticResource MenuRow}" Margin="-6,0" Click="OnQuitStop" Tag="&#xE7E8;"
                             Foreground="{DynamicResource Danger}" Content="Выйти и остановить движки" />
                 </StackPanel>

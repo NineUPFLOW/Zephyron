@@ -51,7 +51,7 @@ public partial class ProgramPickerWindow : Window
             }
             catch (Exception ex)
             {
-                Status.Text = "Список программ не читается: " + ex.GetBaseException().Message;
+                Status.Text = "Не удалось прочитать список программ: " + ex.GetBaseException().Message;
             }
         };
     }
@@ -65,9 +65,9 @@ public partial class ProgramPickerWindow : Window
         List.ItemsSource = shown;
 
         Status.Text = _all.Count == 0
-            ? "Ищу запущенные программы…"
+            ? "Ищу среди запущенных программ…"
             : shown.Count == 0
-                ? "Ничего не подошло. Нужной программы нет среди запущенных — закройте окно и выберите её файлом."
+                ? "Ничего не найдено. Нужной программы нет среди запущенных: закройте окно и выберите её файлом."
                 : string.IsNullOrWhiteSpace(Search.Text)
                     ? $"Запущено программ: {_all.Count}. Нажмите на нужную."
                     : $"Подходит: {shown.Count} из {_all.Count}.";
