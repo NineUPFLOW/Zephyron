@@ -20,9 +20,18 @@ public static class RouteWhy
     /// <summary>Как правила решают для имени (без выключателей) — например, для Telegram.</summary>
     public static Zephyron.Core.Rules.RoutingMode ModeOf(string host, AppSettings settings)
     {
-        var (engine, _) = Zephyron.Zapret.RuleSetExpander.LoadFor(settings);
+        // Правила не прочитались (нет файла, битый YAML) — окно не должно падать:
+        // «напрямую» не обещает туннеля, которого может не быть.
+        try
+        {
+            var (engine, _) = Zephyron.Zapret.RuleSetExpander.LoadFor(settings);
 
-        return engine.Evaluate(ConnectionEvent.Describe(host)).Mode;
+            return engine.Evaluate(ConnectionEvent.Describe(host)).Mode;
+        }
+        catch (Zephyron.Core.Rules.RuleConfigurationException)
+        {
+            return Zephyron.Core.Rules.RoutingMode.Direct;
+        }
     }
 
     /// <summary>Строки объяснения; первая — сама цель.</summary>
