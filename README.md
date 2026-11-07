@@ -7,7 +7,7 @@
 [![Поддержать](https://img.shields.io/badge/%D0%BF%D0%BE%D0%B4%D0%B4%D0%B5%D1%80%D0%B6%D0%B0%D1%82%D1%8C-%E2%9D%A4-ff69b4?style=for-the-badge)](https://web.tribute.tg/d/TBY) [![tips.tips](https://img.shields.io/badge/tips.tips-%E2%9D%A4-ff69b4?style=for-the-badge)](https://tips.tips/ru/000487908)
 [![Телеграм-канал](https://img.shields.io/badge/%D1%82%D0%B5%D0%BB%D0%B5%D0%B3%D1%80%D0%B0%D0%BC-%D0%BA%D0%B0%D0%BD%D0%B0%D0%BB-26A5E4?logo=telegram&logoColor=white&style=for-the-badge)](https://t.me/zephyron0)
 
-**Сортировщик трафика для Windows.** Для каждого сайта, сервиса или программы он
+**Обход блокировок YouTube, Discord и Telegram для Windows.** Zephyron — сортировщик трафика: для каждого сайта, сервиса или программы он
 выбирает путь: отправить через десинк (Zapret / winws2), через VPN (sing-box)
 или пустить напрямую. Через VPN идёт только то, что вы туда назначили; всё
 остальное проходит десинком или напрямую. Подписка на VPN не обязательна:
