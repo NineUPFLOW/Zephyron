@@ -107,6 +107,52 @@ public static class Warp
     public static IReadOnlyList<ProxyServer> TunnelExits(AppSettings settings, IReadOnlyList<ProxyServer> subscriptions) =>
         settings.WarpEnabled ? Exits() : subscriptions;
 
+    /// <summary>Подходит ли сервер подписки на роль посредника для MASQUE.</summary>
+    public static bool CanCarryWarp(ProxyServer server) =>
+        server.IsUsableOutbound && !server.IsEndpoint && !server.IsSelfRegistering;
+
+    /// <summary>
+    /// Через какой сервер подписки выход MASQUE дойдёт до Cloudflare; <c>null</c> — напрямую.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Прямое соединение с Cloudflare у части сетей обрывается ещё на рукопожатии,
+    /// и движок не может завести себе учётную запись («TLS handshake timeout»).
+    /// Через сервер подписки она заводится и ложится в кэш движка.
+    /// </para>
+    /// <para>
+    /// Порядок: сервер, выбранный страной выхода (<see cref="AppSettings.WarpCountryTag"/>),
+    /// затем закреплённый на вкладке, затем самый быстрый из не отмеченных мёртвыми,
+    /// затем первый годный. Подписки нет — <c>null</c>, и всё остаётся как было.
+    /// </para>
+    /// </remarks>
+    public static ProxyServer? Detour(
+        AppSettings settings,
+        IReadOnlyList<ProxyServer> subscriptions,
+        IReadOnlySet<string> dead,
+        IReadOnlyDictionary<string, double> latencies)
+    {
+        var fit = subscriptions.Where(CanCarryWarp).ToList();
+
+        ProxyServer? Named(string? tag) => string.IsNullOrWhiteSpace(tag)
+            ? null
+            : fit.FirstOrDefault(s => s.Tag.Equals(tag, StringComparison.OrdinalIgnoreCase));
+
+        return Named(settings.WarpCountryTag)
+            ?? Named(settings.PreferredServer)
+            ?? fit.Where(s => !dead.Contains(s.Tag))
+                .OrderBy(s => latencies.TryGetValue(s.Tag, out var ms) ? ms : double.MaxValue)
+                .FirstOrDefault()
+            ?? fit.FirstOrDefault();
+    }
+
+    /// <summary>
+    /// Идёт ли через посредника весь туннель WARP: страна выбрана, и посредник — именно её сервер.
+    /// </summary>
+    public static bool ExitsThrough(AppSettings settings, ProxyServer? detour) =>
+        detour is not null && !string.IsNullOrWhiteSpace(settings.WarpCountryTag)
+        && detour.Tag.Equals(settings.WarpCountryTag, StringComparison.OrdinalIgnoreCase);
+
     /// <summary>
     /// Выход, который ставить в селектор первым: WARP, когда включён он, иначе выбранный сервер подписки.
     /// </summary>

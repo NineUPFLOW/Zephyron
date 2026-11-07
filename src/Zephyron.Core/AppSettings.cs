@@ -474,6 +474,17 @@ public sealed record AppSettings
     public bool WarpEnabled { get; init; }
 
     /// <summary>
+    /// Страна выхода WARP: тег сервера подписки, через который туннель WARP
+    /// выходит к Cloudflare; <c>null</c> или пусто — «как есть», из России.
+    /// </summary>
+    /// <remarks>
+    /// Cloudflare определяет страну по адресу, с которого пришло соединение,
+    /// поэтому выход меняется вместе с сервером. Старые настройки поля не
+    /// содержат — читаются как «как есть».
+    /// </remarks>
+    public string? WarpCountryTag { get; init; }
+
+    /// <summary>
     /// Уводить трафик мимо туннеля, когда его выходы перестали отвечать.
     /// </summary>
     /// <remarks>
