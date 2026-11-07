@@ -241,6 +241,7 @@ internal static class TunnelConfig
                     [settings.SubscriptionUrl, .. SubscriptionBook.Load().Entries.Select(e => e.Url)]),
                 PreferredServerTag = Warp.PreferredExit(settings),
                 WarpDetour = warpDetour,
+                WarpExitThroughDetour = Warp.ExitsThrough(settings, warpDetour),
 
                 // Без «Selective Routing» и при WARP пулов нет — их маршруты
                 // идут в пул по умолчанию.

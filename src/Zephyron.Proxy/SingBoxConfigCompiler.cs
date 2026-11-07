@@ -375,6 +375,18 @@ public sealed class SingBoxOptions
     /// </remarks>
     public ProxyServer? WarpDetour { get; init; }
 
+    /// <summary>
+    /// Весь туннель MASQUE, а не только регистрация, идёт через <see cref="WarpDetour"/>
+    /// (<c>detour</c> у выхода): Cloudflare видит адрес сервера и выпускает в его стране.
+    /// </summary>
+    /// <remarks>
+    /// Замер: <c>profile.detour</c> переносит через сервер только заведение учётной
+    /// записи; соединение с узлом Cloudflare остаётся прямым. Выход через сервер
+    /// — это <c>detour</c> самого выхода, и он же объясняет ответы движка
+    /// «Failed to connect tunnel: EOF» у серверов, до узла не доходящих.
+    /// </remarks>
+    public bool WarpExitThroughDetour { get; init; }
+
     /// <summary>Тег скрытого выхода для <see cref="WarpDetour"/>.</summary>
     public const string WarpDetourTag = "warp-via";
 
@@ -1495,8 +1507,11 @@ public sealed class SingBoxConfigCompiler
                 hidden += "'";
 
             outbounds.Add(Fragment(BuildOutbound(via, hidden), options.TlsFragment));
-            ((JsonObject)outbounds.First(o => (string?)o?["tag"] == tags[masque])!)["profile"] =
-                new JsonObject { ["detour"] = hidden };
+            var wrapped = (JsonObject)outbounds.First(o => (string?)o?["tag"] == tags[masque])!;
+            wrapped["profile"] = new JsonObject { ["detour"] = hidden };
+
+            if (options.WarpExitThroughDetour)
+                wrapped["detour"] = hidden;
         }
 
         if (servers.Count == 0)
