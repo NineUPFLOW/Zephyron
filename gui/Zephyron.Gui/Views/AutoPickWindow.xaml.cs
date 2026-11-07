@@ -571,6 +571,37 @@ public partial class AutoPickWindow : Window
         Say($"Результаты запуска от {_last.At.LocalDateTime:dd.MM.yyyy HH:mm}. Откат — кнопкой «Вернуть» у строки или «Вернуть всё».", "Muted");
     }
 
+    private void OnSavePreset(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
+
+            if (settings.PresetName is not { } current || ZapretPaths.FindPreset(current) is not { } path
+                || ZapretPaths.Discover()?.Root is not { } root)
+            {
+                Say("Не нашёл выбранный пресет или папку Zapret — сохранять не во что.", "Danger");
+                return;
+            }
+
+            var directory = System.IO.Path.GetDirectoryName(path)!;
+            var name = $"Мой подбор {DateTime.Now:dd.MM}";
+
+            for (int n = 2; PresetCopies.Problem(name, directory) is not null; n++)
+                name = $"Мой подбор {DateTime.Now:dd.MM} ({n})";
+
+            PresetCopies.WithOwn(directory, System.IO.Path.Combine(root, "lists"),
+                System.IO.Path.GetFileName(path), name, OwnDesyncLists.Read());
+
+            Say($"Сохранён пресет «{name}»: он на «Десинке» среди ваших. Подобранное и так уже работает.", "Success");
+            SavePresetButton.IsEnabled = false;
+        }
+        catch (Exception ex)
+        {
+            Say("Пресет не сохранился: " + ex.GetBaseException().Message, "Danger");
+        }
+    }
+
     private void OnUndoLast(object sender, RoutedEventArgs e)
     {
         if (_last is null || !ConfirmUndo(_last.Entries.Count(x => !x.Restored)))
@@ -689,6 +720,7 @@ public partial class AutoPickWindow : Window
         WriteButton.Visibility = V(_phase == Phase.Done);
         EnginesButton.Visibility = V((_phase is Phase.Done or Phase.Written || _phase == Phase.Idle && _stoppedEngines) && !engines);
         CheckButton.Visibility = V(_phase == Phase.Written && !_checked && engines && _items.Any(i => i.Row?.Written == true));
+        SavePresetButton.Visibility = V(_phase == Phase.Written);
         UndoButton.Visibility = V(_phase == Phase.Written && _items.Any(i => i.RestoreVisibility == Visibility.Visible));
 
         // Esc: во время подбора — «Стоп», иначе — «Закрыть».
