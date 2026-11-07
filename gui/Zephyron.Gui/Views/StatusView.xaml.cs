@@ -653,6 +653,9 @@ public partial class StatusView : UserControl
         }
     }
 
+    /// <summary>Мастер только что пройден, движки ещё не включали: под словом состояния — «осталось нажать».</summary>
+    internal static bool AfterWizard;
+
     private void ShowState(AppSettings settings, SupervisorState? state, bool running, bool singBoxUp, bool coming)
     {
         // Сборка конфига кнопкой «Запустить» показывает свой запуск: чтение состояния
@@ -670,10 +673,15 @@ public partial class StatusView : UserControl
 
         _runningSince = running ? state!.StartedAt : null;
 
+        if (running)
+            AfterWizard = false;
+
         if (!running)
         {
             ShowHero(HomeState.Off, settings.NeedsProxy || settings.NeedsDesync
-                ? "Обход выключен: трафик идёт без изменений."
+                ? (AfterWizard
+                    ? "Осталось нажать «Включить»: до этого трафик идёт без изменений."
+                    : "Обход выключен: трафик идёт без изменений.")
                 : "Запускать нечего: VPN выключен и пресет десинка не выбран.");
 
             StartButton.IsEnabled = settings.NeedsProxy || settings.NeedsDesync;
@@ -1598,7 +1606,7 @@ public partial class StatusView : UserControl
         };
 
         _desyncIdle = engines.Desync && !engines.DesyncRuns
-            ? "Включено «Игнорировать исключения» в параметрах туннеля: всё идёт через туннель, и десинку нечего чинить. "
+            ? "Включено «Без исключений» в параметрах туннеля: всё идёт через туннель, и десинку нечего чинить. "
                 + "Выключите его, и заработают десинк и выбор по сайтам."
             : null;
 
@@ -1620,8 +1628,15 @@ public partial class StatusView : UserControl
                     : $"Для «{WorkModes.Name(WorkMode.Tunnel)}» нужна подписка или WARP — вкладка VPN.")
                 : null);
 
-        EnginesLine.Text = complaint ?? string.Empty;
-        EnginesLine.Visibility = complaint is null ? Visibility.Collapsed : Visibility.Visible;
+        // «Без исключений» меняет смысл режима с туннелем — на виду, не только в окне параметров.
+        bool noExceptions = engines.Tunnel && engines.IgnoreExclusions;
+        string? stripText = noExceptions
+            ? string.Join("\n", new[] { "Включено «Без исключений»: в туннель уходит всё, российские сервисы увидят зарубежный адрес.", complaint }.OfType<string>())
+            : complaint;
+
+        EnginesLine.Text = stripText ?? string.Empty;
+        EnginesLine.Visibility = stripText is null ? Visibility.Collapsed : Visibility.Visible;
+        EnginesSettings.Visibility = noExceptions ? Visibility.Visible : Visibility.Collapsed;
 
         // Автозапуск поднимает ровно это. Сказано здесь же, где задано:
         // иначе про связь пришлось бы догадываться, а догадка — источник

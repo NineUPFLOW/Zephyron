@@ -348,6 +348,7 @@ public partial class MainWindow : Window
         var onboarding = new OnboardingView();
         onboarding.Completed += (_, _) =>
         {
+            StatusView.AfterWizard = true;
             var status = new StatusView();
             ShowPage(status);
             Motion.Page(status);

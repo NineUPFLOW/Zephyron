@@ -217,7 +217,7 @@
                     <Button Style="{StaticResource MenuRow}" Margin="-6,0" Click="OnQuitKeep" Tag="&#xE8BB;"
                             Content="Выйти, движки продолжат работу" />
                     <Button Style="{StaticResource MenuRow}" Margin="-6,0" Click="OnQuitStop" Tag="&#xE7E8;"
-                            Foreground="{DynamicResource Danger}" Content="Выйти и остановить движки" />
+                            Foreground="{DynamicResource Danger}" Content="Выйти и выключить движки" />
                 </StackPanel>
             </Grid>
         </Border>

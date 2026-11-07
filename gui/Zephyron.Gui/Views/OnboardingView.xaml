@@ -6,7 +6,7 @@
 
     <UserControl.Resources>
         <!--
-            Карточка режима на шаге «Режим работы ZY». Выбранная: AccentSoft + AccentLine
+            Карточка режима на шаге «Режим работы». Выбранная: AccentSoft + AccentLine
             и галочка справа — признак не только цветом (спека «Сигнал», раздел 9).
         -->
         <Style x:Key="ModeCard" TargetType="RadioButton">
@@ -118,9 +118,9 @@
                         </Border>
                         <Border Style="{StaticResource Card}" Margin="5,0" Opacity="0">
                             <StackPanel>
-                                <TextBlock Text="VPN по списку" FontWeight="SemiBold" />
+                                <TextBlock Text="Гибрид" FontWeight="SemiBold" />
                                 <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
-                                           Text="В туннель уходит только названное вами. Банки, игры и российские сайты работают как раньше." />
+                                           Text="Десинк и VPN вместе: в туннель уходит только названное вами. Банки, игры и российские сайты работают как раньше." />
                             </StackPanel>
                         </Border>
                         <Border Style="{StaticResource Card}" Margin="5,0" Opacity="0">
@@ -203,7 +203,7 @@
                     Выбор пишется при «Дальше» (WorkModes.Choose).
                 -->
                 <StackPanel x:Name="StepMode" Visibility="Collapsed">
-                    <TextBlock Text="Режим работы ZY" FontSize="17" FontWeight="SemiBold" />
+                    <TextBlock Text="Режим работы" FontSize="17" FontWeight="SemiBold" />
                     <TextBlock Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap"
                                Text="Так программа обходит блокировки. Режим можно сменить в любой момент: на «Главной» и в меню значка в трее." />
 
@@ -220,7 +220,7 @@
                                 <StackPanel Grid.Column="1">
                                     <TextBlock x:Name="PickDesyncName" FontWeight="SemiBold" FontSize="15" />
                                     <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                               Text="Обходит блокировку прямо в вашем соединении: искажает рукопожатие, и фильтр оператора не узнаёт имя сайта. Трафик идёт напрямую, адрес остаётся домашним, подписка не нужна. Не поможет, если сайт закрыт по стране (ChatGPT) или по адресу (Telegram, Instagram)." />
+                                               Text="Обходит блокировку прямо в вашем соединении: искажает рукопожатие, и фильтр оператора не узнаёт имя сайта. Трафик идёт напрямую, адрес остаётся домашним, подписка не нужна. Не поможет, если сайт закрыт по стране (ChatGPT) или по адресу (Telegram, Instagram). Для Telegram есть вкладка TG Proxy." />
                                 </StackPanel>
                             </Grid>
                         </RadioButton>
@@ -293,17 +293,19 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <TextBlock Text="DNS" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0" />
-                        <ComboBox Grid.Column="1" x:Name="DnsPick" AutomationProperties.Name="Путь DNS" Width="260" VerticalAlignment="Center"
+                        <!-- Путь DNS свёрнут под «Дополнительно»: по умолчанию «авто» годится почти всем. -->
+                        <TextBlock x:Name="DnsLabel" Text="DNS" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0" Visibility="Collapsed" />
+                        <ComboBox Grid.Column="1" x:Name="DnsPick" Visibility="Collapsed" AutomationProperties.Name="Путь DNS" Width="260" VerticalAlignment="Center"
                                   SelectionChanged="OnDnsPicked"
                                   ToolTip="Как программа узнаёт адреса сайтов. Позже это меняется во вкладке DNS.">
                             <ComboBoxItem Content="авто: сначала напрямую, при отказе DoH — по TCP, затем через туннель" Tag="Auto" />
                             <ComboBoxItem Content="спрашивать напрямую" Tag="Direct" />
                             <ComboBoxItem Content="спрашивать через туннель" Tag="Tunnel" />
                         </ComboBox>
-                        <ContentControl Grid.Column="2" x:Name="DnsInfo" Style="{StaticResource Info}" Margin="4,0,0,0" />
+                        <ContentControl Grid.Column="2" x:Name="DnsInfo" Style="{StaticResource Info}" Margin="4,0,0,0" Visibility="Collapsed" />
 
                         <TextBlock Grid.Row="1" Text="Прокси для Telegram" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,10,12,0" />
                         <Border Grid.Row="1" Grid.Column="1" Width="260" Margin="0,10,0,0" Padding="12,4,8,4"
@@ -322,6 +324,10 @@
                             </Grid>
                         </Border>
                         <ContentControl Grid.Row="1" Grid.Column="2" x:Name="TgInfo" Style="{StaticResource Info}" Margin="4,10,0,0" />
+
+                        <Button Grid.Row="2" Grid.ColumnSpan="3" x:Name="DnsMore" Style="{StaticResource Ghost}" HorizontalAlignment="Left"
+                                Margin="0,10,0,0" Content="Дополнительно: путь DNS" Click="OnDnsMore"
+                                AutomationProperties.Name="Дополнительно: путь DNS" />
                     </Grid>
                 </StackPanel>
 

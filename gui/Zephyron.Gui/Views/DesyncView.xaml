@@ -70,7 +70,7 @@
                         него в выбор пресета значило бы сменить обход случайно.
                     -->
                     <Grid Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <Button Style="{StaticResource Primary}" Content="Включить"
+                        <Button Style="{StaticResource Primary}" Content="Выбрать"
                                 Padding="10,3"
                                 Tag="{Binding Name}" Click="OnChoose"
                                 Visibility="{Binding ApplyShown}" />
@@ -82,7 +82,7 @@
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <Ellipse Width="6" Height="6" Margin="0,0,8,0" VerticalAlignment="Center"
                                          Fill="{DynamicResource Accent}" />
-                                <TextBlock Text="Включён" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" />
+                                <TextBlock Text="Выбран" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" />
                             </StackPanel>
                         </Border>
                     </Grid>
@@ -172,7 +172,7 @@
                         <!-- Пресет перестал работать — подбор под свою сеть, а не поиск по «Маршрутам». -->
                         <Button Style="{StaticResource Primary}" Click="OnAutoPick" Margin="0,0,8,0"
                                 Content="Подобрать под мою сеть"
-                                ToolTip="Проверит сервисы на вашей сети и подберёт для каждого рабочий способ: напрямую, рецепт десинка, пин или VPN. Движки на 2–5 минут остановятся. Записанное можно вернуть." />
+                                ToolTip="Для всех сервисов сразу: проверит их на вашей сети и подберёт для каждого рабочий способ: напрямую, рецепт десинка, пин или VPN. Движки на 2–5 минут остановятся. Для одного сайта — «Автоподбор» на вкладке «Маршруты». Записанное можно вернуть." />
                         <Button Style="{StaticResource Ghost}" Click="OnOpenFolder"
                                 VerticalAlignment="Center" ToolTip="Папка presets лежит рядом с программой">
                             <StackPanel Orientation="Horizontal">
@@ -358,13 +358,13 @@
                                                 <StackPanel Orientation="Horizontal">
                                                     <TextBlock Text="Какой трафик перехватывать" FontWeight="SemiBold" VerticalAlignment="Center" />
                                                     <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                                    Content="Что десинк вообще видит. Всё, что попало под перехват, winws2 разбирает пакет за пакетом, даже если ни одна часть пресета его не трогает, и каждое новое соединение чего-то стоит. Что не попало, идёт обычным путём и ничего не стоит.&#x0a;&#x0a;ТОЛЬКО САЙТЫ: TCP 80 и 443 и QUIC (UDP 443). Игры и голос в других программах десинк не замечает совсем.&#x0a;&#x0a;КАК В СПОСОБЕ: то, что выбрал его автор.&#x0a;&#x0a;ВСЁ: TCP и UDP на всех портах от 443, когда для поиска нужен широкий охват, а аккуратного перехвата мало.&#x0a;&#x0a;На любом уровне звонки (STUN), поиск адреса Discord и WireGuard определяются по содержимому. Если включён Game filter, он расширяет перехват поверх выбранного уровня." />
+                                                                    Content="Что десинк вообще видит. Всё, что попало под перехват, winws2 разбирает пакет за пакетом, даже если ни одна часть пресета его не трогает, и каждое новое соединение чего-то стоит. Что не попало, идёт обычным путём и ничего не стоит.&#x0a;&#x0a;ТОЛЬКО САЙТЫ: TCP 80 и 443 и QUIC (UDP 443). Игры и голос в других программах десинк не замечает совсем, пока не включён Game filter: тогда уровень называется «Лишь сайты + игры».&#x0a;&#x0a;КАК В СПОСОБЕ: то, что выбрал его автор.&#x0a;&#x0a;ВСЁ: TCP и UDP на всех портах от 443, когда для поиска нужен широкий охват, а аккуратного перехвата мало.&#x0a;&#x0a;На любом уровне звонки (STUN), поиск адреса Discord и WireGuard определяются по содержимому. Если включён Game filter, он расширяет перехват поверх выбранного уровня." />
                                                 </StackPanel>
                                                 <TextBlock Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap"
                                                            Text="Чем уже, тем меньше нагрузка и задержки. Вступает в силу после следующего запуска." />
                                             </StackPanel>
 
-                                            <ComboBox Grid.Column="2" x:Name="CaptureBox" Width="140"
+                                            <ComboBox Grid.Column="2" x:Name="CaptureBox" Width="170"
                                                       VerticalAlignment="Center"
                                                       SelectionChanged="OnCapture">
                                                 <ComboBoxItem Content="Лишь сайты" />
@@ -443,6 +443,12 @@
                               Style="{StaticResource Chevron}" Margin="0,0,8,0" />
                     </Grid>
                 </Button>
+
+                <!-- Ссылка вне карточки: сама карточка — кнопка, вложенная в неё была бы кнопкой в кнопке. -->
+                <TextBlock Style="{StaticResource Caption}" Margin="4,8,0,0">
+                    <Hyperlink Click="OnOpenRoutes" Foreground="{DynamicResource Accent}"
+                               TextDecorations="{x:Null}">Открыть Маршруты</Hyperlink><Run Text=": какому сайту какой рецепт." />
+                </TextBlock>
 
                 <ItemsControl x:Name="Catalog" ItemTemplate="{StaticResource RecipeItem}"
                               Visibility="Collapsed" Margin="0,12,0,0">

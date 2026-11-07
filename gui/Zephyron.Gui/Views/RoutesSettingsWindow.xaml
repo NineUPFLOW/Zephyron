@@ -23,7 +23,7 @@
             <StackPanel>
                 <TextBlock Text="Настройки маршрутов" Style="{StaticResource Title}" />
                 <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
-                           Text="Маршруты сервисов и свои сайты находятся во вкладке «Маршруты». Здесь то, что настраивается один раз." />
+                           Text="Маршруты сервисов и свои сайты находятся во вкладке «Маршруты». Здесь то, что настраивается один раз. Параметры Discord и игр действуют, только когда маршрут сервиса — «через VPN»." />
 
                 <TextBlock Text="Discord" Style="{StaticResource GroupHead}" Margin="4,22,0,7" />
 
