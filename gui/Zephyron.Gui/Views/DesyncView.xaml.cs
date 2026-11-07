@@ -723,6 +723,12 @@ public partial class DesyncView : UserControl
     }
 
     /// <summary>Окно выбора подделок секций выбранного пресета (<see cref="FakeChoice"/>).</summary>
+    private void OnAutoPick(object sender, RoutedEventArgs e)
+    {
+        new AutoPickWindow { Owner = Window.GetWindow(this) }.ShowDialog();
+        Reload();
+    }
+
     private void OnPickFakes(object sender, RoutedEventArgs e)
     {
         try
