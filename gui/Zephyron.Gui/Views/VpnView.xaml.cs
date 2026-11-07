@@ -796,7 +796,9 @@ public partial class VpnView : UserControl
 
         if (_rows.Count == 0)
         {
-            Status.Text = "Подписок нет. Без них нет серверов и VPN недоступен, а десинк при этом работает.";
+            Status.Text = AppSettings.Load(AppSettings.DefaultPath).WarpEnabled
+                ? "Подписок нет: туннель идёт через WARP."
+                : "Подписок нет. Без них нет серверов и VPN недоступен, а десинк при этом работает.";
 
             return;
         }
@@ -853,6 +855,7 @@ public partial class VpnView : UserControl
             // под ними, и чистка по исходным тегам выбросила бы их.
             ApplyPool(settings);
             FillWarpCountry(settings);
+
 
             // Замеры исчезнувших серверов — вон, иначе файл копит их вечно,
             // а по ним судят о свежести всего списка. Звала это только
@@ -1761,10 +1764,18 @@ public partial class VpnView : UserControl
         var measured = Seen(exit.Tag) is { Success: true, LatencyMs: { } ms } ? $" · {ms:0} мс" : string.Empty;
 
         WarpLine.Text = on
-            ? $"Туннель идёт только через WARP, подписки приостановлены. {(string.IsNullOrWhiteSpace(settings.WarpCountryTag) ? "Выход в Москве" : "Выход в стране выбранного сервера")}{measured}."
+            ? $"Туннель идёт только через WARP{(_book.Entries.Count > 0 || _book.Keys.Count > 0 ? ", подписки приостановлены" : "")}. {(string.IsNullOrWhiteSpace(settings.WarpCountryTag) ? "Выход в Москве" : "Выход в стране выбранного сервера")}{measured}."
             : "Бесплатный выход через сеть Cloudflare. Включите WARP, и туннель пойдёт через него вместо подписок.";
 
         FillWarpCountry(settings);
+
+        var file = Warp.FileName();
+        WarpSourceLine.Text = file is null ? "Подключение: встроенное" : $"Подключение: ваш файл «{file}»";
+        WarpSourceHint.Text = file is null
+            ? "Не подключается? Скачайте файл WARP (AmneziaWG) на warp-generation.github.io и загрузите его сюда."
+            : "Свой файл используется вместо встроенного подключения. Страну у файла не выбрать.";
+        WarpFileButton.Content = file is null ? "Загрузить файл WARP" : "Заменить файл";
+        WarpFileRemove.Visibility = file is null ? Visibility.Collapsed : Visibility.Visible;
 
         // Замер — руками движка, а он знает WARP, только когда тот в конфиге.
         // Кнопка на месте всегда: пропадая, она не говорила, почему её нет.
@@ -1776,7 +1787,10 @@ public partial class VpnView : UserControl
                 : "Замер пинга WARP доступен, когда движки работают";
 
         // Подписки и лента на паузе — видно сразу, а не только в подписи.
-        PausedLine.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        // Предупреждать о паузе есть о чём, только когда есть что ставить на паузу.
+        PausedLine.Visibility = on && (_book.Entries.Count > 0 || _book.Keys.Count > 0) ? Visibility.Visible : Visibility.Collapsed;
+        // Выбирать сервер при WARP не из чего: туннель идёт только через него.
+        QuickCard.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
         PausedBox.Visibility = PausedLine.Visibility;
         _paused = on;
         QuickCard.Opacity = on ? 0.55 : 1;
@@ -1810,7 +1824,8 @@ public partial class VpnView : UserControl
 
         // Выбирать страну есть из чего только с подпиской: без неё в списке одно «Как есть».
         // Здесь, а не в ShowWarp: серверы подписки доходят позже, и список досоздаётся.
-        WarpCountryPanel.Visibility = settings.WarpEnabled && (servers.Count > 0 || !string.IsNullOrWhiteSpace(saved))
+        WarpCountryPanel.Visibility = settings.WarpEnabled && Warp.FileServer() is null
+            && (servers.Count > 0 || !string.IsNullOrWhiteSpace(saved))
             ? Visibility.Visible
             : Visibility.Collapsed;
 
@@ -2118,7 +2133,56 @@ public partial class VpnView : UserControl
     /// </summary>
     private void OnAddToggle(object sender, RoutedEventArgs e) => OpenAdd(pasteOnOpen: false);
 
-    private void OnAddWarpFile(object sender, RoutedEventArgs e) => OpenAdd(pasteOnOpen: false);
+    /// <summary>Свой файл WARP: выбор .conf, проверка, и WARP сразу берёт его.</summary>
+    private void OnWarpFile(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Файл WARP",
+            Filter = "Файл WARP (*.conf)|*.conf|Все файлы|*.*",
+        };
+
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true)
+            return;
+
+        try
+        {
+            Warp.SaveFile(dialog.FileName);
+
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
+            var next = settings with { WarpEnabled = true };
+            next.Save(AppSettings.DefaultPath);
+
+            ShowWarp(next);
+            ShowPick(next);
+            ShowQuick(next);
+            Status.Text = $"WARP будет идти через ваш файл «{System.IO.Path.GetFileName(dialog.FileName)}». "
+                + "Вступит в силу после перезапуска движков.";
+            this.Offer("Загружен файл WARP");
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Файл не подошёл: " + ex.GetBaseException().Message;
+        }
+    }
+
+    private void OnWarpFileRemove(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Warp.RemoveFile();
+
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
+            ShowWarp(settings);
+            ShowPick(settings);
+            Status.Text = "Свой файл WARP убран: WARP снова встроенный. Вступит в силу после перезапуска движков.";
+            this.Offer("WARP снова встроенный");
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Убрать файл не удалось: " + ex.GetBaseException().Message;
+        }
+    }
 
     /// <param name="pasteOnOpen">Ctrl+V на вкладке: окно сразу берёт из буфера.</param>
     private void OpenAdd(bool pasteOnOpen)

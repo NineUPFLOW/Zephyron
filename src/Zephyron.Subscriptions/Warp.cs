@@ -84,7 +84,94 @@ public static class Warp
     /// в списке подписок занимал её место — выбор его выхода отключал рабочий
     /// VPN целиком.
     /// </remarks>
-    public static IReadOnlyList<ProxyServer> Exits() => [MasqueServer()];
+    public static IReadOnlyList<ProxyServer> Exits() => [FileServer() ?? MasqueServer()];
+
+    /// <summary>Свой файл WARP (WireGuard/AmneziaWG), загруженный в карточке WARP.</summary>
+    /// <remarks>
+    /// Это источник WARP, а не ключ VPN: при включённом WARP туннель идёт через него вместо
+    /// встроенного MASQUE, имя выхода то же (<see cref="MasqueTag"/>), и всё, что сверяет
+    /// выход с WARP, продолжает работать. Без файла — встроенный.
+    /// </remarks>
+    public static string FilePath => Path.Combine("config", "warp.conf");
+
+    /// <summary>Имя файла, как его выбрал человек; рядом с самим файлом.</summary>
+    public static string FileNamePath => Path.Combine("config", "warp.name");
+
+    /// <summary>Сервер из своего файла WARP; <c>null</c> — файла нет или он не читается.</summary>
+    public static ProxyServer? FileServer(string? path = null)
+    {
+        try
+        {
+            path ??= FilePath;
+
+            if (!File.Exists(path))
+                return null;
+
+            return Parse(File.ReadAllText(path), out var server, out _) ? server : null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Разбирает файл WARP; принимает только WireGuard или AmneziaWG.</summary>
+    public static bool Parse(string text, out ProxyServer? server, out string? error)
+    {
+        server = null;
+        var found = KeyImport.FromText(text, MasqueTag);
+
+        if (found.Keys.Count == 0)
+        {
+            error = found.Problem ?? "в файле нет настроек WireGuard";
+            return false;
+        }
+
+        if (!ProxyUriParser.TryParse(found.Keys[0], out var parsed, out error) || parsed is null)
+            return false;
+
+        if (parsed.Protocol is not (ProxyProtocol.Wireguard))
+        {
+            error = "это не файл WARP: нужен WireGuard или AmneziaWG (.conf)";
+            return false;
+        }
+
+        server = parsed with { Tag = MasqueTag };
+        return true;
+    }
+
+    /// <summary>Сохраняет свой файл WARP; бросает, если он не читается.</summary>
+    public static void SaveFile(string sourcePath)
+    {
+        var text = File.ReadAllText(sourcePath);
+
+        if (!Parse(text, out _, out var error))
+            throw new InvalidDataException(error ?? "файл не читается");
+
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(FilePath))!);
+        File.WriteAllText(FilePath, text);
+        File.WriteAllText(FileNamePath, Path.GetFileName(sourcePath));
+    }
+
+    /// <summary>Убирает свой файл: WARP снова встроенный.</summary>
+    public static void RemoveFile()
+    {
+        File.Delete(FilePath);
+        File.Delete(FileNamePath);
+    }
+
+    /// <summary>Имя своего файла WARP; <c>null</c> — используется встроенный.</summary>
+    public static string? FileName()
+    {
+        try
+        {
+            return FileServer() is null ? null : File.Exists(FileNamePath) ? File.ReadAllText(FileNamePath).Trim() : "warp.conf";
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
 
     /// <summary>
     /// Выходы туннеля: только WARP, когда он включён, иначе только подписки.
