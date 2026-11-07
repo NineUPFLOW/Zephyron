@@ -710,7 +710,7 @@ public partial class PinWindow : Window
         // 240 запросов.
         var main = zones.FirstOrDefault() ?? names[0];
 
-        Status.Text = "Спрашиваю у XBOX DNS, Comss, AstraCat и GeoHide, какие адреса они отдают сейчас…";
+        Status.Text = "Спрашиваю у посредников (Comss, Zapret DNS, GeoHide, WLRUS, Dagami и других), какие адреса они отдают сейчас…";
         // Источники кандидатов — общие с автоподбором маршрутов (PinSources).
         var (known, pool) = await Zephyron.Supervisor.PinSources.LoadAsync([main], _catalog, own, CancellationToken.None);
 

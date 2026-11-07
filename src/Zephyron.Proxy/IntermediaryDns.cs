@@ -56,6 +56,11 @@ public static class IntermediaryDns
         new("Zapret DNS", "zapret", "dns.zapret.moe", ["188.114.96.1", "188.114.97.1"], RelayName: "relay.check.dns.zapret.moe"),
         new("GeoHide EU", "geohide-eu", "eu.geohide.ru", ["5.175.161.3", "5.175.161.40", "143.20.64.192"]),
         new("GeoHide US", "geohide-us", "us.geohide.ru", ["192.255.159.240", "192.255.159.241"]),
+        // Замер 07.11 по DoH: оба отдают на ChatGPT свой прокси (wlrus — 191.217.212.16,
+        // dagami — 45.86.65.240), через него ChatGPT и Gemini отвечают 200 с настоящим
+        // сертификатом. Запасные адреса — честный DoH на то же имя.
+        new("WLRUS DNS", "wlrus", "dns.wlrus.cfd", ["95.85.240.254", "138.124.254.134"]),
+        new("Dagami DNS", "dagami", "dns.dagami.ru", ["45.86.65.240"]),
         new("DNS-AI", "dns-ai", "dns.dns-ai.ru", ["194.87.196.13", "45.151.102.219"]),
         new("AstraCat", "astracat", "dns.astracat.network", ["135.106.217.200", "135.106.197.22"]),
     ];
