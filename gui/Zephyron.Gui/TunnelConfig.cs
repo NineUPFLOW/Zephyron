@@ -143,6 +143,9 @@ internal static class TunnelConfig
                     ServerHealthCache.Load().Latencies())
                 : null;
 
+            // Без посредника движок регистрирует WARP напрямую, а штатные адреса API
+            // у части провайдеров закрыты: прибиваем имя к узлу, который отвечает.
+
             // «В пуле только рабочие» (владелец, 28.09) — буквально: мёртвый
             // по замерам сервер в конфиг не идёт вовсе, а не только выводится
             // из автоподбора. С пулом из трёх подписок в конфиге стало 118
@@ -241,6 +244,7 @@ internal static class TunnelConfig
                     [settings.SubscriptionUrl, .. SubscriptionBook.Load().Entries.Select(e => e.Url)]),
                 PreferredServerTag = Warp.PreferredExit(settings),
                 WarpDetour = warpDetour,
+                WarpRegistrationEdges = settings.WarpEnabled && warpDetour is null ? WarpRegistration.Edges : [],
                 WarpExitThroughDetour = Warp.ExitsThrough(settings, warpDetour),
 
                 // Без «Selective Routing» и при WARP пулов нет — их маршруты

@@ -756,6 +756,19 @@
                                 <StackPanel Grid.Row="1" Grid.ColumnSpan="3">
                                     <TextBlock x:Name="WarpLine" Style="{StaticResource Caption}" Margin="0,10,0,0" TextWrapping="Wrap" />
 
+                                    <!-- Запасной путь: готовый файл WARP добавляется как обычный сервер. -->
+                                    <Grid Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap" VerticalAlignment="Center"
+                                                   Text="Не подключается? Скачайте готовый файл WARP (AmneziaWG) на warp-generation.github.io и добавьте его: он заработает как обычный сервер, а этот переключатель выключите." />
+                                        <Button Grid.Column="1" Style="{StaticResource Ghost}" Margin="12,0,0,0"
+                                                Content="Добавить файл WARP" Click="OnAddWarpFile"
+                                                ToolTip="Откроет добавление ключа: выберите скачанный .conf" />
+                                    </Grid>
+
                                     <!--
                                         Страна выхода: Cloudflare выпускает трафик в стране сервера подписки,
                                         через который идёт WARP. Видно, только пока WARP включён.

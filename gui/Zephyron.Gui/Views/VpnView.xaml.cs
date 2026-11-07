@@ -2110,6 +2110,8 @@ public partial class VpnView : UserControl
     /// </summary>
     private void OnAddToggle(object sender, RoutedEventArgs e) => OpenAdd(pasteOnOpen: false);
 
+    private void OnAddWarpFile(object sender, RoutedEventArgs e) => OpenAdd(pasteOnOpen: false);
+
     /// <param name="pasteOnOpen">Ctrl+V на вкладке: окно сразу берёт из буфера.</param>
     private void OpenAdd(bool pasteOnOpen)
     {

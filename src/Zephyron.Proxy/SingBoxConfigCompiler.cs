@@ -391,6 +391,19 @@ public sealed class SingBoxOptions
     public const string WarpDetourTag = "warp-via";
 
     /// <summary>
+    /// Узлы Cloudflare для регистрации WARP без посредника; пусто — как назначит DNS.
+    /// </summary>
+    /// <remarks>
+    /// Регистрация идёт скрытым прямым выходом, имя которого движок разрешает своим
+    /// резолвером-таблицей в эти адреса (WarpRegistration.Edges). Штатные адреса API
+    /// у части провайдеров не принимают и TCP.
+    /// </remarks>
+    public IReadOnlyList<string> WarpRegistrationEdges { get; init; } = [];
+
+    /// <summary>Тег скрытого прямого выхода регистрации и его резолвера.</summary>
+    public const string WarpRegistrationTag = "warp-reg";
+
+    /// <summary>
     /// Пулы серверов (<see cref="ServerPools"/>): своя группа выбора у каждого,
     /// на который ссылается хоть одно правило.
     /// </summary>
@@ -1037,6 +1050,19 @@ public sealed class SingBoxConfigCompiler
             });
         }
 
+        if (options.WarpRegistrationEdges.Count > 0)
+        {
+            servers.Add(new JsonObject
+            {
+                ["tag"] = SingBoxOptions.WarpRegistrationTag,
+                ["type"] = "hosts",
+                ["predefined"] = new JsonObject
+                {
+                    [WarpRegistration.Host] = new JsonArray(options.WarpRegistrationEdges.Select(e => (JsonNode)e!).ToArray()),
+                },
+            });
+        }
+
         // independent_cache не пишется: в 1.14.0 он объявлен устаревшим, а в
         // 1.16.0 будет убран, и кэш там разделяется сам по резолверам. Держать
         // ключ до последнего значило бы чинить его по чужому расписанию —
@@ -1512,6 +1538,19 @@ public sealed class SingBoxConfigCompiler
 
             if (options.WarpExitThroughDetour)
                 wrapped["detour"] = hidden;
+        }
+        else if (options.WarpRegistrationEdges.Count > 0
+            && servers.FirstOrDefault(s => s.IsSelfRegistering) is { } alone)
+        {
+            outbounds.Add(new JsonObject
+            {
+                ["type"] = "direct",
+                ["tag"] = SingBoxOptions.WarpRegistrationTag,
+                ["domain_resolver"] = SingBoxOptions.WarpRegistrationTag,
+            });
+
+            var wrapped = (JsonObject)outbounds.First(o => (string?)o?["tag"] == tags[alone])!;
+            wrapped["profile"] = new JsonObject { ["detour"] = SingBoxOptions.WarpRegistrationTag };
         }
 
         if (servers.Count == 0)
