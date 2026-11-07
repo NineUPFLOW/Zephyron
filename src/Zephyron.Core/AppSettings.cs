@@ -608,6 +608,12 @@ public sealed record AppSettings
     /// </remarks>
     public bool FakeIpMemory { get; init; } = true;
 
+    /// <summary>Локальный прокси для отдельных программ (SOCKS5 и HTTP на 127.0.0.1), через выход туннеля.</summary>
+    public bool LocalProxy { get; init; }
+
+    /// <summary>Порт локального прокси.</summary>
+    public int LocalProxyPort { get; init; } = 2080;
+
     /// <summary>Сколько серверов с одного входа (адрес:порт) берёт автоподбор; 0 — всех.</summary>
     public int AutoPickPerEntry { get; init; } = 2;
 

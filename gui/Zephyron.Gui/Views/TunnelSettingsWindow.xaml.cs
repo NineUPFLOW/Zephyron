@@ -135,6 +135,14 @@ public partial class TunnelSettingsWindow : Window
         Word(FakeIpMemoryWord, settings.FakeIpMemory);
         FakeIpMemory.IsChecked = settings.FakeIpMemory;
 
+        // Не затираем то, что человек сейчас набирает.
+        if (!LocalProxyPortBox.IsKeyboardFocusWithin)
+            LocalProxyPortBox.Text = settings.LocalProxyPort.ToString();
+
+        LocalProxyLine.Text = settings.LocalProxy
+            ? $"Прокси включён: {LocalProxyInbound.Address(settings.LocalProxyPort)}."
+            : "Прокси выключен, переключатель — на вкладке VPN.";
+
         DeadPoolLine.Text = !selective
             ? "Действует, когда включён Selective Routing."
             : settings.Pools.Count == 0
@@ -320,6 +328,24 @@ public partial class TunnelSettingsWindow : Window
             FakeIpMemory.IsChecked == true
                 ? "Подставные адреса имён «через VPN» сохранятся после перезапуска движков."
                 : "После перезапуска движков подставные адреса выдаются заново, как до 20.10.");
+
+    private void OnLocalProxyPort(object sender, RoutedEventArgs e)
+    {
+        if (!int.TryParse(LocalProxyPortBox.Text.Trim(), out var port) || !LocalProxyInbound.PortAllowed(port))
+        {
+            Status.Text = "Порт — число от 1024 до 65535, кроме 9090, 21080 и 21090.";
+            return;
+        }
+
+        Save(s => s with { LocalProxyPort = port }, $"Порт локального прокси — {port}.");
+        (Owner as MainWindow)?.OfferRestart("Порт локального прокси изменён");
+    }
+
+    private void OnLocalProxyPortKey(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Enter)
+            OnLocalProxyPort(sender, e);
+    }
 
     private void OnSelective(object sender, RoutedEventArgs e) =>
         Save(s => s with { SelectiveRouting = Selective.IsChecked == true },

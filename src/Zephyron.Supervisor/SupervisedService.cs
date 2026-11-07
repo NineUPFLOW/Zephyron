@@ -845,7 +845,7 @@ public sealed class SingBoxService : SupervisedService
 
         foreach (var exit in StartExits(_preferredExit))
         {
-            if (await api.SelectAsync(SelectorGroup, exit, cancellationToken))
+            if (await SelectMainAsync(api, exit, cancellationToken))
             {
                 placed = true;
                 _pinnedPlaced = exit == _preferredExit;
@@ -882,7 +882,7 @@ public sealed class SingBoxService : SupervisedService
                     using var warm = new ClashApi($"127.0.0.1:{_healthPort}", Talk, EngineKeys.Current(_configPath));
 
                     if (await PickOneByOneAsync(warm, cancellationToken) is { } best && run == _run)
-                        await warm.SelectAsync(SelectorGroup, best, cancellationToken);
+                        await SelectMainAsync(warm, best, cancellationToken);
                 }
                 catch (Exception)
                 {
@@ -1357,7 +1357,7 @@ public sealed class SingBoxService : SupervisedService
         // а не в автоподбор, который мог стоять на мёртвом.
         var target = _bypass.TargetFor(action, _returnTo ?? LatencyGroup);
 
-        if (!await api.SelectAsync(SelectorGroup, target, cancellationToken))
+        if (!await SelectMainAsync(api, target, cancellationToken))
         {
             // Откат: положение осталось прежним, и помнить надо прежнее.
             _bypass.Forget();
@@ -1629,7 +1629,7 @@ public sealed class SingBoxService : SupervisedService
             Record(_preferredExit!, pinned);
 
             if (_watch.OnPinned(pinned is not null) == ExitAction.Restore
-                && await api.SelectAsync(SelectorGroup, _preferredExit!, cancellationToken))
+                && await SelectMainAsync(api, _preferredExit!, cancellationToken))
             {
                 Remark = null;
                 Note($"выбранный сервер «{_preferredExit}» снова отвечает — трафик возвращён на него.");
@@ -1687,7 +1687,7 @@ public sealed class SingBoxService : SupervisedService
                 if (run != _run)
                     return;
 
-                if (best is not null && await api.SelectAsync(SelectorGroup, best, CancellationToken.None))
+                if (best is not null && await SelectMainAsync(api, best, CancellationToken.None))
                 {
                     Note($"{why} — поставлен «{best}», первый ответивший при проверке по одному.{promise}");
                     ExitReplaced?.Invoke("Сервер не отвечает — переключился", $"{Capital(why)}. Теперь «{best}».{promise}");
@@ -1717,6 +1717,21 @@ public sealed class SingBoxService : SupervisedService
     /// и знать не должен.
     /// </remarks>
     private const string SelectorGroup = "auto";
+
+    /// <summary>
+    /// Ставит выбор основной группы; группа локального прокси идёт за ним, но мимо туннеля — никогда.
+    /// </summary>
+    /// <remarks>Группы может не быть (прокси выключен) — отказ движка тогда не ошибка.</remarks>
+    private static async Task<bool> SelectMainAsync(ClashApi api, string exit, CancellationToken cancellationToken)
+    {
+        if (!await api.SelectAsync(SelectorGroup, exit, cancellationToken))
+            return false;
+
+        if (exit != "direct")
+            await api.SelectAsync(LocalProxyInbound.ExitTag, exit, cancellationToken);
+
+        return true;
+    }
 
     /// <summary>Группа автоподбора — куда возвращаемся.</summary>
     private const string LatencyGroup = "auto-latency";

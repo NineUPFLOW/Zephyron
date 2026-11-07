@@ -448,6 +448,14 @@ public sealed class SingBoxOptions
     /// </remarks>
     public bool HealthInbound { get; init; }
 
+    /// <summary>
+    /// Вход для отдельных программ (SOCKS5 и HTTP на 127.0.0.1) с выходом только через серверы туннеля.
+    /// </summary>
+    /// <remarks>Без серверов не добавляется: молча отдать домашний адрес хуже, чем отказ.</remarks>
+    public bool LocalProxy { get; init; }
+
+    public int LocalProxyPort { get; init; } = LocalProxyInbound.DefaultPort;
+
     /// <summary>Что именно заводить в туннель.</summary>
     public TunnelScope Scope { get; init; } = TunnelScope.Everything;
 
@@ -597,14 +605,16 @@ public sealed class SingBoxConfigCompiler
 
         var tags = AssignUniqueTags(usable);
 
+        bool localProxy = options.LocalProxy && tags.Count > 0;
+
         var root = new JsonObject
         {
             ["log"] = new JsonObject { ["level"] = options.LogLevel },
             ["certificate"] = Certificates(),
             ["dns"] = BuildDns(options, tags.Count > 0, ruleSet),
-            ["inbounds"] = BuildInbounds(options, CollectProxyAddresses(ruleSet)),
-            ["outbounds"] = BuildOutbounds(usable, tags, options, PoolsInUse(ruleSet, options)),
-            ["route"] = BuildRoute(ruleSet, tags, options),
+            ["inbounds"] = BuildInbounds(options, CollectProxyAddresses(ruleSet), localProxy),
+            ["outbounds"] = BuildOutbounds(usable, tags, options, PoolsInUse(ruleSet, options), localProxy),
+            ["route"] = BuildRoute(ruleSet, tags, options, localProxy),
             ["experimental"] = new JsonObject
             {
                 ["clash_api"] = new JsonObject { ["external_controller"] = options.ClashApiListen },
@@ -875,7 +885,7 @@ public sealed class SingBoxConfigCompiler
     private static Dictionary<ProxyServer, string> AssignUniqueTags(IReadOnlyList<ProxyServer> servers)
     {
         var tags = new Dictionary<ProxyServer, string>();
-        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "direct", "auto" };
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "direct", "auto", LocalProxyInbound.ExitTag };
 
         foreach (var server in servers)
         {
@@ -1342,7 +1352,7 @@ public sealed class SingBoxConfigCompiler
         }
     }
 
-    private static JsonArray BuildInbounds(SingBoxOptions options, IReadOnlyList<string> proxyAddresses)
+    private static JsonArray BuildInbounds(SingBoxOptions options, IReadOnlyList<string> proxyAddresses, bool localProxy)
     {
         var inbounds = options.UseTun
             ? BuildTunInbound(options, proxyAddresses)
@@ -1385,6 +1395,19 @@ public sealed class SingBoxConfigCompiler
             }
 
             inbounds.Add(health);
+        }
+
+        // Только петля и без пароля: программы человека (браузеры) SOCKS с паролем не умеют,
+        // а наружу вход не виден.
+        if (localProxy)
+        {
+            inbounds.Add(new JsonObject
+            {
+                ["type"] = "mixed",
+                ["tag"] = LocalProxyInbound.InboundTag,
+                ["listen"] = "127.0.0.1",
+                ["listen_port"] = options.LocalProxyPort,
+            });
         }
 
         return inbounds;
@@ -1511,7 +1534,8 @@ public sealed class SingBoxConfigCompiler
         IReadOnlyList<ProxyServer> servers,
         IReadOnlyDictionary<ProxyServer, string> tags,
         SingBoxOptions options,
-        IReadOnlyList<ServerPool> pools)
+        IReadOnlyList<ServerPool> pools,
+        bool localProxy)
     {
         var outbounds = new JsonArray
         {
@@ -1655,6 +1679,23 @@ public sealed class SingBoxConfigCompiler
             ["outbounds"] = selectorMembers,
             ["default"] = pinned ?? LatencyTag,
         });
+
+        // Выход локального прокси: те же серверы, но без direct. Надзор переносит
+        // сюда выбор основной группы, кроме ухода мимо туннеля.
+        if (localProxy)
+        {
+            var exitMembers = new JsonArray { LatencyTag };
+            foreach (var server in servers)
+                exitMembers.Add(tags[server]);
+
+            outbounds.Add(new JsonObject
+            {
+                ["type"] = "selector",
+                ["tag"] = LocalProxyInbound.ExitTag,
+                ["outbounds"] = exitMembers,
+                ["default"] = pinned ?? LatencyTag,
+            });
+        }
 
         foreach (var pool in pools)
             AddPool(outbounds, pool, servers, tags, options);
@@ -2452,7 +2493,8 @@ public sealed class SingBoxConfigCompiler
     private static JsonObject BuildRoute(
         RuleSet ruleSet,
         IReadOnlyDictionary<ProxyServer, string> tags,
-        SingBoxOptions options)
+        SingBoxOptions options,
+        bool localProxy)
     {
         bool haveServers = tags.Count > 0;
         var rules = new JsonArray
@@ -2481,6 +2523,17 @@ public sealed class SingBoxConfigCompiler
         }
 
         rules.Add(new JsonObject { ["ip_is_private"] = true, ["outbound"] = "direct" });
+
+        // Сразу после домашней сети (роутер идёт напрямую), раньше всех правил: у программ с
+        // прокси выбор один — туннель.
+        if (localProxy)
+        {
+            rules.Add(new JsonObject
+            {
+                ["inbound"] = new JsonArray { LocalProxyInbound.InboundTag },
+                ["outbound"] = LocalProxyInbound.ExitTag,
+            });
+        }
 
         // В режиме «всё через VPN» правила не отбрасываются целиком, как было
         // раньше: исключения на прямой проход обязаны пережить его. Российские

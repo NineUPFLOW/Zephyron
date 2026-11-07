@@ -1813,6 +1813,50 @@ public partial class VpnView : UserControl
 
     private TunnelPath _path;
 
+    private int _localProxyPort = LocalProxyInbound.DefaultPort;
+
+    /// <summary>Карточка локального прокси; без туннеля он бесполезен — карточка говорит об этом.</summary>
+    private void ShowLocalProxy(AppSettings settings, bool tunnelAvailable)
+    {
+        _localProxyPort = settings.LocalProxyPort;
+        LocalProxyToggle.IsChecked = settings.LocalProxy;
+        LocalProxyWord.Text = settings.LocalProxy ? "включено" : "не включено";
+        LocalProxyAddress.Text = $"{LocalProxyInbound.Address(settings.LocalProxyPort)} — SOCKS5 и HTTP";
+        LocalProxyHint.Text = tunnelAvailable
+            ? "Подходит для расширения браузера, Telegram и лаунчеров игр. Через прокси идут только программы, где он указан."
+            : "Нужен туннель: включите режим с туннелем и добавьте подписку, ключ или WARP. Пока его нет, прокси не заработает.";
+    }
+
+    private void OnLocalProxy(object sender, RoutedEventArgs e)
+    {
+        bool on = LocalProxyToggle.IsChecked == true;
+
+        try
+        {
+            (AppSettings.Load(AppSettings.DefaultPath) with { LocalProxy = on }).Save(AppSettings.DefaultPath);
+            LocalProxyWord.Text = on ? "включено" : "не включено";
+            this.Offer(on ? "Локальный прокси включён" : "Локальный прокси выключен");
+        }
+        catch (Exception ex)
+        {
+            LocalProxyToggle.IsChecked = !on;
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
+        }
+    }
+
+    private void OnLocalProxyCopy(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Clipboard.SetText(LocalProxyInbound.Address(_localProxyPort));
+            Status.Text = "Адрес скопирован: " + LocalProxyInbound.Address(_localProxyPort);
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Не скопировалось: " + ex.GetBaseException().Message;
+        }
+    }
+
     /// <summary>
     /// Выбор наверху и блок выбранного пути целиком; другой — одной строкой с кнопкой «Выбрать».
     /// </summary>
@@ -1841,6 +1885,8 @@ public partial class VpnView : UserControl
 
         WarpSummary.Visibility = path == TunnelPath.Warp ? Visibility.Collapsed : Visibility.Visible;
         VpnSummary.Visibility = path == TunnelPath.Vpn ? Visibility.Collapsed : Visibility.Visible;
+
+        ShowLocalProxy(settings, tunnel && (path == TunnelPath.Warp || hasVpn));
 
         WarpSummaryLine.Text = $"WARP: не используется — туннель идёт через VPN. {(file is null ? "Подключение встроенное." : $"Свой файл «{file}».")}";
 
