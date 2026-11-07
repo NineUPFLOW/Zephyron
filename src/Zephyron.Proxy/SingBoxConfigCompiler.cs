@@ -366,6 +366,19 @@ public sealed class SingBoxOptions
     public string? PreferredServerTag { get; init; }
 
     /// <summary>
+    /// Сервер, через который выход MASQUE доходит до Cloudflare (<c>profile.detour</c>).
+    /// </summary>
+    /// <remarks>
+    /// Идёт в конфиг скрытым выходом: ни в селекторе, ни в автоподборе, ни в пулах
+    /// его нет, и трафик правил на него не попадёт. Без выхода MASQUE в конфиге
+    /// игнорируется.
+    /// </remarks>
+    public ProxyServer? WarpDetour { get; init; }
+
+    /// <summary>Тег скрытого выхода для <see cref="WarpDetour"/>.</summary>
+    public const string WarpDetourTag = "warp-via";
+
+    /// <summary>
     /// Пулы серверов (<see cref="ServerPools"/>): своя группа выбора у каждого,
     /// на который ссылается хоть одно правило.
     /// </summary>
@@ -1471,6 +1484,20 @@ public sealed class SingBoxConfigCompiler
         // с исходящими: для urltest и селектора это такой же тег.
         foreach (var server in servers.Where(s => !s.IsEndpoint))
             outbounds.Add(Fragment(BuildOutbound(server, tags[server]), options.TlsFragment));
+
+        // Скрытый выход под регистрацию и страну WARP: только как detour у MASQUE.
+        // Занятый тег уступает ему: в тегах подписки мог оказаться и такой.
+        if (options.WarpDetour is { IsUsableOutbound: true, IsEndpoint: false, IsSelfRegistering: false } via
+            && servers.FirstOrDefault(s => s.IsSelfRegistering) is { } masque)
+        {
+            var hidden = SingBoxOptions.WarpDetourTag;
+            while (tags.Values.Contains(hidden, StringComparer.OrdinalIgnoreCase))
+                hidden += "'";
+
+            outbounds.Add(Fragment(BuildOutbound(via, hidden), options.TlsFragment));
+            ((JsonObject)outbounds.First(o => (string?)o?["tag"] == tags[masque])!)["profile"] =
+                new JsonObject { ["detour"] = hidden };
+        }
 
         if (servers.Count == 0)
             return outbounds;

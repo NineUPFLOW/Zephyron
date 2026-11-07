@@ -287,6 +287,134 @@ public class WarpTests
         Security = "tls",
     };
 
+    private static ProxyServer Vless(string tag, string host = "203.0.113.5") => new()
+    {
+        Protocol = ProxyProtocol.Vless,
+        Tag = tag,
+        Host = host,
+        Port = 443,
+        Credential = "11111111-1111-1111-1111-111111111111",
+    };
+
+    /// <summary>
+    /// Посредник MASQUE — скрытый выход: сам есть в конфиге, на него указывает
+    /// profile.detour, а в селекторе, автоподборе и пулах его нет.
+    /// </summary>
+    [Fact]
+    public void DetourIsHiddenOutboundReferencedByMasqueProfile()
+    {
+        var config = Compile(
+            new SingBoxOptions { WarpDetour = Vless("🇪🇪 Эстония", "198.51.100.7") },
+            Warp.MasqueServer());
+
+        var outbounds = config.GetProperty("outbounds").EnumerateArray().ToList();
+        var masque = outbounds.First(o => o.GetProperty("tag").GetString() == Warp.MasqueTag);
+        var via = masque.GetProperty("profile").GetProperty("detour").GetString();
+
+        Assert.Equal(SingBoxOptions.WarpDetourTag, via);
+
+        var hidden = outbounds.Single(o => o.GetProperty("tag").GetString() == via);
+        Assert.Equal("vless", hidden.GetProperty("type").GetString());
+        Assert.Equal("198.51.100.7", hidden.GetProperty("server").GetString());
+
+        foreach (var group in outbounds.Where(o => o.TryGetProperty("outbounds", out _)))
+            Assert.DoesNotContain(group.GetProperty("outbounds").EnumerateArray(), m => m.GetString() == via);
+
+        Assert.DoesNotContain("Эстония", masque.ToString());
+    }
+
+    /// <summary>Без посредника конфиг прежний: ни profile, ни лишнего выхода.</summary>
+    [Fact]
+    public void NoDetourLeavesConfigAsBefore()
+    {
+        var outbounds = Compile(Warp.MasqueServer()).GetProperty("outbounds").EnumerateArray().ToList();
+
+        Assert.False(outbounds.First(o => o.GetProperty("tag").GetString() == Warp.MasqueTag).TryGetProperty("profile", out _));
+        Assert.DoesNotContain(outbounds, o => o.GetProperty("tag").GetString() == SingBoxOptions.WarpDetourTag);
+    }
+
+    /// <summary>Посредник без MASQUE в конфиге никуда не попадает.</summary>
+    [Fact]
+    public void DetourWithoutMasqueIsIgnored()
+    {
+        var outbounds = Compile(new SingBoxOptions { WarpDetour = Vless("DE") }, Vless("NL", "198.51.100.9"))
+            .GetProperty("outbounds").EnumerateArray().ToList();
+
+        Assert.DoesNotContain(outbounds, o => o.GetProperty("tag").GetString() == SingBoxOptions.WarpDetourTag);
+    }
+
+    /// <summary>Адрес посредника виден десинку так же, как адреса серверов туннеля.</summary>
+    [Fact]
+    public void DetourAddressIsListedAmongTunnelEndpoints()
+    {
+        var json = new SingBoxConfigCompiler().Compile(
+            RuleSetLoader.Load("mode: selective\nrules: []\n").RuleSet,
+            [Warp.MasqueServer()],
+            new SingBoxOptions { WarpDetour = Vless("DE", "198.51.100.7") }).Json;
+
+        var path = Path.Combine(Path.GetTempPath(), $"warp-detour-{Guid.NewGuid():N}.json");
+        File.WriteAllText(path, json);
+
+        try
+        {
+            Assert.Contains(System.Net.IPAddress.Parse("198.51.100.7"), TunnelEndpoints.Read(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    private static readonly IReadOnlySet<string> NoDead = new HashSet<string>();
+    private static readonly IReadOnlyDictionary<string, double> NoSpeed = new Dictionary<string, double>();
+
+    [Fact]
+    public void DetourPrefersCountryThenPinnedThenFastestAlive()
+    {
+        ProxyServer[] subs = [Vless("A"), Vless("B"), Vless("C")];
+        var speed = new Dictionary<string, double> { ["A"] = 90, ["B"] = 40, ["C"] = 10 };
+        var dead = new HashSet<string> { "C" };
+
+        Assert.Equal("C", Warp.Detour(new AppSettings { WarpCountryTag = "C", PreferredServer = "B" }, subs, dead, speed)!.Tag);
+        Assert.Equal("A", Warp.Detour(new AppSettings { PreferredServer = "a" }, subs, dead, speed)!.Tag);
+        Assert.Equal("B", Warp.Detour(new AppSettings(), subs, dead, speed)!.Tag);
+        Assert.Equal("A", Warp.Detour(new AppSettings(), subs, NoDead, new Dictionary<string, double> { ["A"] = 1 })!.Tag);
+    }
+
+    [Fact]
+    public void DetourFallsBackToFirstFitWhenAllDeadAndSkipsUnfit()
+    {
+        var wireguard = Vless("WG") with { Protocol = ProxyProtocol.Wireguard };
+        ProxyServer[] subs = [Warp.MasqueServer(), wireguard, Vless("A"), Vless("B")];
+
+        Assert.Equal("A", Warp.Detour(new AppSettings(), subs, new HashSet<string> { "A", "B" }, NoSpeed)!.Tag);
+        Assert.Null(Warp.Detour(new AppSettings(), [], NoDead, NoSpeed));
+        Assert.Null(Warp.Detour(new AppSettings(), [Warp.MasqueServer()], NoDead, NoSpeed));
+
+        // Сервер, выбранный страной, исчез из подписки, — берём общий порядок.
+        Assert.Equal("A", Warp.Detour(new AppSettings { WarpCountryTag = "gone" }, subs, NoDead, NoSpeed)!.Tag);
+    }
+
+    /// <summary>Настройка страны: сохраняется, а у старых настроек без поля — «как есть».</summary>
+    [Fact]
+    public void CountrySettingRoundTripsAndOldFilesReadAsNone()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"warp-country-{Guid.NewGuid():N}.json");
+
+        try
+        {
+            new AppSettings { WarpEnabled = true, WarpCountryTag = "🇪🇪 Эстония" }.Save(path);
+            Assert.Equal("🇪🇪 Эстония", AppSettings.Load(path).WarpCountryTag);
+
+            File.WriteAllText(path, "{\"WarpEnabled\": true}");
+            Assert.Null(AppSettings.Load(path).WarpCountryTag);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     private static JsonElement Compile(params ProxyServer[] servers) =>
         Compile(new SingBoxOptions(), servers);
 
