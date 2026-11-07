@@ -153,7 +153,7 @@ public sealed record PartRow : INotifyPropertyChanged
         0 => HasPin ? "пин в hosts" : "напрямую",
         1 => "десинк",
         Off => "выключено",
-        _ => "VPN",
+        _ => "выход",
     };
 
     /// <summary>Номер пункта «выключено» в списке маршрутов (<see cref="RoutingRule.Off"/>).</summary>
@@ -288,7 +288,7 @@ public sealed record PartRow : INotifyPropertyChanged
         0 => "напрямую",
         1 => "десинк",
         Off => "выключено",
-        _ => PoolName is { } pool ? $"VPN · {pool}" : "через выход",
+        _ => PoolName is { } pool ? $"выход · {pool}" : "через выход",
     };
 
     /// <summary>Пул серверов, в который ведёт маршрут «через выход»; <c>null</c> — пул по умолчанию.</summary>
@@ -2007,7 +2007,7 @@ public partial class RoutesView : UserControl
 
     private void OnSearch(object sender, TextChangedEventArgs e) => Filter();
 
-    /// <summary>Отбор по маршруту: <c>null</c> — все, иначе <see cref="PartRow.Applied"/> (0 — напрямую, 1 — десинк, 2 — VPN).</summary>
+    /// <summary>Отбор по маршруту: <c>null</c> — все, иначе <see cref="PartRow.Applied"/> (0 — напрямую, 1 — десинк, 2 — через выход).</summary>
     private int? _route;
 
     private void OnRouteFilter(object sender, RoutedEventArgs e)

@@ -192,6 +192,127 @@ public sealed class ScreenshotTests
         }, TimeSpan.FromMinutes(6));
     }
 
+    private const string WarpFile = """
+        [Interface]
+        PrivateKey = yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=
+        Address = 172.16.0.2/32
+        DNS = 1.1.1.1
+        [Peer]
+        PublicKey = bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=
+        Endpoint = 162.159.192.1:2408
+        AllowedIPs = 0.0.0.0/0
+        """;
+
+    /// <summary>
+    /// Состояния выхода (Нет / WARP встроенный / WARP файл / Мой VPN с подписками и без) на вкладках
+    /// VPN, «Главная», «Маршруты», «TG Proxy» и окно автоподбора. Настройки пишутся в config рядом с тестом.
+    /// </summary>
+    [Fact]
+    public void Exit_states_are_rendered_to_png()
+    {
+        string? folder = Environment.GetEnvironmentVariable("ZEPHYRON_SHOTS");
+
+        if (string.IsNullOrEmpty(folder))
+            return;
+
+        Directory.CreateDirectory(folder);
+        Directory.CreateDirectory("config");
+
+        // Правила и списки из репозитория — без них «Маршруты» не открываются; свои настройки не затираем.
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+        {
+            var source = Path.Combine(dir.FullName, "config");
+
+            if (!File.Exists(Path.Combine(source, "rules.yaml")))
+                continue;
+
+            foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+            {
+                var target = Path.Combine("config", Path.GetRelativePath(source, file));
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+
+                if (!File.Exists(target))
+                    File.Copy(file, target);
+            }
+
+            break;
+        }
+
+        const string sub = "https://example.invalid/sub";
+        var fresh = Zephyron.Core.AppSettings.Fresh;
+        var withSub = fresh with { SubscriptionUrl = sub };
+
+        var states = new (string Name, Func<Zephyron.Core.AppSettings> Settings, bool Book, bool File)[]
+        {
+            ("none-nosub", () => fresh, false, false),
+            ("none-sub", () => Zephyron.Core.Rules.Exits.Apply(withSub, Zephyron.Core.Rules.ExitChoice.None), true, false),
+            ("warp-builtin", () => Zephyron.Core.Rules.Exits.Apply(withSub, Zephyron.Core.Rules.ExitChoice.Warp, false), true, false),
+            ("warp-file", () => Zephyron.Core.Rules.Exits.Apply(withSub, Zephyron.Core.Rules.ExitChoice.Warp, false), true, true),
+            ("warp-nosub", () => Zephyron.Core.Rules.Exits.Apply(fresh, Zephyron.Core.Rules.ExitChoice.Warp, false), false, false),
+            ("vpn-sub", () => Zephyron.Core.Rules.Exits.Apply(withSub, Zephyron.Core.Rules.ExitChoice.Vpn, false), true, false),
+            ("vpn-all", () => Zephyron.Core.Rules.Exits.Apply(withSub, Zephyron.Core.Rules.ExitChoice.Vpn, true), true, false),
+        };
+
+        Sta.Run(() =>
+        {
+            var window = new MainWindow
+            {
+                WindowStartupLocation = WindowStartupLocation.Manual,
+                Left = -20000,
+                Top = 0,
+                ShowActivated = false,
+                ShowInTaskbar = false,
+                Width = 1160,
+                Height = 760,
+            };
+
+            window.Show();
+            Pump(TimeSpan.FromMilliseconds(800));
+
+            foreach (var (name, settings, book, file) in states)
+            {
+                settings().Save(Zephyron.Core.AppSettings.DefaultPath);
+
+                var entries = new SubscriptionBook();
+
+                if (book)
+                    entries.Entries.Add(new SubscriptionEntry { Name = "Основная", Url = sub, InPool = true });
+
+                entries.Save();
+
+                if (file)
+                {
+                    File.WriteAllText("warp-shot.conf", WarpFile);
+                    Zephyron.Subscriptions.Warp.SaveFile("warp-shot.conf");
+                }
+                else if (File.Exists(Zephyron.Subscriptions.Warp.FilePath))
+                {
+                    Zephyron.Subscriptions.Warp.RemoveFile();
+                }
+
+                foreach (string section in new[] { "vpn", "status", "routes", "tgproxy" })
+                {
+                    window.Open("status");
+                    window.Open(section);
+                    Pump(TimeSpan.FromMilliseconds(1200));
+                    SaveFull(window, Path.Combine(folder, $"exit-{name}-{section}.png"));
+                }
+            }
+
+            var autopick = new Views.AutoPickWindow
+            {
+                WindowStartupLocation = WindowStartupLocation.Manual,
+                Left = -20000,
+                ShowActivated = false,
+            };
+
+            autopick.Show();
+            Pump(TimeSpan.FromMilliseconds(700));
+            Save(Chrome(autopick), Path.Combine(folder, "dialog-autopick.png"), autopick.Background);
+            autopick.Close();
+        }, TimeSpan.FromMinutes(6));
+    }
+
     /// <summary>
     /// Снимок страницы целиком: окно раздвигается на высоту содержимого,
     /// поэтому видно всё, что есть в разделе, а не только верхний экран.

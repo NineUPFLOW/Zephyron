@@ -93,7 +93,7 @@
         <StackPanel Grid.Row="0">
             <TextBlock Style="{StaticResource Title}" FontSize="20" Text="Автоподбор маршрутов" />
             <TextBlock Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap"
-                       Text="Проверяет каждый сервис и ваши маршруты и подбирает, как их открывать: напрямую, десинком, пином в hosts или через туннель. Без VPN, если сайт открывается без него. Меняет только маршруты и пины — пресет и подписка не трогаются." />
+                       Text="Проверяет каждый сервис и ваши маршруты и подбирает, как их открывать: напрямую, десинком (пресет и рецепты) или пином в hosts. Выход за границу предлагается, только если иначе никак и вы это разрешили. Меняет только маршруты и пины — пресет и подписка не трогаются." />
 
             <!-- Свой сайт: подбор для одного имени — по ссылке или домену. -->
             <Grid x:Name="SiteRow" Margin="0,12,0,0">
@@ -111,6 +111,20 @@
                         ToolTip="Подобрать маршрут только для этого сайта. Если сайт входит в известный сервис, маршрут ставится всему сервису." />
             </Grid>
 
+            <!-- Выход (WARP или Мой VPN) подбор предлагает последним и только с разрешения. -->
+            <Grid x:Name="ExitRow" Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <ToggleButton x:Name="AllowExit" Style="{StaticResource Switch}" VerticalAlignment="Top"
+                              Click="OnAllowExit" AutomationProperties.Name="Разрешить выход за границу, если иначе никак" />
+                <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                    <TextBlock Text="Разрешить выход за границу, если иначе никак" FontWeight="SemiBold" />
+                    <TextBlock x:Name="AllowExitLine" Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
+
             <!-- Что важно знать до запуска: только то, что меняет решение человека. -->
             <Border x:Name="NotesCard" Margin="0,12,0,0" Padding="14,10" CornerRadius="{StaticResource RMd}"
                     Background="{DynamicResource Raised}" BorderThickness="{StaticResource Stroke}"
@@ -118,12 +132,12 @@
                 <StackPanel>
                     <TextBlock Style="{StaticResource Caption}" FontWeight="SemiBold" Text="Что важно знать" />
                     <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap" LineHeight="20">
-                        • На время подбора (2–5 минут) движки остановлены: весь трафик идёт без обхода и без VPN.<LineBreak />
+                        • На время подбора (2–5 минут) движки остановлены: весь трафик идёт без обхода и без выхода.<LineBreak />
                         • Сервис проверяется по одному своему имени, а маршрут ставится всему сервису — как при выборе вручную.<LineBreak />
                         • Не трогаются: выключенные вами части, античиты (Riot, Battle.net), имена, уже прибитые в hosts.<LineBreak />
                         • Голос и служебные адреса страницей не проверить — их маршрут остаётся как есть.<LineBreak />
-                        • Отказ по стране внутри приложения (ChatGPT, Gemini, Claude) проба не видит — уход с их VPN только предлагается.<LineBreak />
-                        • Если сайт везде отказывает по стране, помочь может только другой сервер VPN — выберите его во вкладке VPN.<LineBreak />
+                        • Отказ по стране внутри приложения (ChatGPT, Gemini, Claude) проба не видит — уход с их выхода только предлагается.<LineBreak />
+                        • Если сайт везде отказывает по стране, помочь может только выход: выберите его на «Главной», разрешите выше и повторите.<LineBreak />
                         • Подбор меряет выбранный пресет с вашими game filter и перехватом. Сменили пресет или их — запустите подбор заново.<LineBreak />
                         • Всё записанное можно вернуть: «Вернуть» у строки или «Вернуть всё».
                     </TextBlock>

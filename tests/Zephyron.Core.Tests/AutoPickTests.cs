@@ -70,6 +70,25 @@ public sealed class AutoPickTests : IDisposable
     }
 
     [Fact]
+    public void The_exit_is_offered_last_and_only_when_allowed()
+    {
+        // Ничего из прямого/десинка/пина не помогло, выход открывает.
+        var exitOnly = new[] { Try(AutoPickWay.Direct, false), Try(AutoPickWay.Preset, false), Try(AutoPickWay.Vpn, true) };
+
+        var denied = Row(RoutingMode.Direct, null, exitOnly);
+        denied.AllowExit = false;
+        Assert.Null(AutoPick.Choose(denied));
+
+        var allowed = Row(RoutingMode.Direct, null, exitOnly);
+        Assert.Equal(AutoPickWay.Vpn, AutoPick.Choose(allowed)!.Way);
+
+        // Десинк помогает — выход не нужен, даже если он открывает быстрее и разрешён.
+        var fixable = Row(RoutingMode.Direct, null,
+            Try(AutoPickWay.Direct, false), Try(AutoPickWay.Preset, true), Try(AutoPickWay.Vpn, true));
+        Assert.Equal(AutoPickWay.Preset, AutoPick.Choose(fixable)!.Way);
+    }
+
+    [Fact]
     public void Nothing_working_changes_nothing()
     {
         var row = Row(RoutingMode.Desync, null,

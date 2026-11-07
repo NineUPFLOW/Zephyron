@@ -123,7 +123,7 @@ public static class RouteClashes
     public static string Word(RouteChoice choice) => choice switch
     {
         RouteChoice.Desync => "десинк",
-        RouteChoice.Vpn => "через VPN",
+        RouteChoice.Vpn => "через выход",
         RouteChoice.Pin => "пин",
         _ => "напрямую",
     };
@@ -261,7 +261,7 @@ public static class RouteClashes
         if (Pair(one, other, RouteChoice.Pin, RouteChoice.Vpn))
         {
             return "прибитое имя не получает fakeip, и в туннель движок его "
-                + "не заводит — правило «через VPN» не сделает ничего";
+                + "не заводит — правило «через выход» не сделает ничего";
         }
 
         if (Pair(one, other, RouteChoice.Pin, RouteChoice.Desync))
@@ -283,7 +283,7 @@ public static class RouteClashes
 
         if (Pair(one, other, RouteChoice.Direct, RouteChoice.Vpn))
         {
-            return "«напрямую» и «через VPN» взаимно исключают друг друга — "
+            return "«напрямую» и «через выход» взаимно исключают друг друга — "
                 + "сработает та строка, что стоит первой";
         }
 

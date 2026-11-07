@@ -132,7 +132,7 @@ public sealed class AutoPickItem : INotifyPropertyChanged
         : Row.CurrentMode switch
         {
             RoutingMode.Direct => "напрямую",
-            RoutingMode.Proxy => "VPN",
+            RoutingMode.Proxy => "через выход",
             _ => string.IsNullOrEmpty(Row.CurrentRecipe) || Row.CurrentRecipe == DesyncRecipes.FromPreset
                 ? "десинк: пресет"
                 : "десинк: " + (Row.RuleRecipe ?? Row.CurrentRecipe),
@@ -178,10 +178,10 @@ public sealed class AutoPickItem : INotifyPropertyChanged
         AutoPickWay.Preset => "Пресет",
         AutoPickWay.Recipe => "Рецепт «" + t.Title + "»",
         AutoPickWay.Pin => "Пин " + t.Address + " (" + t.Title + ")",
-        _ => "VPN (" + t.Server + ")",
+        _ => "Выход (" + t.Server + ")",
     };
 
-    private string ChoiceText(AutoPickChoice choice) => (choice.Optional ? "можно без VPN: " : "") + choice.Way switch
+    private string ChoiceText(AutoPickChoice choice) => (choice.Optional ? "можно без выхода: " : "") + choice.Way switch
     {
         AutoPickWay.Direct => "напрямую",
         AutoPickWay.Preset => "десинк: пресет",
@@ -295,7 +295,7 @@ public partial class AutoPickWindow : Window
 {
     private enum Phase { Idle, Running, Done, Writing, Written, Checking }
 
-    private static readonly string[] StageNames = ["Напрямую", "Пресет", "Рецепты", "Пин", "VPN"];
+    private static readonly string[] StageNames = ["Напрямую", "Пресет", "Рецепты", "Пин", "Выход"];
 
     private readonly ObservableCollection<AutoPickItem> _items = [];
     private readonly Dictionary<string, AutoPickItem> _byHost = new(StringComparer.Ordinal);
@@ -321,6 +321,20 @@ public partial class AutoPickWindow : Window
     private int _ticks;
     private string _filter = "all";
 
+    /// <summary>Выключатель выхода — по умолчанию выключен; подпись говорит, что за выход выбран.</summary>
+    private void ShowAllowExit()
+    {
+        var exit = Exits.Of(AppSettings.Load(AppSettings.DefaultPath));
+
+        AllowExitLine.Text = exit == ExitChoice.None
+            ? "Выход не выбран на «Главной»: пробовать нечего, подбор ищет только напрямую, десинком и пином."
+            : AllowExit.IsChecked == true
+                ? $"Если ни напрямую, ни десинк, ни пин не помогут, сайт предложат вести через выход «{Exits.Name(exit)}»."
+                : "Выключено: сайты не уводятся за границу, подбор ищет только напрямую, десинком и пином.";
+    }
+
+    private void OnAllowExit(object sender, RoutedEventArgs e) => ShowAllowExit();
+
     public AutoPickWindow()
     {
         InitializeComponent();
@@ -335,6 +349,7 @@ public partial class AutoPickWindow : Window
 
         Loaded += (_, _) =>
         {
+            ShowAllowExit();
             LoadLast();
             ApplyPhase();
             StartButton.Focus();
@@ -737,6 +752,7 @@ public partial class AutoPickWindow : Window
 
         // Свой сайт — когда можно начать новый подбор; что важно знать — до первого запуска.
         SiteRow.Visibility = V(_phase is Phase.Idle or Phase.Written);
+        ExitRow.Visibility = V(_phase is Phase.Idle or Phase.Written);
         SiteButton.IsEnabled = _phase is Phase.Idle or Phase.Written;
         NotesCard.Visibility = V(_phase == Phase.Idle);
 
@@ -934,8 +950,12 @@ public partial class AutoPickWindow : Window
 
             var settings = AppSettings.Load(AppSettings.DefaultPath);
 
+            var exit = Exits.Of(settings);
+            bool allowExit = AllowExit.IsChecked == true;
+
             // До остановки движков: подписка может читаться через сам туннель.
-            if (settings.NeedsProxy)
+            // Выход пробуется, только если он выбран и разрешён; WARP — если его проба возможна (свой файл).
+            if (allowExit && exit == ExitChoice.Vpn && settings.NeedsProxy)
             {
                 try
                 {
@@ -943,16 +963,25 @@ public partial class AutoPickWindow : Window
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    _warnings.Add("Подписка не прочиталась (" + ex.GetBaseException().Message + ") — этап «VPN» пропущен.");
+                    _warnings.Add("Подписка не прочиталась (" + ex.GetBaseException().Message + ") — этап «Выход» пропущен.");
                 }
             }
 
-            _stageSkip[4] = !settings.NeedsProxy ? "VPN выключен в настройках"
+            if (allowExit && exit == ExitChoice.Warp && Zephyron.Subscriptions.Warp.Exits() is [{ IsMeasurable: true } warp])
+                servers = [warp];
+
+            _stageSkip[4] = !allowExit ? "выход не разрешён"
+                : exit == ExitChoice.None ? "выход не выбран"
+                : exit == ExitChoice.Warp && servers.Count == 0 ? "встроенный WARP пробой не проверить"
                 : servers.Count == 0 ? "нет выбранного живого сервера"
                 : null;
 
-            if (_stageSkip[4] is not null && servers.Count == 0 && settings.NeedsProxy && _warnings.Count == 0)
-                _warnings.Add("Нет подписки либо выбранный сервер не отвечает — этап «VPN» пропущен.");
+            if (allowExit && exit != ExitChoice.None && servers.Count == 0 && _warnings.Count == 0)
+            {
+                _warnings.Add(exit == ExitChoice.Warp
+                    ? "Встроенный WARP пробой проверить нельзя (загрузите свой файл WARP на вкладке VPN) — этап «Выход» пропущен."
+                    : "Нет подписки либо выбранный сервер не отвечает — этап «Выход» пропущен.");
+            }
 
             var paths = ZapretPaths.Discover();
             var winws = paths is null ? null : Path.Combine(paths.Root, "exe", "winws2.exe");
@@ -992,7 +1021,7 @@ public partial class AutoPickWindow : Window
             // Progress создаётся здесь, в потоке окна: обратные вызовы возвращаются в него.
             _progress = new Progress<AutoPickRow>(OnRow);
 
-            var report = await AutoPick.RunAsync(targets, servers, _progress, token);
+            var report = await AutoPick.RunAsync(targets, servers, _progress, token, allowExit);
 
             Finish(report);
         }

@@ -2348,4 +2348,34 @@
         </Setter>
     </Style>
 
+
+    <!--
+        Сегмент выбора выхода («Главная», вкладка VPN): выбранный отмечен рамкой Accent и подложкой AccentSoft,
+        без свечения — как выбранный пункт меню.
+    -->
+    <Style x:Key="ModeSegment" TargetType="RadioButton">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Foreground" Value="{DynamicResource Text}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Shape" Background="{DynamicResource Wash}"
+                            BorderBrush="{DynamicResource LineStrong}" BorderThickness="{StaticResource Stroke}"
+                            CornerRadius="{StaticResource RMd}" Padding="12,10">
+                        <ContentPresenter HorizontalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource WashHover}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentSoft}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

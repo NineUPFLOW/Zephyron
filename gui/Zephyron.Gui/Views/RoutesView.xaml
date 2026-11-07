@@ -290,7 +290,7 @@
                                 </RadioButton>
                                 <RadioButton Style="{StaticResource RouteFilter}" GroupName="RouteFilter" Tag="2" Click="OnRouteFilter" Margin="3,0,0,0">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="Через VPN" />
+                                        <TextBlock Text="Через выход" />
                                         <TextBlock x:Name="CountVpn" Margin="6,0,0,0" FontWeight="SemiBold" />
                                     </StackPanel>
                                 </RadioButton>

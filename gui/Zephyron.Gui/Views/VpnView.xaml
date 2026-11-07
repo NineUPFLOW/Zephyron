@@ -417,10 +417,11 @@
 
                 <ContentControl Style="{StaticResource PageHead}"
                                 local:PageHead.Title="VPN"
-                                local:PageHead.Subtitle="Подписки, их серверы и маршрут, по которому идёт трафик.">
+                                local:PageHead.Subtitle="Выход за границу: WARP или ваши подписки и ключи. Показан блок выбранного выхода.">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="RefreshButton" Style="{StaticResource Ghost}"
-                                Content="Перечитать" Click="OnRefresh" Margin="0,0,8,0" />
+                                Content="Перечитать" Click="OnRefresh" Margin="0,0,8,0"
+                                AutomationProperties.Name="Перечитать подписки" />
                         <!--
                             Настройки — отдельным окном. То, что задают
                             однажды, не должно занимать полосу над списком,
@@ -431,9 +432,206 @@
                                 ToolTip="Режим, автоподбор по зарубежным, обход туннеля при недоступных выходах, проверка серверов." />
 
                         <Button x:Name="MeasureButton" Style="{StaticResource Primary}"
-                                Content="Замерить все серверы" Click="OnMeasure" />
+                                Content="Замерить все серверы" Click="OnMeasure"
+                                AutomationProperties.Name="Замерить все серверы" />
                     </StackPanel>
                 </ContentControl>
+
+                <!--
+                    Выход за границу (владелец, 07.11): наверху выбор «Нет / WARP / Мой VPN» с короткой
+                    подписью, под ним — только блок выбранного выхода целиком. Блок другого выхода
+                    сведён в одну строку с кнопкой «Выбрать». Тот же выбор, что на «Главной» (Rules.Exits).
+                -->
+                <Border x:Name="ExitCard" Style="{StaticResource Card}" Margin="0,16,0,0">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <TextBlock Text="Выход за границу" Style="{StaticResource Eyebrow}" VerticalAlignment="Bottom" />
+                        </StackPanel>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <RadioButton x:Name="PickNone" Grid.Column="0" Style="{StaticResource ModeSegment}"
+                                         GroupName="VpnExit" Tag="None" Click="OnPickExit" AutomationProperties.Name="Выход: нет">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE9E9;"
+                                               Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
+                                    <TextBlock Text="Нет" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+
+                            <RadioButton x:Name="PickWarp" Grid.Column="2" Style="{StaticResource ModeSegment}"
+                                         GroupName="VpnExit" Tag="Warp" Click="OnPickExit" AutomationProperties.Name="Выход: WARP">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE753;"
+                                               Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
+                                    <TextBlock Text="WARP" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+
+                            <RadioButton x:Name="PickVpn" Grid.Column="4" Style="{StaticResource ModeSegment}"
+                                         GroupName="VpnExit" Tag="Vpn" Click="OnPickExit" AutomationProperties.Name="Выход: Мой VPN">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE774;"
+                                               Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
+                                    <TextBlock Text="Мой VPN" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+                        </Grid>
+
+                        <TextBlock x:Name="ExitNow" Style="{StaticResource Caption}" FontSize="12.5" Margin="2,12,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Невыбранный выход — одной строкой: что с ним и кнопка «Выбрать». Текст и кнопки пишет код (ShowExitSummaries). -->
+                <Border x:Name="WarpSummary" Margin="0,12,0,0" Padding="14,8" CornerRadius="{StaticResource RMd}"
+                        Background="{DynamicResource Raised}" BorderBrush="{DynamicResource Border}"
+                        BorderThickness="{StaticResource Stroke}" Visibility="Collapsed">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="WarpSummaryLine" Style="{StaticResource Caption}" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource Text}" VerticalAlignment="Center" />
+                        <Button x:Name="WarpSummaryAction" Grid.Column="1" Style="{StaticResource Ghost}" Padding="12,4" Margin="12,-2,0,-2"
+                                Content="Выбрать" Click="OnSummaryWarp" AutomationProperties.Name="Выбрать WARP выходом" />
+                    </Grid>
+                </Border>
+
+                <Border x:Name="VpnSummary" Margin="0,12,0,0" Padding="14,8" CornerRadius="{StaticResource RMd}"
+                        Background="{DynamicResource Raised}" BorderBrush="{DynamicResource Border}"
+                        BorderThickness="{StaticResource Stroke}" Visibility="Collapsed">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="VpnSummaryLine" Style="{StaticResource Caption}" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource Text}" VerticalAlignment="Center" />
+                        <Button x:Name="VpnSummaryAction" Grid.Column="1" Style="{StaticResource Ghost}" Padding="12,4" Margin="12,-2,0,-2"
+                                Click="OnSummaryVpn" />
+                    </Grid>
+                </Border>
+
+                <!-- Ответ на действие: одно место для всей вкладки, видно при любом выходе. -->
+                <Border x:Name="StatusBox" Margin="4,12,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Control x:Name="StatusMark" Style="{StaticResource StateMark}" Visibility="Collapsed"
+                                 VerticalAlignment="Top" Margin="0,1,10,0" />
+                        <TextBlock x:Name="Status" Grid.Column="1" TextWrapping="Wrap" Text="Загружаю подписки…">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource Caption}">
+                                    <Style.Triggers>
+                                        <Trigger Property="Text" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </Border>
+
+
+                    <!--
+                        WARP — выбор пути, а не запасной (владелец, 01.10: «разводка
+                        впн и варп… лучше сделать взаимоисключающими»). Включён — туннель
+                        идёт только через WARP, подписки на паузе; выключен — только
+                        подписки. В узкой колонке — столбиком: заголовок и выключатель,
+                        пояснение, внизу состояние и замер.
+                    -->
+                    <views:FitWidth x:Name="WarpHost" Margin="0,12,0,0" Visibility="Collapsed">
+                        <Border x:Name="WarpCard" Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <Border Grid.Column="0" Style="{StaticResource IconTile}" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE753;" Foreground="#F38020" />
+                                </Border>
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="Cloudflare WARP" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
+                                                Content="Бесплатный выход Cloudflare: без счёта, без срока, без почты и ключей — учётную запись движок заводит себе сам.&#x0a;&#x0a;Это выбор выхода: пока выходом выбран WARP, подписки не используются. Выключили — выходом станет «Мой VPN», если есть подписки или ключи, иначе «Нет». Применяется после следующего запуска движков.&#x0a;&#x0a;Выпускает трафик в ближайшем городе Cloudflare, из России — в Москве. От блокировок оператора спасает, от отказов по стране — нет: адрес остаётся отечественным, пока не выбрана «Страна выхода» — тогда Cloudflare выпускает трафик в стране выбранного сервера подписки.&#x0a;&#x0a;Идёт по MASQUE поверх HTTP/2 на 443 порту. После запуска ему нужно около полуминуты, прежде чем пойдёт трафик." />
+                                </StackPanel>
+
+
+                                <StackPanel Grid.Row="1" Grid.ColumnSpan="3">
+                                    <TextBlock x:Name="WarpLine" Style="{StaticResource Caption}" Margin="0,10,0,0" TextWrapping="Wrap" />
+
+                                    <!-- Запасной путь: готовый файл WARP добавляется как обычный сервер. -->
+                                    <!--
+                                        Источник WARP: встроенный или свой файл. Файл — это WARP, а не ключ VPN:
+                                        он идёт сюда, а не в подписки, и работает тем же переключателем.
+                                    -->
+                                    <StackPanel Margin="0,10,0,0">
+                                        <TextBlock x:Name="WarpSourceLine" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock x:Name="WarpSourceHint" Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                            <Button x:Name="WarpFileButton" Style="{StaticResource Ghost}" Padding="12,4"
+                                                    Click="OnWarpFile" AutomationProperties.Name="Загрузить файл WARP" />
+                                            <Button x:Name="WarpFileRemove" Style="{StaticResource Ghost}" Padding="12,4" Margin="8,0,0,0"
+                                                    Content="Вернуть встроенный" Click="OnWarpFileRemove"
+                                                    ToolTip="Забыть свой файл: WARP снова пойдёт через встроенное подключение Cloudflare" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!--
+                                        Страна выхода: Cloudflare выпускает трафик в стране сервера подписки,
+                                        через который идёт WARP. Видно, только пока WARP включён.
+                                    -->
+                                    <StackPanel x:Name="WarpCountryPanel" Margin="0,10,0,0" Visibility="Collapsed">
+                                        <TextBlock Text="Страна выхода" FontWeight="SemiBold" />
+                                        <ComboBox x:Name="WarpCountry" Margin="0,6,0,0"
+                                                  SelectionChanged="OnWarpCountry"
+                                                  AutomationProperties.Name="Страна выхода WARP">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Image Source="{Binding Flag}" Width="20" Height="14" Margin="0,0,8,0"
+                                                               Visibility="{Binding FlagShown}" />
+                                                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                        <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                                   Text="Сайты, закрытые для России, увидят выбранную страну. Не каждый сервер подписки пропускает WARP: если выход не поднимется, выберите другой." />
+                                        <TextBlock x:Name="WarpCountryWarn" Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource Warn}" Visibility="Collapsed" />
+                                        <TextBlock x:Name="WarpExitLine" Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="2" Grid.ColumnSpan="3" Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,10,0,0">
+                                    <!-- Меряет движок, а он знает WARP, только когда тот в конфиге. -->
+                                    <Button x:Name="WarpCheckButton" Style="{StaticResource Ghost}" Padding="12,4" Content="Замерить WARP"
+                                            Click="OnCheckWarp" ToolTipService.ShowOnDisabled="True"
+                                            AutomationProperties.Name="Замерить WARP" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </views:FitWidth>
 
                 <!--
                     Два столбца на сетке «Главной» (1.75 : 1, промежуток 12), плитки — в FitWidth:
@@ -444,7 +642,7 @@
                     нет ни в одном состоянии (владелец, 07.11). Карточку WARP код переносит
                     между столбцами (VpnView.ShowWarp).
                 -->
-                <Grid Margin="0,16,0,0">
+                <Grid x:Name="VpnColumns" Margin="0,12,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="1.75*" />
                         <ColumnDefinition Width="12" />
@@ -719,100 +917,6 @@
                                 </StackPanel>
                         </Border>
                     </views:FitWidth>
-                    <!--
-                        WARP — выбор пути, а не запасной (владелец, 01.10: «разводка
-                        впн и варп… лучше сделать взаимоисключающими»). Включён — туннель
-                        идёт только через WARP, подписки на паузе; выключен — только
-                        подписки. В узкой колонке — столбиком: заголовок и выключатель,
-                        пояснение, внизу состояние и замер.
-                    -->
-                    <views:FitWidth x:Name="WarpHost" VerticalAlignment="Top" Margin="0,12,0,0">
-                        <Border x:Name="WarpCard" Style="{StaticResource Card}">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="*" />
-                                </Grid.RowDefinitions>
-
-                                <Border Grid.Column="0" Style="{StaticResource IconTile}" VerticalAlignment="Center" Margin="0,0,12,0">
-                                    <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE753;" Foreground="#F38020" />
-                                </Border>
-
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="Cloudflare WARP" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                    <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                Content="Бесплатный выход Cloudflare: без счёта, без срока, без почты и ключей — учётную запись движок заводит себе сам.&#x0a;&#x0a;Это выбор выхода: пока выходом выбран WARP, подписки не используются. Выключили — выходом станет «Мой VPN», если есть подписки или ключи, иначе «Нет». Применяется после следующего запуска движков.&#x0a;&#x0a;Выпускает трафик в ближайшем городе Cloudflare, из России — в Москве. От блокировок оператора спасает, от отказов по стране — нет: адрес остаётся отечественным, пока не выбрана «Страна выхода» — тогда Cloudflare выпускает трафик в стране выбранного сервера подписки.&#x0a;&#x0a;Идёт по MASQUE поверх HTTP/2 на 443 порту. После запуска ему нужно около полуминуты, прежде чем пойдёт трафик." />
-                                </StackPanel>
-
-                                <ToggleButton Grid.Column="2" x:Name="WarpSwitch" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="OnWarp" />
-
-                                <StackPanel Grid.Row="1" Grid.ColumnSpan="3">
-                                    <TextBlock x:Name="WarpLine" Style="{StaticResource Caption}" Margin="0,10,0,0" TextWrapping="Wrap" />
-
-                                    <!-- Запасной путь: готовый файл WARP добавляется как обычный сервер. -->
-                                    <!--
-                                        Источник WARP: встроенный или свой файл. Файл — это WARP, а не ключ VPN:
-                                        он идёт сюда, а не в подписки, и работает тем же переключателем.
-                                    -->
-                                    <StackPanel Margin="0,10,0,0">
-                                        <TextBlock x:Name="WarpSourceLine" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                        <TextBlock x:Name="WarpSourceHint" Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap" />
-                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                            <Button x:Name="WarpFileButton" Style="{StaticResource Ghost}" Padding="12,4"
-                                                    Click="OnWarpFile" AutomationProperties.Name="Загрузить файл WARP" />
-                                            <Button x:Name="WarpFileRemove" Style="{StaticResource Ghost}" Padding="12,4" Margin="8,0,0,0"
-                                                    Content="Вернуть встроенный" Click="OnWarpFileRemove"
-                                                    ToolTip="Забыть свой файл: WARP снова пойдёт через встроенное подключение Cloudflare" />
-                                        </StackPanel>
-                                    </StackPanel>
-
-                                    <!--
-                                        Страна выхода: Cloudflare выпускает трафик в стране сервера подписки,
-                                        через который идёт WARP. Видно, только пока WARP включён.
-                                    -->
-                                    <StackPanel x:Name="WarpCountryPanel" Margin="0,10,0,0" Visibility="Collapsed">
-                                        <TextBlock Text="Страна выхода" FontWeight="SemiBold" />
-                                        <ComboBox x:Name="WarpCountry" Margin="0,6,0,0"
-                                                  SelectionChanged="OnWarpCountry"
-                                                  AutomationProperties.Name="Страна выхода WARP">
-                                            <ComboBox.ItemTemplate>
-                                                <DataTemplate>
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <Image Source="{Binding Flag}" Width="20" Height="14" Margin="0,0,8,0"
-                                                               Visibility="{Binding FlagShown}" />
-                                                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
-                                                    </StackPanel>
-                                                </DataTemplate>
-                                            </ComboBox.ItemTemplate>
-                                        </ComboBox>
-                                        <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
-                                                   Text="Сайты, закрытые для России, увидят выбранную страну. Не каждый сервер подписки пропускает WARP: если выход не поднимется, выберите другой." />
-                                        <TextBlock x:Name="WarpCountryWarn" Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
-                                                   Foreground="{DynamicResource Warn}" Visibility="Collapsed" />
-                                        <TextBlock x:Name="WarpExitLine" Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap" />
-                                    </StackPanel>
-                                </StackPanel>
-
-                                <StackPanel Grid.Row="2" Grid.ColumnSpan="3" Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,10,0,0">
-                                    <Control x:Name="WarpDot" Style="{StaticResource StateMark}" Width="12" Height="12" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                    <TextBlock x:Name="WarpWord" Style="{StaticResource Caption}" Margin="0,0,10,0" VerticalAlignment="Center" />
-                                    <!--
-                                        Замер пинга — значком, как у подписок (владелец, 01.10).
-                                        Меряет движок, а он знает WARP, только когда тот в конфиге.
-                                    -->
-                                    <Button x:Name="WarpCheckButton" Style="{StaticResource IconGhost}" Content="&#xEC4A;"
-                                            Click="OnCheckWarp" ToolTipService.ShowOnDisabled="True"
-                                            AutomationProperties.Name="Замерить WARP" />
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-                    </views:FitWidth>
                     </StackPanel>
                 </Grid>
 
@@ -867,54 +971,10 @@
                 </Grid>
 
                 <!--
-                    Подписки не используются (выбран WARP или выход не выбран): панель WarnSoft
-                    с ромбом «частично», текст и кнопка — из кода (ShowExitHint). Одно сообщение
-                    вместо плашки и строки статуса с тем же смыслом.
-                -->
-                <Border x:Name="PausedBox" Margin="0,8,0,0" Padding="12,8" CornerRadius="{StaticResource RMd}"
-                        Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}"
-                        BorderThickness="{StaticResource Stroke}" Visibility="Collapsed">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <Control Style="{StaticResource StateMark}" Tag="Degraded" Margin="0,1,10,0" VerticalAlignment="Top" />
-                        <TextBlock x:Name="PausedLine" Grid.Column="1" Style="{StaticResource Caption}" TextWrapping="Wrap"
-                                   Foreground="{DynamicResource Text}" VerticalAlignment="Center" />
-                        <Button x:Name="PausedAction" Grid.Column="2" Style="{StaticResource Ghost}" Padding="12,4" Margin="12,-2,0,-2"
-                                Click="OnExitHint" />
-                    </Grid>
-                </Border>
-
-                <!--
                     Новая подписка — отдельным окном (SubscriptionAddWindow,
                     владелец 01.10: «как в Happ»). До того здесь стояла
                     карточка с одним полем на всё.
                 -->
-
-                <Border x:Name="StatusBox" Margin="0,10,0,0">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Control x:Name="StatusMark" Style="{StaticResource StateMark}" Visibility="Collapsed"
-                                 VerticalAlignment="Top" Margin="0,1,10,0" />
-                        <TextBlock x:Name="Status" Grid.Column="1" TextWrapping="Wrap" Text="Загружаю подписки…">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource Caption}">
-                                    <Style.Triggers>
-                                        <Trigger Property="Text" Value="">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                        </Trigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </Grid>
-                </Border>
 
                 <!--
                     Полоса замера. Замер идёт десятками секунд и до неё

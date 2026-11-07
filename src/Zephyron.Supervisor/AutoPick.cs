@@ -155,6 +155,12 @@ public sealed class AutoPickRow
     public bool FactoryVpn { get; set; }
 
     /// <summary>
+    /// Можно ли предлагать выход (VPN или WARP), если иначе никак. Подбор ищет напрямую, десинк и пин;
+    /// выход — последним и только с разрешения человека (07.11).
+    /// </summary>
+    public bool AllowExit { get; set; } = true;
+
+    /// <summary>
     /// Что прибить в hosts при решении <see cref="AutoPickWay.Pin"/>: имя → адрес.
     /// Только имена, чья проба на этом адресе прошла: прочие остались бы без пина.
     /// </summary>
@@ -261,7 +267,7 @@ public static class AutoPick
         if (tries.FirstOrDefault(t => t.Status is >= 500) is { } error)
             return $"сам адрес отвечает ошибкой {error.Status} — служебное имя, а не страница";
 
-        // Сертификат не на это имя — и напрямую, и через VPN. Одна прямая проба
+        // Сертификат не на это имя — и напрямую, и через выход. Одна прямая проба
         // так выглядела бы и у заглушки провайдера, поэтому VPN обязан подтвердить.
         var answered = tries.Where(t => t.Way != AutoPickWay.Vpn && t.Status is not null).ToList();
         var vpn = tries.Where(t => t.Way == AutoPickWay.Vpn).ToList();
@@ -275,7 +281,7 @@ public static class AutoPick
         }
 
         // Рукопожатие проходит, а на запрос сервер молча закрывает соединение — на
-        // каждом прямом пути и через VPN тоже. Так отвечает узел без HTTPS-страницы:
+        // каждом прямом пути и через выход тоже. Так отвечает узел без HTTPS-страницы:
         // голос, игровой сервер (rtcp.on.epicgames.com, 25.10). DPI режет иначе —
         // тишиной или сбросом, и не через туннель.
         // shortcut: признаки — текст RecipeTrial («сервер закрыл соединение») и .NET
@@ -318,21 +324,21 @@ public static class AutoPick
             return Move(row);
 
         // Работающий VPN меняем на путь без него, если тот открывает настоящую
-        // страницу (pageOnly: 403 тоже «ответ», но без VPN сайт как раз не работает).
+        // страницу (pageOnly: 403 тоже «ответ», но без выхода сайт как раз не работает).
         // Владелец 26.10: «мы должны экономить трафик VPN». Заводской VPN (ChatGPT,
         // Gemini, Claude) — только предложением без галочки: такие сайты отказывают
         // по стране внутри приложения, а проба видит лишь первую страницу.
         if (current == true && row.CurrentMode == RoutingMode.Proxy && top == 2)
         {
-            return Best(tries, top, pageOnly: true, pins: row.Pins) is { Way: not AutoPickWay.Vpn } lighter
-                ? lighter with { Optional = row.FactoryVpn, Why = "без VPN: " + lighter.Why }
+            return Best(tries, top, pageOnly: true, pins: row.Pins, allowExit: false) is { Way: not AutoPickWay.Vpn } lighter
+                ? lighter with { Optional = row.FactoryVpn, Why = "без выхода: " + lighter.Why }
                 : null;
         }
 
         if (current != false)
             return null;
 
-        return Best(tries, top, pins: row.Pins);
+        return Best(tries, top, pins: row.Pins, allowExit: row.AllowExit);
     }
 
     /// <summary>
@@ -410,7 +416,8 @@ public static class AutoPick
         IReadOnlyList<AutoPickTry> tries,
         int level,
         bool pageOnly = false,
-        IReadOnlyDictionary<string, string>? pins = null)
+        IReadOnlyDictionary<string, string>? pins = null,
+        bool allowExit = true)
     {
         // Предложение уйти с VPN — только по странице или перенаправлению: 403 проверки
         // на робота или 404 на корне ещё не значат, что без туннеля сайт работает.
@@ -455,17 +462,18 @@ public static class AutoPick
             var names = pins is { Count: > 0 } ? "; прибиты: " + string.Join(", ", pins.Keys) : "";
 
             return new(AutoPickWay.Pin, RoutingMode.Direct, null, pin[0].Title,
-                $"прибито в hosts к {pin[0].Address} ({pin[0].Title}) — открывается без VPN{names}");
+                $"прибито в hosts к {pin[0].Address} ({pin[0].Title}) — открывается без выхода{names}");
         }
 
-        if (Stable(tries.Where(t => t.Way == AutoPickWay.Vpn)) is { } vpn)
+        // Выход — последним и только с разрешением: напрямую, десинк и пин проверены раньше.
+        if (allowExit && Stable(tries.Where(t => t.Way == AutoPickWay.Vpn)) is { } vpn)
         {
             // Без VPN сервер отвечал, но отказом: это не блокировка, а страна.
             bool refused = tries.Any(t => t.Way != AutoPickWay.Vpn && t.Level == 1);
 
             return new(AutoPickWay.Vpn, RoutingMode.Proxy, null, null, refused
-                ? $"без VPN сайт отказывает по стране, через VPN открывается ({vpn[0].Server})"
-                : $"открывается через VPN ({vpn[0].Server})");
+                ? $"без выхода сайт отказывает по стране, через выход открывается ({vpn[0].Server})"
+                : $"открывается через выход ({vpn[0].Server})");
         }
 
         return null;
@@ -526,8 +534,13 @@ public static class AutoPick
         IReadOnlyList<AutoPickTarget> targets,
         IReadOnlyList<ProxyServer> vpnServers,
         IProgress<AutoPickRow>? progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowExit = false)
     {
+        // Без разрешения выход не пробуется вовсе: подбор не должен гнать сайты за границу сам.
+        if (!allowExit)
+            vpnServers = [];
+
         var state = SupervisorState.Load(SupervisorState.DefaultPath);
 
         if (state is not null && state.IsSupervisorAlive())
@@ -639,6 +652,7 @@ public static class AutoPick
             var row = new AutoPickRow(target, mode, mode == RoutingMode.Desync ? decision.Rule?.Recipe : null)
             {
                 FactoryVpn = mode == RoutingMode.Proxy && decision.Rule is { Source: RuleSource.Base },
+                AllowExit = allowExit,
                 RecipeMissing = mode == RoutingMode.Desync && preset is not null
                     && !string.IsNullOrEmpty(decision.Rule?.Recipe)
                     && !RecipeResolver.Known(preset, decision.Rule!.Recipe),
@@ -792,9 +806,9 @@ public static class AutoPick
 
                 bool works = reading.Reached && Works(reading.Status);
 
-                // 403 через VPN — тоже отказ: проба туннеля видит только код, ни заголовка
+                // 403 через выход — тоже отказ: проба туннеля видит только код, ни заголовка
                 // проверки на робота, ни тела. Иначе 403 напрямую (отказ) проигрывал бы
-                // тем же 403 через VPN (medium.com, 26.10).
+                // тем же 403 через выход (medium.com, 26.10).
                 row.Add(new AutoPickTry(AutoPickWay.Vpn, null, null, server.Tag, works, reading.Elapsed,
                     reading.Detail ?? (reading.Status is { } code ? $"ответ {code}" : "нет ответа"),
                     reading.Status, Stub: reading.Status is 403 or 451));
@@ -967,7 +981,7 @@ public static class AutoPick
         }
         else if (settings.NeedsProxy && vpnServers.Count > 0)
         {
-            notes.Add("sing-box не найден — пробы VPN пропущены");
+            notes.Add("sing-box не найден — пробы выхода пропущены");
         }
 
         // Отменённый прогон не должен вернуть неполный отчёт как законченный.
@@ -1196,7 +1210,7 @@ public static class AutoPick
             var current = row.CurrentMode switch
             {
                 RoutingMode.Direct => "напрямую",
-                RoutingMode.Proxy => "через VPN",
+                RoutingMode.Proxy => "через выход",
                 _ => string.IsNullOrEmpty(row.CurrentRecipe) ? "десинк: пресет" : "десинк: " + (row.RuleRecipe ?? row.CurrentRecipe) + (row.RecipeMissing ? " — нет ни в пресете, ни в каталоге" : ""),
             };
 
@@ -1210,7 +1224,7 @@ public static class AutoPick
                     AutoPickWay.Preset => $"пресет «{t.Title}»",
                     AutoPickWay.Recipe => $"рецепт «{t.Title}»",
                     AutoPickWay.Pin => $"пин {t.Address} ({t.Title})",
-                    _ => $"VPN «{t.Server}»",
+                    _ => $"выход «{t.Server}»",
                 };
 
                 text.AppendLine($"  {(t.Works ? "+" : "-")} {way}: {t.Detail}");
@@ -1224,7 +1238,7 @@ public static class AutoPick
                 : CurrentWorks(row) switch
                 {
                     true when row.Tries.Max(t => t.Level) == 1 =>
-                        "оставить как есть: сайт отказывает по стране на любом пути — ни VPN, ни пин не помогли",
+                        "оставить как есть: сайт отказывает по стране на любом пути — ни выход, ни пин не помогли",
                     true => "оставить как есть: нынешний путь работает",
                     null => "оставить как есть: нынешний путь не измерен",
 
@@ -1404,7 +1418,7 @@ public static class AutoPick
                 && file.Entries.Any(e => e.Match == MatchKind.Domain && e.Enabled && !e.Off
                     && e.Mode == RoutingMode.Desync && e.Matches(SiteFixer.RuleValue(row.Host)));
 
-            // Не через VPN сейчас — правила не нужно, hosts бьёт любое разрешение имени.
+            // Не через выход сейчас — правила не нужно, hosts бьёт любое разрешение имени.
             if (pins is not null && row.CurrentMode != RoutingMode.Proxy && !ownDesync)
             {
                 entries.Add((row, new AutoPickJournalEntry

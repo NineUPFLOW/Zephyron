@@ -1927,6 +1927,6 @@ public partial class CheckView : UserControl
     {
         RoutingMode.Direct => "напрямую",
         RoutingMode.Desync => "десинк",
-        _ => "VPN",
+        _ => "через выход",
     };
 }

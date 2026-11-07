@@ -87,7 +87,7 @@ public static class RouteWhy
 
     private static string Word(RoutingMode mode) => mode switch
     {
-        RoutingMode.Proxy => "VPN",
+        RoutingMode.Proxy => "через выход",
         RoutingMode.Desync => "десинк",
         _ => "напрямую",
     };
