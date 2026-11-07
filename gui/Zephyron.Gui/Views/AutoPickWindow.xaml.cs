@@ -224,10 +224,10 @@ public sealed class AutoPickItem : INotifyPropertyChanged
 
         return Category switch
         {
-            Kind.Changed => (ChoiceText(Row.Choice!), "Success"),
-            Kind.Failed => (Row.Tries.Any(t => t.Works)
+            Kind.Changed => (ChoiceText(Row.Choice!) + (Row.Confirm is null ? "" : " · " + Row.Confirm), "Success"),
+            Kind.Failed => ((Row.Tries.Any(t => t.Works)
                 ? "ничего устойчивого — оставлено как есть"
-                : "ничего не помогло", "Danger"),
+                : "ничего не помогло") + (Row.Confirm is null ? "" : " · " + Row.Confirm), "Danger"),
             Kind.Same => (Row.Tries.Count > 0 && Row.Tries.Max(t => t.Level) == 1
                 ? "оставить как есть: везде отказ по стране" : "оставить как есть", "Muted"),
             _ => ("", "Muted"),

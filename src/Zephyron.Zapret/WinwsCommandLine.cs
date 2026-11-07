@@ -95,6 +95,11 @@ public static class WinwsCommandLine
     /// Виртуальные локалки Радмина и Hamachi: десинк их не перехватывает
     /// (<see cref="TunnelCapture"/>). Без сетей строка остаётся как была.
     /// </param>
+    /// <param name="warpApi">
+    /// WARP — выбранный путь туннеля: регистрация идёт на api.cloudflareclient.com
+    /// и доходит только под десинком (замер: узел 104.17.0.1), поэтому имя
+    /// покрывается всегда (<see cref="WarpApiProfile"/>).
+    /// </param>
     public static IReadOnlyList<string> Build(
         ZapretPreset preset,
         string? excludeList = null,
@@ -106,9 +111,10 @@ public static class WinwsCommandLine
         IReadOnlyList<IPAddress>? tunAddresses = null,
         Core.CaptureWidth capture = Core.CaptureWidth.Preset,
         string? keepList = null,
-        IReadOnlyList<string>? lans = null)
+        IReadOnlyList<string>? lans = null,
+        bool warpApi = false)
     {
-        var arguments = BuildPreset(preset, excludeList, own, keepList);
+        var arguments = BuildPreset(preset, excludeList, own, keepList, warpApi);
 
         PresetCapture.Apply(arguments, capture);
 
@@ -124,7 +130,8 @@ public static class WinwsCommandLine
         ZapretPreset preset,
         string? excludeList,
         IReadOnlyList<OwnDesyncProfile>? own,
-        string? keepList = null)
+        string? keepList = null,
+        bool warpApi = false)
     {
         var arguments = new List<string>();
 
@@ -204,6 +211,9 @@ public static class WinwsCommandLine
                 arguments.Add($"--lua-desync={step}");
         }
 
+        if (warpApi)
+            arguments.AddRange(WarpApiProfile(preset));
+
         // Видео YouTube — только по TCP: его и мерят проверка с автоподбором. Замер 05.11,
         // новые соединения через десинк: QUIC к зарубежным узлам Google сбоил в 7–12 из 25,
         // TCP к тому же redirector — 0 из 25. Браузер без QUIC сразу идёт по TCP.
@@ -263,6 +273,48 @@ public static class WinwsCommandLine
         }
 
         return arguments;
+    }
+
+    private const string WarpApiHost = "api.cloudflareclient.com";
+
+    /// <summary>
+    /// Профиль для API регистрации WARP: TLS 443, рецепт — из самого пресета.
+    /// </summary>
+    /// <remarks>
+    /// Стоит перед секциями пресета: иначе имя могла бы забрать чужая секция
+    /// раньше. Имя инлайном (<c>--hostlist-domains</c>, один хост), а не списком —
+    /// без файла и без лимита хостлиста в 16К у winws2 1.0.7. Рецепт берётся у секции
+    /// пресета, уже закрывающей это имя, а если её нет — у первой общей секции TLS
+    /// на 443 (по именам, без UDP). Нет ни той, ни другой — профиль не добавляется.
+    /// </remarks>
+    private static IReadOnlyList<string> WarpApiProfile(ZapretPreset preset)
+    {
+        static bool Tls443(ZapretSection s) =>
+            s.RawArguments.Any(a => a.StartsWith("--filter-tcp=", StringComparison.Ordinal)
+                && PresetCapture.Ranges(a["--filter-tcp=".Length..]).Any(r => r.First <= 443 && 443 <= r.Last))
+            && !s.RawArguments.Any(a => a.StartsWith("--filter-udp=", StringComparison.Ordinal));
+
+        static List<string> Steps(ZapretSection s) =>
+            s.RawArguments.Where(a => a.StartsWith("--lua-desync=", StringComparison.Ordinal)).ToList();
+
+        var section =
+            preset.Sections.FirstOrDefault(s => Tls443(s) && Steps(s).Count > 0
+                && s.InlineDomains.Any(d => d.Equals(WarpApiHost, StringComparison.OrdinalIgnoreCase)))
+            ?? preset.Sections.FirstOrDefault(s => Tls443(s) && Steps(s).Count > 0 && FiltersByName(s)
+                && !Steps(s).Any(a => a is "--lua-desync=pass" or "--lua-desync=drop"));
+
+        if (section is null)
+            return [];
+
+        return
+        [
+            "--new",
+            "--name=Zephyron: WARP API",
+            "--filter-tcp=443",
+            $"--hostlist-domains={WarpApiHost}",
+            OutRange,
+            .. Steps(section),
+        ];
     }
 
     private static bool IsVideoTcp(ZapretSection section) =>

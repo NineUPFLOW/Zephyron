@@ -636,7 +636,8 @@ internal static class SupervisorHost
         // это расшифрованная игра на их адаптере (LocalNetworks.VirtualLans, 14.10).
         var lans = Zephyron.Core.Rules.LocalNetworks.VirtualLans;
 
-        var arguments = WinwsCommandLine.Build(preset, exclude, own, gameFilter, servers, fakeRange, udpOff, tun, settings.Capture, keep, lans).ToList();
+        var arguments = WinwsCommandLine.Build(preset, exclude, own, gameFilter, servers, fakeRange, udpOff, tun, settings.Capture, keep, lans,
+            warpApi: settings.WarpEnabled && !options.NoProxy).ToList();
 
         // Подделки секций, выбранные в «Десинке»; образцы разрешаются от рабочей папки winws2 (корень Zapret).
         if (FakeChoice.Apply(arguments, Path.GetFileNameWithoutExtension(presetPath), settings.FakeSwaps) is > 0 and var swapped)

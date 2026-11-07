@@ -169,6 +169,9 @@ public sealed class AutoPickRow
     /// <summary>Решение; <c>null</c> — менять нечего.</summary>
     public AutoPickChoice? Choice { get; set; }
 
+    /// <summary>Исход трёх подтверждающих проб («подтверждено 3/3», «сорвалось на 2/3»); <c>null</c> — не подтверждали.</summary>
+    public string? Confirm { get; set; }
+
     /// <summary>Записано ли решение; <c>null</c> — до записи не дошло.</summary>
     public bool? Written { get; set; }
 
@@ -715,7 +718,7 @@ public static class AutoPick
 
         var live = rows.Where(r => r.Skip is null).ToList();
 
-        async Task Measure(AutoPickRow row, AutoPickWay way, string? recipe, string? title)
+        async Task<bool> Measure(AutoPickRow row, AutoPickWay way, string? recipe, string? title)
         {
             var clock = Stopwatch.StartNew();
             var flow = await RecipeTrial.OpensAsync(row.Host, addresses[row], cancellationToken);
@@ -726,6 +729,7 @@ public static class AutoPick
                 flow.Stub));
 
             progress?.Report(row);
+            return Works(flow);
         }
 
         // Пресет — с теми же настройками страницы «Десинк», что в работе (SupervisorHost):
@@ -1071,6 +1075,139 @@ public static class AutoPick
             }
         });
 
+        // f) Три подтверждения: победитель обязан открыться три раза подряд. Срыв
+        // отклоняет кандидата (в пробы ложится неудача, и Choose берёт следующего);
+        // не подтверждённое за круги не пишем. Мерится только победитель.
+        await Stage("triple", timings, async () =>
+        {
+            var confirmed = new Dictionary<AutoPickRow, AutoPickChoice>();
+
+            Task Wait() => Task.Delay(AutoPickConfirm.Pause, cancellationToken);
+
+            for (int round = 0; round < 6; round++)
+            {
+                var todo = rows
+                    .Where(r => r.Choice is { } c && !(confirmed.TryGetValue(r, out var done) && done == c))
+                    .ToList();
+
+                if (todo.Count == 0)
+                    break;
+
+                var results = new ConcurrentDictionary<AutoPickRow, AutoPickConfirm.Result>();
+
+                async Task Confirm(AutoPickRow row, Func<Task<bool>> probe)
+                {
+                    results[row] = await AutoPickConfirm.RunAsync(probe, Wait);
+                    progress?.Report(row);
+                }
+
+                bool Is(AutoPickRow r, AutoPickWay way) => r.Choice!.Way == way;
+
+                await Each(todo.Where(r => Is(r, AutoPickWay.Direct)).ToList(),
+                    r => Confirm(r, () => Measure(r, AutoPickWay.Direct, null, null)), cancellationToken);
+
+                if (canDesync && todo.Where(r => Is(r, AutoPickWay.Preset)).ToList() is { Count: > 0 } presets)
+                {
+                    var failed = await RecipeTrial.WithWinwsAsync(winws!, paths!.Root, PresetArguments(),
+                        () => Each(presets, r => Confirm(r, () => Measure(r, AutoPickWay.Preset, null,
+                            r.Tries.FirstOrDefault(t => t.Way == AutoPickWay.Preset)?.Title)), cancellationToken),
+                        cancellationToken);
+
+                    if (failed is not null)
+                        notes.Add("подтверждение пресета: " + failed);
+                }
+
+                foreach (var group in todo.Where(r => Is(r, AutoPickWay.Recipe))
+                    .GroupBy(r => r.Choice!.Recipe, StringComparer.OrdinalIgnoreCase))
+                {
+                    if (!canDesync || choices.FirstOrDefault(c =>
+                            string.Equals(c.Name, group.Key, StringComparison.OrdinalIgnoreCase)) is not { } choice)
+                    {
+                        continue;
+                    }
+
+                    var hosts = group.Select(r => r.Host).ToList();
+                    await File.WriteAllLinesAsync(list, hosts, cancellationToken);
+
+                    var failed = await RecipeTrial.WithWinwsAsync(winws!, paths!.Root,
+                        RecipeTrial.RecipeArguments(preset!, paths.Root, hosts, choice.Steps, list),
+                        () => Each(group, r => Confirm(r, () => Measure(r, AutoPickWay.Recipe, choice.Name, choice.Title)),
+                            cancellationToken),
+                        cancellationToken);
+
+                    if (failed is not null)
+                        notes.Add($"подтверждение рецепта «{choice.Title}»: {failed}");
+                }
+
+                await Each(todo.Where(r => Is(r, AutoPickWay.Pin) && r.Tries.Any(t => t.Way == AutoPickWay.Pin)).ToList(),
+                    r => Confirm(r, async () =>
+                    {
+                        var was = r.Tries.Last(t => t.Way == AutoPickWay.Pin);
+                        var attempt = PinTry(await PinPicker.ProbeAsync(
+                            new PinCandidate(was.Address!, PinSource.Pool, was.Title ?? ""), r.Host, cancellationToken));
+
+                        r.Add(attempt);
+                        return attempt.Works;
+                    }), cancellationToken);
+
+                // По одному: каждая проба поднимает свой sing-box на своём порту.
+                if (singBox is not null)
+                {
+                    foreach (var row in todo.Where(r => Is(r, AutoPickWay.Vpn)))
+                    {
+                        results[row] = await AutoPickConfirm.RunAsync(
+                            async () => (await MeasureVpn(vpnServers[0], [row])).Count > 0, Wait);
+                        progress?.Report(row);
+                    }
+                }
+
+                foreach (var row in todo)
+                {
+                    var choice = row.Choice!;
+
+                    var label = choice.Way switch
+                    {
+                        AutoPickWay.Direct => "напрямую",
+                        AutoPickWay.Preset => "пресет",
+                        AutoPickWay.Recipe => $"рецепт «{choice.Title}»",
+                        AutoPickWay.Pin => "пин",
+                        _ => "VPN",
+                    };
+
+                    void Note(string text) => row.Confirm = (row.Confirm is null ? "" : row.Confirm + "; ") + label + ": " + text;
+
+                    // Способа не смогли поднять (нет winws2/рецепта/sing-box): подтверждать нечем,
+                    // и не подтверждённое не пишем.
+                    if (!results.TryGetValue(row, out var result))
+                    {
+                        Note("не подтверждено, способ не поднялся");
+                        row.Choice = null;
+                        continue;
+                    }
+
+                    Note(result.Text);
+
+                    if (result.Confirmed)
+                    {
+                        row.Choice = choice with { Why = choice.Why + " · " + result.Text };
+                        confirmed[row] = row.Choice;
+                    }
+                    else
+                    {
+                        // Неудача уже в пробах; следующий кандидат — на следующем круге.
+                        row.Choice = Choose(row);
+
+                        if (row.Choice is not null && row.Choice == choice)
+                            row.Choice = null;
+                    }
+                }
+            }
+
+            // Круги кончились, а кандидат не подтверждён — не пишем.
+            foreach (var row in rows.Where(r => r.Choice is { } c && !(confirmed.TryGetValue(r, out var done) && done == c)))
+                row.Choice = null;
+        });
+
         foreach (var row in rows)
             progress?.Report(row);
 
@@ -1248,6 +1385,9 @@ public static class AutoPick
                         ? "ничего устойчивого: что-то открывалось через раз или только заглушкой — оставлено как есть"
                         : "ничего не помогло",
                 };
+
+            if (row.Confirm is { } confirm)
+                text.AppendLine("  три подтверждения: " + confirm);
 
             text.AppendLine("  итог: " + verdict);
             text.AppendLine();
