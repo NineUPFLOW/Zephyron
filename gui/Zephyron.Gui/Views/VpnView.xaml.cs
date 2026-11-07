@@ -288,6 +288,9 @@ public sealed class SubRow : System.ComponentModel.INotifyPropertyChanged
 
     public Visibility ActiveShown => Active ? Visibility.Visible : Visibility.Collapsed;
 
+    /// <summary>При включённом WARP папка «в работе», но трафик через неё не идёт.</summary>
+    public string ActiveWord => Fade < 1 ? "На паузе" : "Используется";
+
     public Visibility ActivateShown => Active ? Visibility.Collapsed : Visibility.Visible;
 }
 
@@ -1761,7 +1764,6 @@ public partial class VpnView : UserControl
             ? $"Туннель идёт только через WARP, подписки приостановлены. {(string.IsNullOrWhiteSpace(settings.WarpCountryTag) ? "Выход в Москве" : "Выход в стране выбранного сервера")}{measured}."
             : "Бесплатный выход через сеть Cloudflare. Включите WARP, и туннель пойдёт через него вместо подписок.";
 
-        WarpCountryPanel.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         FillWarpCountry(settings);
 
         // Замер — руками движка, а он знает WARP, только когда тот в конфиге.
@@ -1805,6 +1807,12 @@ public partial class VpnView : UserControl
             .ToList();
 
         var saved = settings.WarpCountryTag;
+
+        // Выбирать страну есть из чего только с подпиской: без неё в списке одно «Как есть».
+        // Здесь, а не в ShowWarp: серверы подписки доходят позже, и список досоздаётся.
+        WarpCountryPanel.Visibility = settings.WarpEnabled && (servers.Count > 0 || !string.IsNullOrWhiteSpace(saved))
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
         var key = string.Join('\n', servers.Select(s => s.Tag).Append(saved ?? string.Empty));
 
@@ -2125,6 +2133,21 @@ public partial class VpnView : UserControl
             AddKeys(request.Input, request.InPool);
         else
             AddSubscription(request.Input, request.Name, request.InPool);
+
+        // Добавленное должно работать сразу: при включённом WARP подписки и ключи
+        // стоят на паузе, и новый сервер молча не использовался бы (жалоба 07.11).
+        var settings = AppSettings.Load(AppSettings.DefaultPath);
+
+        if (settings.WarpEnabled && _book.Entries.Count + (_book.Keys.Count > 0 ? 1 : 0) > 0)
+        {
+            var next = settings with { WarpEnabled = false };
+            next.Save(AppSettings.DefaultPath);
+            ShowWarp(next);
+            ShowPick(next);
+            ShowQuick(next);
+            Status.Text += " Встроенный WARP выключен: туннель пойдёт через добавленное.";
+            this.Offer("WARP выключен, добавлен сервер");
+        }
     }
 
     /// <summary>Ссылку подписки — в книгу; обёртки клиентов уже развёрнуты окном.</summary>

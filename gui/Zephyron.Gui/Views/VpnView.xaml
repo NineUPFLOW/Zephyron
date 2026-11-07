@@ -79,7 +79,7 @@
                                             Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentLine}"
                                             BorderThickness="{StaticResource Stroke}"
                                             Visibility="{Binding ActiveShown}">
-                                        <TextBlock Text="Используется" FontSize="12" Foreground="{DynamicResource Accent}" />
+                                        <TextBlock Text="{Binding ActiveWord}" FontSize="12" Foreground="{DynamicResource Accent}" />
                                     </Border>
                                 </Grid>
 
@@ -521,7 +521,7 @@
 
                                     <StackPanel Orientation="Horizontal" Margin="0,0,8,0">
                                         <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE71B;" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                        <TextBlock Style="{StaticResource Caption}" Text="Тип протокола" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                        <TextBlock Style="{StaticResource Caption}" Text="Протокол" Margin="0,0,6,0" VerticalAlignment="Center" />
                                         <TextBlock x:Name="StatProtocol" Text="—" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
 
@@ -610,7 +610,7 @@
                         плитка ленты, его пояснение — строкой под заголовком. Выбрать плитку —
                         то же, что «выбрать» у сервера в списке. Плитки и флаги мельче (25.10).
                     -->
-                    <views:FitWidth Grid.Row="2" Grid.Column="0">
+                    <views:FitWidth Grid.Row="2" Grid.Column="0" VerticalAlignment="Top">
                         <Border x:Name="QuickCard" Style="{StaticResource Card}">
                             <StackPanel>
                                 <Grid>
@@ -757,17 +757,13 @@
                                     <TextBlock x:Name="WarpLine" Style="{StaticResource Caption}" Margin="0,10,0,0" TextWrapping="Wrap" />
 
                                     <!-- Запасной путь: готовый файл WARP добавляется как обычный сервер. -->
-                                    <Grid Margin="0,10,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap" VerticalAlignment="Center"
-                                                   Text="Не подключается? Скачайте готовый файл WARP (AmneziaWG) на warp-generation.github.io и добавьте его: он заработает как обычный сервер, а этот переключатель выключите." />
-                                        <Button Grid.Column="1" Style="{StaticResource Ghost}" Margin="12,0,0,0"
+                                    <StackPanel Margin="0,10,0,0">
+                                        <TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap"
+                                                   Text="Не подключается? Скачайте файл WARP (AmneziaWG) на warp-generation.github.io и добавьте его — он заработает как обычный сервер." />
+                                        <Button Style="{StaticResource Ghost}" Margin="0,8,0,0" HorizontalAlignment="Left" Padding="12,4"
                                                 Content="Добавить файл WARP" Click="OnAddWarpFile"
-                                                ToolTip="Откроет добавление ключа: выберите скачанный .conf" />
-                                    </Grid>
+                                                ToolTip="Выберите скачанный файл .conf. Встроенный WARP выключится сам." />
+                                    </StackPanel>
 
                                     <!--
                                         Страна выхода: Cloudflare выпускает трафик в стране сервера подписки,
