@@ -1061,7 +1061,7 @@ public sealed record AppSettings
 
     /// <summary>Есть ли выход кроме WARP: подписка или отдельные ключи.</summary>
     [JsonIgnore]
-    private bool HasSubscriptionExit => !string.IsNullOrWhiteSpace(SubscriptionUrl) || KeysEnabled;
+    public bool HasSubscriptionExit => !string.IsNullOrWhiteSpace(SubscriptionUrl) || KeysEnabled;
 
     public static AppSettings TryLoad(string? path, out ReadResult result)
     {
@@ -1171,10 +1171,9 @@ public sealed record AppSettings
 
     /// <remarks>
     /// <para>
-    /// Имена — те же, что в окне с 04.10 (<see cref="WorkModes"/>). До 06.10
-    /// здесь стояли прежние пять («выборочно», «всё через VPN, кроме РФ»), и
-    /// отчёт владельца 06.10 называл один режим двумя языками: сводка —
-    /// «Гибрид», «Диагностика» и проверка блокировок — «выборочно».
+    /// Слова — те же, что на «Главной» (<see cref="Exits"/>, 07.11): выход и
+    /// охват. Иначе сводка и «Диагностика» говорили бы на языке, которого
+    /// в окне больше нет.
     /// </para>
     /// <para>
     /// Режим с туннелем без выхода называется тем, чем он на деле и является.
@@ -1187,15 +1186,20 @@ public sealed record AppSettings
     {
         var engines = Engines;
 
-        if (WorkModes.Of(engines) is not { } mode)
+        if (!engines.Anything)
             return "выключено";
 
-        var name = WorkModes.Name(mode);
+        // Туннель поднят, а выхода нет — это просто десинк, и называется он так.
+        var exit = Exits.Of(this);
 
-        if (engines.Tunnel && !HasTunnelExit)
-            return engines.Desync ? $"{name} — VPN не задан, работает только десинк" : $"{name} — VPN не задан";
+        if (exit == ExitChoice.None)
+            return engines.Tunnel ? "Десинк — выход не выбран" : "Десинк";
 
-        return engines.Tunnel && engines.IgnoreExclusions ? $"{name} без исключений" : name;
+        var scope = engines.IgnoreExclusions ? "весь трафик без исключений"
+            : engines.TunnelTakesAll ? "весь трафик"
+            : "по маршрутам";
+
+        return $"Выход {Exits.Name(exit)}, {scope}";
     }
 
     /// <summary>Нужен ли в этом режиме туннель.</summary>

@@ -77,7 +77,7 @@ public partial class RoutesView
 
             var path = window.Mode switch
             {
-                RoutingMode.Proxy => "через VPN",
+                RoutingMode.Proxy => "через выход",
                 RoutingMode.Desync => "десинк",
                 _ => "напрямую",
             };

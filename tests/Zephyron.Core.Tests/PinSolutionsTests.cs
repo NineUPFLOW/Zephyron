@@ -198,11 +198,11 @@ public sealed class PinSolutionsTests : IDisposable
                 mode: proxy
             """);
 
-        // «Напрямую» десинк снимет; «через VPN» без туннеля — тоже, с туннелем — нет.
+        // «Напрямую» десинк снимет; «через выход» без туннеля идёт под десинком (07.11).
         var withoutTunnel = PinSolutions.RouteBlockers(instagram, engine.RuleSet, tunnelUp: false, _hosts);
         var withTunnel = PinSolutions.RouteBlockers(instagram, engine.RuleSet, tunnelUp: true, _hosts);
 
-        Assert.Equal(3, withoutTunnel.Count);
+        Assert.Equal(2, withoutTunnel.Count);
         Assert.Equal(["instagram.com", "www.instagram.com"], withTunnel.Select(b => b.Name).Order());
         Assert.All(withTunnel, b => Assert.Equal(DesyncBypass.Direct, b.Why));
     }

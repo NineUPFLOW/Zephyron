@@ -288,10 +288,10 @@ public sealed record PartRow : INotifyPropertyChanged
         0 => "напрямую",
         1 => "десинк",
         Off => "выключено",
-        _ => PoolName is { } pool ? $"VPN · {pool}" : "через VPN",
+        _ => PoolName is { } pool ? $"VPN · {pool}" : "через выход",
     };
 
-    /// <summary>Пул серверов, в который ведёт маршрут «через VPN»; <c>null</c> — пул по умолчанию.</summary>
+    /// <summary>Пул серверов, в который ведёт маршрут «через выход»; <c>null</c> — пул по умолчанию.</summary>
     public string? PoolId { get; set; }
 
     /// <summary>Имя пула — на кнопке пути и в подписи.</summary>
@@ -728,9 +728,12 @@ public partial class RoutesView : UserControl
 
             MarkPins(services, data.Pins, data.PinZones, zapretRoot);
             // Без «Selective Routing» пулов не видно и здесь: маршрут в пул
-            // идёт «через VPN» в пул по умолчанию, так его и показываем.
-            _pools = settings.SelectiveRouting == true ? settings.Pools : null;
+            // идёт «через выход» в пул по умолчанию, так его и показываем.
+            // При выходе WARP пулов тоже нет: они работают с «Мой VPN» (AppSettings.EnginePools).
+            _exit = Exits.Of(settings);
+            _pools = settings.SelectiveRouting == true && _exit != ExitChoice.Warp ? settings.Pools : null;
             MarkPools(services, userRules, _pools ?? []);
+            MarkNoExit(services, _exit);
 
             // Раскрытые папки переживают перерисовку. Прежде любое действие
             // внутри папки — пин, свой маршрут, обновление списка — собирало
@@ -1176,10 +1179,25 @@ public partial class RoutesView : UserControl
     private IReadOnlyList<ServerPool>? _pools;
 
     /// <summary>
-    /// Маршрут «через VPN» в свой пул — пул назван на кнопке пути и в подписи
-    /// (идеи №6, 19.10). Без этого «через VPN» в пул «Россия» и в пул
+    /// Маршрут «через выход» в свой пул — пул назван на кнопке пути и в подписи
+    /// (идеи №6, 19.10). Без этого «через выход» в пул «Россия» и в пул
     /// по умолчанию выглядели бы одинаково.
     /// </summary>
+    private ExitChoice _exit;
+
+    /// <summary>
+    /// Выход не выбран — «через выход» идёт напрямую под десинком (HostsFile.DescribeDesyncExclusions);
+    /// строка говорит это, а не «через выход» как есть.
+    /// </summary>
+    private static void MarkNoExit(IReadOnlyList<ServiceRow> services, ExitChoice exit)
+    {
+        if (exit != ExitChoice.None)
+            return;
+
+        foreach (var part in services.SelectMany(s => s.Parts).Where(p => p.Applied == 2))
+            part.Mode = "выход не выбран — сейчас через десинк";
+    }
+
     private static void MarkPools(IReadOnlyList<ServiceRow> services, UserRulesFile rules, IReadOnlyList<ServerPool> pools)
     {
         if (pools.Count == 0)
@@ -1778,7 +1796,7 @@ public partial class RoutesView : UserControl
     /// </summary>
     /// <remarks>
     /// Пин и туннель друг друга исключают: пин говорит «иди на этот адрес»,
-    /// правило «через VPN» — «иди через зарубежный выход», и вместе выходит
+    /// правило «через выход» — «иди через зарубежный выход», и вместе выходит
     /// «зайди на отечественный узел из-за границы». Замер 2026-09-11: рукопожатие
     /// к прибитому адресу через выход в Нидерландах не проходит вовсе, браузер
     /// показывает ERR_SSL_PROTOCOL_ERROR, и виноватым выглядит пин.
@@ -2085,7 +2103,7 @@ public partial class RoutesView : UserControl
     {
         0 => "напрямую",
         1 => "на десинке",
-        _ => "через VPN",
+        _ => "через выход",
     };
 
     /// <summary>Показывает то, что подходит под поиск и под отбор по маршруту.</summary>
@@ -2432,7 +2450,7 @@ public partial class RoutesView : UserControl
               + ". Они в списке ниже вместе с сервисами; строки и папки можно перетаскивать.";
 
         // Снятые правила по программе (Rules.ProgramRulesOff, 04.10) — словами,
-        // а не молча: человек ставил игру «через VPN», и правило пропало.
+        // а не молча: человек ставил игру «через выход», и правило пропало.
         if (AppSettings.Load(AppSettings.DefaultPath).RemovedProgramRules is { Count: > 0 } removed)
             OwnSummary.Text += $" Прежние правила по программе сняты 04.10: {string.Join(", ", removed)}. Добавьте программу заново — теперь это папка из доменов и адресов.";
     }
@@ -2958,7 +2976,7 @@ public partial class RoutesView : UserControl
     }
 
     /// <summary>
-    /// Окно пути: по умолчанию, напрямую, десинк с рецептом, через VPN с пулом, выключено.
+    /// Окно пути: по умолчанию, напрямую, десинк с рецептом, через выход с пулом, выключено.
     /// </summary>
     private void AskPath(PartRow row)
     {
@@ -2984,6 +3002,8 @@ public partial class RoutesView : UserControl
         var window = new PathWindow(row.Title, current, row.PoolId, row.DefaultLabel, canRecipe, desyncNote, _pools)
         {
             Owner = Window.GetWindow(this),
+            PoolsHint = _exit == ExitChoice.Warp ? "Выход WARP: пулы серверов работают с «Мой VPN»."
+                : _exit == ExitChoice.None ? "Выход не выбран: пока он не выбран на «Главной», такой маршрут идёт через десинк." : null,
         };
 
         if (window.ShowDialog() != true || parsed is not var (routeKind, value))
@@ -3403,6 +3423,6 @@ public partial class RoutesView : UserControl
     {
         RoutingMode.Direct => "напрямую",
         RoutingMode.Desync => "десинк",
-        _ => "через VPN",
+        _ => "через выход",
     };
 }

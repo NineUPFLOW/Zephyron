@@ -152,8 +152,8 @@ public sealed class NoSubscriptionTests
             SubscriptionUrl = "https://panel.example/sub",
         };
 
-        Assert.Contains("только десинк", without.DescribeMode());
-        Assert.Equal("Гибрид", with.DescribeMode());
+        Assert.Contains("выход не выбран", without.DescribeMode());
+        Assert.Equal("Выход Мой VPN, по маршрутам", with.DescribeMode());
     }
 
     /// <summary>
@@ -166,8 +166,8 @@ public sealed class NoSubscriptionTests
         var settings = new AppSettings { SubscriptionUrl = "https://panel.example/sub" };
 
         Assert.Equal("Десинк", settings.With(new EngineChoice { Desync = true, Tunnel = false }).DescribeMode());
-        Assert.Equal("Туннель", settings.With(new EngineChoice { Desync = false, Tunnel = true }).DescribeMode());
-        Assert.Equal("Туннель без исключений",
+        Assert.Equal("Выход Мой VPN, весь трафик", settings.With(new EngineChoice { Desync = false, Tunnel = true }).DescribeMode());
+        Assert.Equal("Выход Мой VPN, весь трафик без исключений",
             settings.With(new EngineChoice { Desync = false, Tunnel = true, IgnoreExclusions = true }).DescribeMode());
         Assert.Equal("выключено", settings.With(new EngineChoice { Desync = false, Tunnel = false }).DescribeMode());
     }

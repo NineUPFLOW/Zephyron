@@ -4,12 +4,12 @@ using Zephyron.Proxy;
 namespace Zephyron.Gui.Views;
 
 /// <summary>
-/// Выбрали «через VPN», а имена прибиты в hosts, — предложить снять пин.
+/// Выбрали «через выход», а имена прибиты в hosts, — предложить снять пин.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Пин бьёт любое разрешение имени, и прибитое имя не получает адрес туннеля:
-/// маршрут «через VPN» на нём молча не действует. 23.09 владелец так
+/// маршрут «через выход» на нём молча не действует. 23.09 владелец так
 /// и споткнулся на crunchyroll — VPN выбран, а 1009 остаётся, потому что имена
 /// прибиты с прошлой попытки. Узнать это можно было только разбором.
 /// </para>
@@ -64,7 +64,7 @@ internal static class PinConflict
             var result = HostsEditor.Unpin(pinned);
             _ = HostsEditor.FlushDnsAsync();
 
-            return result.Reverted ?? $"Пин снят с {pinned.Count} имён — теперь они пойдут через VPN.";
+            return result.Reverted ?? $"Пин снят с {pinned.Count} имён — теперь они пойдут через выход.";
         }
         catch (Exception ex)
         {

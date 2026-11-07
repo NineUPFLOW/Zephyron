@@ -187,7 +187,7 @@ public sealed class AutoPickItem : INotifyPropertyChanged
         AutoPickWay.Preset => "десинк: пресет",
         AutoPickWay.Recipe => "десинк: " + choice.Title,
         AutoPickWay.Pin => "пин в hosts: " + choice.Title,
-        _ => "через VPN",
+        _ => "через выход",
     };
 
     /// <summary>Итог: цвет и текст идут парой, смысл не только в цвете.</summary>

@@ -17,6 +17,14 @@ namespace Zephyron.Supervisor;
 /// </remarks>
 public static class RouteWhy
 {
+    /// <summary>Как правила решают для имени (без выключателей) — например, для Telegram.</summary>
+    public static Zephyron.Core.Rules.RoutingMode ModeOf(string host, AppSettings settings)
+    {
+        var (engine, _) = Zephyron.Zapret.RuleSetExpander.LoadFor(settings);
+
+        return engine.Evaluate(ConnectionEvent.Describe(host)).Mode;
+    }
+
     /// <summary>Строки объяснения; первая — сама цель.</summary>
     public static IReadOnlyList<string> Explain(string target, AppSettings? settings = null)
     {

@@ -78,21 +78,27 @@ public static class TgWsProxy
     };
 
     /// <summary>
-    /// Нужен ли прокси при таком режиме — пояснение для выбора в мастере.
+    /// Идёт ли Telegram через выход при этих настройках: выход выбран, а маршрут Telegram ведёт в туннель.
+    /// </summary>
+    /// <param name="telegram">Как правила решают для Telegram (например, для telegram.org).</param>
+    public static bool ViaExit(AppSettings settings, Rules.RoutingMode telegram) =>
+        settings.NeedsProxy && settings.Engines.Effective(telegram, tunnelUp: true) == Rules.RoutingMode.Proxy;
+
+    /// <summary>
+    /// Нужен ли прокси при таком выходе — пояснение для выбора в мастере.
     /// </summary>
     /// <remarks>
-    /// Без VPN адреса Telegram закрыты (замер 07.10, «Десинк»: без прокси
-    /// медиа не шло ни разу), а в режимах с туннелем Telegram идёт через VPN
-    /// по адресам списка, и прокси там запасной путь.
+    /// Без выхода адреса Telegram закрыты (замер 07.10: без прокси медиа не шло
+    /// ни разу). Если же Telegram идёт через выход, прокси ему не нужен.
     /// </remarks>
-    public static string Explain(Rules.WorkMode mode) => mode == Rules.WorkMode.Desync
-        ? "В «Десинке» VPN нет, а адреса Telegram закрыты: без прокси Telegram Desktop "
-          + "не подключится. С ним работает целиком, с фото и видео. Только Telegram Desktop "
-          + "на этом компьютере — телефон через него не подключить. Подключить Telegram к нему — "
+    public static string Explain(AppSettings settings, Rules.RoutingMode telegram) => ViaExit(settings, telegram)
+        ? "Telegram идёт через выход — прокси не нужен. Включайте его, только если выход подводит: "
+          + "прокси работает для Telegram Desktop на этом компьютере. Подключить Telegram к нему — "
           + "кнопкой на вкладке «TG Proxy»."
-        : "В «Гибриде» и «Туннеле» Telegram идёт через VPN — прокси не обязателен, но и не мешает: "
-          + "Telegram Desktop, подключённый к нему, ходит мимо VPN. Только Telegram Desktop "
-          + "на этом компьютере. Подключить Telegram к нему — кнопкой на вкладке «TG Proxy».";
+        : "Telegram не идёт через выход, а его адреса закрыты: без прокси Telegram Desktop "
+          + "не подключится. С ним работает целиком, с фото и видео, но только вместе с десинком. "
+          + "Только Telegram Desktop на этом компьютере — телефон через него не подключить. "
+          + "Подключить Telegram к нему — кнопкой на вкладке «TG Proxy».";
 
     /// <summary>Ключи запуска; секрет — не здесь, а в <see cref="SecretVariable"/>.</summary>
     /// <remarks>

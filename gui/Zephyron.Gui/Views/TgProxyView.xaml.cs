@@ -64,10 +64,13 @@ public partial class TgProxyView : UserControl
         _showingRoutes = false;
 
         // Без десинка прокси молча не работает: его соединения к Telegram
-        // и доменам за Cloudflare режет DPI (жалоба пользователя 11.10 —
-        // «включаю только его, Telegram не работает, нужен ещё десинк»).
-        // Поднимать десинк ради него самим владелец не стал — говорим прямо.
-        DesyncWarning.Visibility = settings.TelegramProxy && !settings.NeedsDesync
+        // и доменам за Cloudflare режет DPI (жалоба пользователя 11.10).
+        // Но если Telegram идёт через выход, соединения прокси уходят в него
+        // и десинк им не нужен — тогда предупреждение было бы неверным.
+        bool viaExit = TgWsProxy.ViaExit(settings, RouteWhy.ModeOf("telegram.org", settings));
+
+        ViaExitNote.Visibility = viaExit ? Visibility.Visible : Visibility.Collapsed;
+        DesyncWarning.Visibility = settings.TelegramProxy && !settings.NeedsDesync && !viaExit
             ? Visibility.Visible
             : Visibility.Collapsed;
     }

@@ -125,15 +125,15 @@ public sealed class ModeTableTests : IDisposable
     }
 
     [Fact]
-    public void Desync_alone_lets_vpn_go_direct()
+    public void Without_an_exit_names_via_exit_get_desync()
     {
-        // Туннеля нет, везти «через VPN» некуда — и десинк его не трогает,
-        // как и «напрямую». «Десинк» остаётся десинку.
+        // Туннеля нет, везти «через выход» некуда: имя идёт напрямую и
+        // получает десинк. Не трогается только «напрямую».
         var found = HostsFile.DescribeDesyncExclusions(
             Book(OperatingMode.DesyncOnly), _hosts, tunnelUp: false);
 
         Assert.Equal(DesyncBypass.Direct, HostsFile.BypassFor(found, Direct));
-        Assert.Equal(DesyncBypass.VpnWithoutTunnel, HostsFile.BypassFor(found, Vpn));
+        Assert.Equal(DesyncBypass.None, HostsFile.BypassFor(found, Vpn));
         Assert.Equal(DesyncBypass.None, HostsFile.BypassFor(found, Desync));
     }
 

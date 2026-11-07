@@ -229,7 +229,7 @@ public static class PinSolutions
 
         return solution.Names
             .Select(name => (Name: name, Why: HostsFile.BypassFor(exclusions, name)))
-            .Where(p => p.Why is DesyncBypass.Direct or DesyncBypass.VpnWithoutTunnel)
+            .Where(p => p.Why is DesyncBypass.Direct)
             .ToList();
     }
 

@@ -123,7 +123,7 @@ public partial class TunnelSettingsWindow : Window
         // Как у прочих строк — сказать, когда настройка ничего не делает:
         // пулы при WARP и заведённые пулы при выключенной.
         Line(SelectiveLine, selective
-            ? settings.WarpEnabled ? "Сейчас не работает: туннель идёт через WARP." : string.Empty
+            ? Exits.Of(settings) == ExitChoice.Warp ? "Сейчас не работает: выбран выход WARP, пулы работают с «Мой VPN»." : string.Empty
             : settings.Pools.Count > 0
                 ? $"Заведённые пулы ({settings.Pools.Count}) сохранены, но не действуют: их маршруты идут через любые серверы."
                 : string.Empty);
@@ -143,8 +143,10 @@ public partial class TunnelSettingsWindow : Window
                 ? "Маршруты молчащего пула пойдут через любые серверы."
                 : "Маршруты молчащего пула ждут его и не открываются.";
 
-        Word(BypassWord, settings.BypassWhenTunnelDead);
-        Bypass.IsChecked = settings.BypassWhenTunnelDead;
+        // Kill switch перекрывает обход (SupervisorHost): пока он включён, обход показан выключенным и недоступным.
+        Word(BypassWord, settings.BypassWhenTunnelDead && !settings.KillSwitch);
+        Bypass.IsChecked = settings.BypassWhenTunnelDead && !settings.KillSwitch;
+        Bypass.IsEnabled = !settings.KillSwitch;
 
         Word(VerifyWord, settings.VerifyTraffic);
         Verify.IsChecked = settings.VerifyTraffic;
@@ -264,8 +266,8 @@ public partial class TunnelSettingsWindow : Window
     private void ShowBypass(bool on)
     {
         // Kill switch обход перекрывает (SupervisorHost) — строка говорит об этом, а не о выключателе.
-        BypassLine.Text = on && AppSettings.Load(AppSettings.DefaultPath).KillSwitch
-            ? "Не действует: включён kill switch на вкладке VPN — мимо туннеля не уводится ничего."
+        BypassLine.Text = AppSettings.Load(AppSettings.DefaultPath).KillSwitch
+            ? "Выключено: включён kill switch на вкладке VPN — мимо туннеля не уводится ничего. Выключите его, чтобы настроить обход."
             : on
             ? "Если выходы не работают, трафик пойдёт открыто, с домашнего адреса."
             : "Если выходы не работают, сеть отключится, но ничего не пойдёт мимо туннеля.";
@@ -316,14 +318,14 @@ public partial class TunnelSettingsWindow : Window
     private void OnFakeIpMemory(object sender, RoutedEventArgs e) =>
         Save(s => s with { FakeIpMemory = FakeIpMemory.IsChecked == true },
             FakeIpMemory.IsChecked == true
-                ? "Подставные адреса имён «через VPN» сохранятся после перезапуска движков."
+                ? "Подставные адреса имён «через выход» сохранятся после перезапуска движков."
                 : "После перезапуска движков подставные адреса выдаются заново, как до 20.10.");
 
     private void OnSelective(object sender, RoutedEventArgs e) =>
         Save(s => s with { SelectiveRouting = Selective.IsChecked == true },
             Selective.IsChecked == true
                 ? "Selective Routing включён: пулы серверов — на вкладке VPN, над подписками."
-                : "Selective Routing выключен: пулов на вкладке нет, маршруты «через VPN» идут через любые серверы.");
+                : "Selective Routing выключен: пулов на вкладке нет, маршруты «через выход» идут через любые серверы.");
 
     private void OnDeadPool(object sender, RoutedEventArgs e) =>
         Save(s => s with { DeadPoolToDefault = DeadPool.IsChecked == true },

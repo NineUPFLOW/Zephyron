@@ -398,7 +398,7 @@ internal sealed class TrayIcon : IDisposable
 
         try
         {
-            _menu ??= new TrayMenu(Toggle, ChooseMode, Show, Quit);
+            _menu ??= new TrayMenu(Toggle, ChooseExit, Show, Quit);
             _menu.Render(TrayStatus.Read(_busy, _stopping));
 
             try
@@ -415,7 +415,7 @@ internal sealed class TrayIcon : IDisposable
                 // состояния, так что его не жалко собрать заново.
                 Discard(_menu);
 
-                _menu = new TrayMenu(Toggle, ChooseMode, Show, Quit);
+                _menu = new TrayMenu(Toggle, ChooseExit, Show, Quit);
                 _menu.Render(TrayStatus.Read(_busy, _stopping));
                 _menu.PopUp();
             }
@@ -469,7 +469,7 @@ internal sealed class TrayIcon : IDisposable
     }
 
     /// <summary>
-    /// Режим из меню: записать его и сразу перезапустить движки.
+    /// Выход из меню: записать его и сразу перезапустить движки.
     /// </summary>
     /// <remarks>
     /// Перезапуском, а не просьбой перезапустить: переключатель в трее
@@ -477,7 +477,7 @@ internal sealed class TrayIcon : IDisposable
     /// Остановленные движки поднимаются: человек выбрал, как работать сейчас,
     /// а не «запомни на потом». Тот же режим ещё раз — ничего не трогает.
     /// </remarks>
-    private async void ChooseMode(Zephyron.Core.Rules.WorkMode mode)
+    private async void ChooseExit(Zephyron.Core.Rules.ExitChoice exit)
     {
         if (_busy)
             return;
@@ -489,13 +489,13 @@ internal sealed class TrayIcon : IDisposable
         {
             var settings = Zephyron.Core.AppSettings.Load(Zephyron.Core.AppSettings.DefaultPath);
 
-            if (Zephyron.Core.Rules.WorkModes.Of(settings.Engines) == mode
-                || !Zephyron.Core.Rules.WorkModes.CanChoose(settings, mode))
+            if (Zephyron.Core.Rules.Exits.Of(settings) == exit
+                || !Zephyron.Core.Rules.Exits.CanChoose(settings, exit))
                 return;
 
-            Zephyron.Core.Rules.WorkModes.Choose(settings, mode).Save(Zephyron.Core.AppSettings.DefaultPath);
+            Zephyron.Core.Rules.Exits.Apply(settings, exit).Save(Zephyron.Core.AppSettings.DefaultPath);
 
-            var who = $"меню трея: режим «{Zephyron.Core.Rules.WorkModes.Name(mode)}»";
+            var who = $"меню трея: выход «{Zephyron.Core.Rules.Exits.Name(exit)}»";
 
             if (EngineControl.IsRunning)
                 await EngineControl.RestartAsync(who, CancellationToken.None);

@@ -22,17 +22,6 @@ public enum DesyncBypass
     Direct,
 
     /// <summary>
-    /// Поставлено «через VPN», а туннель не поднят.
-    /// </summary>
-    /// <remarks>
-    /// Таблица владельца 23.09: при одном десинке «VPN идёт напрямую».
-    /// Везти такое имя некуда, и десинк к нему не применяется — ровно как
-    /// к «напрямую». Отдельной причиной, а не <see cref="Direct"/>: лечится
-    /// это не переключателем в маршрутах, а выключателем туннеля.
-    /// </remarks>
-    VpnWithoutTunnel,
-
-    /// <summary>
     /// Поставлено «через VPN», и туннель поднят.
     /// </summary>
     /// <remarks>
@@ -307,9 +296,10 @@ public static class HostsFile
     /// </para>
     /// <para>
     /// <paramref name="tunnelUp"/> — поднят ли туннель вместе с десинком.
-    /// «Через VPN» выводится из-под десинка в обоих случаях, меняется лишь
-    /// причина: без туннеля имя идёт напрямую (таблица владельца 23.09),
-    /// с туннелем — в туннель, где десинк его только портит.
+    /// «Через выход» выводится из-под десинка только с туннелем: имя идёт
+    /// в туннель, где десинк его только портит. Без туннеля везти его некуда,
+    /// оно идёт напрямую и остаётся десинку (владелец, 07.11: прежде такие
+    /// имена не получали ни выхода, ни десинка).
     /// </para>
     /// </remarks>
     public static IReadOnlyList<(string Name, DesyncBypass Why)> DescribeDesyncExclusions(
@@ -372,10 +362,15 @@ public static class HostsFile
             if (mode != Core.Rules.RoutingMode.Proxy)
                 continue;
 
+            // Без туннеля «через выход» везти некуда: имя идёт напрямую и
+            // получает десинк, как любое другое (выход не выбран, 07.11).
+            if (!tunnelUp)
+                break;
+
             foreach (var domain in domains)
             {
                 if (order.FirstMatch(domain) == Core.Rules.RoutingMode.Proxy)
-                    Add(domain, tunnelUp ? DesyncBypass.Tunnel : DesyncBypass.VpnWithoutTunnel);
+                    Add(domain, DesyncBypass.Tunnel);
             }
         }
 
@@ -530,7 +525,6 @@ public static class HostsFile
     {
         DesyncBypass.Pin => "мимо десинка: пин в hosts",
         DesyncBypass.Direct => "мимо десинка: «напрямую»",
-        DesyncBypass.VpnWithoutTunnel => "мимо десинка: «через VPN», а туннель выключен",
         DesyncBypass.Tunnel => "мимо десинка: идёт в туннель",
         _ => string.Empty,
     };

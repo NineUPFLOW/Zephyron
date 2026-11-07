@@ -530,7 +530,7 @@ internal static class SupervisorHost
             singBox, options.ProxyConfig, 9090, trafficPort,
             // Kill switch запрещает увод мимо туннеля в любом режиме: уводит сам sing-box
             // (его выход «direct»), а ему фильтр выход разрешает — в «Туннеле» это была бы
-            // дыра в kill switch, в «Гибриде» — имена «через VPN» с домашнего адреса.
+            // дыра в kill switch, в «Гибриде» — имена «через выход» с домашнего адреса.
             bypassWhenDead: settings.BypassWhenTunnelDead && !settings.KillSwitch,
             preferredExit: Warp.PreferredExit(settings),
             exitCheckSeconds: settings.ExitCheckSeconds,

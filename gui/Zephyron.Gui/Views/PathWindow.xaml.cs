@@ -22,12 +22,12 @@ public enum PathPick
 
 /// <summary>
 /// Путь маршрута отдельным окном: выключено, напрямую, десинк с рецептом,
-/// через VPN с пулом серверов.
+/// через выход с пулом серверов.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Владелец 19.10 (идеи №6): «выбор пути — отдельным окном; десинк раскрывает
-/// рецепты, через VPN — пулы». Пулов в меню пути было не вместить: их у
+/// рецепты, через выход — пулы». Пулов в меню пути было не вместить: их у
 /// человека сколько угодно, и у каждого своё — сколько серверов, кто закреплён.
 /// </para>
 /// <para>
@@ -41,7 +41,7 @@ public partial class PathWindow : Window
 {
     public PathPick Picked { get; private set; }
 
-    /// <summary>Пул при «через VPN»; <c>null</c> — пул по умолчанию.</summary>
+    /// <summary>Пул при «через выход»; <c>null</c> — пул по умолчанию.</summary>
     public string? Pool { get; private set; }
 
     /// <summary>Нажато «Рецепт…» — выбрать рецепт десинка следом.</summary>
@@ -52,12 +52,12 @@ public partial class PathWindow : Window
     private readonly string _desyncNote;
     private readonly IReadOnlyList<ServerPool> _pools;
 
-    /// <summary>«Selective Routing» включён — под «через VPN» выбирается пул.</summary>
+    /// <summary>«Selective Routing» включён — под «через выход» выбирается пул.</summary>
     private readonly bool _poolsOn;
 
     /// <param name="title">Имя маршрута.</param>
     /// <param name="current">Что стоит сейчас.</param>
-    /// <param name="pool">Пул маршрута «через VPN»; <c>null</c> — пул по умолчанию.</param>
+    /// <param name="pool">Пул маршрута «через выход»; <c>null</c> — пул по умолчанию.</param>
     /// <param name="defaultLabel">
     /// Куда маршрут шёл бы без своего правила; <c>null</c> — умолчания у него нет (свой маршрут).
     /// </param>
@@ -109,14 +109,18 @@ public partial class PathWindow : Window
         Options.Children.Add(Card(PathPick.Desync, "Десинк", _desyncNote,
             Picked == PathPick.Desync && _canRecipe ? RecipeButton() : null));
 
-        Options.Children.Add(Card(PathPick.Proxy, "Через VPN", ProxyNote(),
+        Options.Children.Add(Card(PathPick.Proxy, "Через выход", ProxyNote(),
             Picked == PathPick.Proxy && _poolsOn ? PoolList() : null));
 
         Options.Children.Add(Card(PathPick.Off, "Отключено",
             "Не действует ни этот маршрут, ни заводское правило для того же списка: имена решаются другими правилами."));
     }
 
-    private string ProxyNote() => ServerPools.Find(_pools, Pool) is { } pool
+    /// <summary>Что сказать вместо пулов, когда они не действуют (выход WARP); <c>null</c> — как обычно.</summary>
+    public string? PoolsHint { get; init; }
+
+    private string ProxyNote() => PoolsHint is not null ? PoolsHint
+        : ServerPools.Find(_pools, Pool) is { } pool
         ? $"Пул «{pool.Name}»."
         : _pools.Count == 0
             ? "Через серверы подписок: лучший по замеру или выбранный во вкладке VPN."
@@ -185,7 +189,7 @@ public partial class PathWindow : Window
         return button;
     }
 
-    /// <summary>Пулы под «через VPN»: пул по умолчанию и свои.</summary>
+    /// <summary>Пулы под «через выход»: пул по умолчанию и свои.</summary>
     private UIElement PoolList()
     {
         var list = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };

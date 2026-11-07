@@ -121,8 +121,8 @@ public sealed record EngineChoice
     {
         if (!tunnelUp)
         {
-            // Везти некуда: VPN идёт напрямую, десинк — десинку, если поднят.
-            return book == RoutingMode.Desync && DesyncRuns ? RoutingMode.Desync : RoutingMode.Direct;
+            // Везти некуда: всё, кроме «напрямую», идёт напрямую под десинком, если он поднят.
+            return book != RoutingMode.Direct && DesyncRuns ? RoutingMode.Desync : RoutingMode.Direct;
         }
 
         if (IgnoreExclusions)
@@ -149,7 +149,7 @@ public sealed record EngineChoice
     /// Режимы и есть таблица владельца от 23.09, строка за строкой:
     /// </para>
     /// <list type="bullet">
-    /// <item>десинк — напрямую, десинк, VPN идёт напрямую
+    /// <item>десинк — напрямую, десинк, «через выход» идёт напрямую под десинком
     /// (<see cref="OperatingMode.DesyncOnly"/>: туннеля нет, а «VPN»
     /// выводится из-под десинка списком исключений);</item>
     /// <item>десинк и туннель — всё как в книге

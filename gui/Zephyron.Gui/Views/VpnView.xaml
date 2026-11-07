@@ -436,10 +436,13 @@
                 </ContentControl>
 
                 <!--
-                    Ряды — на сетке «Главной» (1.75 : 1, промежуток 12), плитки — в FitWidth:
-                    длинное имя сервера не раздвигает колонку. Первый ряд — выход, через
-                    который идёт трафик, и недавние серверы; второй — быстрая смена сервера
-                    и рядом WARP (владелец, 25.10: компактнее, на одном уровне).
+                    Два столбца на сетке «Главной» (1.75 : 1, промежуток 12), плитки — в FitWidth:
+                    длинное имя сервера не раздвигает колонку. Слева — выход, через который идёт
+                    трафик, и под ним настройки выбранного выхода: при «Мой VPN» быстрая смена
+                    сервера, при WARP — карточка WARP. Справа — недавние серверы, а при остальных
+                    выходах под ними карточка WARP. Столбцы, а не ряды: пустот между карточками
+                    нет ни в одном состоянии (владелец, 07.11). Карточку WARP код переносит
+                    между столбцами (VpnView.ShowWarp).
                 -->
                 <Grid Margin="0,16,0,0">
                     <Grid.ColumnDefinitions>
@@ -447,13 +450,9 @@
                         <ColumnDefinition Width="12" />
                         <ColumnDefinition Width="*" MinWidth="250" />
                     </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="12" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
 
-                    <views:FitWidth Grid.Column="0">
+                    <StackPanel x:Name="LeftColumn" Grid.Column="0">
+                    <views:FitWidth VerticalAlignment="Top">
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
                                 <Grid>
@@ -540,77 +539,12 @@
                             </StackPanel>
                         </Border>
                     </views:FitWidth>
-
-                    <!--
-                        Недавние серверы — через которые шёл трафик, свежие первыми
-                        (ExitHistory: пишется, когда программа спрашивает движок о выходе).
-                    -->
-                    <views:FitWidth Grid.Column="2">
-                        <Border Style="{StaticResource Card}">
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="Недавние серверы" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                        <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                        Content="Выходы, через которые недавно шёл трафик, — свежие первыми. Замечаются, пока программа открыта: смену при закрытом окне журнал увидит, когда окно спросит движок снова.&#x0a;&#x0a;Задержка и цвет — по последнему замеру сервера." />
-                                    </StackPanel>
-
-                                    <ItemsControl x:Name="RecentList" Margin="0,10,0,0">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Grid Margin="0,0,0,9">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto" />
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
-
-                                                    <Grid Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
-                                                        <Border CornerRadius="{StaticResource RSm}" ClipToBounds="True" Visibility="{Binding FlagShown}"
-                                                                BorderBrush="{DynamicResource Border}" BorderThickness="1">
-                                                            <Image Source="{Binding Flag}" Width="24" Height="16" Stretch="UniformToFill"
-                                                                   RenderOptions.BitmapScalingMode="HighQuality" />
-                                                        </Border>
-                                                        <TextBlock Text="{Binding Mark}" FontFamily="{Binding MarkFont}" FontSize="{Binding MarkSize}"
-                                                                   FontWeight="SemiBold" Foreground="{Binding MarkBrush}" Width="24"
-                                                                   TextAlignment="Center" VerticalAlignment="Center"
-                                                                   Visibility="{Binding MarkShown}" />
-                                                    </Grid>
-
-                                                    <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis"
-                                                               VerticalAlignment="Center" FontWeight="{Binding Weight}" />
-
-                                                    <TextBlock Grid.Column="2" Text="{Binding Latency}" Style="{StaticResource Mono}"
-                                                               Margin="8,0,10,0" VerticalAlignment="Center" />
-
-                                                    <Rectangle RadiusX="1" RadiusY="1" Grid.Column="3" Width="7" Height="7" Fill="{Binding Color}"
-                                                             VerticalAlignment="Center" />
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-
-                                    <StackPanel x:Name="RecentEmptyBox" Margin="0,8,0,0" HorizontalAlignment="Center"
-                                                Visibility="Collapsed">
-                                        <Path Width="20" Height="20" Stretch="Uniform" HorizontalAlignment="Center"
-                                              Stroke="{DynamicResource Faint}" StrokeThickness="1.5" StrokeLineJoin="Round"
-                                              Data="M 3,22 A 3,3 0 1 1 9,22 A 3,3 0 1 1 3,22 Z M 21,8 A 3,3 0 1 1 27,8 A 3,3 0 1 1 21,8 Z M 21,24 A 3,3 0 1 1 27,24 A 3,3 0 1 1 21,24 Z M 8.1,20.2 L 21.9,9.8 M 9,22.3 L 21,23.7" />
-                                        <TextBlock Margin="0,6,0,0" HorizontalAlignment="Center" TextAlignment="Center"
-                                                   FontSize="13" FontWeight="SemiBold" Text="Серверов пока нет" />
-                                        <TextBlock x:Name="RecentEmpty" Style="{StaticResource Caption}" TextWrapping="Wrap"
-                                                   Margin="0,4,0,0" MaxWidth="240" TextAlignment="Center" Visibility="Collapsed"
-                                                   Text="Журнал заполняется, пока движки работают и окно открыто." />
-                                    </StackPanel>
-                                </StackPanel>
-                        </Border>
-                    </views:FitWidth>
-
                     <!--
                         Быстрая смена сервера (макет владельца 01.10): автоподбор — первая
                         плитка ленты, его пояснение — строкой под заголовком. Выбрать плитку —
                         то же, что «выбрать» у сервера в списке. Плитки и флаги мельче (25.10).
                     -->
-                    <views:FitWidth Grid.Row="2" Grid.Column="0" VerticalAlignment="Top">
+                    <views:FitWidth x:Name="QuickHost" VerticalAlignment="Top" Margin="0,12,0,0">
                         <Border x:Name="QuickCard" Style="{StaticResource Card}">
                             <StackPanel>
                                 <Grid>
@@ -708,18 +642,83 @@
                                                         Content="Нестабильные — серверы, что работают через раз: из последних пяти и больше замеров удачных меньше четырёх из пяти. Они жёлтые в списке.&#x0a;&#x0a;Включено — автоподбор их не берёт, а в ленте и при сортировке по задержке они идут после стабильных. Выключено — только по задержке, как все.&#x0a;&#x0a;Выбрать нестабильный руками можно всегда. Автоподбор меняется после следующего запуска движков." />
                                     </StackPanel>
 
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                        <ToggleButton x:Name="KillSwitchToggle" Style="{StaticResource Switch}"
+                                    <StackPanel x:Name="KillSwitchRow" Orientation="Horizontal" Margin="0,0,0,4">
+                                        <ToggleButton x:Name="KillSwitchToggle" Style="{StaticResource Switch}" AutomationProperties.Name="Kill switch"
                                                       VerticalAlignment="Center" Click="OnKillSwitch" />
                                         <TextBlock Text="Kill switch" Margin="10,0,0,0" VerticalAlignment="Center" />
                                         <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                        Content="«Туннель»: пока туннель не работает — упал, перезапускается или ждёт сервера, — трафик мимо него с вашего адреса не уходит вовсе: выходить в сеть мимо туннеля могут лишь сам движок, Zephyron и локальная сеть (роутер, принтеры, Radmin и Hamachi). Новый адаптер — второй Wi-Fi, телефон по USB — закрывается сразу, как появится.&#x0a;&#x0a;«Гибрид»: десинк и «напрямую» работают как обычно, а имена «через VPN» не уводятся мимо туннеля, когда выходы подписки молчат, — ждут, пока сервер оживёт. Пока движок туннеля перезапускается, они могут уйти напрямую.&#x0a;&#x0a;В обоих режимах «Обход туннеля» в настройках туннеля не действует.&#x0a;&#x0a;Не включается, если рядом работает другой десинк на WinDivert (GoodbyeDPI, Zapret): его пакеты Windows видит без имени программы, и фильтр закрыл бы ими сам туннель.&#x0a;&#x0a;Фильтры Windows держит надзор: остановили движки или закрыли программу — Windows снимает их сама, сеть не остаётся закрытой.&#x0a;&#x0a;По умолчанию выключен. Применяется после следующего запуска движков." />
+                                                        Content="Работает при «Весь трафик через выход»: пока выход не работает — упал, перезапускается или ждёт сервера, — трафик мимо него с вашего адреса не уходит вовсе: выходить в сеть мимо выхода могут лишь сам движок, Zephyron и локальная сеть (роутер, принтеры, Radmin и Hamachi). Новый адаптер — второй Wi-Fi, телефон по USB — закрывается сразу, как появится.&#x0a;&#x0a;«Работа мимо туннеля» в параметрах туннеля при включённом kill switch не действует.&#x0a;&#x0a;Не включается, если рядом работает другой десинк на WinDivert (GoodbyeDPI, Zapret): его пакеты Windows видит без имени программы, и фильтр закрыл бы ими сам туннель.&#x0a;&#x0a;Фильтры Windows держит надзор: остановили движки или закрыли программу — Windows снимает их сама, сеть не остаётся закрытой.&#x0a;&#x0a;По умолчанию выключен. Применяется после следующего запуска движков." />
                                     </StackPanel>
                                 </WrapPanel>
                             </StackPanel>
                         </Border>
                     </views:FitWidth>
+                    </StackPanel>
 
+                    <StackPanel x:Name="RightColumn" Grid.Column="2">
+                    <!--
+                        Недавние серверы — через которые шёл трафик, свежие первыми
+                        (ExitHistory: пишется, когда программа спрашивает движок о выходе).
+                    -->
+                    <views:FitWidth>
+                        <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Недавние серверы" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
+                                                        Content="Выходы, через которые недавно шёл трафик, — свежие первыми. Замечаются, пока программа открыта: смену при закрытом окне журнал увидит, когда окно спросит движок снова.&#x0a;&#x0a;Задержка и цвет — по последнему замеру сервера." />
+                                    </StackPanel>
+
+                                    <ItemsControl x:Name="RecentList" Margin="0,10,0,0">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,0,0,9">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <Grid Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
+                                                        <Border CornerRadius="{StaticResource RSm}" ClipToBounds="True" Visibility="{Binding FlagShown}"
+                                                                BorderBrush="{DynamicResource Border}" BorderThickness="1">
+                                                            <Image Source="{Binding Flag}" Width="24" Height="16" Stretch="UniformToFill"
+                                                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                                                        </Border>
+                                                        <TextBlock Text="{Binding Mark}" FontFamily="{Binding MarkFont}" FontSize="{Binding MarkSize}"
+                                                                   FontWeight="SemiBold" Foreground="{Binding MarkBrush}" Width="24"
+                                                                   TextAlignment="Center" VerticalAlignment="Center"
+                                                                   Visibility="{Binding MarkShown}" />
+                                                    </Grid>
+
+                                                    <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis"
+                                                               VerticalAlignment="Center" FontWeight="{Binding Weight}" />
+
+                                                    <TextBlock Grid.Column="2" Text="{Binding Latency}" Style="{StaticResource Mono}"
+                                                               Margin="8,0,10,0" VerticalAlignment="Center" />
+
+                                                    <Rectangle RadiusX="1" RadiusY="1" Grid.Column="3" Width="7" Height="7" Fill="{Binding Color}"
+                                                             VerticalAlignment="Center" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <StackPanel x:Name="RecentEmptyBox" Margin="0,8,0,0" HorizontalAlignment="Center"
+                                                Visibility="Collapsed">
+                                        <Path Width="20" Height="20" Stretch="Uniform" HorizontalAlignment="Center"
+                                              Stroke="{DynamicResource Faint}" StrokeThickness="1.5" StrokeLineJoin="Round"
+                                              Data="M 3,22 A 3,3 0 1 1 9,22 A 3,3 0 1 1 3,22 Z M 21,8 A 3,3 0 1 1 27,8 A 3,3 0 1 1 21,8 Z M 21,24 A 3,3 0 1 1 27,24 A 3,3 0 1 1 21,24 Z M 8.1,20.2 L 21.9,9.8 M 9,22.3 L 21,23.7" />
+                                        <TextBlock Margin="0,6,0,0" HorizontalAlignment="Center" TextAlignment="Center"
+                                                   FontSize="13" FontWeight="SemiBold" Text="Серверов пока нет" />
+                                        <TextBlock x:Name="RecentEmpty" Style="{StaticResource Caption}" TextWrapping="Wrap"
+                                                   Margin="0,4,0,0" MaxWidth="240" TextAlignment="Center" Visibility="Collapsed"
+                                                   Text="Журнал заполняется, пока движки работают и окно открыто." />
+                                    </StackPanel>
+                                </StackPanel>
+                        </Border>
+                    </views:FitWidth>
                     <!--
                         WARP — выбор пути, а не запасной (владелец, 01.10: «разводка
                         впн и варп… лучше сделать взаимоисключающими»). Включён — туннель
@@ -727,7 +726,7 @@
                         подписки. В узкой колонке — столбиком: заголовок и выключатель,
                         пояснение, внизу состояние и замер.
                     -->
-                    <views:FitWidth Grid.Row="2" Grid.Column="2">
+                    <views:FitWidth x:Name="WarpHost" VerticalAlignment="Top" Margin="0,12,0,0">
                         <Border x:Name="WarpCard" Style="{StaticResource Card}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -748,7 +747,7 @@
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                     <TextBlock Text="Cloudflare WARP" FontWeight="SemiBold" VerticalAlignment="Center" />
                                     <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                Content="Бесплатный выход Cloudflare: без счёта, без срока, без почты и ключей — учётную запись движок заводит себе сам.&#x0a;&#x0a;Это выбор пути: включённый WARP ставит подписки на паузу, и весь туннель идёт через него. Выключили — туннель вернётся к подпискам и к выбранному там серверу. Применяется после следующего запуска движков.&#x0a;&#x0a;Выпускает трафик в ближайшем городе Cloudflare, из России — в Москве. От блокировок оператора спасает, от отказов по стране — нет: адрес остаётся отечественным, пока не выбрана «Страна выхода» — тогда Cloudflare выпускает трафик в стране выбранного сервера подписки.&#x0a;&#x0a;Идёт по MASQUE поверх HTTP/2 на 443 порту. После запуска ему нужно около полуминуты, прежде чем пойдёт трафик." />
+                                                Content="Бесплатный выход Cloudflare: без счёта, без срока, без почты и ключей — учётную запись движок заводит себе сам.&#x0a;&#x0a;Это выбор выхода: пока выходом выбран WARP, подписки не используются. Выключили — выходом станет «Мой VPN», если есть подписки или ключи, иначе «Нет». Применяется после следующего запуска движков.&#x0a;&#x0a;Выпускает трафик в ближайшем городе Cloudflare, из России — в Москве. От блокировок оператора спасает, от отказов по стране — нет: адрес остаётся отечественным, пока не выбрана «Страна выхода» — тогда Cloudflare выпускает трафик в стране выбранного сервера подписки.&#x0a;&#x0a;Идёт по MASQUE поверх HTTP/2 на 443 порту. После запуска ему нужно около полуминуты, прежде чем пойдёт трафик." />
                                 </StackPanel>
 
                                 <ToggleButton Grid.Column="2" x:Name="WarpSwitch" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="OnWarp" />
@@ -794,6 +793,8 @@
                                         </ComboBox>
                                         <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
                                                    Text="Сайты, закрытые для России, увидят выбранную страну. Не каждый сервер подписки пропускает WARP: если выход не поднимется, выберите другой." />
+                                        <TextBlock x:Name="WarpCountryWarn" Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource Warn}" Visibility="Collapsed" />
                                         <TextBlock x:Name="WarpExitLine" Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap" />
                                     </StackPanel>
                                 </StackPanel>
@@ -812,13 +813,14 @@
                             </Grid>
                         </Border>
                     </views:FitWidth>
+                    </StackPanel>
                 </Grid>
 
             </StackPanel>
 
             <!--
                 Пулы серверов (владелец 19.10, идеи №6): папки серверов через
-                все подписки, в которые ведут маршруты «через VPN». Сервер
+                все подписки, в которые ведут маршруты «через выход». Сервер
                 кладут в пул перетаскиванием на папку или из «⋯» строки.
                 Стоят над подписками: их мало, а подписки раскрываются
                 на сотни строк.
@@ -864,7 +866,11 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- Подписки на паузе: панель WarnSoft с ромбом «частично»; Visibility пишет код у PausedLine. -->
+                <!--
+                    Подписки не используются (выбран WARP или выход не выбран): панель WarnSoft
+                    с ромбом «частично», текст и кнопка — из кода (ShowExitHint). Одно сообщение
+                    вместо плашки и строки статуса с тем же смыслом.
+                -->
                 <Border x:Name="PausedBox" Margin="0,8,0,0" Padding="12,8" CornerRadius="{StaticResource RMd}"
                         Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}"
                         BorderThickness="{StaticResource Stroke}" Visibility="Collapsed">
@@ -872,11 +878,13 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <Control Style="{StaticResource StateMark}" Tag="Degraded" Margin="0,1,10,0" VerticalAlignment="Top" />
                         <TextBlock x:Name="PausedLine" Grid.Column="1" Style="{StaticResource Caption}" TextWrapping="Wrap"
-                                   Foreground="{DynamicResource Text}" Visibility="Collapsed"
-                                   Text="Подписки приостановлены: туннель идёт через WARP. Выключите WARP выше, и он вернётся к подпискам." />
+                                   Foreground="{DynamicResource Text}" VerticalAlignment="Center" />
+                        <Button x:Name="PausedAction" Grid.Column="2" Style="{StaticResource Ghost}" Padding="12,4" Margin="12,-2,0,-2"
+                                Click="OnExitHint" />
                     </Grid>
                 </Border>
 

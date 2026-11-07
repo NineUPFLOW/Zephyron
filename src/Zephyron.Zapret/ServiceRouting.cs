@@ -75,14 +75,14 @@ public static class ServiceRouting
 
         public string DescribeDefault() => DefaultOff ? "выключено" : DefaultMode switch
         {
-            RoutingMode.Proxy => "VPN",
+            RoutingMode.Proxy => "через выход",
             RoutingMode.Desync => "десинк",
             _ => "напрямую",
         };
 
         public string DescribeMode() => Off ? "выключено" : Mode switch
         {
-            RoutingMode.Proxy => "VPN",
+            RoutingMode.Proxy => "через выход",
             RoutingMode.Desync => "десинк",
             _ => "напрямую",
         };
