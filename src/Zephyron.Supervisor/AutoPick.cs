@@ -222,6 +222,13 @@ public static class AutoPick
     /// </remarks>
     private const int VpnServers = 1;
 
+    /// <summary>Порядок выходов в замере: серверы VPN, и WARP лишь после них — ему достаются сайты, не открывшиеся ни через один.</summary>
+    public static IReadOnlyList<ProxyServer> ExitOrder(IReadOnlyList<ProxyServer> vpn, ProxyServer? warp) =>
+        [.. vpn.Take(VpnServers), .. warp is null ? [] : new[] { warp }];
+
+    private static bool IsWarp(string? tag) =>
+        tag is not null && (tag == Warp.MasqueTag || tag == Warp.FileServer()?.Tag);
+
     /// <summary>Услуги с античитом: он плохо переносит и десинк, и туннель, трогать их незачем.</summary>
     private static readonly string[] Anticheat = ["Riot и Valorant", "Battle.net и Blizzard"];
 
@@ -469,14 +476,20 @@ public static class AutoPick
         }
 
         // Выход — последним и только с разрешением: напрямую, десинк и пин проверены раньше.
-        if (allowExit && Stable(tries.Where(t => t.Way == AutoPickWay.Vpn)) is { } vpn)
+        // Выходов может быть два: сервер VPN, затем WARP. Берём первый, у которого все пробы удались:
+        // провал VPN-сервера не должен отменять открывшийся через WARP сайт.
+        if (allowExit && tries.Where(t => t.Way == AutoPickWay.Vpn).GroupBy(t => t.Server)
+                .FirstOrDefault(g => g.All(Good)) is { } proved)
         {
+            var vpn = proved.ToList();
+            var exit = IsWarp(vpn[0].Server) ? "WARP" : "VPN";
+
             // Без VPN сервер отвечал, но отказом: это не блокировка, а страна.
             bool refused = tries.Any(t => t.Way != AutoPickWay.Vpn && t.Level == 1);
 
             return new(AutoPickWay.Vpn, RoutingMode.Proxy, null, null, refused
-                ? $"без VPN сайт отказывает по стране, через VPN открывается ({vpn[0].Server})"
-                : $"открывается через VPN ({vpn[0].Server})");
+                ? $"без туннеля сайт отказывает по стране, через {exit} открывается ({vpn[0].Server})"
+                : $"открывается через {exit} ({vpn[0].Server})");
         }
 
         return null;
@@ -538,11 +551,11 @@ public static class AutoPick
         IReadOnlyList<ProxyServer> vpnServers,
         IProgress<AutoPickRow>? progress,
         CancellationToken cancellationToken,
-        bool allowExit = false)
+        bool allowExit = false,
+        ProxyServer? warp = null)
     {
         // Без разрешения выход не пробуется вовсе: подбор не должен гнать сайты за границу сам.
-        if (!allowExit)
-            vpnServers = [];
+        vpnServers = allowExit ? ExitOrder(vpnServers, warp) : [];
 
         var state = SupervisorState.Load(SupervisorState.DefaultPath);
 
@@ -1011,7 +1024,7 @@ public static class AutoPick
                     .Where(r => r.CurrentMode == RoutingMode.Proxy || r.Tries.All(t => t.Level < 2))
                     .ToList();
 
-                foreach (var server in vpnServers.Take(VpnServers))
+                foreach (var server in vpnServers)
                 {
                     if (left.Count == 0)
                         break;

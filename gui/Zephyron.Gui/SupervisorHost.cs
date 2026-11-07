@@ -533,6 +533,7 @@ internal static class SupervisorHost
             // дыра в kill switch, в «Гибриде» — имена «через VPN» с домашнего адреса.
             bypassWhenDead: settings.BypassWhenTunnelDead && !settings.KillSwitch,
             preferredExit: Warp.PreferredExit(settings),
+            fallbackExit: Warp.UsesFallback(settings) ? Warp.Exits()[0].Tag : null,
             exitCheckSeconds: settings.ExitCheckSeconds,
             replacePinned: settings.ReplaceSilentServer,
             dnsViaAuto: options.DnsViaAuto,

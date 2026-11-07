@@ -1652,7 +1652,7 @@ public partial class StatusView : UserControl
         PathText.Text = path == TunnelPath.Warp
             ? "Бесплатный выход Cloudflare: встроенный или ваш файл WARP, страна — на вкладке VPN. Подписки не используются."
             : settings.HasSubscriptionExit
-                ? "Серверы ваших подписок и ключей. WARP не используется."
+                ? Zephyron.Subscriptions.Warp.UsesFallback(settings) ? "Серверы ваших подписок и ключей. WARP — запасной, если серверы VPN не ответят." : "Серверы ваших подписок и ключей. WARP не используется."
                 : "Подписок и ключей пока нет — добавьте их на вкладке VPN.";
     }
 

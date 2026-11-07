@@ -156,18 +156,41 @@ public partial class WarpTests
     }
 
     /// <summary>
-    /// Все серверы подписки отмечены мёртвыми — движок перебирает их сам
-    /// вместе с WARP. Отметки бывают устаревшими: 23.09 девять серверов
-    /// числились мёртвыми по замерам, сделанным с неверной набивкой XHTTP,
-    /// и в автоподборе оставался один WARP.
+    /// Все серверы подписки отмечены мёртвыми — WARP в автоподбор всё равно не входит:
+    /// на него переводит надзор (владелец, 08.11), а urltest остаётся над серверами VPN.
     /// </summary>
     [Fact]
-    public void AllSubscriptionServersDeadBringsWarpIn()
+    public void AllSubscriptionServersDeadKeepsWarpOutOfAutoLatency()
     {
         var root = Compile(new SingBoxOptions { DeadServerTags = new HashSet<string> { "NL" } },
             Ordinary(), Warp.MasqueServer());
 
-        Assert.Equal(["NL", Warp.MasqueTag], Members(root, "auto-latency"));
+        Assert.Equal(["NL"], Members(root, "auto-latency"));
+        Assert.Contains(Warp.MasqueTag, Members(root, "auto"));
+    }
+
+    [Fact]
+    public void FallbackWarpFollowsPathAndSubscription()
+    {
+        var withKeys = new AppSettings { SubscriptionUrl = "https://x.example/sub" };
+
+        Assert.True(Warp.UsesFallback(withKeys));
+        Assert.False(Warp.UsesFallback(withKeys with { WarpFallback = false }));
+        Assert.False(Warp.UsesFallback(withKeys with { WarpEnabled = true }));
+        Assert.False(Warp.UsesFallback(new AppSettings()));
+
+        Assert.Equal(["NL", Warp.MasqueTag], Warp.TunnelExits(withKeys, [Ordinary()]).Select(s => s.Tag));
+        Assert.Equal(["NL"], Warp.TunnelExits(withKeys with { WarpFallback = false }, [Ordinary()]).Select(s => s.Tag));
+        Assert.Equal([Warp.MasqueTag], Warp.TunnelExits(withKeys with { WarpEnabled = true }, [Ordinary()]).Select(s => s.Tag));
+    }
+
+    [Fact]
+    public void ExitsOnlyEscalateToWarpOnceThenBypass()
+    {
+        Assert.True(TunnelBypass.GoesToWarp(BypassAction.Engage, hasWarp: true, onWarp: false));
+        Assert.False(TunnelBypass.GoesToWarp(BypassAction.Engage, hasWarp: true, onWarp: true));
+        Assert.False(TunnelBypass.GoesToWarp(BypassAction.Engage, hasWarp: false, onWarp: false));
+        Assert.False(TunnelBypass.GoesToWarp(BypassAction.Release, hasWarp: true, onWarp: false));
     }
 
     /// <summary>

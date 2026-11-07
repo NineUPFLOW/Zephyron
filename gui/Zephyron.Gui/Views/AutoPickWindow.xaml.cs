@@ -323,7 +323,7 @@ public partial class AutoPickWindow : Window
     private int _ticks;
     private string _filter = "all";
 
-    /// <summary>Выключатель выхода за границу — по умолчанию выключен; подпись говорит, через что пойдёт туннель.</summary>
+    /// <summary>Выключатель выхода за границу — последнее средство, по умолчанию включён (AppSettings.AutoPickExit); подпись говорит, через что пойдёт туннель.</summary>
     private void ShowAllowExit()
     {
         var settings = AppSettings.Load(AppSettings.DefaultPath);
@@ -331,11 +331,16 @@ public partial class AutoPickWindow : Window
         AllowExitLine.Text = !settings.Engines.Tunnel
             ? "Сейчас режим «Десинк», туннеля нет: пробовать нечего, подбор ищет только напрямую, десинком и пином."
             : AllowExit.IsChecked == true
-                ? $"Если ни напрямую, ни десинк, ни пин не помогут, сайт предложат вести «через VPN» — через {TunnelPaths.Name(TunnelPaths.Of(settings))}."
+                ? "Если ни напрямую, ни десинк, ни пин не помогут, сайт предложат вести «через VPN» — через "
+                    + (Zephyron.Subscriptions.Warp.UsesFallback(settings) ? "VPN, а если сервер не откроет — через WARP." : TunnelPaths.Name(TunnelPaths.Of(settings)) + ".")
                 : "Выключено: сайты не уводятся за границу, подбор ищет только напрямую, десинком и пином.";
     }
 
-    private void OnAllowExit(object sender, RoutedEventArgs e) => ShowAllowExit();
+    private void OnAllowExit(object sender, RoutedEventArgs e)
+    {
+        (AppSettings.Load(AppSettings.DefaultPath) with { AutoPickExit = AllowExit.IsChecked == true }).Save(AppSettings.DefaultPath);
+        ShowAllowExit();
+    }
 
     public AutoPickWindow()
     {
@@ -351,6 +356,7 @@ public partial class AutoPickWindow : Window
 
         Loaded += (_, _) =>
         {
+            AllowExit.IsChecked = AppSettings.Load(AppSettings.DefaultPath).AutoPickExit;
             ShowAllowExit();
             LoadLast();
             ApplyPhase();
@@ -990,6 +996,12 @@ public partial class AutoPickWindow : Window
             if (allowExit && tunnel && path == TunnelPath.Warp && Zephyron.Subscriptions.Warp.Exits() is [{ IsMeasurable: true } warp])
                 servers = [warp];
 
+            // VPN первым, WARP — только для того, что не открылось через сервер (владелец, 08.11).
+            Zephyron.Subscriptions.ProxyServer? fallback = allowExit && tunnel && servers.Count > 0 && Zephyron.Subscriptions.Warp.UsesFallback(settings)
+                && Zephyron.Subscriptions.Warp.Exits() is [{ IsMeasurable: true } spare]
+                ? spare
+                : null;
+
             _stageSkip[4] = !allowExit ? "выход не разрешён"
                 : !tunnel ? "режим «Десинк»: туннеля нет"
                 : path == TunnelPath.Warp && servers.Count == 0 ? "встроенный WARP пробой не проверить"
@@ -1041,7 +1053,7 @@ public partial class AutoPickWindow : Window
             // Progress создаётся здесь, в потоке окна: обратные вызовы возвращаются в него.
             _progress = new Progress<AutoPickRow>(OnRow);
 
-            var report = await AutoPick.RunAsync(targets, servers, _progress, token, allowExit);
+            var report = await AutoPick.RunAsync(targets, servers, _progress, token, allowExit, fallback);
 
             Finish(report);
         }

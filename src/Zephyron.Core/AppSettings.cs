@@ -474,6 +474,18 @@ public sealed record AppSettings
     public bool WarpEnabled { get; init; }
 
     /// <summary>
+    /// На пути VPN держать WARP запасным выходом (владелец, 08.11: «VPN по умолчанию, WARP запасной»).
+    /// </summary>
+    /// <remarks>Включено по умолчанию; работает, только если есть подписка или ключи и путь не WARP.</remarks>
+    public bool WarpFallback { get; init; } = true;
+
+    /// <summary>
+    /// Автоподбор может увести сайт в туннель как последнее средство — после прямого, пресета, рецептов и пина.
+    /// </summary>
+    /// <remarks>Включено по умолчанию; явно сохранённое «выключено» остаётся.</remarks>
+    public bool AutoPickExit { get; init; } = true;
+
+    /// <summary>
     /// Страна выхода WARP: тег сервера подписки, через который туннель WARP
     /// выходит к Cloudflare; <c>null</c> или пусто — «как есть», из России.
     /// </summary>

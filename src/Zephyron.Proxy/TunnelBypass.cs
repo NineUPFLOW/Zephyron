@@ -154,6 +154,12 @@ public sealed class TunnelBypass
         _unconfirmed = false;
     }
 
+    /// <summary>
+    /// Мёртвый VPN при запасном WARP: сперва выход через WARP, и только его провал уводит мимо туннеля.
+    /// </summary>
+    public static bool GoesToWarp(BypassAction action, bool hasWarp, bool onWarp) =>
+        action == BypassAction.Engage && hasWarp && !onWarp;
+
     /// <summary>Куда переключить группу выбора.</summary>
     public string TargetFor(BypassAction action, string latencyTag) => action switch
     {

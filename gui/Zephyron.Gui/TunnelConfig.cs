@@ -254,7 +254,8 @@ internal static class TunnelConfig
                     [settings.SubscriptionUrl, .. SubscriptionBook.Load().Entries.Select(e => e.Url)]),
                 PreferredServerTag = Warp.PreferredExit(settings),
                 WarpDetour = warpDetour,
-                WarpRegistrationEdges = settings.WarpEnabled && warpDetour is null ? WarpRegistration.Edges : [],
+                // Запасной WARP регистрируется напрямую: через сервер подписки он не поднялся бы как раз тогда, когда нужен.
+                WarpRegistrationEdges = (settings.WarpEnabled || Warp.UsesFallback(settings)) && warpDetour is null ? WarpRegistration.Edges : [],
                 WarpExitThroughDetour = Warp.ExitsThrough(settings, warpDetour),
 
                 // Без «Selective Routing» и при WARP пулов нет — их маршруты

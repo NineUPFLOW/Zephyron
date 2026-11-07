@@ -506,8 +506,10 @@ public sealed class SingBoxService : SupervisedService
         bool dnsViaAuto = false,
         string? watchUrl = null,
         IReadOnlyList<ServerPool>? pools = null,
-        bool deadPoolToDefault = true)
+        bool deadPoolToDefault = true,
+        string? fallbackExit = null)
     {
+        _fallbackExit = string.IsNullOrWhiteSpace(fallbackExit) ? null : fallbackExit;
         _pools = [.. (pools ?? []).Select(p => new PoolState(p, replacePinned))];
         _deadPoolToDefault = deadPoolToDefault;
         _watchUrl = string.IsNullOrWhiteSpace(watchUrl) ? Ping.Cloudflare : watchUrl;
@@ -525,6 +527,12 @@ public sealed class SingBoxService : SupervisedService
     }
 
     private readonly string? _preferredExit;
+
+    /// <summary>Запасной выход (WARP при подписке): в группу автоподбора не входит, ставится при мёртвом VPN.</summary>
+    private readonly string? _fallbackExit;
+
+    /// <summary>Сейчас выбран запасной выход, а не VPN.</summary>
+    private bool _onFallback;
 
     /// <summary>Движок только ради DNS — см. параметр конструктора.</summary>
     private readonly bool _dnsOnly;
@@ -1004,6 +1012,7 @@ public sealed class SingBoxService : SupervisedService
         _refreshStop.Dispose();
         _refreshStop = new CancellationTokenSource();
         _bypass.Forget();
+        _onFallback = false;
 
         // Заодно и остальная память о прежнем запуске. Держать её врозь
         // незачем: вся она об одном — о процессе, которого больше нет.
@@ -1343,8 +1352,24 @@ public sealed class SingBoxService : SupervisedService
     /// </remarks>
     private async Task ApplyBypassAsync(bool tunnelWorks, CancellationToken cancellationToken)
     {
-        if (!_bypassWhenDead)
+        if (!_bypassWhenDead && _fallbackExit is null)
             return;
+
+        // Идём через WARP, а VPN, возможно, ожил: возвращаемся на него (замер ниже — того же рода, что снимает обход).
+        if (_onFallback && !_bypass.Engaged && tunnelWorks)
+        {
+            using var back = new ClashApi($"127.0.0.1:{_healthPort}", Talk, EngineKeys.Current(_configPath));
+            var vpn = _pinnedPlaced ? _preferredExit! : LatencyGroup;
+
+            if (await back.MeasureAsync(vpn, _watchUrl, CheckTimeout, cancellationToken) is not null
+                && await SelectMainAsync(back, vpn, cancellationToken))
+            {
+                _onFallback = false;
+                Note("VPN ожил — обратно");
+            }
+
+            return;
+        }
 
         var action = _bypass.Observe(tunnelWorks);
 
@@ -1352,6 +1377,31 @@ public sealed class SingBoxService : SupervisedService
             return;
 
         using var api = new ClashApi($"127.0.0.1:{_healthPort}", Talk, EngineKeys.Current(_configPath));
+
+        if (TunnelBypass.GoesToWarp(action, _fallbackExit is not null, _onFallback))
+        {
+            if (await SelectMainAsync(api, _fallbackExit!, cancellationToken))
+            {
+                _onFallback = true;
+
+                // Три проверки через WARP считаются заново — прежние были про VPN.
+                _bypass.Forget();
+                Note("Серверы VPN не отвечают — выход через WARP");
+            }
+            else
+            {
+                _bypass.Forget();
+            }
+
+            return;
+        }
+
+        // Kill switch: мимо туннеля нельзя, WARP при этом остаётся в туннеле.
+        if (!_bypassWhenDead)
+        {
+            _bypass.Forget();
+            return;
+        }
 
         // Возврат из обхода — прямо на живой сервер, найденный по одному,
         // а не в автоподбор, который мог стоять на мёртвом.
@@ -1364,11 +1414,24 @@ public sealed class SingBoxService : SupervisedService
             return;
         }
 
-        Note(action == BypassAction.Engage
-            ? "выходы подписки не отвечают три проверки подряд — трафик уведён мимо туннеля, "
-                + "чтобы не легла вся сеть. Он идёт открыто и с домашнего адреса. "
-                + "Вернём в туннель, как только выход оживёт; отключается настройкой."
-            : "выход подписки ожил — трафик возвращён в туннель.");
+        if (action == BypassAction.Release)
+        {
+            bool toWarp = target == _fallbackExit;
+            _onFallback = toWarp;
+
+            if (toWarp)
+            {
+                Note("WARP снова отвечает — трафик возвращён в туннель через WARP.");
+                return;
+            }
+
+            Note(_fallbackExit is not null ? "VPN ожил — обратно" : "выход подписки ожил — трафик возвращён в туннель.");
+            return;
+        }
+
+        Note("выходы подписки не отвечают три проверки подряд — трафик уведён мимо туннеля, "
+            + "чтобы не легла вся сеть. Он идёт открыто и с домашнего адреса. "
+            + "Вернём в туннель, как только выход оживёт; отключается настройкой.");
     }
 
     /// <summary>
@@ -1415,6 +1478,14 @@ public sealed class SingBoxService : SupervisedService
         // Выбранный автоподбором молчит — ищем живого по одному. Найден —
         // обход снимется, и селектор встанет прямо на него (_returnTo).
         _returnTo = await PickOneByOneAsync(api, cancellationToken, notifyNoLive: true);
+
+        // VPN молчит, а WARP мог ожить: вернуть на него, не дожидаясь серверов.
+        if (_returnTo is null && _fallbackExit is not null
+            && await api.MeasureAsync(_fallbackExit, _watchUrl, CheckTimeout, cancellationToken) is not null)
+        {
+            _returnTo = _fallbackExit;
+        }
+
         return _returnTo is not null;
     }
 
@@ -1598,7 +1669,7 @@ public sealed class SingBoxService : SupervisedService
 
         // Без сети не отвечает никто, и искать замену — перебрать все серверы
         // впустую (так перебрал их прогрев 23.10, см. PickOneByOneAsync).
-        if (_bypass.Engaged || _exitCheckSeconds <= 0 || _picking != 0 || !PhysicalNetwork.Up())
+        if (_bypass.Engaged || _onFallback || _exitCheckSeconds <= 0 || _picking != 0 || !PhysicalNetwork.Up())
             return;
 
         // После промаха — на каждом опросе, иначе по настройке.

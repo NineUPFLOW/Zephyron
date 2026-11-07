@@ -89,6 +89,36 @@ public sealed class AutoPickTests : IDisposable
     }
 
     [Fact]
+    public void Exit_goes_through_vpn_first_and_warp_only_when_vpn_failed()
+    {
+        var vpn = new Zephyron.Subscriptions.ProxyServer { Protocol = Zephyron.Subscriptions.ProxyProtocol.Vless, Credential = "c", Tag = "NL", Host = "h", Port = 1 };
+        var warp = Zephyron.Subscriptions.Warp.MasqueServer();
+
+        Assert.Equal(["NL", warp.Tag], AutoPick.ExitOrder([vpn, vpn with { Tag = "DE" }], warp).Select(s => s.Tag));
+        Assert.Equal([warp.Tag], AutoPick.ExitOrder([], warp).Select(s => s.Tag));
+
+        AutoPickTry Exit(string server, bool works) => Try(AutoPickWay.Vpn, works) with { Server = server };
+        var direct = Try(AutoPickWay.Direct, false);
+
+        // VPN открыл — WARP не нужен; VPN не открыл, WARP открыл — выход WARP, и Why это называет.
+        var viaVpn = AutoPick.Choose(Row(RoutingMode.Direct, null, direct, Exit("NL", true)))!;
+        Assert.Contains("VPN", viaVpn.Why);
+
+        var viaWarp = AutoPick.Choose(Row(RoutingMode.Direct, null, direct, Exit("NL", false),
+            Exit(Zephyron.Subscriptions.Warp.MasqueTag, true)))!;
+        Assert.Equal(RoutingMode.Proxy, viaWarp.Mode);
+        Assert.Contains("WARP", viaWarp.Why);
+    }
+
+    [Fact]
+    public void Exit_is_allowed_by_default_but_explicit_false_stays()
+    {
+        Assert.True(new AppSettings().AutoPickExit);
+        Assert.True(AppSettings.Fresh.AutoPickExit);
+        Assert.False((new AppSettings() with { AutoPickExit = false }).AutoPickExit);
+    }
+
+    [Fact]
     public void Nothing_working_changes_nothing()
     {
         var row = Row(RoutingMode.Desync, null,

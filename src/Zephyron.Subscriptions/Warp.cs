@@ -192,7 +192,13 @@ public static class Warp
     /// </para>
     /// </remarks>
     public static IReadOnlyList<ProxyServer> TunnelExits(AppSettings settings, IReadOnlyList<ProxyServer> subscriptions) =>
-        settings.WarpEnabled ? Exits() : subscriptions;
+        settings.WarpEnabled ? Exits() : UsesFallback(settings) ? [.. subscriptions, .. Exits()] : subscriptions;
+
+    /// <summary>
+    /// WARP как запасной выход на пути VPN: есть подписка или ключи, путь не WARP, запасной не выключен.
+    /// </summary>
+    public static bool UsesFallback(AppSettings settings) =>
+        !settings.WarpEnabled && settings.WarpFallback && settings.HasSubscriptionExit;
 
     /// <summary>Подходит ли сервер подписки на роль посредника для MASQUE.</summary>
     public static bool CanCarryWarp(ProxyServer server) =>

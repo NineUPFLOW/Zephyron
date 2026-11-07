@@ -218,7 +218,7 @@ public sealed class TunnelConfigTests : IDisposable
     [InlineData(false)]
     public async Task Warp_and_the_subscription_are_one_or_the_other(bool warp)
     {
-        var root = await BuildAsync(s => s with { WarpEnabled = warp });
+        var root = await BuildAsync(s => s with { WarpEnabled = warp, WarpFallback = false });
 
         var tags = root.GetProperty("outbounds")
             .EnumerateArray()
@@ -279,14 +279,14 @@ public sealed class TunnelConfigTests : IDisposable
     [Fact]
     public async Task The_fake_ip_memory_follows_the_setting()
     {
-        var on = await BuildAsync();
+        var on = await BuildAsync(s => s with { WarpFallback = false });
         var cache = on.GetProperty("experimental").GetProperty("cache_file");
 
         Assert.True(cache.GetProperty("enabled").GetBoolean());
         Assert.True(cache.GetProperty("store_fakeip").GetBoolean());
         Assert.False(cache.TryGetProperty("store_masque_config", out _));
 
-        var off = await BuildAsync(s => s with { FakeIpMemory = false });
+        var off = await BuildAsync(s => s with { FakeIpMemory = false, WarpFallback = false });
 
         Assert.False(off.GetProperty("experimental").TryGetProperty("cache_file", out _));
     }
