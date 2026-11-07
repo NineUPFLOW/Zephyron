@@ -52,13 +52,13 @@ public sealed class UpdateApplier
         _backup = Path.GetFullPath(backup);
         _log = Path.Combine(_target, UpdateInstaller.LogFile);
 
-        var keep = new HashSet<string>(UpdateInstaller.Preserved.Select(Path.GetFileName)!, StringComparer.OrdinalIgnoreCase);
+        var keep = new HashSet<string>(UpdateInstaller.Preserved, StringComparer.OrdinalIgnoreCase);
 
         // Сама программа — последней: при сбое посреди подмены она остаётся
         // прежней и запускается с прежними файлами вокруг, а не новой среди старых.
         _files = Directory.EnumerateFiles(_source, "*", SearchOption.AllDirectories)
             .Select(f => Path.GetRelativePath(_source, f))
-            .Where(f => !keep.Contains(Path.GetFileName(f)))
+            .Where(f => !keep.Contains(f)) // по относительному пути: одноимённый файл в другой папке обновляется
             .OrderBy(f => string.Equals(Path.GetFileName(f), UpdateInstaller.Canonical, StringComparison.OrdinalIgnoreCase))
             .ThenBy(f => f, StringComparer.OrdinalIgnoreCase)
             .ToList();

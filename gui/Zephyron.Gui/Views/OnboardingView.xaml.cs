@@ -927,7 +927,7 @@ public partial class OnboardingView : UserControl
         VpnForMode.Text = mode switch
         {
             WorkMode.Tunnel when !settings.HasTunnelExit =>
-                $"Режиму «{WorkModes.Name(WorkMode.Tunnel)}» подписка нужна: без неё поднимать нечего, и останется «{WorkModes.Name(WorkMode.Desync)}».",
+                $"Режиму «{WorkModes.Name(WorkMode.Tunnel)}» нужна подписка, ключ или WARP (WARP работает без подписки — включите его на вкладке «VPN»). Пока выхода нет, останется «{WorkModes.Name(WorkMode.Desync)}».",
 
             WorkMode.Route when !settings.HasTunnelExit =>
                 $"«{WorkModes.Name(WorkMode.Route)}» без подписки работает как «{WorkModes.Name(WorkMode.Desync)}»: вести в туннель нечего.",

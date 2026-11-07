@@ -108,7 +108,9 @@ public partial class TunnelSettingsWindow : Window
         // Замену ищет сторож, а он молчит при выключенной проверке: сказать
         // об этом надо здесь же, иначе включённая настройка не делает ничего
         // и не объясняет почему (у владельца 30.09 стояло «не проверять»).
-        ReplaceLine.Text = settings.ExitCheckSeconds <= 0
+        ReplaceLine.Text = TunnelPaths.Of(settings) == TunnelPath.Warp
+            ? VpnView.WarpPickNote
+            : settings.ExitCheckSeconds <= 0
             ? "Проверка текущего сервера выключена, замену искать некому. Включите её ниже."
             : string.IsNullOrWhiteSpace(settings.PreferredServer)
             ? "Сервер не выбран: замену подбирает автоподбор."

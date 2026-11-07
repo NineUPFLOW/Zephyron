@@ -67,7 +67,8 @@ public partial class UpdateWindow : Window
 
         _latest = latest;
         _newer = UpdateCheck.IsNewer(latest.Version, UpdateCheck.Current);
-        MaxHeight = SystemParameters.WorkArea.Height - 40;
+        MaxHeight = Math.Min(MaxHeight, SystemParameters.WorkArea.Height - 40);
+        Height = Math.Min(Height, MaxHeight);
 
         if (!_newer)
         {

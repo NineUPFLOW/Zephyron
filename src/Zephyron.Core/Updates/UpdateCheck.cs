@@ -288,7 +288,13 @@ public static class UpdateCheck
         var parts = trimmed.Split('.', StringSplitOptions.RemoveEmptyEntries);
 
         // Version требует минимум двух чисел; одиночное «1» им не является.
-        return parts.Length >= 2 ? string.Join('.', parts.Take(4)) : trimmed + ".0";
+        // До четырёх компонентов: 1.2.0 и 1.2.0.0 — одна версия (Version их различает).
+        var list = parts.Length >= 2 ? parts.Take(4).ToList() : [trimmed, "0"];
+
+        while (list.Count < 4)
+            list.Add("0");
+
+        return string.Join('.', list);
     }
 
     /// <summary>Версия, которая работает прямо сейчас.</summary>

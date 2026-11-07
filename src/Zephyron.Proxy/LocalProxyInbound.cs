@@ -66,16 +66,75 @@ public static class LocalProxyInbound
     /// <remarks>
     /// Занятый порт валит sing-box целиком, вместе с туннелем, поэтому проверяем до запуска.
     /// «Наш» определяет конфиг, с которым движок работает сейчас, а не настройка: порт
-    /// держит он сам, и это не помеха.
+    /// держит он сам, и это не помеха. Только пока sing-box жив: конфиг остаётся на диске
+    /// и после остановки, а порт за это время могла занять другая программа.
     /// </remarks>
-    public static string? Problem(int port, string runningConfigPath, Func<int, bool>? busy = null)
+    public static string? Problem(int port, string runningConfigPath, Func<int, bool>? busy = null, Func<bool>? engineRunning = null)
     {
         if (!PortAllowed(port))
             return $"порт {port} не подходит: нужен от 1024 до 65535, не занятый движком";
 
-        if (!(busy ?? IsBusy)(port) || InConfig(runningConfigPath, port))
+        if (!(busy ?? IsBusy)(port)
+            || (InConfig(runningConfigPath, port) && (engineRunning ?? EngineRunning)()))
             return null;
 
         return $"порт {port} занят другой программой — выберите другой в параметрах туннеля";
+    }
+
+    private static bool EngineRunning()
+    {
+        var running = System.Diagnostics.Process.GetProcessesByName("sing-box");
+
+        foreach (var process in running)
+            process.Dispose();
+
+        return running.Length > 0;
+    }
+
+    private static string OutcomePath(string configPath) => configPath + ".local-proxy";
+
+    /// <summary>
+    /// Запомнить, поднят ли прокси в собранном конфиге: карточка показывает правду,
+    /// а не только выключатель (порт занят, нет серверов — входа в конфиге нет).
+    /// </summary>
+    public static void SaveOutcome(string configPath, bool wanted, int port, string? problem)
+    {
+        var path = OutcomePath(configPath);
+
+        try
+        {
+            if (!wanted || InConfig(configPath, port))
+                File.Delete(path);
+            else
+                File.WriteAllText(path, $"{port}|{problem ?? "нет работающих серверов выхода"}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Не записалось — карточка покажет выключатель, как раньше.
+        }
+    }
+
+    /// <summary>
+    /// Почему прокси на этом порту не поднят при последней сборке; поднят, не просили
+    /// или порт с тех пор сменили — <c>null</c>.
+    /// </summary>
+    public static string? LastProblem(string configPath, int port)
+    {
+        try
+        {
+            var path = OutcomePath(configPath);
+
+            if (!File.Exists(path))
+                return null;
+
+            var text = File.ReadAllText(path).Trim();
+            var bar = text.IndexOf('|');
+
+            return bar > 0 && text[..bar] == port.ToString(System.Globalization.CultureInfo.InvariantCulture) ? text[(bar + 1)..] : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 }

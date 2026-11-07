@@ -22,6 +22,9 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        // Не выше рабочей области: низ с кнопками не уходит под панель задач.
+        MaxHeight = Math.Min(MaxHeight, SystemParameters.WorkArea.Height - 40);
+        Height = Math.Min(Height, MaxHeight);
 
         // Горячие клавиши разделов (OnPreviewKeyDown) — в подсказке пункта, иначе о них не узнать.
         foreach (var item in Items().Where(i => Array.IndexOf(Numbered, i.Tag as string) >= 0))
@@ -1056,7 +1059,21 @@ public partial class MainWindow : Window
         _toastArmed = false;
         _toastTimer.Stop();
 
-        var outcome = await EngineControl.RestartAsync("«Перезапустить» во всплывающем сообщении", CancellationToken.None);
+        EngineOutcome outcome;
+        try
+        {
+            outcome = await EngineControl.RestartAsync("«Перезапустить» во всплывающем сообщении", CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            // async void: необработанное исключение уронило бы приложение.
+            ToastTitle.Text = "Перезапуск не удался";
+            ToastBody.Text = "Перезапуск не удался: " + ex.GetBaseException().Message;
+            ToastAct.IsEnabled = true;
+            ShowToastKind("Failed", assertive: true);
+
+            return;
+        }
 
         if (!outcome.Ok)
         {

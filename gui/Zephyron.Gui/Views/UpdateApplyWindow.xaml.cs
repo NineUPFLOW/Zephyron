@@ -73,6 +73,9 @@ public partial class UpdateApplyWindow : Window
     public UpdateApplyWindow(ApplyOptions options)
     {
         InitializeComponent();
+        // Не выше рабочей области: низ с кнопками не уходит под панель задач.
+        MaxHeight = Math.Min(MaxHeight, SystemParameters.WorkArea.Height - 40);
+        Height = Math.Min(Height, MaxHeight);
 
         _options = options;
         _applier = new UpdateApplier(options.Source, options.Target,

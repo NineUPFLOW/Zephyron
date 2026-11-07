@@ -172,7 +172,19 @@ internal static class EngineControl
         // него, как до 03.10: хуже задуманного, но не хуже прежнего.
         bool dnsEngine = false;
 
-        if (settings.NeedsDnsEngine)
+        // «Авто» при одном десинке: обычный DNS оператора проверяется до запуска,
+        // и если он прячет блокируемые имена — запросы забирает движок по DoH.
+        bool poisoned = !settings.NeedsDnsEngine && !settings.NeedsProxy && settings.NeedsDesync
+            && !settings.UseRouterDns && settings.DnsVia == DnsRoute.Auto
+            && await Task.Run(() => Zephyron.Core.Diagnostics.SystemDnsCheck.Poisoned(), cancellationToken);
+
+        if (poisoned)
+        {
+            Journal.Write("DNS", "DNS оператора не находит блокируемые имена (YouTube и др.) — запросы Windows отдаю движку по DoH.");
+            note += "DNS оператора подменяет имена — включён DNS через движок. ";
+        }
+
+        if (settings.NeedsDnsEngine || poisoned)
         {
             var built = TunnelConfig.BuildDnsOnly(settings);
             dnsEngine = built.Ok;

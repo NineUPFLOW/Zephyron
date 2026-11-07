@@ -860,6 +860,8 @@ public sealed record AppSettings
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         Converters = { new JsonStringEnumConverter() },
+        AllowTrailingCommas = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
     };
 
     /// <summary>Как прошло чтение настроек.</summary>
@@ -1133,7 +1135,16 @@ public sealed record AppSettings
         catch (Exception)
         {
             // Испорченный файл настроек не повод не запуститься: берём значения
-            // по умолчанию, а сохранение перезапишет его корректным.
+            // по умолчанию. Копия нужна, чтобы следующее сохранение не стёрло
+            // подписку человека без следа.
+            try
+            {
+                File.Copy(target, target + ".bad-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"), overwrite: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+            }
+
             result = ReadResult.Unreadable;
             return Fresh;
         }
@@ -1157,21 +1168,30 @@ public sealed record AppSettings
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
 
-        var temp = target + ".tmp";
+        // Уникальное имя: два процесса не должны писать в один временный файл.
+        var temp = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
 
-        File.WriteAllText(temp, JsonSerializer.Serialize(this, Options), new UTF8Encoding(false));
-
-        for (int attempt = 0; ; attempt++)
+        try
         {
-            try
+            File.WriteAllText(temp, JsonSerializer.Serialize(this, Options), new UTF8Encoding(false));
+
+            for (int attempt = 0; ; attempt++)
             {
-                File.Move(temp, target, overwrite: true);
-                return;
+                try
+                {
+                    File.Move(temp, target, overwrite: true);
+                    return;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && attempt < 9)
+                {
+                    Thread.Sleep(50);
+                }
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && attempt < 9)
-            {
-                Thread.Sleep(50);
-            }
+        }
+        catch
+        {
+            try { File.Delete(temp); } catch (Exception) { }
+            throw;
         }
     }
 

@@ -453,7 +453,7 @@ public static class ProxyUriParser
             LocalAddresses = addresses,
             Mtu = int.TryParse(Get(q, "mtu"), out var mtu) && mtu >= 576 ? mtu : 1280,
             KeepaliveSeconds = int.TryParse(Get(q, "keepalive") ?? Get(q, "persistent_keepalive"), out var keep)
-                && keep > 0 ? keep : 30,
+                && keep >= 0 ? keep : 30,
             AmneziaOptions = AmneziaSettings.From(key => Get(q, key)),
             Extra = q,
         };

@@ -370,6 +370,7 @@ public partial class VpnView : UserControl
             // только при перезаходе на вкладку.
             var load = LoadAsync();
             _ = ShowExitAsync();
+            _settingsStamp = SettingsStamp();
             _exitTimer.Start();
             await load;
 
@@ -386,10 +387,19 @@ public partial class VpnView : UserControl
             _work?.Cancel();
             _reading?.Cancel();
             _exitTimer.Stop();
+            _reshowTimer?.Stop();
         };
 
         _exitTimer.Tick += async (_, _) =>
         {
+            // Режим, путь или локальный прокси сменили в трее или на другой вкладке.
+            var stamp = SettingsStamp();
+            if (stamp != _settingsStamp)
+            {
+                _settingsStamp = stamp;
+                Reshow();
+            }
+
             await ShowExitAsync();
             await ProbeExitAsync();
             await RefreshMeasuresAsync();
@@ -406,6 +416,14 @@ public partial class VpnView : UserControl
     /// доходили до карточки с таким же опозданием.
     /// </remarks>
     private readonly System.Windows.Threading.DispatcherTimer _exitTimer = new() { Interval = TimeSpan.FromSeconds(3) };
+
+    private DateTime _settingsStamp;
+
+    private static DateTime SettingsStamp()
+    {
+        try { return File.GetLastWriteTimeUtc(AppSettings.DefaultPath); }
+        catch { return default; }
+    }
 
     /// <summary>Строка автоподбора без текущего выхода — к ней дописывается выход.</summary>
     private string _pickBase = string.Empty;
@@ -1750,6 +1768,9 @@ public partial class VpnView : UserControl
         if (settings.ExitCheckSeconds <= 0)
             _pickBase += " Проверка сервера выключена.";
 
+        if (TunnelPaths.Of(settings) == TunnelPath.Warp)
+            _pickBase = WarpPickNote;
+
         ShowPickLine(_pickBase);
         ForeignSwitch.IsChecked = settings.ForeignExitsOnly;
         StableSwitch.IsChecked = settings.StableFirst;
@@ -1823,9 +1844,18 @@ public partial class VpnView : UserControl
         LocalProxyToggle.IsChecked = settings.LocalProxy;
         LocalProxyWord.Text = settings.LocalProxy ? "включено" : "не включено";
         LocalProxyAddress.Text = $"{LocalProxyInbound.Address(settings.LocalProxyPort)} — SOCKS5 и HTTP";
+        LocalProxyHint.ClearValue(TextBlock.ForegroundProperty);
         LocalProxyHint.Text = tunnelAvailable
             ? "Подходит для расширения браузера, Telegram и лаунчеров игр. Через прокси идут только программы, где он указан."
             : "Нужен туннель: включите режим с туннелем и добавьте подписку, ключ или WARP. Пока его нет, прокси не заработает.";
+
+        // Включён, но при последней сборке не поднялся — говорим почему, а не «включено».
+        if (settings.LocalProxy && tunnelAvailable && LocalProxyInbound.LastProblem(settings.ProxyConfigPath, settings.LocalProxyPort) is { } why)
+        {
+            LocalProxyWord.Text = "не запущен";
+            LocalProxyHint.Text = $"Не запущен: {why}. Программы с этим адресом сейчас не соединятся.";
+            LocalProxyHint.SetResourceReference(TextBlock.ForegroundProperty, "Warn");
+        }
     }
 
     private void OnLocalProxy(object sender, RoutedEventArgs e)
@@ -2200,13 +2230,20 @@ public partial class VpnView : UserControl
     /// </remarks>
     private const string WarpOwner = "\0warp";
 
+    /// <summary>Выбор сервера при туннеле через WARP ничего не меняет — так и говорим.</summary>
+    internal const string WarpPickNote = "Сейчас выход — WARP; выбор сервера действует, когда туннель идёт через VPN.";
+
     private void ChooseAuto()
     {
+        bool warp = TunnelPaths.Of(AppSettings.Load(AppSettings.DefaultPath)) == TunnelPath.Warp;
+
         // Выключить автоподбор плиткой «Авто» нечем: чтобы закрепить сервер,
         // надо знать какой. Говорим, где это делается.
         if (string.IsNullOrWhiteSpace(AppSettings.Load(AppSettings.DefaultPath).PreferredServer))
         {
-            Status.Text = "Автоподбор уже включён. Чтобы закрепить сервер, нажмите его плитку или «выбрать» в списке.";
+            Status.Text = warp
+                ? WarpPickNote
+                : "Автоподбор уже включён. Чтобы закрепить сервер, нажмите его плитку или «выбрать» в списке.";
             return;
         }
 
@@ -2218,7 +2255,9 @@ public partial class VpnView : UserControl
             Reshow();
             ShowPick(settings);
 
-            Status.Text = "Сервер откреплён: снова выбирается самый быстрый по задержке.";
+            Status.Text = warp
+                ? WarpPickNote
+                : "Сервер откреплён: снова выбирается самый быстрый по задержке.";
             this.Offer("Сервер выбран");
         }
         catch (Exception ex)

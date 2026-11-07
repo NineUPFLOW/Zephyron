@@ -316,6 +316,7 @@ internal static class TunnelConfig
 
             SingBoxConfigCompiler.WriteToFile(settings.ProxyConfigPath, result.Json);
             RouterDnsBuildState.Save(settings.ProxyConfigPath, requestedDns, routerDns.Warning);
+            LocalProxyInbound.SaveOutcome(settings.ProxyConfigPath, settings.LocalProxy, settings.LocalProxyPort, proxyProblem);
 
             var note = settings.WarpEnabled
                 ? "Конфиг создан: туннель через WARP, подписки приостановлены"

@@ -38,7 +38,8 @@ public static class OwnLists
     /// <summary>Свой ли это список.</summary>
     public static bool IsOwn(string? value) =>
         value is not null
-        && value.Replace('\\', '/').StartsWith(Folder, StringComparison.OrdinalIgnoreCase);
+        && value.Replace('\\', '/').StartsWith(Folder, StringComparison.OrdinalIgnoreCase)
+        && !value.Replace('\\', '/').Split('/').Contains("..");
 
     /// <summary>Название списка — имя файла без расширения.</summary>
     public static string NameOf(string value) =>
@@ -130,9 +131,10 @@ public static class OwnLists
     {
         try
         {
-            var full = Full(value, root);
+            // Списки каталога лежат вне own/, но «..» не пускаем нигде.
+            var full = value.Replace('\\', '/').Split('/').Contains("..") ? null : Full(value, root);
 
-            if (!File.Exists(full))
+            if (full is null || !File.Exists(full))
                 return [];
 
             return File.ReadAllLines(full)
@@ -235,9 +237,9 @@ public static class OwnLists
 
         try
         {
-            var full = Full(value, root);
+            var full = Inside(value, root);
 
-            if (File.Exists(full))
+            if (full is not null && File.Exists(full))
                 File.Delete(full);
         }
         catch (IOException)
@@ -250,4 +252,13 @@ public static class OwnLists
 
     private static string Full(string value, string? root) =>
         System.IO.Path.GetFullPath(System.IO.Path.Combine(root ?? Directory.GetCurrentDirectory(), value));
+
+    /// <summary>Полный путь, если он остался внутри папки своих списков; иначе <c>null</c> (обход через «..»).</summary>
+    private static string? Inside(string value, string? root)
+    {
+        var full = Full(value, root);
+        var own = Full(Folder, root).Replace('/', System.IO.Path.DirectorySeparatorChar);
+
+        return full.StartsWith(own, StringComparison.OrdinalIgnoreCase) ? full : null;
+    }
 }

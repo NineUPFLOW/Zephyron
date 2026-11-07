@@ -43,6 +43,7 @@ public static class WireGuardConf
 
     private static ProxyServer Parse(string text, string? name)
     {
+        int keep;
         var face = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var peer = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         Dictionary<string, string>? section = null;
@@ -50,7 +51,9 @@ public static class WireGuardConf
 
         foreach (var raw in text.Split('\n'))
         {
-            var line = raw.Trim();
+            // Как wg-quick: всё после «#» — комментарий, в том числе в конце значения.
+            var hash = raw.IndexOf('#');
+            var line = (hash >= 0 ? raw[..hash] : raw).Trim();
 
             if (line.Length == 0 || line.StartsWith('#') || line.StartsWith(';'))
                 continue;
@@ -96,7 +99,9 @@ public static class WireGuardConf
                 ? mtu
                 : 1280,
             KeepaliveSeconds = peer.TryGetValue("PersistentKeepalive", out var keepText)
-                && int.TryParse(keepText, out var keep) && keep > 0
+                && (keepText.Equals("off", StringComparison.OrdinalIgnoreCase)
+                    ? (keep = 0) == 0
+                    : int.TryParse(keepText, out keep) && keep >= 0)
                     ? keep
                     : 30,
             AmneziaOptions = AmneziaSettings.From(key => face.TryGetValue(key, out var value) ? value : null),

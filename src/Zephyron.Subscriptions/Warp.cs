@@ -109,7 +109,7 @@ public static class Warp
 
             return Parse(File.ReadAllText(path), out var server, out _) ? server : null;
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return null;
         }
@@ -167,7 +167,7 @@ public static class Warp
         {
             return FileServer() is null ? null : File.Exists(FileNamePath) ? File.ReadAllText(FileNamePath).Trim() : "warp.conf";
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return null;
         }

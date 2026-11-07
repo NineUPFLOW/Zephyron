@@ -2493,7 +2493,10 @@ public static class BlockCheck
             bool forbidden = status is 403 && !refused && !challenged;
 
             // Капча под 200: тело мало (kept не обнулён), текст — проверка на робота.
-            bool botWall = status is 200 && !refused && moved is null && LooksLikeBotCheck(said);
+            // Под 200 — только короткая страница с фразой проверки, без голого «captcha»:
+            // обычная форма входа с reCAPTCHA доступна, а не «за проверкой».
+            bool botWall = status is 200 && !refused && moved is null
+                && said is { Length: < 800 } && LooksLikeBotCheck(said.Replace("captcha", "", StringComparison.OrdinalIgnoreCase));
 
             // Маленькая страница, пришедшая целиком, заморозки показать
             // не могла — в разметке ищутся скрипты и стили той же зоны,

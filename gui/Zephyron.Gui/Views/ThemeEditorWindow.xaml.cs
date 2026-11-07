@@ -117,6 +117,9 @@ public partial class ThemeEditorWindow : Window
     public ThemeEditorWindow(Theme from, string? editing)
     {
         InitializeComponent();
+        // Не выше рабочей области: низ с кнопками не уходит под панель задач.
+        MaxHeight = Math.Min(MaxHeight, SystemParameters.WorkArea.Height - 40);
+        Height = Math.Min(Height, MaxHeight);
         PreviewLanes.Show(HomeState.Running, HomeState.Running, HomeState.Running);
 
         // Владелец (Owner) известен только после конструктора — мерить «Главную» при показе.
@@ -724,6 +727,7 @@ public partial class ThemeEditorWindow : Window
     /// <summary>Закрыли без сохранения — вернуть тему, что была до редактора.</summary>
     private void OnClosing(object? sender, CancelEventArgs e)
     {
+        _settle.Stop();
         if (!_saved)
             Themes.Apply(_original);
     }

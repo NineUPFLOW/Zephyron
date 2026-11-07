@@ -165,6 +165,15 @@ public partial class LogView : UserControl
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         using var reader = new StreamReader(stream);
 
+        // Журнал растёт без границ — читаем только хвост, не весь файл.
+        const long tailBytes = 256 * 1024;
+        if (stream.Length > tailBytes)
+        {
+            stream.Seek(-tailBytes, SeekOrigin.End);
+            reader.DiscardBufferedData();
+            reader.ReadLine(); // первая строка обрезана посередине
+        }
+
         var ring = new string[count];
         int written = 0;
 

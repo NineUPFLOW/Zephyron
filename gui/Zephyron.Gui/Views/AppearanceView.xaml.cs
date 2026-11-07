@@ -27,9 +27,12 @@ public partial class AppearanceView : UserControl
     /// <summary>
     /// Плитки тем: встроенные первыми, затем из папки themes\.
     /// </summary>
-    private void ShowTheme(AppSettings settings)
+    // Список тем с диска: смена вида (шрифт, масштаб) его не меняет — не читаем заново.
+    private IReadOnlyList<ThemeLoad>? _loads;
+
+    private void ShowTheme(AppSettings settings, bool reread = true)
     {
-        var loads = ThemeLoader.LoadAll();
+        var loads = (!reread ? _loads : null) ?? (_loads = ThemeLoader.LoadAll());
         var current = Themes.Current;
 
         ThemeList.ItemsSource = loads
@@ -271,10 +274,15 @@ public partial class AppearanceView : UserControl
 
         try
         {
-            var fonts = new List<FontItem> { new(ThemeFont, (FontFamily)FindResource("UiFont")) };
-            fonts.AddRange(SystemFonts.Value);
+            // Список шрифтов пересобираем, только если шрифт темы сменился; выбор остаётся.
+            var themeFamily = (FontFamily)FindResource("UiFont");
+            if (UiFontChoice.ItemsSource is not List<FontItem> { Count: > 0 } fonts || !Equals(fonts[0].Family, themeFamily))
+            {
+                fonts = new List<FontItem> { new(ThemeFont, themeFamily) };
+                fonts.AddRange(SystemFonts.Value);
+                UiFontChoice.ItemsSource = fonts;
+            }
 
-            UiFontChoice.ItemsSource = fonts;
             UiFontChoice.SelectedItem = fonts.FirstOrDefault(f =>
                 string.Equals(f.Name, settings.UiFont, StringComparison.OrdinalIgnoreCase)) ?? fonts[0];
 
@@ -345,7 +353,7 @@ public partial class AppearanceView : UserControl
                 ? string.Empty
                 : "Тема не применилась с этими настройками: " + string.Join("; ", result.Problems.Take(2));
 
-            ShowTheme(settings);
+            ShowTheme(settings, reread: false);
         }
         catch (Exception ex)
         {
@@ -504,7 +512,7 @@ public partial class AppearanceView : UserControl
         try
         {
             ThemeWriter.Export(id, dialog.FileName);
-            Status.Text = $"Тема выгружена: {dialog.FileName}. Её можно передать — загружается кнопкой «Загрузить из файла…».";
+            Status.Text = $"Тема выгружена: {dialog.FileName}. Её можно передать — загружается кнопкой «Взять из файла…».";
         }
         catch (Exception ex)
         {

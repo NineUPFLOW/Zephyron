@@ -96,7 +96,7 @@ public static class SubscriptionParser
             UploadBytes = Field("upload"),
             DownloadBytes = Field("download"),
             TotalBytes = Field("total"),
-            ExpiresAt = expire > 0 ? DateTimeOffset.FromUnixTimeSeconds(expire) : null,
+            ExpiresAt = expire is > 0 and <= 253402300799 ? DateTimeOffset.FromUnixTimeSeconds(expire) : null,
             UpdateIntervalHours = double.TryParse(updateInterval, NumberStyles.Float, CultureInfo.InvariantCulture, out var hours)
                 ? hours
                 : null,

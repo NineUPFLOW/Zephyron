@@ -18,7 +18,7 @@ public static class RuleSetLoader
         {
             text = File.ReadAllText(path);
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             throw new RuleConfigurationException($"Не удалось прочитать {path}: {ex.Message}", ex);
         }
@@ -168,7 +168,7 @@ public static class RuleSetLoader
         {
             return ParseRules(File.ReadAllText(path));
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             throw new RuleConfigurationException($"Не удалось прочитать {path}: {ex.Message}", ex);
         }

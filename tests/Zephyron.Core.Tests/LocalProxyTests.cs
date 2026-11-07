@@ -93,7 +93,9 @@ public class LocalProxyTests
         {
             File.WriteAllText(path, """{"inbounds":[{"tag":"local-proxy","listen_port":2080}]}""");
 
-            Assert.Null(LocalProxyInbound.Problem(2080, path, busy: _ => true));
+            Assert.Null(LocalProxyInbound.Problem(2080, path, busy: _ => true, engineRunning: () => true));
+            // Конфиг остался от прошлого запуска, движок не работает — порт держит кто-то другой.
+            Assert.NotNull(LocalProxyInbound.Problem(2080, path, busy: _ => true, engineRunning: () => false));
             Assert.NotNull(LocalProxyInbound.Problem(2081, path, busy: _ => true));
 
             File.WriteAllText(path, """{"inbounds":[{"tag":"health-in","listen_port":2080}]}""");

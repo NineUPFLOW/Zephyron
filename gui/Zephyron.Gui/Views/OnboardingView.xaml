@@ -237,10 +237,10 @@
                                 <StackPanel Grid.Column="1">
                                     <TextBlock x:Name="PickTunnelName" FontWeight="SemiBold" FontSize="15" />
                                     <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                               Text="Весь трафик идёт через туннель, кроме сайтов с пометкой «напрямую». Работает как обычный VPN-клиент: адрес зарубежный, открывается всё, что открывает ваш сервер. Российские сайты тоже увидят зарубежный адрес. Нужна подписка или WARP." />
+                                               Text="Весь трафик идёт через туннель, кроме сайтов с пометкой «напрямую». Работает как обычный VPN-клиент: адрес зарубежный, открывается всё, что открывает ваш сервер. Российские сайты тоже увидят зарубежный адрес. Нужна подписка, ключ или WARP." />
                                     <TextBlock x:Name="PickTunnelNote" Style="{StaticResource Caption}" Margin="0,4,0,0"
                                                TextWrapping="Wrap" Foreground="{DynamicResource Warn}" Visibility="Collapsed"
-                                               Text="Подписки пока нет — её спросит следующий шаг. Без неё этот режим поднимать нечем, и останется «Десинк»." />
+                                               Text="Выхода пока нет — подписку или ключ спросит следующий шаг. WARP работает и без подписки: включите его на вкладке «VPN». Пока выхода нет, останется «Десинк»." />
                                 </StackPanel>
                             </Grid>
                         </RadioButton>
@@ -300,10 +300,10 @@
                         <TextBlock x:Name="DnsLabel" Text="DNS" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0" Visibility="Collapsed" />
                         <ComboBox Grid.Column="1" x:Name="DnsPick" Visibility="Collapsed" AutomationProperties.Name="Путь DNS" Width="260" VerticalAlignment="Center"
                                   SelectionChanged="OnDnsPicked"
-                                  ToolTip="Как программа узнаёт адреса сайтов. Позже это меняется во вкладке DNS.">
-                            <ComboBoxItem Content="авто: сначала напрямую, при отказе DoH — по TCP, затем через туннель" Tag="Auto" />
-                            <ComboBoxItem Content="спрашивать напрямую" Tag="Direct" />
-                            <ComboBoxItem Content="спрашивать через туннель" Tag="Tunnel" />
+                                  ToolTip="Как программа узнаёт адреса сайтов. «Авто»: сначала напрямую, при отказе DoH — по TCP, затем через туннель. Позже это меняется во вкладке DNS.">
+                            <ComboBoxItem Content="авто" Tag="Auto" />
+                            <ComboBoxItem Content="напрямую" Tag="Direct" />
+                            <ComboBoxItem Content="через туннель" Tag="Tunnel" />
                         </ComboBox>
                         <ContentControl Grid.Column="2" x:Name="DnsInfo" Style="{StaticResource Info}" Margin="4,0,0,0" Visibility="Collapsed" />
 

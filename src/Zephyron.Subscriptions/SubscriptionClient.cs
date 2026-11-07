@@ -212,7 +212,8 @@ public sealed class SubscriptionClient : IDisposable
             if (amp >= 0)
                 inner = inner[..amp];
 
-            return new Uri(Uri.UnescapeDataString(inner));
+            // Битая вложенная ссылка — не исключение: оставляем исходную, её схема не http.
+            return Uri.TryCreate(Uri.UnescapeDataString(inner), UriKind.Absolute, out var wrapped) ? wrapped : url;
         }
 
         return url;

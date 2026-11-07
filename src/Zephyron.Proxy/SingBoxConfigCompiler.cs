@@ -1755,8 +1755,11 @@ public sealed class SingBoxConfigCompiler
                 ["port"] = (int)server.Port,
                 ["public_key"] = server.PeerPublicKey ?? string.Empty,
                 ["allowed_ips"] = new JsonArray { "0.0.0.0/0", "::/0" },
-                ["persistent_keepalive_interval"] = server.KeepaliveSeconds,
             };
+
+            // 0 — без keepalive (PersistentKeepalive = 0/off в файле).
+            if (server.KeepaliveSeconds > 0)
+                peer["persistent_keepalive_interval"] = server.KeepaliveSeconds;
 
             if (!string.IsNullOrEmpty(server.PreSharedKey))
                 peer["pre_shared_key"] = server.PreSharedKey;
