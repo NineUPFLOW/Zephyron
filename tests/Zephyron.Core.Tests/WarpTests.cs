@@ -18,7 +18,7 @@ namespace Zephyron.Core.Tests;
 /// Проверено на живой сети: рукопожатие проходит, данные не возвращаются
 /// ни на одном из пяти портов.
 /// </remarks>
-public class WarpTests
+public partial class WarpTests
 {
     /// <summary>
     /// MASQUE описывается двумя строками: узла у него нет, движок выбирает
