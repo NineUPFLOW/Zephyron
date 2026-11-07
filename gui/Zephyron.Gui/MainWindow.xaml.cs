@@ -1032,17 +1032,7 @@ public partial class MainWindow : Window
 
     private void OnGreetingDonate(object sender, RoutedEventArgs e) => DonateMenu.Show(sender);
 
-    private static void OpenLink(string url)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
-        }
-        catch (Exception)
-        {
-            // Нет браузера по умолчанию — те же ссылки есть на «Главной» и в «О программе».
-        }
-    }
+    private static void OpenLink(string url) => Links.Open(url);
 
     private void HideToast()
     {

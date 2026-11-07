@@ -75,17 +75,7 @@ public partial class StatusView : UserControl
     /// <summary>Описание — README на GitHub: он и есть документация, другой нет.</summary>
     private void OnDocs(object sender, RoutedEventArgs e) => OpenLink(About.Repository + "#readme");
 
-    private static void OpenLink(string url)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
-        }
-        catch (Exception)
-        {
-            // Нет браузера по умолчанию — те же ссылки есть в «Ещё», в карточке «О программе».
-        }
-    }
+    private static void OpenLink(string url) => Links.Open(url);
 
     private void OnArtSize(object sender, SizeChangedEventArgs e) => PlaceArt();
 
@@ -1958,10 +1948,23 @@ public partial class StatusView : UserControl
         StopButton.IsEnabled = false;
         StateHint.Text = "Останавливаю движки…";
 
-        await EngineControl.StopAsync("кнопка «Остановить» на «Главной»", CancellationToken.None);
+        try
+        {
+            var result = await EngineControl.StopAsync("кнопка «Остановить» на «Главной»", CancellationToken.None);
 
-        StopButton.IsEnabled = true;
-        Update();
+            // Драйвер перехвата не выгрузился — файлы движка заняты, обновление и удаление упрутся в них.
+            if (result.Contains("не выгружен", StringComparison.Ordinal))
+                ShowProblem(result);
+        }
+        catch (Exception ex)
+        {
+            ShowProblem("Остановить не удалось: " + ex.GetBaseException().Message);
+        }
+        finally
+        {
+            StopButton.IsEnabled = true;
+            Update();
+        }
     }
 
 

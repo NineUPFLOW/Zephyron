@@ -2280,15 +2280,24 @@ public partial class RoutesView : UserControl
 
             Reload();
 
+            bool opened = true;
+
             if (ListFile(path) is { } full)
             {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("notepad.exe", $"\"{full}\"")
+                try
                 {
-                    UseShellExecute = true,
-                })?.Dispose();
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("notepad.exe", $"\"{full}\"")
+                    {
+                        UseShellExecute = true,
+                    })?.Dispose();
+                }
+                catch (Exception)
+                {
+                    opened = false;
+                }
             }
 
-            Status.Text = $"Заведён список «{name}» с {domain}. Допишите {(address ? "адреса, подсети или имена" : "имена")} и сохраните — "
+            Status.Text = (opened ? "" : $"Блокнот не открылся — файл: {ListFile(path)}. ") + $"Заведён список «{name}» с {domain}. Допишите {(address ? "адреса, подсети или имена" : "имена")} и сохраните — "
                 + "вступит в силу после следующего запуска движков.";
         }
         catch (Exception ex)

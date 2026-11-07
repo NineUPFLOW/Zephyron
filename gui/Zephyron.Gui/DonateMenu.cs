@@ -25,17 +25,7 @@ internal static class DonateMenu
     {
         var item = new MenuItem { Header = name };
 
-        item.Click += (_, _) =>
-        {
-            try
-            {
-                Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
-            }
-            catch (Exception)
-            {
-                // Нет браузера по умолчанию — обе ссылки есть в README.
-            }
-        };
+        item.Click += (_, _) => Links.Open(url);
 
         return item;
     }

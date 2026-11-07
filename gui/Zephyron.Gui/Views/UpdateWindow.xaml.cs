@@ -778,17 +778,7 @@ public partial class UpdateWindow : Window
 
     private void OnDonate(object sender, RoutedEventArgs e) => DonateMenu.Show(sender);
 
-    private static void Open(string address)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo { FileName = address, UseShellExecute = true });
-        }
-        catch (Exception)
-        {
-            // Нет браузера по умолчанию — окно остаётся, ставить можно и так.
-        }
-    }
+    private static void Open(string address) => Links.Open(address);
 
     private void OnSkip(object sender, RoutedEventArgs e) => Finish(UpdateChoice.Skip);
 

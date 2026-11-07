@@ -453,12 +453,12 @@ internal sealed class TrayIcon : IDisposable
         {
             if (_stopping)
                 await EngineControl.StopAsync("меню трея", CancellationToken.None);
-            else
-                await EngineControl.StartAsync("меню трея", CancellationToken.None);
+            else if (await EngineControl.StartAsync("меню трея", CancellationToken.None) is { Ok: false } outcome)
+                Notify("Движки не запустились", outcome.Message, null);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Разбор — в окне: там есть куда написать причину.
+            Notify(_stopping ? "Движки не остановились" : "Движки не запустились", ex.GetBaseException().Message, null);
         }
         finally
         {
@@ -497,14 +497,16 @@ internal sealed class TrayIcon : IDisposable
 
             var who = $"меню трея: режим «{Zephyron.Core.Rules.WorkModes.Name(mode)}»";
 
-            if (EngineControl.IsRunning)
-                await EngineControl.RestartAsync(who, CancellationToken.None);
-            else
-                await EngineControl.StartAsync(who, CancellationToken.None);
+            var outcome = EngineControl.IsRunning
+                ? await EngineControl.RestartAsync(who, CancellationToken.None)
+                : await EngineControl.StartAsync(who, CancellationToken.None);
+
+            if (!outcome.Ok)
+                Notify("Движки не запустились", outcome.Message, null);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Разбор — в окне: там есть куда написать причину.
+            Notify("Режим не сменился", ex.GetBaseException().Message, null);
         }
         finally
         {
@@ -561,17 +563,7 @@ internal sealed class TrayIcon : IDisposable
                 ToolTipIcon.Info);
         });
 
-    private static void OpenLink(string url)
-    {
-        try
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = url, UseShellExecute = true });
-        }
-        catch (Exception)
-        {
-            // Нет браузера по умолчанию — та же ссылка есть в карточке подписки.
-        }
-    }
+    private static void OpenLink(string url) => Links.Open(url);
 
     private async void RestartFromNotice()
     {

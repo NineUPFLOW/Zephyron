@@ -237,14 +237,14 @@ public partial class CheckView : UserControl
                 Collected[at] = next;
         }
 
-        var picker = new AutoPickWindow { Owner = Window.GetWindow(this) };
-        picker.PickOnOpen(row.Host);
-        picker.ShowDialog();
-
-        Put(row with { FixNote = "Перепроверяю после подбора…", FixIdle = false });
-
         try
         {
+            var picker = new AutoPickWindow { Owner = Window.GetWindow(this) };
+            picker.PickOnOpen(row.Host);
+            picker.ShowDialog();
+
+            Put(row with { FixNote = "Перепроверяю после подбора…", FixIdle = false });
+
             var settings = AppSettings.Load(AppSettings.DefaultPath);
             var (engine, _) = RuleSetExpander.LoadFor(settings);
             bool tunnelled = EngineControl.IsRunning && settings.NeedsProxy && Proxied(engine, row.Host);

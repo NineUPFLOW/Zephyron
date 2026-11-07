@@ -357,6 +357,7 @@ public partial class TgProxyView : UserControl
 
         if (text.Length > 0 && host is null)
         {
+            Status.Text = "Это не адрес воркера: нужен вид name.user.workers.dev.";
             WorkerBox.Focus();
             return;
         }
@@ -372,17 +373,8 @@ public partial class TgProxyView : UserControl
         OnWorker(sender, e);
     }
 
-    private void OnWorkerCode(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            Clipboard.SetText(TgWsProxy.WorkerScript);
-        }
-        catch (Exception)
-        {
-            // Буфер занят другой программой — нажмут ещё раз.
-        }
-    }
+    private void OnWorkerCode(object sender, RoutedEventArgs e) =>
+        Copy(TgWsProxy.WorkerScript, "Код воркера скопирован: вставьте его в редактор воркера Cloudflare.");
 
     /// <summary>
     /// Пишет пути и применяет их: прокси окна перезапускается сразу, прокси
