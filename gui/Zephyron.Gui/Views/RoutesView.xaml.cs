@@ -1064,9 +1064,7 @@ public partial class RoutesView : UserControl
         if (!CanDrop(e, out var source, out var target))
         {
             if (source is not null && target is not null && source != target)
-                Status.Text = "Переставлять можно лишь внутри группы: правило по процессу проверяется раньше доменного, доменное раньше адресного, а ваше раньше заводского, куда бы вы его ни поставили."
-                    + ""
-                    + "";
+                Status.Text = "Переставлять можно лишь внутри группы: правило по процессу проверяется раньше доменного, доменное раньше адресного, а ваше раньше заводского, куда бы вы его ни поставили.";
 
             return;
         }
@@ -1076,7 +1074,10 @@ public partial class RoutesView : UserControl
             var file = UserRulesFile.Load();
 
             if (!file.Move(source!.UserIndex, target!.UserIndex))
+            {
+                Status.Text = "Порядок не изменился: правило уже на этом месте.";
                 return;
+            }
 
             file.Save();
             Reload();
@@ -1086,8 +1087,7 @@ public partial class RoutesView : UserControl
             OrderPanel.Visibility = Visibility.Visible;
             Chevrons.Turn(OrderChevron, true);
 
-            Status.Text = $"Порядок записан: {source.Value} встал на место {target.Value}. Вступит в силу после следующего запуска движков."
-                + "Вступит в силу после следующего запуска движков.";
+            Status.Text = $"Порядок записан: {source.Value} встал на место {target.Value}. Вступит в силу после следующего запуска движков.";
         }
         catch (Exception ex)
         {
@@ -1841,7 +1841,11 @@ public partial class RoutesView : UserControl
             var ours = HostsEditor.Pins().Keys.Where(pin => Covers(zones, pin)).ToList();
 
             if (ours.Count == 0)
+            {
+                Status.Text = "Пинов этого сервиса в hosts уже нет.";
+                Reload();
                 return;
+            }
 
             // Спрашиваем (владелец, 26.09). Прежде повторное нажатие снимало
             // молча — снятие казалось дешёвым, «вернуть как было». Но вернуть
@@ -2583,6 +2587,7 @@ public partial class RoutesView : UserControl
         }
         catch (Exception ex)
         {
+            toggle.IsChecked = !on;
             Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
     }

@@ -555,11 +555,15 @@ public partial class HostsView : UserControl
                     ? HostsEditor.PinWithDesync(entries, note: "руками")
                     : HostsEditor.Repin(entries, note: "руками");
 
-                NewName.Clear();
-                NewAddress.Clear();
+                // Откатили — поля остаются как были: человек поправит и повторит.
+                if (result.Reverted is null)
+                {
+                    NewName.Clear();
+                    NewAddress.Clear();
 
-                // Неразобранное остаётся в поле: его поправят и добавят ещё раз.
-                NewList.Text = string.Join(Environment.NewLine, bad);
+                    // Неразобранное остаётся в поле: его поправят и добавят ещё раз.
+                    NewList.Text = string.Join(Environment.NewLine, bad);
+                }
 
                 var said = pins.Count == 1
                     ? $"Прибито: {pins.First().Key} → {pins.First().Value}."

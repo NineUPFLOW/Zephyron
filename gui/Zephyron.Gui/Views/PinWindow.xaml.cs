@@ -568,6 +568,12 @@ public partial class PinWindow : Window
     {
         var result = HostsEditor.Pin(answers, note: $"{_target.Short} — {source}", via: via);
 
+        if (result.Reverted is not null)
+        {
+            Status.Text = result.Reverted;
+            return;
+        }
+
         // Маршрут уводится напрямую тем же движением. Это не довесок,
         // а условие работы пина: доменное правило срабатывает поверх
         // прибитого адреса и уводит соединение мимо него.
@@ -579,10 +585,7 @@ public partial class PinWindow : Window
         Changed = true;
         ShowPins();
 
-        // Откатили — говорим только это: «прибито» про несуществующее
-        // хуже молчания.
-        Status.Text = result.Reverted
-            ?? $"Прибито имён: {result.Pinned}. Маршрут части уведён напрямую — "
+        Status.Text = $"Прибито имён: {result.Pinned}. Маршрут части уведён напрямую — "
             + "иначе правило сработало бы поверх адреса."
             + (result.Backup is null ? string.Empty : $" Копия прежнего файла: {result.Backup}.")
 

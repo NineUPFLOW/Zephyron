@@ -913,25 +913,43 @@ public partial class DnsView : UserControl
     {
         PinsButton.IsEnabled = false;
 
-        var state = SupervisorState.Load(SupervisorState.DefaultPath);
-        bool engines = state is not null && state.IsSupervisorAlive();
-
-        PinsStatus.Text = "Проверяю: по одному соединению на первый адрес каждого имени и вопрос посредникам…";
-
         try
         {
-            var result = await Task.Run(() => PinRefresh.RunAsync(CancellationToken.None, byHand: true));
+            var state = SupervisorState.Load(SupervisorState.DefaultPath);
+            bool engines = state is not null && state.IsSupervisorAlive();
 
-            PinRefreshWatch.Write("кнопкой", result);
-            ShowPinWatch(AppSettings.Load(AppSettings.DefaultPath));
+            PinsStatus.Text = "Проверяю: по одному соединению на первый адрес каждого имени и вопрос посредникам…";
+
+            PinRefreshResult result;
+
+            try
+            {
+                result = await Task.Run(() => PinRefresh.RunAsync(CancellationToken.None, byHand: true));
+            }
+            catch (Exception ex)
+            {
+                PinsStatus.Text = "Проверить не удалось: " + ex.GetBaseException().Message;
+                Journal.Write("пин", "проверка адресов не удалась: " + ex.GetBaseException().Message);
+                return;
+            }
 
             PinsStatus.Text = Describe(result)
                 + (engines ? string.Empty : " Движки не подняты — часть посредников без десинка не отвечает, и мёртвыми могли показаться живые.");
+
+            // Проверка прошла; сбой записи в журнал наблюдения её не отменяет.
+            try
+            {
+                PinRefreshWatch.Write("кнопкой", result);
+                ShowPinWatch(AppSettings.Load(AppSettings.DefaultPath));
+            }
+            catch (Exception ex)
+            {
+                PinsStatus.Text += " Запись о проверке не сохранилась: " + ex.GetBaseException().Message;
+            }
         }
         catch (Exception ex)
         {
             PinsStatus.Text = "Проверить не удалось: " + ex.GetBaseException().Message;
-            Journal.Write("пин", "проверка адресов не удалась: " + ex.GetBaseException().Message);
         }
         finally
         {

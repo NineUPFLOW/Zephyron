@@ -901,10 +901,13 @@ public partial class OnboardingView : UserControl
             if (next != settings)
                 next.Save(AppSettings.DefaultPath);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Не записалось — мастер идёт дальше со старым режимом, DNS и прокси;
-            // они видны на «Главной» и вкладках DNS и «TG Proxy».
+            // Мастер идёт дальше со старым режимом, DNS и прокси, но человек
+            // должен знать, что выбранное не записалось.
+            MessageBox.Show(Window.GetWindow(this),
+                "Режим не записался: " + ex.GetBaseException().Message + " — выберите его на «Главной».",
+                "Zephyron", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         Show(4);

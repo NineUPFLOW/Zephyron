@@ -289,13 +289,35 @@ public partial class MoreView : UserControl
         {
             var subscription = AppSettings.Load(AppSettings.DefaultPath).SubscriptionUrl;
 
-            SetAside(AppSettings.DefaultPath);
-            SetAside(UserRulesFile.DefaultPath);
-
+            // Runtime первым: он единственный, что не откатить, и если занят —
+            // настройки с маршрутами ещё на месте.
             if (Directory.Exists("runtime"))
                 Directory.Delete("runtime", recursive: true);
 
-            (AppSettings.Fresh with { SubscriptionUrl = subscription }).Save(AppSettings.DefaultPath);
+            try
+            {
+                SetAside(AppSettings.DefaultPath);
+                SetAside(UserRulesFile.DefaultPath);
+
+                (AppSettings.Fresh with { SubscriptionUrl = subscription }).Save(AppSettings.DefaultPath);
+            }
+            catch
+            {
+                // Отложенное возвращаем, чтобы не остаться без файлов.
+                foreach (var path in new[] { AppSettings.DefaultPath, UserRulesFile.DefaultPath })
+                {
+                    try
+                    {
+                        if (!File.Exists(path) && File.Exists(path + ".bak"))
+                            File.Move(path + ".bak", path);
+                    }
+                    catch (Exception)
+                    {
+                    }
+                }
+
+                throw;
+            }
 
             Reload();
             Status.Text = "Настройки сброшены, подписка осталась. Прежние сохранены рядом с расширением .bak.";
@@ -364,6 +386,7 @@ public partial class MoreView : UserControl
             var keep = Path.GetFullPath(Path.Combine(runtime, "singbox.json"));
 
             var removed = 0;
+            var busy = 0;
             long freed = 0;
 
             foreach (var file in Directory.EnumerateFiles(runtime, "*", SearchOption.AllDirectories))
@@ -390,10 +413,12 @@ public partial class MoreView : UserControl
                 catch (Exception)
                 {
                     // Один занятый файл не повод бросать уборку на половине.
+                    busy++;
                 }
             }
 
-            Status.Text = $"Удалено файлов: {removed}, освобождено {freed / 1024.0:0.#} КБ. "
+            Status.Text = $"Удалено файлов: {removed}, освобождено {freed / 1024.0:0.#} КБ"
+                + (busy > 0 ? $", не удалось убрать: {busy} (заняты). " : ". ")
                 + "Действующий конфиг сохранён.";
         }
         catch (Exception ex)
@@ -426,8 +451,10 @@ public partial class MoreView : UserControl
 
                 if (code != 0)
                 {
-                    failed = $"netsh {arguments} завершился с кодом {code}. "
-                        + "Обычно это значит, что не хватило прав администратора.";
+                    failed = code == TimedOut
+                        ? "netsh не ответил за 30 с"
+                        : $"netsh {arguments} завершился с кодом {code}. "
+                          + "Обычно это значит, что не хватило прав администратора.";
 
                     break;
                 }
@@ -444,6 +471,8 @@ public partial class MoreView : UserControl
         });
     }
 
+    private const int TimedOut = -2;
+
     private static int Run(string file, string arguments)
     {
         try
@@ -459,8 +488,7 @@ public partial class MoreView : UserControl
             if (process is null)
                 return -1;
 
-            process.WaitForExit(30_000);
-            return process.ExitCode;
+            return process.WaitForExit(30_000) ? process.ExitCode : TimedOut;
         }
         catch (Exception)
         {

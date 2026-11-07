@@ -238,16 +238,23 @@ public partial class VpnView
         var pool = ServerPools.Create(settings.Pools, name);
         OpenPools.Add(pool.Id);
 
-        string? tag = first is null ? null : IntoWork(first, settings, out _);
+        try
+        {
+            string? tag = first is null ? null : IntoWork(first, settings, out _);
 
-        if (tag is not null)
-            pool = pool with { Servers = [tag] };
+            if (tag is not null)
+                pool = pool with { Servers = [tag] };
 
-        SavePools(pools => [.. pools, pool],
-            tag is null
-                ? $"Пул «{name}» заведён. Перетащите в него серверы, а маршрут направьте в него в «Маршрутах»."
-                : $"Пул «{name}» заведён, в нём «{first!.Name}». Маршрут направьте в него в «Маршрутах».",
-            pool.Id);
+            SavePools(pools => [.. pools, pool],
+                tag is null
+                    ? $"Пул «{name}» заведён. Перетащите в него серверы, а маршрут направьте в него в «Маршрутах»."
+                    : $"Пул «{name}» заведён, в нём «{first!.Name}». Маршрут направьте в него в «Маршрутах».",
+                pool.Id);
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Не получилось: " + ex.GetBaseException().Message;
+        }
     }
 
     private void OnPoolFolder(object sender, RoutedEventArgs e)

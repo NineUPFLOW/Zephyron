@@ -477,7 +477,7 @@ public partial class RecipeWindow : Window
                 // фильтр, но не пришедшая страница, и валить его в одну
                 // кучу с отказом так же неверно, как с успехом.
                 row.VerdictColour = (Brush)FindResource(
-                    flow.Page ? "Success" : ok ? "Warn" : "Danger");
+                    flow.Page ? "Success" : flow.Passed ? "Warn" : "Danger");
 
                 row.Edge = (Brush)FindResource(ok ? "AccentLine" : "Border");
 

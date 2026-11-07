@@ -446,6 +446,15 @@ public partial class TunnelSettingsWindow : Window
         }
         catch (Exception ex)
         {
+            // Переключатель уже щёлкнули — показываем то, что реально записано.
+            try
+            {
+                Show(AppSettings.Load(AppSettings.DefaultPath));
+            }
+            catch (Exception)
+            {
+            }
+
             Status.Text = "Не записалось: " + ex.GetBaseException().Message;
         }
     }

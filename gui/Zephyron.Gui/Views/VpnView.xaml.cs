@@ -2796,7 +2796,16 @@ public partial class VpnView : UserControl
         if (answer != MessageBoxResult.OK)
             return;
 
-        SubscriptionBook.SaveKeys([], true);
+        try
+        {
+            SubscriptionBook.SaveKeys([], true);
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Не получилось: " + ex.GetBaseException().Message;
+            return;
+        }
+
         _ = LoadAsync();
         Status.Text = "Отдельные ключи удалены.";
         this.Offer("Отдельные ключи удалены");
@@ -3251,6 +3260,10 @@ public partial class VpnView : UserControl
                 ? string.Join(", ", known.Select(p => $"{p.Tag}: {p.Health!.LatencyMs:0} мс"))
                 : "WARP не отозвался. Туннель поднимается не мгновенно — если движки "
                   + "только что запущены, повторите через полминуты.";
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Замер WARP не получился: " + ex.GetBaseException().Message;
         }
         finally
         {

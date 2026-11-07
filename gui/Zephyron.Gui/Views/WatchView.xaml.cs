@@ -1045,15 +1045,17 @@ public partial class WatchView : UserControl
         menu.IsOpen = true;
     }
 
-    private static void CopyText(string text)
+    private void CopyText(string text)
     {
         try
         {
             Clipboard.SetText(text);
+            Answer(CopyButton, "Копировать", "Скопировано: 1");
         }
         catch (Exception)
         {
             // Буфер обмена держит другая программа — бывает, и не наша беда.
+            Answer(CopyButton, "Копировать", "Буфер занят, повторите");
         }
     }
 

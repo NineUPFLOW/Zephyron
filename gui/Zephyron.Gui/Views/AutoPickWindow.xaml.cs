@@ -624,10 +624,10 @@ public partial class AutoPickWindow : Window
 
         try
         {
-            AutoPickJournal.RestoreAll(_last);
+            var results = AutoPickJournal.RestoreAll(_last);
             _last = AutoPickJournal.Load().FirstOrDefault(r => r.At == _last.At) ?? _last;
             ShowLast();
-            Say("Возвращено. Изменённые после записи маршруты не тронуты.", "Success");
+            SayRestored(results);
         }
         catch (Exception ex)
         {
@@ -1285,7 +1285,16 @@ public partial class AutoPickWindow : Window
         }
 
         if (written > 0)
-            await ApplyEnginesAsync(check: true);
+        {
+            try
+            {
+                await ApplyEnginesAsync(check: true);
+            }
+            catch (Exception ex)
+            {
+                Say("Записано, но движки не перезапустились: " + ex.GetBaseException().Message, "Danger");
+            }
+        }
     }
 
     /// <summary>Находит в журнале только что записанный прогон и вяжет записи со строками.</summary>
@@ -1367,12 +1376,20 @@ public partial class AutoPickWindow : Window
                 return false;
             }
 
-            for (int i = 0; i < 60; i++)
-            {
-                if (SupervisorState.Load(SupervisorState.DefaultPath)?.IsSupervisorAlive() == true)
-                    break;
+            bool alive = false;
 
-                await Task.Delay(1000);
+            for (int i = 0; i < 60 && !alive; i++)
+            {
+                alive = SupervisorState.Load(SupervisorState.DefaultPath)?.IsSupervisorAlive() == true;
+
+                if (!alive)
+                    await Task.Delay(1000);
+            }
+
+            if (!alive)
+            {
+                Say("Движки не поднялись за 60 с", "Danger");
+                return false;
             }
 
             await Task.Delay(TimeSpan.FromSeconds(5));
@@ -1486,9 +1503,11 @@ public partial class AutoPickWindow : Window
         if (_run is null || rows.Count == 0 || !ConfirmUndo(rows.Count))
             return;
 
+        IReadOnlyList<string?> results;
+
         try
         {
-            var results = AutoPickJournal.RestoreAll(_run);
+            results = AutoPickJournal.RestoreAll(_run);
 
             for (int i = 0; i < _run.Entries.Count; i++)
             {
@@ -1508,8 +1527,20 @@ public partial class AutoPickWindow : Window
         RefreshAll();
         ApplyPhase();
 
-        Say("Возвращено. Изменённые после записи маршруты не тронуты.", "Success");
+        SayRestored(results);
         await Guarded(() => ApplyEnginesAsync(check: false), "Движки не перезапустились: ");
+    }
+
+    /// <summary>Итог отката: «уже возвращено» в счёт не идёт, остальные отказы — пропущенные.</summary>
+    private void SayRestored(IReadOnlyList<string?> results)
+    {
+        int total = results.Count(r => r != "уже возвращено");
+        int skipped = results.Count(r => r is not null && r != "уже возвращено");
+
+        if (skipped == 0)
+            Say("Возвращено. Изменённые после записи маршруты не тронуты.", "Success");
+        else
+            Say($"Возвращено {total - skipped} из {total}, пропущено {skipped} (изменены после записи).", "Warn");
     }
 
     // ---------------------------------------------------------------- закрытие
