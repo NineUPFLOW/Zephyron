@@ -2062,7 +2062,7 @@ public sealed class SingBoxConfigCompiler
         // uTLS подделывает отпечаток клиента. Для REALITY он обязателен:
         // без него сервер не отвечает. Без отпечатка в ссылке — firefox, не chrome:
         // chrome у REALITY даёт JA4 того отпечатка, который ТСПУ режет к дата-центрам
-        // (замер 29.10 в NetZapret); REALITY отпечаток клиента не сверяет.
+        // (замер 29.10); REALITY отпечаток клиента не сверяет.
         string? fingerprint = Fingerprint(server.Fingerprint);
         if (fingerprint is not null || reality)
         {
