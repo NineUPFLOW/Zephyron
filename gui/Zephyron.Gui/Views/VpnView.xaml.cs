@@ -759,6 +759,7 @@ public partial class VpnView : UserControl
         // перечитываем, иначе карточка покажет состояние до переноса.
         settings = AppSettings.Load(AppSettings.DefaultPath);
         ShowWarp(settings);
+        _ = VerifyWarpAsync(settings, TimeSpan.FromSeconds(45));
 
         // Запасы подписок, убранных раньше, — в том числе до того, как их
         // начали стирать при удалении (30.09). Пустая книга не в счёт: так же
@@ -848,6 +849,7 @@ public partial class VpnView : UserControl
             // Теги пула — до чистки замеров: замеры подписок в работе лежат
             // под ними, и чистка по исходным тегам выбросила бы их.
             ApplyPool(settings);
+            FillWarpCountry(settings);
 
             // Замеры исчезнувших серверов — вон, иначе файл копит их вечно,
             // а по ним судят о свежести всего списка. Звала это только
@@ -1756,8 +1758,11 @@ public partial class VpnView : UserControl
         var measured = Seen(exit.Tag) is { Success: true, LatencyMs: { } ms } ? $" · {ms:0} мс" : string.Empty;
 
         WarpLine.Text = on
-            ? $"Туннель идёт только через WARP, подписки приостановлены. Выход в Москве{measured}."
+            ? $"Туннель идёт только через WARP, подписки приостановлены. {(string.IsNullOrWhiteSpace(settings.WarpCountryTag) ? "Выход в Москве" : "Выход в стране выбранного сервера")}{measured}."
             : "Бесплатный выход через сеть Cloudflare. Включите WARP, и туннель пойдёт через него вместо подписок.";
+
+        WarpCountryPanel.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        FillWarpCountry(settings);
 
         // Замер — руками движка, а он знает WARP, только когда тот в конфиге.
         // Кнопка на месте всегда: пропадая, она не говорила, почему её нет.
@@ -1774,6 +1779,195 @@ public partial class VpnView : UserControl
         _paused = on;
         QuickCard.Opacity = on ? 0.55 : 1;
         QuickServers.IsEnabled = !on;
+    }
+
+    /// <summary>Строка выбора «Страны выхода» WARP.</summary>
+    public sealed record WarpCountryChoice(string? Tag, string Label, BitmapImage? Flag, Visibility FlagShown);
+
+    private string _warpChoicesKey = string.Empty;
+    private CancellationTokenSource? _warpWatch;
+
+    /// <summary>
+    /// Список «Страны выхода»: «Как есть» и серверы подписок в работе — те же, что в ленте быстрой смены.
+    /// </summary>
+    /// <remarks>
+    /// Выбранный сервер, которого в подписке уже нет, остаётся в списке с пометкой:
+    /// молча сбрасывать выбор на «Как есть» нельзя, человек решит сам.
+    /// Список не пересобирается, пока не изменился: иначе раскрытый список схлопывался бы по таймеру.
+    /// </remarks>
+    private void FillWarpCountry(AppSettings settings)
+    {
+        var servers = _rows
+            .Where(r => r.Active)
+            .SelectMany(r => r.Pooled)
+            .Where(Warp.CanCarryWarp)
+            .DistinctBy(s => s.Tag)
+            .ToList();
+
+        var saved = settings.WarpCountryTag;
+
+        var key = string.Join('\n', servers.Select(s => s.Tag).Append(saved ?? string.Empty));
+
+        if (key == _warpChoicesKey)
+            return;
+
+        var choices = new List<WarpCountryChoice> { new(null, "Как есть (Россия)", null, Visibility.Collapsed) };
+
+        foreach (var server in servers)
+            choices.Add(ChoiceOf(server.Tag, null));
+
+        if (!string.IsNullOrWhiteSpace(saved) && !servers.Any(s => s.Tag.Equals(saved, StringComparison.OrdinalIgnoreCase)))
+            choices.Add(ChoiceOf(saved, " — сервера нет в подписке"));
+
+        _warpChoicesKey = key;
+        _fillingWarp = true;
+
+        try
+        {
+            WarpCountry.ItemsSource = choices;
+            WarpCountry.SelectedItem = choices.FirstOrDefault(c => c.Tag is not null
+                    && c.Tag.Equals(saved, StringComparison.OrdinalIgnoreCase))
+                ?? choices[0];
+        }
+        finally
+        {
+            _fillingWarp = false;
+        }
+
+        static WarpCountryChoice ChoiceOf(string tag, string? note)
+        {
+            var (country, name) = CountryTag.Split(tag);
+            var flag = country.Length == 2 ? FlagImages.For(country) : null;
+
+            return new(tag, (name.Length > 0 ? name : tag) + note, flag, flag is null ? Visibility.Collapsed : Visibility.Visible);
+        }
+    }
+
+    private bool _fillingWarp;
+
+    private void OnWarpCountry(object sender, SelectionChangedEventArgs e)
+    {
+        if (_fillingWarp || WarpCountry.SelectedItem is not WarpCountryChoice choice)
+            return;
+
+        try
+        {
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
+
+            if (string.Equals(settings.WarpCountryTag ?? string.Empty, choice.Tag ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            settings = settings with { WarpCountryTag = choice.Tag };
+            settings.Save(AppSettings.DefaultPath);
+            ShowWarp(settings);
+
+            Status.Text = choice.Tag is null
+                ? "Страна выхода WARP: как есть. Вступит в силу после следующего запуска движков."
+                : $"Выход WARP через «{choice.Label}». Вступит в силу после следующего запуска движков; "
+                  + "страну проверю сам, когда туннель поднимется.";
+
+            this.Offer("Страна выхода WARP изменена");
+            _ = VerifyWarpAsync(settings, TimeSpan.FromSeconds(90));
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Страна выхода не записалась: " + ex.GetBaseException().Message;
+        }
+    }
+
+    /// <summary>Страна выбранного сервера двумя буквами; <c>null</c> — «как есть» либо в имени нет флага.</summary>
+    private static string? ExpectedCountry(AppSettings settings) =>
+        string.IsNullOrWhiteSpace(settings.WarpCountryTag)
+            ? null
+            : CountryTag.Split(settings.WarpCountryTag).Country is { Length: 2 } code ? code : null;
+
+    private static string CountryName(string code)
+    {
+        try
+        {
+            return $"{new System.Globalization.RegionInfo(code).DisplayName} ({code})";
+        }
+        catch (ArgumentException)
+        {
+            return code;
+        }
+    }
+
+    /// <summary>
+    /// Спрашивает у Cloudflare, откуда виден выход, и говорит это словами в карточке.
+    /// </summary>
+    /// <remarks>
+    /// Повторяет, пока не совпало или не вышел срок: после смены страны выход
+    /// меняется только с перезапуском движков, и туннель поднимается не мгновенно
+    /// (первое соединение через сервер бывает с «EOF» и проходит повтором).
+    /// Ничего не меняет сам: не вышло — говорит, что не вышло, и предлагает другой сервер.
+    /// </remarks>
+    private async Task VerifyWarpAsync(AppSettings settings, TimeSpan budget)
+    {
+        _warpWatch?.Cancel();
+        var watch = _warpWatch = new CancellationTokenSource();
+        var token = watch.Token;
+
+        if (!settings.WarpEnabled)
+        {
+            WarpExitLine.Text = string.Empty;
+            return;
+        }
+
+        if (!EnginesRunning)
+        {
+            WarpExitLine.Text = "Движки не запущены: откуда виден выход, проверю после запуска.";
+            return;
+        }
+
+        var expected = ExpectedCountry(settings);
+        var deadline = DateTime.UtcNow + budget;
+        WarpExit? seen = null;
+        var verdict = WarpExitVerdict.Down;
+
+        try
+        {
+            do
+            {
+                WarpExitLine.Text = seen is { WarpOn: true, Country: { } now }
+                    ? $"Проверяю выход… Cloudflare пока видит {CountryName(now)}."
+                    : "Проверяю, откуда виден выход, — туннель поднимается не сразу…";
+
+                seen = await Task.Run(() => WarpTrace.ReadAsync(token), token);
+                verdict = WarpTrace.Judge(seen, expected);
+
+                if (verdict == WarpExitVerdict.Match)
+                    break;
+
+                await Task.Delay(TimeSpan.FromSeconds(5), token);
+            }
+            while (DateTime.UtcNow < deadline);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (token.IsCancellationRequested)
+            return;
+
+        var retry = " Выберите другой сервер в списке или «Как есть».";
+
+        WarpExitLine.Text = verdict switch
+        {
+            WarpExitVerdict.Match when seen?.Country is { } code && expected is not null =>
+                $"Выход подтверждён: {CountryName(code)}.",
+            WarpExitVerdict.Match =>
+                seen?.Country is { } code2
+                    ? $"WARP работает, выход: {CountryName(code2)}." + (settings.WarpCountryTag is null ? string.Empty
+                        : " Страну сервера по названию определить не удалось, поэтому сверять нечего.")
+                    : "WARP работает.",
+            WarpExitVerdict.Mismatch =>
+                $"Выбрана другая страна, но Cloudflare видит {CountryName(seen!.Country ?? "?")}. "
+                + "Если вы только что сменили страну, перезапустите движки." + retry,
+            _ => $"Выход не поднялся за {budget.TotalSeconds:0} с. Если вы только что включили WARP или сменили страну, "
+                + "перезапустите движки; иначе этот сервер, скорее всего, не пропускает WARP." + retry,
+        };
     }
 
     /// <summary>
@@ -1831,6 +2025,7 @@ public partial class VpnView : UserControl
             ShowQuick(next);
 
             this.Offer("WARP переключён");
+            _ = VerifyWarpAsync(next, TimeSpan.FromSeconds(90));
         }
         catch (Exception ex)
         {
@@ -2884,7 +3079,9 @@ public partial class VpnView : UserControl
         finally
         {
             WarpCheckButton.IsEnabled = true;
-            ShowWarp(AppSettings.Load(AppSettings.DefaultPath));
+            var now = AppSettings.Load(AppSettings.DefaultPath);
+            ShowWarp(now);
+            _ = VerifyWarpAsync(now, TimeSpan.FromSeconds(20));
         }
     }
 

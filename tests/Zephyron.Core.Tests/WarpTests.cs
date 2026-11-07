@@ -321,6 +321,29 @@ public class WarpTests
             Assert.DoesNotContain(group.GetProperty("outbounds").EnumerateArray(), m => m.GetString() == via);
 
         Assert.DoesNotContain("Эстония", masque.ToString());
+
+        // Регистрация через сервер, сам туннель — напрямую: detour у выхода не пишется.
+        Assert.False(masque.TryGetProperty("detour", out _));
+    }
+
+    /// <summary>Страна выбрана — через сервер идёт и сам туннель (detour у выхода).</summary>
+    [Fact]
+    public void CountryRoutesWholeTunnelThroughDetour()
+    {
+        var masque = Compile(
+                new SingBoxOptions { WarpDetour = Vless("🇪🇪 Эстония"), WarpExitThroughDetour = true },
+                Warp.MasqueServer())
+            .GetProperty("outbounds").EnumerateArray()
+            .First(o => o.GetProperty("tag").GetString() == Warp.MasqueTag);
+
+        Assert.Equal(SingBoxOptions.WarpDetourTag, masque.GetProperty("detour").GetString());
+        Assert.Equal(SingBoxOptions.WarpDetourTag, masque.GetProperty("profile").GetProperty("detour").GetString());
+
+        var estonia = Vless("🇪🇪 Эстония");
+        Assert.True(Warp.ExitsThrough(new AppSettings { WarpCountryTag = "🇪🇪 эстония" }, estonia));
+        Assert.False(Warp.ExitsThrough(new AppSettings(), estonia));
+        Assert.False(Warp.ExitsThrough(new AppSettings { WarpCountryTag = "DE" }, estonia));
+        Assert.False(Warp.ExitsThrough(new AppSettings { WarpCountryTag = "DE" }, null));
     }
 
     /// <summary>Без посредника конфиг прежний: ни profile, ни лишнего выхода.</summary>
@@ -393,6 +416,20 @@ public class WarpTests
 
         // Сервер, выбранный страной, исчез из подписки, — берём общий порядок.
         Assert.Equal("A", Warp.Detour(new AppSettings { WarpCountryTag = "gone" }, subs, NoDead, NoSpeed)!.Tag);
+    }
+
+    [Fact]
+    public void TraceVerdictComparesCountryAndNeedsWarp()
+    {
+        var ee = WarpTrace.Parse("fl=1\nip=203.0.113.7\nloc=ee\ncolo=TLL\nwarp=on\n");
+        var plain = WarpTrace.Parse("loc=EE\nwarp=off\n");
+
+        Assert.Equal(new WarpExit("EE", true), ee);
+        Assert.Equal(WarpExitVerdict.Match, WarpTrace.Judge(ee, "EE"));
+        Assert.Equal(WarpExitVerdict.Match, WarpTrace.Judge(ee, null));
+        Assert.Equal(WarpExitVerdict.Mismatch, WarpTrace.Judge(ee, "DE"));
+        Assert.Equal(WarpExitVerdict.Down, WarpTrace.Judge(plain, "EE"));
+        Assert.Equal(WarpExitVerdict.Down, WarpTrace.Judge(null, null));
     }
 
     /// <summary>Настройка страны: сохраняется, а у старых настроек без поля — «как есть».</summary>

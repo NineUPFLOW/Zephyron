@@ -147,6 +147,13 @@ public static class Warp
     }
 
     /// <summary>
+    /// Идёт ли через посредника весь туннель WARP: страна выбрана, и посредник — именно её сервер.
+    /// </summary>
+    public static bool ExitsThrough(AppSettings settings, ProxyServer? detour) =>
+        detour is not null && !string.IsNullOrWhiteSpace(settings.WarpCountryTag)
+        && detour.Tag.Equals(settings.WarpCountryTag, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Выход, который ставить в селектор первым: WARP, когда включён он, иначе выбранный сервер подписки.
     /// </summary>
     /// <remarks>
