@@ -141,6 +141,33 @@ public static class TunnelEndpoints
     }
 
     /// <summary>
+    /// Сети, которые TUN забирает в туннель при выборочном перехвате:
+    /// <c>route_address</c> и <c>route_exclude_address</c>. <c>null</c> — перехват
+    /// полный, конфиг не читается или TUN нет: «вне туннеля» тогда сказать нечего.
+    /// </summary>
+    public static (IReadOnlyList<string> Include, IReadOnlyList<string> Exclude)? TunRoutes(string configPath)
+    {
+        try
+        {
+            var tun = (JsonNode.Parse(File.ReadAllText(configPath))?["inbounds"] as JsonArray)?
+                .OfType<JsonObject>()
+                .FirstOrDefault(i => (string?)i["type"] == "tun");
+
+            List<string> Read(string key) => [.. (tun?[key] as JsonArray ?? [])
+                .Select(n => (string?)n)
+                .OfType<string>()];
+
+            var include = Read("route_address");
+
+            return include.Count == 0 ? null : (include, Read("route_exclude_address"));
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Адреса нашего TUN (<c>address</c> у входа <c>tun</c>) — без длины префикса.
     /// </summary>
     /// <remarks>

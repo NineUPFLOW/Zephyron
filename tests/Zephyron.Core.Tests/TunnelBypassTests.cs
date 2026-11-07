@@ -1,206 +1,104 @@
+using System.Net;
+using Zephyron.Core.Connections;
+using Zephyron.Core.Rules;
 using Zephyron.Proxy;
 using Xunit;
 
 namespace Zephyron.Core.Tests;
 
-/// <summary>
-/// Обход туннеля, пока его выходы мертвы.
-/// </summary>
-/// <remarks>
-/// Жалоба владельца 20.09: «при падении серверов сделать так, чтоб вся
-/// остальная сеть не страдала». Движок при мёртвой подписке жив и трафик
-/// принимает, а наружу тот не выходит; в режиме «всё через VPN» это вся
-/// сеть целиком.
-/// </remarks>
+/// <summary>Имя «через VPN» с настоящим адресом: наблюдение и проверка имён.</summary>
 public sealed class TunnelBypassTests
 {
-    private static TunnelBypass Fresh() => new();
+    private static readonly string[] Include = ["104.16.0.0/12", "198.18.0.0/15"];
+    private static readonly string[] Exclude = ["104.17.0.0/16"];
+
+    private static WatchContext Context(bool selective = true) => new(
+        ["198.18.0.0/15"], [], selective ? Include : null, selective ? Exclude : null);
+
+    [Theory]
+    [InlineData("104.16.5.5", false)]   // в забираемой сети
+    [InlineData("188.40.167.81", true)] // вне забираемых
+    [InlineData("104.17.1.1", true)]    // в выведенной
+    public void RealAddressOutsideTheRoutesBypassesTheTunnel(string address, bool bypass) =>
+        Assert.Equal(bypass, Context().BypassesTunnel(IPAddress.Parse(address)));
 
     [Fact]
-    public void A_working_tunnel_is_left_alone()
+    public void WithoutRoutesNothingBypasses() =>
+        Assert.False(Context(selective: false).BypassesTunnel(IPAddress.Parse("188.40.167.81")));
+
+    private static WatchEntry Entry(string address, WatchContext context)
     {
-        var bypass = Fresh();
+        var connection = new ConnectionEvent
+        {
+            Timestamp = DateTimeOffset.Now,
+            Protocol = ProtocolKind.Tcp,
+            RemoteAddress = IPAddress.Parse(address),
+            RemotePort = 443,
+            ExecutablePath = @"C:\x\app.exe",
+            Hostname = "2ip.io",
+        };
 
-        for (int i = 0; i < 10; i++)
-            Assert.Equal(BypassAction.Keep, bypass.Observe(tunnelWorks: true));
+        var rule = new RoutingRule { Match = MatchKind.Domain, Value = "2ip.io", Mode = RoutingMode.Proxy, Ordinal = 7 };
 
-        Assert.False(bypass.Engaged);
+        return WatchEntry.From(connection, new RuleDecision { Mode = RoutingMode.Proxy, Rule = rule, Reason = "domain 2ip.io" }, context);
     }
 
     [Fact]
-    public void One_failed_check_is_not_enough()
+    public void ProxyRuleWithARealOutsideAddressIsShownAsDirect()
     {
-        // Единичный отказ случается и при исправном туннеле — сеть моргнула,
-        // выход перегружен. Уводить по нему значило бы метаться мимо туннеля
-        // и обратно несколько раз в час.
-        var bypass = Fresh();
+        var entry = Entry("188.40.167.81", Context());
 
-        Assert.Equal(BypassAction.Keep, bypass.Observe(tunnelWorks: false));
-        Assert.False(bypass.Engaged);
+        Assert.Equal(WatchRoute.Direct, entry.Mode);
+        Assert.True(entry.IsBypass);
+        Assert.True(entry.Certain);
+        Assert.StartsWith("мимо туннеля · #7", entry.Rule);
+        Assert.StartsWith("мимо туннеля · ", entry.RuleName);
+
+        var back = WatchEntry.Parse(entry.ToLine())!;
+        Assert.True(back.IsBypass);
+        Assert.Contains("Мимо туннеля: 1", WatchEntry.Summarize([entry.ToLine()]));
     }
 
     [Fact]
-    public void Three_failures_in_a_row_take_the_traffic_around()
+    public void InsideRoutesOrFakeStaysTunnel()
     {
-        var bypass = Fresh();
+        Assert.Equal(WatchRoute.Proxy, Entry("104.16.5.5", Context()).Mode);
+        Assert.Equal(WatchRoute.Proxy, Entry("198.18.0.9", Context()).Mode);
+        Assert.False(Entry("188.40.167.81", Context(selective: false)).IsBypass);
+    }
 
-        Assert.Equal(BypassAction.Keep, bypass.Observe(false));
-        Assert.Equal(BypassAction.Keep, bypass.Observe(false));
-        Assert.Equal(BypassAction.Engage, bypass.Observe(false));
+    private static IReadOnlyList<IPAddress> Ips(params string[] a) => [.. a.Select(IPAddress.Parse)];
 
-        Assert.True(bypass.Engaged);
+    [Fact]
+    public void FakeAnswersPass()
+    {
+        var v = TunnelNameCheck.Judge([("2ip.io", Ips("198.18.0.4"))], null, []);
+        Assert.True(v.Ok);
     }
 
     [Fact]
-    public void A_successful_check_resets_the_count()
+    public void RealAnswerFailsAndSaysWhatToDo()
     {
-        // Два отказа, успех, два отказа — обхода быть не должно:
-        // подряд их не было.
-        var bypass = Fresh();
+        var v = TunnelNameCheck.Judge([("a.io", Ips("198.18.0.4")), ("2ip.io", Ips("188.40.167.81"))], null, ["192.168.1.1/32"]);
 
-        bypass.Observe(false);
-        bypass.Observe(false);
-        bypass.Observe(true);
-        bypass.Observe(false);
-
-        Assert.Equal(BypassAction.Keep, bypass.Observe(false));
-        Assert.False(bypass.Engaged);
+        Assert.False(v.Ok);
+        Assert.Contains("2ip.io → 188.40.167.81", v.Text);
+        Assert.DoesNotContain("a.io →", v.Text);
+        Assert.Contains("192.168.1.1", v.Text);
+        Assert.Contains("сторонний DNS-клиент", v.Text);
     }
 
     [Fact]
-    public void A_revived_exit_brings_the_traffic_back()
+    public void NamesSkipPinsMasksAndNonProxyAndStopAtThree()
     {
-        var bypass = Fresh();
+        RoutingRule R(string v, RoutingMode m = RoutingMode.Proxy) => new() { Match = MatchKind.Domain, Value = v, Mode = m };
 
-        bypass.Observe(false);
-        bypass.Observe(false);
-        bypass.Observe(false);
+        var rules = new RuleSet
+        {
+            DefaultMode = RoutingMode.Desync,
+            Rules = [R("*.x.com"), R("pinned.io"), R("direct.io", RoutingMode.Direct), R("a.io"), R("b.io"), R("c.io"), R("d.io")],
+        };
 
-        Assert.Equal(BypassAction.Release, bypass.Observe(tunnelWorks: true));
-        Assert.False(bypass.Engaged);
-    }
-
-    [Fact]
-    public void Staying_dead_does_not_engage_twice()
-    {
-        // Повторное переключение — лишний запрос к движку на каждой проверке
-        // и лишняя строка в журнале о том, что и так уже сделано.
-        var bypass = Fresh();
-
-        bypass.Observe(false);
-        bypass.Observe(false);
-        bypass.Observe(false);
-
-        for (int i = 0; i < 5; i++)
-            Assert.Equal(BypassAction.Keep, bypass.Observe(false));
-
-        Assert.True(bypass.Engaged);
-    }
-
-    [Fact]
-    public void The_count_stops_growing_once_engaged()
-    {
-        var bypass = Fresh();
-
-        for (int i = 0; i < 20; i++)
-            bypass.Observe(false);
-
-        Assert.Equal(TunnelBypass.FailuresBeforeBypass, bypass.Failures);
-    }
-
-    [Fact]
-    public void Forgetting_puts_it_back_as_it_was()
-    {
-        // Нужно при перезапуске движка: новый процесс поднимается с группой,
-        // указывающей на автоподбор, и память о прежнем обходе заставила бы
-        // считать трафик уведённым, когда он идёт в туннель.
-        var bypass = Fresh();
-
-        bypass.Observe(false);
-        bypass.Observe(false);
-        bypass.Observe(false);
-
-        bypass.Forget();
-
-        Assert.False(bypass.Engaged);
-        Assert.Equal(0, bypass.Failures);
-        Assert.Equal(BypassAction.Keep, bypass.Observe(false));
-    }
-
-    [Fact]
-    public void A_release_that_the_traffic_disproves_is_undone_at_once()
-    {
-        // Обход снимается по ответу выхода на замер, а замер — запрос
-        // на двести байт. Отвечающий на него выход трафик нести не обязан:
-        // 19.09 у владельца «США (вход РФ)» отвечал за 190 мс и не довозил
-        // ничего. Без этого правила выходило бы качание — снятие по замеру,
-        // три проверки сети вхолостую, возврат, и по кругу.
-        var bypass = Fresh();
-
-        bypass.Observe(false);
-        bypass.Observe(false);
-        Assert.Equal(BypassAction.Engage, bypass.Observe(false));
-
-        Assert.Equal(BypassAction.Release, bypass.Observe(true));
-
-        // Первый же провал настоящего трафика, без ожидания порога.
-        Assert.Equal(BypassAction.Engage, bypass.Observe(false));
-        Assert.True(bypass.Engaged);
-    }
-
-    [Fact]
-    public void Traffic_that_really_goes_through_confirms_the_release()
-    {
-        // Подтверждённое снятие не возвращается по первому же провалу:
-        // дальше действует обычный порог, иначе единичный сбой сети
-        // уводил бы трафик мимо туннеля навсегда.
-        var bypass = Fresh();
-
-        bypass.Observe(false);
-        bypass.Observe(false);
-        bypass.Observe(false);
-
-        bypass.Observe(true);
-
-        // Настоящий трафик прошёл — выход подтверждён делом.
-        bypass.Observe(true);
-
-        Assert.Equal(BypassAction.Keep, bypass.Observe(false));
-        Assert.Equal(BypassAction.Keep, bypass.Observe(false));
-        Assert.Equal(BypassAction.Engage, bypass.Observe(false));
-    }
-
-    [Fact]
-    public void Forgetting_clears_the_unconfirmed_release_too()
-    {
-        var bypass = Fresh();
-
-        bypass.Observe(false);
-        bypass.Observe(false);
-        bypass.Observe(false);
-        bypass.Observe(true);
-
-        bypass.Forget();
-
-        // Память о неподтверждённом снятии относилась к прежнему процессу.
-        Assert.Equal(BypassAction.Keep, bypass.Observe(false));
-    }
-
-    [Fact]
-    public void Engaging_points_at_direct_and_releasing_at_the_group()
-    {
-        var bypass = Fresh();
-
-        Assert.Equal("direct", bypass.TargetFor(BypassAction.Engage, "auto-latency"));
-        Assert.Equal("auto-latency", bypass.TargetFor(BypassAction.Release, "auto-latency"));
-        Assert.Equal("auto-latency", bypass.TargetFor(BypassAction.Keep, "auto-latency"));
-    }
-
-    [Fact]
-    public void The_threshold_matches_the_one_for_dead_servers()
-    {
-        // Обе проверки отвечают на один вопрос — «выход мёртв или моргнул», —
-        // и разные пороги означали бы два разных ответа.
-        Assert.Equal(TunnelBypass.FailuresBeforeBypass, new SingBoxOptions().DeadAfterFailures);
+        Assert.Equal(["a.io", "b.io", "c.io"], TunnelNameCheck.Names(rules, ["pinned.io"]));
     }
 }

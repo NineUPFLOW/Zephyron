@@ -63,6 +63,8 @@ public sealed record WatchEntry(
                 "мультикаст — поиск устройств в домашней сети"),
             not null when connection.IsLoopback || LocalNetworks.IsLocal(remote) => (WatchRoute.Local,
                 decision.Reason ?? "локальная сеть"),
+            not null when decision.Mode == RoutingMode.Proxy && decision.Rule is not null && context.BypassesTunnel(remote) =>
+                (WatchRoute.Direct, $"{BypassRule} · #{decision.Rule.Ordinal} {decision.Reason}"),
             _ => (Route(decision.Mode), decision.Rule is null
                 ? decision.Reason ?? "по умолчанию"
                 : $"#{decision.Rule.Ordinal} {decision.Reason}"),
@@ -90,6 +92,12 @@ public sealed record WatchEntry(
     public const string FakeRule = "подставной адрес движка — имя идёт через VPN";
 
     /// <summary>
+    /// Начало правила записи, которую правила ведут в VPN, но адрес настоящий
+    /// и вне сетей выборочного TUN: пакеты идут мимо туннеля.
+    /// </summary>
+    public const string BypassRule = "мимо туннеля";
+
+    /// <summary>
     /// Известно ли «куда» точно, а не по ответу правил.
     /// </summary>
     /// <remarks>
@@ -98,7 +106,10 @@ public sealed record WatchEntry(
     /// правила: sing-box и winws2 наблюдение не спрашивает. Окно рисует это
     /// залитым и полым кружком (макет владельца 10.10).
     /// </remarks>
-    public bool Certain => Mode is WatchRoute.Local or WatchRoute.Engine || Rule == FakeRule;
+    public bool Certain => Mode is WatchRoute.Local or WatchRoute.Engine || Rule == FakeRule || IsBypass;
+
+    /// <summary>Правила ведут в VPN, а адрес настоящий и вне сетей TUN.</summary>
+    public bool IsBypass => Rule.StartsWith(BypassRule, StringComparison.Ordinal);
 
     /// <summary>
     /// Правило коротко — для таблицы и отбора: «#47 google», а не
@@ -108,7 +119,9 @@ public sealed record WatchEntry(
     /// Выводится из текста правила, а не хранится отдельно: так оно
     /// одинаково у живой записи и у прочитанной из журнала.
     /// </remarks>
-    public string RuleName => ShortRule(Rule);
+    public string RuleName => IsBypass && Rule.IndexOf(" · ", StringComparison.Ordinal) is var cut and >= 0
+        ? BypassRule + " · " + ShortRule(Rule[(cut + 3)..])
+        : ShortRule(Rule);
 
     internal static string ShortRule(string rule)
     {
@@ -341,6 +354,14 @@ public sealed record WatchEntry(
         text.AppendLine($"Наблюдение: сеансов {sessions}, {first:dd.MM HH:mm:ss} — {last:dd.MM HH:mm:ss}, соединений {entries.Count}.");
         text.AppendLine("«Куда» — что сказали бы правила, а не что сделал движок; точно известны только «туннель»");
         text.AppendLine("по подставному адресу движка, «локально» и «движок». Имя на адресе CDN бывает чужим.");
+        int bypass = entries.Count(e => e.IsBypass);
+
+        if (bypass > 0)
+        {
+            text.AppendLine($"Мимо туннеля: {bypass} — правила ведут в VPN, но адрес настоящий и вне сетей TUN");
+            text.AppendLine("(имя разрешил чужой DNS-клиент, минуя движок); см. «Диагностику», «Имена и hosts».");
+        }
+
         text.AppendLine();
         text.AppendLine($"{"программа",-32} {"всего",7} {"туннель",8} {"десинк",8} {"напрямую",9} {"локально",9} {"движок",7} {"udp",6}");
 

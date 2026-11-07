@@ -554,6 +554,8 @@ public static class Doctor
             lines.Add(Warn("Файл hosts не читается: " + ex.GetBaseException().Message));
         }
 
+        lines.AddRange(TunnelNames(settings));
+
         var guards = SecuritySoftware.Running();
 
         if (guards.Count > 0)
@@ -564,6 +566,45 @@ public static class Doctor
         }
 
         return lines;
+    }
+
+    /// <summary>Только «Гибрид» с поднятым туннелем: иначе имя «через VPN» подставного адреса не ждёт.</summary>
+    private static IReadOnlyList<DoctorCheck> TunnelNames(AppSettings settings)
+    {
+        try
+        {
+            var state = SupervisorState.Load(SupervisorState.DefaultPath);
+
+            if (settings.Mode != OperatingMode.Selective || state is null || !state.IsSupervisorAlive()
+                || !state.Services.Any(s => s.Name == "sing-box")
+                || TunnelEndpoints.TunRoutes(settings.ProxyConfigPath) is null)
+            {
+                return [];
+            }
+
+            var engine = RuleSetLoader.LoadFor(settings);
+
+            RuleSetExpander.Expand(engine.RuleSet, ZapretPaths.Discover()?.Root);
+
+            var names = TunnelNameCheck.Names(engine.RuleSet, HostsEditor.Pins().Keys);
+
+            if (names.Count == 0)
+                return [];
+
+            var answers = names.Select(n =>
+            {
+                try { return (n, (IReadOnlyList<System.Net.IPAddress>)System.Net.Dns.GetHostAddresses(n)); }
+                catch (Exception) { return (n, (IReadOnlyList<System.Net.IPAddress>)[]); }
+            }).ToList();
+
+            var verdict = TunnelNameCheck.Judge(answers, TunnelEndpoints.FakeRange(settings.ProxyConfigPath), SystemResolvers.Discover());
+
+            return [verdict.Ok ? Ok(verdict.Text) : Bad(verdict.Text)];
+        }
+        catch (Exception ex)
+        {
+            return [Warn("Имена «через VPN» не проверились: " + ex.GetBaseException().Message)];
+        }
     }
 
     private static IReadOnlyList<DoctorCheck> Browsers()

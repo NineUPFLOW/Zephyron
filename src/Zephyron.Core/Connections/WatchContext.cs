@@ -47,21 +47,45 @@ public sealed class WatchContext
 
     private readonly IReadOnlyList<IpCidrRange> _fake;
     private readonly HashSet<IPAddress> _servers;
+    private readonly IReadOnlyList<IpCidrRange>? _tunInclude;
+    private readonly IReadOnlyList<IpCidrRange> _tunExclude;
 
     /// <param name="fakeRanges">Диапазоны подставных адресов движка (<c>inet4_range</c>, <c>inet6_range</c>).</param>
     /// <param name="servers">Адреса серверов VPN из конфига движка.</param>
-    public WatchContext(IEnumerable<string> fakeRanges, IEnumerable<IPAddress> servers)
+    /// <param name="tunInclude">Сети, которые выборочный TUN забирает; <c>null</c> — перехват полный или неизвестен.</param>
+    /// <param name="tunExclude">Сети, выведенные из TUN.</param>
+    public WatchContext(IEnumerable<string> fakeRanges, IEnumerable<IPAddress> servers,
+        IEnumerable<string>? tunInclude = null, IEnumerable<string>? tunExclude = null)
     {
-        _fake = fakeRanges
-            .Select(r => { try { return IpCidrRange.Parse(r); } catch (RuleConfigurationException) { return null; } })
-            .OfType<IpCidrRange>()
-            .ToList();
+        _tunInclude = tunInclude is null ? null : Ranges(tunInclude);
+        _tunExclude = Ranges(tunExclude ?? []);
+
+        _fake = Ranges(fakeRanges);
 
         _servers = servers.Select(Normal).ToHashSet();
     }
 
     /// <summary>Без движка: ни подставных адресов, ни серверов.</summary>
     public static WatchContext None { get; } = new([], []);
+
+    private static List<IpCidrRange> Ranges(IEnumerable<string> values) => values
+        .Select(r => { try { return IpCidrRange.Parse(r); } catch (RuleConfigurationException) { return null; } })
+        .OfType<IpCidrRange>()
+        .ToList();
+
+    /// <summary>
+    /// Минует ли адрес выборочный TUN: вне забираемых сетей или в выведенных.
+    /// Без списка сетей (полный перехват, туннель не поднят) — нет.
+    /// </summary>
+    public bool BypassesTunnel(IPAddress address)
+    {
+        if (_tunInclude is null)
+            return false;
+
+        address = Normal(address);
+
+        return !_tunInclude.Any(r => r.Contains(address)) || _tunExclude.Any(r => r.Contains(address));
+    }
 
     public bool IsFake(IPAddress address) => _fake.Any(r => r.Contains(Normal(address)));
 

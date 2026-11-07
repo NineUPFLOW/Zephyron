@@ -524,8 +524,11 @@ public partial class WatchView : UserControl
             entry.ModeWord,
             colour,
             entry.Certain ? colour : Brushes.Transparent,
-            entry.Certain
-                ? "Известно точно: подставной адрес движки, сама движок или домашняя сеть"
+            entry.IsBypass
+                ? "Мимо туннеля: правило ведёт в VPN, но имя разрешено в настоящий адрес (его ответил чужой DNS-клиент, а не движок), "
+                    + "а выборочный TUN такие адреса не забирает. Отключите сторонний DNS-клиент или используйте наш DNS."
+                : entry.Certain
+                ? "Известно точно: подставной адрес движка, сам движок или домашняя сеть"
                 : "Так решили бы правила, движок не спрашивали",
             entry.Process,
             entry.Endpoint,

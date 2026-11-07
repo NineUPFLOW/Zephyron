@@ -88,9 +88,15 @@ public sealed class ConnectionWatch : IAsyncDisposable
             if (state is null || !state.IsSupervisorAlive() || !File.Exists(settings.ProxyConfigPath))
                 return WatchContext.None;
 
+            // Сети TUN — только в «Гибриде» с поднятым туннелем; иначе «вне туннеля» не судится.
+            var routes = settings.Mode == OperatingMode.Selective && state.Services.Any(s => s.Name == "sing-box")
+                ? Zephyron.Proxy.TunnelEndpoints.TunRoutes(settings.ProxyConfigPath)
+                : null;
+
             return new WatchContext(
                 Zephyron.Proxy.TunnelEndpoints.FakeRanges(settings.ProxyConfigPath),
-                Zephyron.Proxy.TunnelEndpoints.Read(settings.ProxyConfigPath));
+                Zephyron.Proxy.TunnelEndpoints.Read(settings.ProxyConfigPath),
+                routes?.Include, routes?.Exclude);
         }
         catch (Exception)
         {
