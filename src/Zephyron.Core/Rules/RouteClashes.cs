@@ -30,6 +30,9 @@ public sealed record RouteEntry
 
     /// <summary>Группа это или одно имя — по точке: <c>discord</c> и <c>discord.com</c>.</summary>
     public bool IsGroup => !Name.Contains('.');
+
+    /// <summary>Пин с нашей пометкой десинка: имя из-под десинка не выведено.</summary>
+    public bool DesyncOpen { get; init; }
 }
 
 /// <summary>Одно имя названо дважды и по-разному.</summary>
@@ -76,10 +79,12 @@ public static class RouteClashes
     /// или доменом им не о чем.
     /// </remarks>
     /// <param name="pins">Прибитые нами имена.</param>
+    /// <param name="desyncPins">Из них помеченные для десинка: с десинком они не спорят, с туннелем — да.</param>
     public static IReadOnlyList<RouteClash> FromRules(
         IEnumerable<UserRuleEntry> rules,
         IEnumerable<string> pins,
-        Func<string, IReadOnlyList<string>>? members = null)
+        Func<string, IReadOnlyList<string>>? members = null,
+        IReadOnlySet<string>? desyncPins = null)
     {
         var entries = new List<RouteEntry>();
 
@@ -103,7 +108,14 @@ public static class RouteClashes
             var name = Trim(pinned);
 
             if (name.Length > 0)
-                entries.Add(new RouteEntry { Name = name, Choice = RouteChoice.Pin });
+            {
+                entries.Add(new RouteEntry
+                {
+                    Name = name,
+                    Choice = RouteChoice.Pin,
+                    DesyncOpen = desyncPins?.Contains(pinned) == true || desyncPins?.Contains(name) == true,
+                });
+            }
         }
 
         return Find(entries, members);
@@ -162,7 +174,7 @@ public static class RouteClashes
             // Спорит пин только с тем, что требует видеть имя: с туннелем
             // и с десинком. Об этом и говорим.
             if ((first.Choice == RouteChoice.Pin || entry.Choice == RouteChoice.Pin)
-                && !Incompatible(first.Choice, entry.Choice))
+                && !Incompatible(first, entry))
             {
                 continue;
             }
@@ -220,7 +232,7 @@ public static class RouteClashes
                 // Только несовместимые. Разные, но совместимые маршруты —
                 // это уточнение, а не спор: точное имя перекрывает группу,
                 // и так и задумано.
-                if (!Incompatible(group.Choice, own.Choice))
+                if (!Incompatible(group, own))
                     continue;
 
                 yield return new RouteClash
@@ -247,6 +259,12 @@ public static class RouteClashes
     public static bool Incompatible(RouteChoice one, RouteChoice other) =>
         Pair(one, other, RouteChoice.Pin, RouteChoice.Vpn)
         || Pair(one, other, RouteChoice.Pin, RouteChoice.Desync);
+
+    /// <summary>То же для записей: пин с пометкой десинка десинку не мешает.</summary>
+    private static bool Incompatible(RouteEntry one, RouteEntry other) =>
+        Incompatible(one.Choice, other.Choice)
+        && !(one.DesyncOpen && other.Choice == RouteChoice.Desync)
+        && !(other.DesyncOpen && one.Choice == RouteChoice.Desync);
 
     /// <summary>
     /// Чем противоречие кончится на деле.

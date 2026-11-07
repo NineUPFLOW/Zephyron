@@ -195,4 +195,21 @@ public sealed class RulesShareTests : IDisposable
         Assert.Equal("instagram.com", clash.Name);
         Assert.Contains("десинк", clash.Outcome);
     }
+
+    [Fact]
+    public void A_desync_marked_pin_does_not_clash_with_desync_but_does_with_vpn()
+    {
+        var desyncPins = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "instagram.com", "claude.ai" };
+
+        var clashes = RouteClashes.FromRules(
+            [
+                Rule(MatchKind.Domain, "*.instagram.com", RoutingMode.Desync),
+                Rule(MatchKind.Domain, "*.claude.ai", RoutingMode.Proxy),
+            ],
+            ["instagram.com", "claude.ai"],
+            desyncPins: desyncPins);
+
+        var clash = Assert.Single(clashes);
+        Assert.Equal("claude.ai", clash.Name);
+    }
 }

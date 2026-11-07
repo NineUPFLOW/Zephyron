@@ -217,6 +217,16 @@ public enum BlockKind
     Forbidden,
 
     /// <summary>
+    /// Страница 200 оказалась проверкой на робота: самой страницы проба не видит.
+    /// </summary>
+    /// <remarks>
+    /// Не «доступен» и не блок: судить не по чему, решает браузер. Скрипты
+    /// своей зоны у такой страницы всё равно докачиваются — замерзший скрипт
+    /// делает её <see cref="Stall"/>.
+    /// </remarks>
+    BotWall,
+
+    /// <summary>
     /// Короткое приветствие проходит, длинное — браузерное, с постквантовым ключом, — нет.
     /// </summary>
     /// <remarks>
@@ -258,6 +268,9 @@ public sealed record ProbeOutcome
 
     /// <summary>Сайт ответил 403, страну не назвал и робота не проверял.</summary>
     public bool Forbidden { get; init; }
+
+    /// <summary>Ответ 200, но это страница проверки на робота, а не сайт.</summary>
+    public bool BotWall { get; init; }
 
     /// <summary>
     /// Сторона отказалась от версии протокола, а не оборвала разговор.
@@ -521,6 +534,7 @@ public sealed record TargetReport
         BlockKind.Dns => "резолвер даёт нерабочий адрес",
         BlockKind.GeoBlock => "сайт отказывает по стране",
         BlockKind.Forbidden => "сайт отказал, причину не назвал",
+        BlockKind.BotWall => "за проверкой на робота",
         BlockKind.LongHello => "режут длинное приветствие браузера",
         BlockKind.BrokenCname => "оборванный CNAME",
 
@@ -537,7 +551,7 @@ public sealed record TargetReport
     /// Имя без адреса — свойство списка, а не сети: советовать по нему
     /// нечего, и в перечне закрытого оно только сбивает.
     /// </remarks>
-    public bool Actionable => Kind is not (BlockKind.None or BlockKind.NoAddress or BlockKind.Handshake);
+    public bool Actionable => Kind is not (BlockKind.None or BlockKind.NoAddress or BlockKind.Handshake or BlockKind.BotWall);
 
     /// <summary>
     /// Отчего именно вердикт таков — словами той пробы, что его решила.
@@ -563,7 +577,7 @@ public sealed record TargetReport
             {
                 // Открытому объяснять нечего — кроме молчащего QUIC: по TCP открыт, а браузер подвиснет.
                 BlockKind.None => Data.QuicSilent == true ? Data : null,
-                BlockKind.GeoBlock or BlockKind.Forbidden or BlockKind.Stall => Data,
+                BlockKind.GeoBlock or BlockKind.Forbidden or BlockKind.BotWall or BlockKind.Stall => Data,
                 BlockKind.TlsDpi or BlockKind.Handshake or BlockKind.LongHello => Tls,
                 BlockKind.HttpsPort or BlockKind.Full or BlockKind.Dns
                     or BlockKind.Sinkhole or BlockKind.BrokenCname => Tcp,
@@ -617,6 +631,7 @@ public sealed record TargetReport
             + "не нашёлся рабочий — VPN с выходом не в России; десинк не поможет",
         BlockKind.GeoBlock => "только VPN — десинк не поможет",
         BlockKind.Forbidden => "открыть в браузере: открывается — ничего не нужно, отказ и там — VPN",
+        BlockKind.BotWall => "откройте в браузере: откроется — ничего не нужно, нет — решайте по картине там",
         BlockKind.LongHello => "десинк или другой адрес Cloudflare в hosts (8.47.69.x, 8.6.112.x не резали), иначе VPN",
         BlockKind.BrokenCname => "подставить адрес",
         // Браузеру этот сайт открывается: у него приветствие TLS другое
@@ -1594,6 +1609,9 @@ public static class BlockCheck
             if (data.Refused)
                 return BlockKind.GeoBlock;
 
+            if (data.BotWall)
+                return BlockKind.BotWall;
+
             return data.Forbidden ? BlockKind.Forbidden : BlockKind.None;
         }
 
@@ -1767,7 +1785,8 @@ public static class BlockCheck
     private static readonly string[] BotCheckWords =
     [
         "just a moment", "checking your browser", "verify you are human", "verifying you are human",
-        "captcha", "are you a robot", "ddos-guard",
+        "captcha", "are you a robot", "ddos-guard", "enable javascript and cookies",
+        "проверка безопасности", "проверка браузера", "вы не робот", "я не робот",
     ];
 
     internal static bool IsHome(IPAddress address) => address.GetAddressBytes() is [10, ..] or [192, 168, ..] or [172, >= 16 and <= 31, ..];
@@ -2462,7 +2481,7 @@ public static class BlockCheck
             // «отказывает по стране» значило слать человека в VPN без причины.
             // 27.10 themoviedb.org: 403 был его собственной проверкой на робота
             // («Just a moment…» через CloudFront, без метки Cloudflare).
-            var said = status is 403 && kept is not null && header > 0
+            var said = status is 403 or 200 && kept is not null && header > 0
                 && PageAssets.Decode(kept.ToArray()[header..], chunked, contentEncoding) is { } refusalPage
                     ? VisibleText(refusalPage)
                     : null;
@@ -2472,6 +2491,9 @@ public static class BlockCheck
 
             challenged = !refused && (challenged || status is 403 && LooksLikeBotCheck(said));
             bool forbidden = status is 403 && !refused && !challenged;
+
+            // Капча под 200: тело мало (kept не обнулён), текст — проверка на робота.
+            bool botWall = status is 200 && !refused && moved is null && LooksLikeBotCheck(said);
 
             // Маленькая страница, пришедшая целиком, заморозки показать
             // не могла — в разметке ищутся скрипты и стили той же зоны,
@@ -2489,6 +2511,7 @@ public static class BlockCheck
                 Ok = true,
                 Refused = refused,
                 Forbidden = forbidden,
+                BotWall = botWall,
                 Elapsed = stopwatch.Elapsed,
                 Detail = refused
                     ? region is not null
@@ -2496,6 +2519,8 @@ public static class BlockCheck
                         : $"сайт ответил {status} — связь исправна, отказывает он сам"
                     : forbidden
                         ? $"сайт ответил {status} и причину не назвал — связь исправна, проверьте в браузере"
+                    : botWall
+                        ? $"сайт отдал проверку на робота, {total} Б — страницы проба не видит, откройте в браузере"
                     : challenged
                         ? $"{(cloudflare ? "Cloudflare" : "сайт")} проверяет на робота — связь исправна, браузер проверку пройдёт"
                         // «784 из 0 Б» у переадресации с Content-Length: 0 — счёт идёт с заголовками, ноль ни о чём.

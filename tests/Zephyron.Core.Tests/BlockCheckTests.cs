@@ -257,6 +257,30 @@ public class BlockCheckTests
         Assert.True(Report(BlockKind.Forbidden).Actionable);
     }
 
+    [Theory]
+    [InlineData("Please enable JavaScript and cookies to continue")]
+    [InlineData("Проверка безопасности. Подождите несколько секунд")]
+    [InlineData("DDoS-Guard: checking your browser")]
+    public void Bot_check_words_are_recognised_in_both_languages(string text) =>
+        Assert.True(BlockCheck.LooksLikeBotCheck(text));
+
+    [Fact]
+    public void A_bot_wall_under_200_is_not_available_nor_a_block()
+    {
+        var wall = new ProbeOutcome { Ok = true, BotWall = true, Detail = "проверка" };
+
+        var kind = BlockCheck.Classify(Ok(), Ok(), Ok(), wall);
+
+        Assert.Equal(BlockKind.BotWall, kind);
+        Assert.Equal("за проверкой на робота", Report(kind).Describe());
+        Assert.Contains("браузере", Report(kind).Remedy());
+        Assert.False(Report(kind).Actionable);
+    }
+
+    [Fact]
+    public void A_bot_wall_keeps_its_scripts_to_fetch() =>
+        Assert.True(BlockCheck.NeedsAsset(200, refused: false, challenged: false, moved: null, total: 700));
+
     /// <summary>Оборванный CNAME лечится подстановкой адреса, а не маршрутом.</summary>
     /// <remarks>
     /// Случай <c>tr.rbxcdn.com</c>: Roblox отдаёт по нему ссылки на превью,

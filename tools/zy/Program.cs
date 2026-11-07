@@ -393,7 +393,7 @@ int Routes()
 {
     var rules = UserRulesFile.Load().Entries;
     var pins = Zephyron.Proxy.HostsEditor.Pins().Keys.ToList();
-    var clashes = RouteClashes.FromRules(rules, pins);
+    var clashes = RouteClashes.FromRules(rules, pins, desyncPins: Zephyron.Proxy.HostsEditor.DesyncPins());
 
     Console.WriteLine($"своих маршрутов: {rules.Count(r => r.Enabled)}, пинов: {pins.Count}");
 
