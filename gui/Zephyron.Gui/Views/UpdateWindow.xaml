@@ -170,7 +170,10 @@
                 </Button>
             </WrapPanel>
 
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+            <TextBlock Style="{StaticResource Caption}" HorizontalAlignment="Right" Margin="0,0,0,6"
+                       Text="Движки остановятся, соединения оборвутся на минуту." />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="SkipButton" Style="{StaticResource Ghost}" Content="Пропустить эту версию" Click="OnSkip" Padding="14,8" Margin="0,0,8,0" />
                 <Button x:Name="LaterButton" Style="{StaticResource Ghost}" Content="Не сейчас" Click="OnLater" Padding="14,8" IsCancel="True" />
                 <Button x:Name="InstallButton" Style="{StaticResource Primary}" Click="OnInstall"
@@ -181,6 +184,7 @@
                         <TextBlock Text="Установить" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
+            </StackPanel>
             </StackPanel>
         </Grid>
     </Grid>

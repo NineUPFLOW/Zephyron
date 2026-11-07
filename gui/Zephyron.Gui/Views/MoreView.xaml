@@ -27,37 +27,17 @@
                 <TextBlock Text="Если что-то не работает" FontWeight="SemiBold" FontSize="15" Margin="4,22,0,10" />
 
                 <!--
-                    «Сайт не открывается» — в «Ещё», пока в тестовом режиме
-                    (владелец 29.09: «спрячем в ещё, пока она в тестовом режиме»).
-                    Автоподбор на одно имя: VPN последним, после рецептов и пина; записывает
-                    сработавший маршрут. Решение — в AutoPick (AutoPickWindow.PickOnOpen).
+                    «Сайт не открывается» переехал в «Проверку блокировок»: там то же поле
+                    адреса и кнопка «Исправить» у каждой строки (CheckView.OnFixRow);
+                    второго входа в автоподбор здесь не держим.
                 -->
                 <Border Style="{StaticResource Card}">
                     <StackPanel>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Сайт не открывается?" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Text="· проверка и пробный запуск" Style="{StaticResource Caption}"
-                                       VerticalAlignment="Center" Margin="6,0,0,0" />
-                        </StackPanel>
-
-                        <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,0" TextWrapping="Wrap"
-                                   Text="Вставьте ссылку или имя сайта — откроется автоподбор для него: напрямую, десинк пресета, каждый рецепт, пин в hosts и только если не помогло ничего — VPN. Движки на время замера остановятся и поднимутся сами; записанное можно вернуть." />
-
-                        <Grid Margin="0,10,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-
-                            <TextBox Grid.Column="0" x:Name="FixSite" Margin="0,0,8,0" KeyDown="OnFixKey"
-                                     gui:Hint.Text="https://aternos.org/go/ или просто aternos.org" />
-
-                            <Button Grid.Column="1" x:Name="FixButton" Style="{StaticResource Ghost}"
-                                    Content="Исправить" Click="OnFix" MinWidth="110" />
-                        </Grid>
-
-                        <TextBlock x:Name="FixResult" Style="{StaticResource Caption}" Margin="0,8,0,0"
-                                   TextWrapping="Wrap" Visibility="Collapsed" />
+                        <TextBlock Text="Сайт не открывается?" FontWeight="SemiBold" />
+                        <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,0" TextWrapping="Wrap">
+                            <Run Text="Вставьте его адрес в " /><Hyperlink Click="OnOpenCheck" Foreground="{DynamicResource Accent}"
+                                       TextDecorations="{x:Null}">Проверку блокировок</Hyperlink><Run Text=": она покажет, что закрыто, и починит." />
+                        </TextBlock>
                     </StackPanel>
                 </Border>
 
@@ -273,7 +253,7 @@
                             </StackPanel>
 
                             <Button Grid.Column="1" x:Name="ResetSettingsButton" Style="{StaticResource Destructive}"
-                                    Content="Вернуть исходное" Click="OnResetSettings" VerticalAlignment="Center" />
+                                    Content="Сбросить настройки" Click="OnResetSettings" VerticalAlignment="Center" />
                         </Grid>
 
                         <Border Height="1" Background="{DynamicResource Border}" Margin="0,16,0,16" />
@@ -291,7 +271,7 @@
                             </StackPanel>
 
                             <Button Grid.Column="1" x:Name="ForgetRoutesButton" Style="{StaticResource Destructive}"
-                                    Content="Вернуть исходное" Click="OnForgetRoutes" VerticalAlignment="Center" />
+                                    Content="Забыть маршруты" Click="OnForgetRoutes" VerticalAlignment="Center" />
                         </Grid>
 
                         <Border Height="1" Background="{DynamicResource Border}" Margin="0,16,0,16" />
@@ -327,7 +307,7 @@
                             </StackPanel>
 
                             <Button Grid.Column="1" x:Name="ResetNetworkButton" Style="{StaticResource Destructive}"
-                                    Content="Вернуть исходное" Click="OnResetNetwork" VerticalAlignment="Center" />
+                                    Content="Сбросить сеть Windows…" Click="OnResetNetwork" VerticalAlignment="Center" />
                         </Grid>
 
                     </StackPanel>

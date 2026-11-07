@@ -30,7 +30,7 @@ namespace Zephyron.Gui.Views;
 /// темы и перекрашивается вместе с ней.
 /// </para>
 /// <para>
-/// 05.10 (владелец) — шестой шаг, четвёртым: режим работы ZY с объяснением
+/// 05.10 (владелец) — шестой шаг, четвёртым: режим работы с объяснением
 /// каждого. После подписки — «Туннелю» нужен выход, — до пробного запуска,
 /// который поднимает ровно выбранное.
 /// </para>
@@ -843,6 +843,21 @@ public partial class OnboardingView : UserControl
             ShowDnsHint();
     }
 
+    /// <summary>Показывает или прячет путь DNS: значение по умолчанию пишется и свёрнутым.</summary>
+    private void OnDnsMore(object sender, RoutedEventArgs e)
+    {
+        var show = DnsPick.Visibility != Visibility.Visible;
+        var visibility = show ? Visibility.Visible : Visibility.Collapsed;
+
+        DnsLabel.Visibility = visibility;
+        DnsPick.Visibility = visibility;
+        DnsInfo.Visibility = visibility;
+
+        var name = show ? "Скрыть путь DNS" : "Дополнительно: путь DNS";
+        DnsMore.Content = name;
+        System.Windows.Automation.AutomationProperties.SetName(DnsMore, name);
+    }
+
     private void OnDnsPicked(object sender, SelectionChangedEventArgs e)
     {
         if (IsInitialized && DnsInfo is not null)
@@ -980,7 +995,7 @@ public partial class OnboardingView : UserControl
             SubLink.Clear();
 
             int usable = info.Servers.Count(s => s.IsUsableOutbound);
-            VpnStatus.Text = $"Подписка подключена, серверов: {usable}.";
+            VpnStatus.Text = $"Подписка подключена, серверов: {usable}. Осталось нажать «Включить» на «Главной».";
 
             if (_wantsTunnel)
                 ChooseWantedTunnel();

@@ -152,6 +152,9 @@ public partial class DesyncView : UserControl
         Unloaded += (_, _) => _counting?.Cancel();
     }
 
+    private void OnOpenRoutes(object sender, RoutedEventArgs e) =>
+        (Window.GetWindow(this) as MainWindow)?.Open("routes");
+
     private void OnGameFilter(object sender, RoutedEventArgs e)
     {
         try
@@ -533,7 +536,7 @@ public partial class DesyncView : UserControl
                 PresetModules.Result.Already =>
                     $"Модуль {module} уже подключён, файл не тронут.",
                 _ =>
-                    $"В пресете нет ни одной строки --lua-init, дописывать не к чему. "
+                    "В пресете нет ни одной строки --lua-init, дописывать не к чему. "
                         + "Откройте его в редакторе.",
             };
         }
@@ -610,6 +613,11 @@ public partial class DesyncView : UserControl
         // Заполняем, не поднимая события выбора: иначе показ тут же
         // записал бы состояние обратно и предложил перезапуск.
         _fillingCapture = true;
+
+        // Game filter добавляет порты игр к любому уровню (WinwsCommandLine.Build), узкому тоже.
+        if (CaptureBox.Items[0] is ComboBoxItem narrow)
+            narrow.Content = settings.GameFilter ? "Лишь сайты + игры" : "Лишь сайты";
+
         CaptureBox.SelectedIndex = Array.IndexOf(CaptureOrder, settings.Capture);
         _fillingCapture = false;
 
@@ -1042,7 +1050,9 @@ public partial class DesyncView : UserControl
 
             Redraw();
 
-            Status.Text = $"Выбран «{name}». Применится при следующем запуске движков.";
+            Status.Text = EngineControl.IsRunning || EngineControl.Coming
+                ? $"Выбран «{name}». Применится при следующем запуске движков."
+                : $"Выбран «{name}». Применится, когда вы включите движки на «Главной».";
 
             this.Offer($"Выбран пресет «{name}»");
         }

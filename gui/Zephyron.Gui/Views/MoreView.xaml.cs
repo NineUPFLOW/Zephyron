@@ -270,7 +270,7 @@ public partial class MoreView : UserControl
     {
         if (EnginesRunning())
         {
-            Status.Text = "Сначала остановите движки: под ними лежит состояние супервизора, и без него их будет нечем остановить.";
+            Status.Text = "Сначала выключите движки: под ними лежит состояние супервизора, и без него их будет нечем остановить.";
 
             return;
         }
@@ -347,7 +347,7 @@ public partial class MoreView : UserControl
     {
         if (EnginesRunning())
         {
-            Status.Text = "Супервизор работает и держит эти файлы. Сначала остановите движки.";
+            Status.Text = "Супервизор работает и держит эти файлы. Сначала выключите движки.";
             return;
         }
 
@@ -556,29 +556,6 @@ public partial class MoreView : UserControl
         }
     }
 
-    private void OnFixKey(object sender, System.Windows.Input.KeyEventArgs e)
-    {
-        if (e.Key == System.Windows.Input.Key.Enter)
-            OnFix(sender, e);
-    }
-
-    /// <summary>
-    /// «Сайт не открывается» — автоподбор на это имя: VPN последним, после рецептов
-    /// и пина в hosts (владелец 28.10: «VPN мы экономим»; см. CheckView.OnFixRow).
-    /// </summary>
-    private void OnFix(object sender, RoutedEventArgs e)
-    {
-        if (Zephyron.Supervisor.SiteFixer.HostOf(FixSite.Text) is not { } host)
-        {
-            FixResult.Visibility = Visibility.Visible;
-            FixResult.Text = "Не понял адрес. Вставьте ссылку или имя сайта, например aternos.org.";
-            return;
-        }
-
-        var picker = new AutoPickWindow { Owner = Window.GetWindow(this) };
-        picker.PickOnOpen(host);
-        picker.ShowDialog();
-
-        FixResult.Visibility = Visibility.Visible;
-        FixResult.Text = $"Подбор для {host} закрыт — что записано, видно в «Маршрутах» и в журнале.";
-    }}
+    private void OnOpenCheck(object sender, RoutedEventArgs e) =>
+        (Window.GetWindow(this) as MainWindow)?.Open("check");
+}

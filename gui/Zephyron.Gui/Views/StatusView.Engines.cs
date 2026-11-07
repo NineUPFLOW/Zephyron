@@ -113,7 +113,7 @@ public partial class StatusView
         keep.Click += (_, _) => TrayIcon.Exit(stopEngines: false);
         menu.Items.Add(keep);
 
-        var stop = new MenuItem { Header = "Выйти и остановить движки" };
+        var stop = new MenuItem { Header = "Выйти и выключить движки" };
         stop.SetResourceReference(ForegroundProperty, "Danger");
         stop.Click += (_, _) => TrayIcon.Exit(stopEngines: true);
         menu.Items.Add(stop);

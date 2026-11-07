@@ -77,7 +77,7 @@
                         </StackPanel>
 
                         <Button Grid.Column="2" x:Name="SurveyButton" Style="{StaticResource Primary}" Padding="16,6"
-                                Content="Проверить" Click="OnSurvey" VerticalAlignment="Top" />
+                                Content="Проверить резолверы" Click="OnSurvey" VerticalAlignment="Top" />
                     </Grid>
                 </Border>
 
@@ -123,7 +123,7 @@
                         </StackPanel>
 
                         <Button Grid.Column="2" x:Name="PinsButton" Style="{StaticResource Ghost}" Padding="16,6"
-                                Content="Проверить" Click="OnPins" VerticalAlignment="Top"
+                                Content="Проверить пины" Click="OnPins" VerticalAlignment="Top"
                                 ToolTip="Проверить свежие адреса посредников и заменить умершие пины" />
                     </Grid>
                 </Border>
