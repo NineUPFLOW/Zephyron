@@ -229,7 +229,9 @@ public sealed class AutoPickItem : INotifyPropertyChanged
                 ? "ничего устойчивого — оставлено как есть"
                 : "ничего не помогло") + (Row.Confirm is null ? "" : " · " + Row.Confirm), "Danger"),
             Kind.Same => (Row.Tries.Count > 0 && Row.Tries.Max(t => t.Level) == 1
-                ? "оставить как есть: везде отказ по стране" : "оставить как есть", "Muted"),
+                ? "менять нечего: сайт везде отказывает по стране"
+                : AutoPick.CurrentWorks(Row) == true ? "менять не нужно: открывается нынешним путём"
+                : "оставлено как есть: нынешний путь не измерен", "Muted"),
             _ => ("", "Muted"),
         };
     }
@@ -720,6 +722,9 @@ public partial class AutoPickWindow : Window
 
     private int Ticked => _items.Count(i => i.Apply && i.Selectable);
 
+    /// <summary>Подбор закончен, и ни в одной строке нет изменения.</summary>
+    private bool NothingToWrite => _phase == Phase.Done && !_items.Any(i => i.Selectable);
+
     private void ApplyPhase()
     {
         bool busy = _phase is Phase.Running or Phase.Checking;
@@ -744,8 +749,21 @@ public partial class AutoPickWindow : Window
         CloseButton.Visibility = V(!busy);
         CloseButton.IsEnabled = _phase != Phase.Writing;
 
+        // Подбор ничего не нашёл менять: записывать нечего, и главная кнопка — закрыть
+        // (с запуском движков, если окно их погасило), а не серая «Записать».
+        bool nothing = NothingToWrite;
+        bool restart = nothing && _stoppedEngines && !engines;
+
+        if (nothing)
+        {
+            WriteButton.Visibility = Visibility.Collapsed;
+            EnginesButton.Visibility = Visibility.Collapsed;
+        }
+
+        CloseButton.Content = restart ? "Запустить движки и закрыть" : nothing ? "Готово" : "Закрыть окно";
+
         // «Закрыть» после записи — главная кнопка.
-        CloseButton.Style = (Style)FindResource(_phase == Phase.Written ? "Primary" : "Ghost");
+        CloseButton.Style = (Style)FindResource(_phase == Phase.Written || nothing ? "Primary" : "Ghost");
 
         StartButton.IsEnabled = _phase is Phase.Idle or Phase.Written;
         StopButton.IsEnabled = busy;
@@ -762,6 +780,7 @@ public partial class AutoPickWindow : Window
                 + "Пробы сверяют сертификат сайта: если неверны системные часы или нет корневых сертификатов, "
                 + "«не открывается» будет почти везде — сначала поправьте их.",
             Phase.Running => "Остановить подбор можно в любой момент: найденное сохранится.",
+            Phase.Done when nothing => "Менять ничего не нужно: проверенное открывается нынешним путём.",
             Phase.Done => "Снимите галочки у строк, которые менять не нужно.",
             Phase.Writing => "Идёт запись — окно закрыть нельзя.",
             Phase.Checking => "Проверяю записанные имена уже с работающими движками.",
@@ -1545,7 +1564,18 @@ public partial class AutoPickWindow : Window
 
     // ---------------------------------------------------------------- закрытие
 
-    private void OnClose(object sender, RoutedEventArgs e) => Close();
+    private void OnClose(object sender, RoutedEventArgs e)
+    {
+        // «Запустить движки и закрыть» — без лишнего вопроса при закрытии.
+        if (NothingToWrite && _stoppedEngines && !EnginesAlive())
+        {
+            _leaving = true;
+            _ = StartAndCloseAsync();
+            return;
+        }
+
+        Close();
+    }
 
     protected override void OnClosing(CancelEventArgs e)
     {

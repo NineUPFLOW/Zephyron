@@ -1065,7 +1065,21 @@ public sealed record AppSettings
     /// и следующее чтение перевело бы их ещё раз: включённый человеком game
     /// filter молча выключился бы.
     /// </remarks>
-    public static AppSettings Fresh => new() { WarpIsPath = true, GameFilterReset = true, PresetV11Lite = true, PresetV12Lite = true };
+    /// <remarks>
+    /// Первый запуск (владелец 08.11: «чтобы всё работало сразу у всех»): «Гибрид» — десинк
+    /// для всего, что он чинит, и туннель только маршрутам, которые закрыты по адресу;
+    /// выход — встроенный WARP, он не требует подписки; Telegram — через свой прокси.
+    /// DNS «авто» сам переходит на DoH, если оператор подменяет имена.
+    /// </remarks>
+    public static AppSettings Fresh => new()
+    {
+        WarpIsPath = true,
+        WarpEnabled = true,
+        TelegramProxy = true,
+        GameFilterReset = true,
+        PresetV11Lite = true,
+        PresetV12Lite = true,
+    };
 
     /// <summary>Есть ли выход кроме WARP: подписка или отдельные ключи.</summary>
     [JsonIgnore]

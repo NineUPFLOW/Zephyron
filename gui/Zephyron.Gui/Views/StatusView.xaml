@@ -447,7 +447,7 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
 
-                                <RadioButton x:Name="ModeDesync" Grid.Column="0" Style="{StaticResource ModeSegment}"
+                                <RadioButton x:Name="ModeDesync" AutomationProperties.Name="Режим «Десинк»" Grid.Column="0" Style="{StaticResource ModeSegment}"
                                              GroupName="WorkMode" Tag="Desync" Click="OnMode">
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                         <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE9E9;"
@@ -458,7 +458,7 @@
                                     </StackPanel>
                                 </RadioButton>
 
-                                <RadioButton x:Name="ModeTunnel" Grid.Column="2" Style="{StaticResource ModeSegment}"
+                                <RadioButton x:Name="ModeTunnel" AutomationProperties.Name="Режим «Туннель»" Grid.Column="2" Style="{StaticResource ModeSegment}"
                                              GroupName="WorkMode" Tag="Tunnel" Click="OnMode">
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                         <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE774;"
@@ -469,7 +469,7 @@
                                     </StackPanel>
                                 </RadioButton>
 
-                                <RadioButton x:Name="ModeRoute" Grid.Column="4" Style="{StaticResource ModeSegment}"
+                                <RadioButton x:Name="ModeRoute" AutomationProperties.Name="Режим «Гибрид»" Grid.Column="4" Style="{StaticResource ModeSegment}"
                                              GroupName="WorkMode" Tag="Route" Click="OnMode">
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                         <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE8AB;"
@@ -761,7 +761,7 @@
                                     заводит или убирает задачу, а положение затем ставится
                                     по ответу планировщика: отказал — выключатель вернётся.
                                 -->
-                                <ToggleButton Grid.Column="2" x:Name="AutostartSwitch" Style="{StaticResource Switch}"
+                                <ToggleButton Grid.Column="2" x:Name="AutostartSwitch" AutomationProperties.Name="Запускать вместе с Windows" Style="{StaticResource Switch}"
                                               Click="OnAutostart" VerticalAlignment="Top" />
                             </Grid>
                         </Border>

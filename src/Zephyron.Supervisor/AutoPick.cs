@@ -589,6 +589,10 @@ public static class AutoPick
         var pinned = HostsFile.Read();
         var ownPins = HostsEditor.Pins();
         var addresses = new ConcurrentDictionary<AutoPickRow, IPAddress>();
+
+        // Прочие адреса имени: путь годится, только если открываются все — иначе
+        // браузер, получивший закрытый адрес, сайт не откроет (дальше — пин).
+        var more = new ConcurrentDictionary<AutoPickRow, IPAddress[]>();
         var rows = new List<AutoPickRow>();
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -711,7 +715,22 @@ public static class AutoPick
             if (address is null || HostsFile.IsBlocking(address))
                 row.Skip = "имя не разрешается";
             else
+            {
                 addresses[row] = address;
+
+                // Имя за CDN отвечает несколькими адресами, и оператор бывает закрыл лишь часть
+                // (08.11: x.com — 162.159.140.229 открывается, 172.66.0.227 молчит).
+                var others = (await DohResolver.CandidatesAsync(row.Host, dohClient, cancellationToken))
+                    .Select(a => IPAddress.TryParse(a, out var ip) ? ip : null)
+                    .OfType<IPAddress>()
+                    .Where(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
+                        && !a.Equals(address) && !HostsFile.IsBlocking(a))
+                    .Take(2)
+                    .ToArray();
+
+                if (others.Length > 0)
+                    more[row] = others;
+            }
 
             progress?.Report(row);
         }, cancellationToken));
@@ -722,14 +741,33 @@ public static class AutoPick
         {
             var clock = Stopwatch.StartNew();
             var flow = await RecipeTrial.OpensAsync(row.Host, addresses[row], cancellationToken);
+            bool works = Works(flow);
+            string? partly = null;
+
+            if (works && more.TryGetValue(row, out var others))
+            {
+                foreach (var other in others)
+                {
+                    var next = await RecipeTrial.OpensAsync(row.Host, other, cancellationToken);
+
+                    if (!Works(next))
+                    {
+                        works = false;
+                        flow = next;
+                        partly = $"{addresses[row]} открывается, {other} — нет: часть адресов имени закрыта";
+                        break;
+                    }
+                }
+            }
+
             clock.Stop();
 
-            row.Add(new AutoPickTry(way, recipe, title, null, Works(flow), clock.Elapsed,
-                RecipeTrial.Verdict(flow, clock.Elapsed), flow.Status, flow.Status is null ? null : flow.CertValid,
+            row.Add(new AutoPickTry(way, recipe, title, null, works, clock.Elapsed,
+                partly ?? RecipeTrial.Verdict(flow, clock.Elapsed), flow.Status, flow.Status is null ? null : flow.CertValid,
                 flow.Stub));
 
             progress?.Report(row);
-            return Works(flow);
+            return works;
         }
 
         // Пресет — с теми же настройками страницы «Десинк», что в работе (SupervisorHost):
