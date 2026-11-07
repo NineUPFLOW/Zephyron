@@ -204,11 +204,11 @@ public sealed class ScreenshotTests
         """;
 
     /// <summary>
-    /// Состояния выхода (Нет / WARP встроенный / WARP файл / Мой VPN с подписками и без) на вкладках
+    /// Состояния режима и пути туннеля (Десинк / Гибрид и Туннель с VPN или WARP, с файлом и без, с подписками и без) на вкладках
     /// VPN, «Главная», «Маршруты», «TG Proxy» и окно автоподбора. Настройки пишутся в config рядом с тестом.
     /// </summary>
     [Fact]
-    public void Exit_states_are_rendered_to_png()
+    public void Tunnel_path_states_are_rendered_to_png()
     {
         string? folder = Environment.GetEnvironmentVariable("ZEPHYRON_SHOTS");
 
@@ -242,15 +242,18 @@ public sealed class ScreenshotTests
         var fresh = Zephyron.Core.AppSettings.Fresh;
         var withSub = fresh with { SubscriptionUrl = sub };
 
+        Zephyron.Core.AppSettings Mode(Zephyron.Core.AppSettings s, Zephyron.Core.Rules.WorkMode mode, Zephyron.Core.Rules.TunnelPath path) =>
+            Zephyron.Core.Rules.TunnelPaths.Apply(Zephyron.Core.Rules.WorkModes.Choose(s, mode) with { SubscriptionUrl = s.SubscriptionUrl }, path);
+
         var states = new (string Name, Func<Zephyron.Core.AppSettings> Settings, bool Book, bool File)[]
         {
-            ("none-nosub", () => fresh, false, false),
-            ("none-sub", () => Zephyron.Core.Rules.Exits.Apply(withSub, Zephyron.Core.Rules.ExitChoice.None), true, false),
-            ("warp-builtin", () => Zephyron.Core.Rules.Exits.Apply(withSub, Zephyron.Core.Rules.ExitChoice.Warp, false), true, false),
-            ("warp-file", () => Zephyron.Core.Rules.Exits.Apply(withSub, Zephyron.Core.Rules.ExitChoice.Warp, false), true, true),
-            ("warp-nosub", () => Zephyron.Core.Rules.Exits.Apply(fresh, Zephyron.Core.Rules.ExitChoice.Warp, false), false, false),
-            ("vpn-sub", () => Zephyron.Core.Rules.Exits.Apply(withSub, Zephyron.Core.Rules.ExitChoice.Vpn, false), true, false),
-            ("vpn-all", () => Zephyron.Core.Rules.Exits.Apply(withSub, Zephyron.Core.Rules.ExitChoice.Vpn, true), true, false),
+            ("desync", () => Mode(withSub, Zephyron.Core.Rules.WorkMode.Desync, Zephyron.Core.Rules.TunnelPath.Vpn), true, false),
+            ("hybrid-vpn", () => Mode(withSub, Zephyron.Core.Rules.WorkMode.Route, Zephyron.Core.Rules.TunnelPath.Vpn), true, false),
+            ("hybrid-vpn-nosub", () => Mode(fresh, Zephyron.Core.Rules.WorkMode.Route, Zephyron.Core.Rules.TunnelPath.Vpn), false, false),
+            ("hybrid-warp", () => Mode(withSub, Zephyron.Core.Rules.WorkMode.Route, Zephyron.Core.Rules.TunnelPath.Warp), true, false),
+            ("hybrid-warp-file", () => Mode(withSub, Zephyron.Core.Rules.WorkMode.Route, Zephyron.Core.Rules.TunnelPath.Warp), true, true),
+            ("tunnel-warp-nosub", () => Mode(fresh, Zephyron.Core.Rules.WorkMode.Tunnel, Zephyron.Core.Rules.TunnelPath.Warp), false, false),
+            ("tunnel-vpn", () => Mode(withSub, Zephyron.Core.Rules.WorkMode.Tunnel, Zephyron.Core.Rules.TunnelPath.Vpn), true, false),
         };
 
         Sta.Run(() =>
@@ -295,7 +298,28 @@ public sealed class ScreenshotTests
                     window.Open("status");
                     window.Open(section);
                     Pump(TimeSpan.FromMilliseconds(1200));
-                    SaveFull(window, Path.Combine(folder, $"exit-{name}-{section}.png"));
+                    SaveFull(window, Path.Combine(folder, $"path-{name}-{section}.png"));
+                }
+            }
+
+            // Минимальная ширина окна: вкладка VPN и «Главная» в двух путях туннеля.
+            window.Width = 880;
+            window.Height = 560;
+
+            foreach (var (name, settings, book, file) in states.Where(x => x.Name is "hybrid-vpn" or "hybrid-warp"))
+            {
+                settings().Save(Zephyron.Core.AppSettings.DefaultPath);
+
+                var entries = new SubscriptionBook();
+                entries.Entries.Add(new SubscriptionEntry { Name = "Основная", Url = sub, InPool = true });
+                entries.Save();
+
+                foreach (string section in new[] { "vpn", "status" })
+                {
+                    window.Open("status");
+                    window.Open(section);
+                    Pump(TimeSpan.FromMilliseconds(1200));
+                    SaveFull(window, Path.Combine(folder, $"min-{name}-{section}.png"));
                 }
             }
 
@@ -310,6 +334,13 @@ public sealed class ScreenshotTests
             Pump(TimeSpan.FromMilliseconds(700));
             Save(Chrome(autopick), Path.Combine(folder, "dialog-autopick.png"), autopick.Background);
             autopick.Close();
+
+            // Состояния были записаны в config рядом с тестом — убираем, чтобы не влиять на прочие тесты.
+            foreach (var leftover in new[] { Zephyron.Core.AppSettings.DefaultPath, SubscriptionBook.DefaultPath,
+                         Zephyron.Subscriptions.Warp.FilePath, Zephyron.Subscriptions.Warp.FileNamePath, "warp-shot.conf" })
+            {
+                File.Delete(leftover);
+            }
         }, TimeSpan.FromMinutes(6));
     }
 

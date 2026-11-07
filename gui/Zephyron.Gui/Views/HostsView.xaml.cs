@@ -623,7 +623,7 @@ public partial class HostsView : UserControl
         RepeatsText.Text = string.Join(" ", parts);
 
         RepeatsButton.Visibility = report.Removable.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        RepeatsButton.Content = $"Убрать повторы ({report.Removable.Count})";
+        RepeatsButton.Content = $"Удалить повторы ({report.Removable.Count})";
     }
 
     private void OnShowRepeats(object sender, RoutedEventArgs e)

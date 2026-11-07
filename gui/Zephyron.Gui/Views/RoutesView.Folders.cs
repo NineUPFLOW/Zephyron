@@ -104,7 +104,7 @@ public partial class RoutesView
         menu.Items.Add(MenuEntry("", "Задать другое имя…", () => Rename(folder)));
         menu.Items.Add(MenuEntry("", "Добавить маршрут…", () => OnAddIntoFolder(anchor, e)));
         menu.Items.Add(new Separator { Style = (Style)FindResource("MenuLine") });
-        menu.Items.Add(MenuEntry("", folder.Made ? "Убрать папку" : "Разобрать папку", () => Dissolve(folder)));
+        menu.Items.Add(MenuEntry("", folder.Made ? "Удалить папку" : "Разобрать папку", () => Dissolve(folder)));
 
         menu.IsOpen = true;
     }

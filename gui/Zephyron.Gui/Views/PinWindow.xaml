@@ -165,7 +165,7 @@
 
                     <Button Style="{StaticResource Choice}" Tag="proxy" Click="OnMode">
                         <StackPanel>
-                            <TextBlock Text="Через выход" FontWeight="SemiBold" />
+                            <TextBlock Text="Через VPN" FontWeight="SemiBold" />
                             <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
                                        Text="Через туннель. Помогает и когда закрыт сам адрес." />
                         </StackPanel>

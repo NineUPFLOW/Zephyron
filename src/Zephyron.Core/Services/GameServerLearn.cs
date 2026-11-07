@@ -24,7 +24,7 @@ public sealed record LearnedGame(string Name, string Program, string List, Func<
 /// лежат в части по именам, а на адресе CDN имя бывает чужим.
 /// </para>
 /// <para>
-/// Только пока часть стоит «через выход»: в остальных путях список адресов игры
+/// Только пока часть стоит «через VPN»: в остальных путях список адресов игры
 /// ничего не меняет, а «Наблюдение» ради него шло бы впустую. Наблюдение
 /// начинается само, пока игра запущена (<c>AutoFillWatch</c> окна).
 /// </para>
@@ -41,11 +41,11 @@ public static class GameServerLearn
         new("ARC Raiders", "PioneerGame.exe", ArcRaidersList, s => s.LearnArcRaidersServers),
     ];
 
-    /// <summary>Игры, чьи серверы дописываются сейчас: выключатель включён, часть «через выход».</summary>
+    /// <summary>Игры, чьи серверы дописываются сейчас: выключатель включён, часть «через VPN».</summary>
     public static IReadOnlyList<LearnedGame> Active(AppSettings settings, IReadOnlyList<UserRuleEntry> rules) =>
         All.Where(g => g.On(settings) && RoutedToVpn(rules, g.List)).ToList();
 
-    /// <summary>Стоит ли список адресов «через выход» — первым совпавшим правилом.</summary>
+    /// <summary>Стоит ли список адресов «через VPN» — первым совпавшим правилом.</summary>
     public static bool RoutedToVpn(IEnumerable<UserRuleEntry> rules, string list) =>
         rules.FirstOrDefault(e => e.Enabled && e.Match == MatchKind.IpSet && e.Matches(list))?.Mode
             == RoutingMode.Proxy;

@@ -2,7 +2,7 @@ namespace Zephyron.Proxy;
 
 /// <summary>
 /// Нейросети, которые отказывают России по стране: их имена — из тех же списков,
-/// что правила «через выход» в <c>config/rules.yaml</c>.
+/// что правила «через VPN» в <c>config/rules.yaml</c>.
 /// </summary>
 /// <remarks>
 /// <para>

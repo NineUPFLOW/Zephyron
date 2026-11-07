@@ -260,7 +260,7 @@ public sealed class SubRow : System.ComponentModel.INotifyPropertyChanged
     /// <summary>Занят ли замер вообще — хоть этой подпиской, хоть соседней.</summary>
     public bool Busy { get; set; }
 
-    public string CheckLabel => Checking ? "Тест пинга: идёт замер…" : "Тест пинга: замерить серверы подписки";
+    public string CheckLabel => Checking ? "Замер идёт…" : "Замерить серверы подписки";
 
     /// <summary>
     /// Пока идёт один замер, второй не начинают: каждый поднимает по пять
@@ -288,7 +288,7 @@ public sealed class SubRow : System.ComponentModel.INotifyPropertyChanged
 
     public Visibility ActiveShown => Active ? Visibility.Visible : Visibility.Collapsed;
 
-    /// <summary>Выход не «Мой VPN»: папка «в работе», но трафик через неё не идёт.</summary>
+    /// <summary>Выход не «VPN»: папка «в работе», но трафик через неё не идёт.</summary>
     public string ActiveWord => Fade < 1 ? "Не используется" : "Используется";
 
     public Visibility ActivateShown => Active ? Visibility.Collapsed : Visibility.Visible;
@@ -373,7 +373,7 @@ public partial class VpnView : UserControl
             _exitTimer.Start();
             await load;
 
-            // «Мой VPN» без подписок на «Главной»: пришли добавить (StatusView.OnExit).
+            // «VPN» без подписок на «Главной»: пришли добавить (StatusView.OnExit).
             if (OpenAddOnShow)
             {
                 OpenAddOnShow = false;
@@ -601,7 +601,7 @@ public partial class VpnView : UserControl
         CurrentCaption.Text = running
             ? "Сейчас трафик идёт через"
             : desyncOnly
-                ? "Выход не выбран — туннель не запускается"
+                ? "В режиме «Десинк» туннель не запускается"
                 : pinned ? "Закреплён — поднимется вместе с движками" : "Движки не запущены";
 
         // Где сервер лежит: подписка пула или выход WARP.
@@ -808,8 +808,8 @@ public partial class VpnView : UserControl
         {
             // Выход WARP говорит о себе карточкой выше; «приостановлены» без подписок не бывает.
             // Строка «Подписок и ключей нет» с кнопкой «Добавить» уже стоит наверху — не повторяем.
-            Status.Text = Exits.Of(settings) == ExitChoice.Vpn
-                ? "Подписок нет. Добавьте подписку или ключ — без них нет серверов."
+            Status.Text = TunnelPaths.Of(settings) == TunnelPath.Vpn
+                ? "Подписок нет. Добавьте подписку или ключ — без них у туннеля нет серверов."
                 : string.Empty;
 
             return;
@@ -888,7 +888,7 @@ public partial class VpnView : UserControl
             int servers = _rows.Sum(r => r.Servers.Count);
 
             // Числа — в сводке у заголовка; здесь только беда.
-            Status.Text = servers == 0 && _rows.Count > 0 && _exit == ExitChoice.Vpn
+            Status.Text = servers == 0 && _rows.Count > 0 && _path == TunnelPath.Vpn
                 ? "Ни одна подписка не вернула серверов."
                 : string.Empty;
         }
@@ -1168,7 +1168,7 @@ public partial class VpnView : UserControl
                 $"{server.Host}:{server.Port}",
                 string.Empty,
                 Brushes.Transparent,
-                "взять",
+                "выбрать",
                 true,
                 server.IsMeasurable,
                 Chip: chip,
@@ -1216,7 +1216,7 @@ public partial class VpnView : UserControl
         {
             Color = (Brush)FindResource(known ? Key(server.Tag) : "Faint"),
             Latency = latency,
-            ChooseLabel = chosen ? "текущий" : "взять",
+            ChooseLabel = chosen ? "выбран" : "выбрать",
             CanChoose = !chosen,
             AutoPickLabel = excluded ? "Вернуть в автоподбор" : "Не брать в автоподбор",
             Measured = Measured(server.Tag),
@@ -1366,8 +1366,8 @@ public partial class VpnView : UserControl
     {
         var items = new List<object> { TopBlock };
 
-        // Подписки, пулы и подпись — блок «Мой VPN»; при других выходах они свёрнуты в строку наверху.
-        if (_exit == ExitChoice.Vpn)
+        // Подписки, пулы и подпись — блок «VPN»; при других выходах они свёрнуты в строку наверху.
+        if (_path == TunnelPath.Vpn)
         {
             if (_poolsOn)
                 items.Add(PoolsBlock);
@@ -1753,8 +1753,8 @@ public partial class VpnView : UserControl
         ForeignSwitch.IsChecked = settings.ForeignExitsOnly;
         StableSwitch.IsChecked = settings.StableFirst;
         KillSwitchToggle.IsChecked = settings.KillSwitch;
-        // Только при «Весь трафик через выход»: при выборе по маршрутам он не действует.
-        KillSwitchRow.Visibility = Exits.AllTraffic(settings) ? Visibility.Visible : Visibility.Collapsed;
+        // Только в режиме «Туннель» (весь трафик): в «Гибриде» он не действует.
+        KillSwitchRow.Visibility = settings.Engines.TunnelTakesAll ? Visibility.Visible : Visibility.Collapsed;
 
         // Выход — следом, не дожидаясь таймера: иначе первые четверть минуты
         // на вкладке строка была бы без него.
@@ -1770,8 +1770,7 @@ public partial class VpnView : UserControl
     /// </remarks>
     private void ShowWarp(AppSettings settings)
     {
-        var exit = Exits.Of(settings);
-        bool on = exit == ExitChoice.Warp;
+        bool on = TunnelPaths.Of(settings) == TunnelPath.Warp;
         bool hasVpn = _book.Entries.Count + (_book.Keys.Count > 0 ? 1 : 0) > 0;
         var file = Warp.FileName();
 
@@ -1799,62 +1798,51 @@ public partial class VpnView : UserControl
         // Кнопка на месте всегда: пропадая, она не говорила, почему её нет.
         WarpCheckButton.IsEnabled = on && EnginesRunning;
         WarpCheckButton.ToolTip = !on
-            ? "Замер пинга WARP доступен, когда он выбран выходом и движки работают"
+            ? "Замер пинга WARP доступен, когда туннель идёт через него и движки работают"
             : EnginesRunning
                 ? "Проверить отклик WARP"
                 : "Замер пинга WARP доступен, когда движки работают";
 
-        // Подписки не используются, пока выход не «Мой VPN»: бледнее и с честным бейджем.
-        _paused = exit != ExitChoice.Vpn;
-        _exit = exit;
+        // Подписки не используются, пока туннель не идёт через них — при WARP и в режиме «Десинк»:
+        // бейдж у папки говорит «Не используется».
+        _paused = !settings.Engines.Tunnel;
+        _path = TunnelPaths.Of(settings);
 
-        ShowExitBlocks(settings, exit, hasVpn);
+        ShowPathBlocks(settings, hasVpn);
     }
 
-    private ExitChoice _exit;
+    private TunnelPath _path;
 
     /// <summary>
-    /// Выбор наверху и блок выбранного выхода целиком; другой — одной строкой с кнопкой «Выбрать».
+    /// Выбор наверху и блок выбранного пути целиком; другой — одной строкой с кнопкой «Выбрать».
     /// </summary>
-    private void ShowExitBlocks(AppSettings settings, ExitChoice exit, bool hasVpn)
+    private void ShowPathBlocks(AppSettings settings, bool hasVpn)
     {
-        PickNone.IsChecked = exit == ExitChoice.None;
-        PickWarp.IsChecked = exit == ExitChoice.Warp;
-        PickVpn.IsChecked = exit == ExitChoice.Vpn;
-
-        bool all = Exits.AllTraffic(settings);
-        var scope = all ? "весь трафик" : "только сайты с маршрутом «через выход»";
+        var path = _path;
+        bool tunnel = settings.Engines.Tunnel;
         var file = Warp.FileName();
 
-        ExitNow.Text = exit switch
-        {
-            ExitChoice.Warp => $"Работает WARP ({(file is null ? "встроенный" : $"файл «{file}»")}): {scope}.",
-            ExitChoice.Vpn => $"Работает Мой VPN: {scope}.",
-            _ => "Выход не выбран: работает один десинк, трафик идёт напрямую.",
-        };
+        PickVpn.IsChecked = path == TunnelPath.Vpn;
+        PickWarp.IsChecked = path == TunnelPath.Warp;
 
-        // Блок выбранного выхода — целиком, остальное скрыто. Список подписок, пулы и подпись живут в ShowPage.
-        WarpHost.Visibility = exit == ExitChoice.Warp ? Visibility.Visible : Visibility.Collapsed;
-        VpnColumns.Visibility = exit == ExitChoice.Vpn ? Visibility.Visible : Visibility.Collapsed;
+        ExitNow.Text = (path == TunnelPath.Warp
+                ? $"Туннель идёт через WARP ({(file is null ? "встроенный" : $"файл «{file}»")})."
+                : hasVpn ? "Туннель идёт через серверы ваших подписок и ключей." : "Туннель идёт через VPN, но подписок и ключей нет — добавьте их ниже.")
+            + (tunnel ? string.Empty : $" Сейчас режим «{WorkModes.Name(WorkMode.Desync)}»: туннель не запускается, режим меняется на «Главной».");
+
+        // Блок выбранного пути — целиком, невыбранный — строкой. Подписки, пулы и подпись живут в ShowPage.
+        WarpHost.Visibility = path == TunnelPath.Warp ? Visibility.Visible : Visibility.Collapsed;
+        VpnColumns.Visibility = path == TunnelPath.Vpn && hasVpn ? Visibility.Visible : Visibility.Collapsed;
         QuickCard.Opacity = 1;
         QuickServers.IsEnabled = true;
 
         // Кнопки подписок — только когда подписки на виду.
-        RefreshButton.Visibility = MeasureButton.Visibility = exit == ExitChoice.Vpn ? Visibility.Visible : Visibility.Collapsed;
+        RefreshButton.Visibility = MeasureButton.Visibility = path == TunnelPath.Vpn ? Visibility.Visible : Visibility.Collapsed;
 
-        ShowExitSummaries(exit, hasVpn);
-    }
+        WarpSummary.Visibility = path == TunnelPath.Warp ? Visibility.Collapsed : Visibility.Visible;
+        VpnSummary.Visibility = path == TunnelPath.Vpn ? Visibility.Collapsed : Visibility.Visible;
 
-    /// <summary>Строки невыбранных выходов: что с ними и кнопка «Выбрать».</summary>
-    private void ShowExitSummaries(ExitChoice exit, bool hasVpn)
-    {
-        WarpSummary.Visibility = exit == ExitChoice.Warp ? Visibility.Collapsed : Visibility.Visible;
-        VpnSummary.Visibility = exit == ExitChoice.Vpn ? Visibility.Collapsed : Visibility.Visible;
-
-        var why = exit == ExitChoice.Vpn ? "выбран Мой VPN" : "выход не выбран";
-        var file = Warp.FileName();
-
-        WarpSummaryLine.Text = $"WARP: не используется — {why}. {(file is null ? "Подключение встроенное." : $"Свой файл «{file}».")}";
+        WarpSummaryLine.Text = $"WARP: не используется — туннель идёт через VPN. {(file is null ? "Подключение встроенное." : $"Свой файл «{file}».")}";
 
         var parts = new List<string>();
 
@@ -1865,63 +1853,65 @@ public partial class VpnView : UserControl
             parts.Add($"ключи: {_book.Keys.Count}");
 
         VpnSummaryLine.Text = hasVpn
-            ? $"{string.Join(", ", parts)}, не используются — {(exit == ExitChoice.Warp ? "выбран WARP" : "выход не выбран")}."
+            ? $"{string.Join(", ", parts)}, не используются — выбран WARP."
             : "Подписок и ключей нет.";
         VpnSummaryAction.Content = hasVpn ? "Выбрать" : "Добавить";
         System.Windows.Automation.AutomationProperties.SetName(VpnSummaryAction,
-            hasVpn ? "Выбрать Мой VPN выходом" : "Добавить подписку или ключ");
+            hasVpn ? "Выбрать VPN для туннеля" : "Добавить подписку или ключ");
     }
 
-    private void OnSummaryWarp(object sender, RoutedEventArgs e) => ChooseExit(ExitChoice.Warp);
+    private void OnSummaryWarp(object sender, RoutedEventArgs e) => ChoosePath(TunnelPath.Warp);
 
-    private void OnSummaryVpn(object sender, RoutedEventArgs e) => PickExit(ExitChoice.Vpn);
+    private void OnSummaryVpn(object sender, RoutedEventArgs e) => PickPath(TunnelPath.Vpn);
 
-    private void OnPickExit(object sender, RoutedEventArgs e)
+    private void OnPickPath(object sender, RoutedEventArgs e)
     {
-        if (sender is FrameworkElement { Tag: string tag } && Enum.TryParse<ExitChoice>(tag, out var exit))
-            PickExit(exit);
+        if (sender is FrameworkElement { Tag: string tag } && Enum.TryParse<TunnelPath>(tag, out var path))
+            PickPath(path);
     }
 
-    /// <summary>«Мой VPN» без подписок и ключей не выбирается — вместо этого открывается добавление.</summary>
-    private void PickExit(ExitChoice exit)
+    /// <summary>VPN без подписок и ключей не выбирается — вместо этого открывается добавление.</summary>
+    private void PickPath(TunnelPath path)
     {
         var settings = AppSettings.Load(AppSettings.DefaultPath);
 
-        if (exit == ExitChoice.Vpn && !Exits.CanChoose(settings, exit))
+        if (!TunnelPaths.CanChoose(settings, path))
         {
             ShowWarp(settings);
             OpenAdd(pasteOnOpen: false);
             return;
         }
 
-        ChooseExit(exit);
+        ChoosePath(path);
     }
 
-    /// <summary>Единое применение выхода с вкладки: записать, перерисовать, сказать про перезапуск.</summary>
-    private void ChooseExit(ExitChoice exit)
+    /// <summary>Единое применение пути с вкладки: записать, перерисовать, сказать про перезапуск.</summary>
+    private void ChoosePath(TunnelPath path)
     {
         try
         {
             var settings = AppSettings.Load(AppSettings.DefaultPath);
 
-            if (!Exits.CanChoose(settings, exit))
+            if (!TunnelPaths.CanChoose(settings, path))
             {
-                Status.Text = "Для «Мой VPN» нужна подписка или ключ — добавьте их кнопкой «Подключить подписку».";
+                Status.Text = "Для VPN нужна подписка или ключ — добавьте их кнопкой «Добавить подписку».";
                 return;
             }
 
-            var next = Exits.Apply(settings, exit);
-            next.Save(AppSettings.DefaultPath);
+            var next = TunnelPaths.Apply(settings, path);
+
+            if (next != settings)
+                next.Save(AppSettings.DefaultPath);
 
             ShowWarp(next);
             ShowPick(next);
             Reshow();
             ShowPage();
 
-            Status.Text = $"Выход: «{Exits.Name(exit)}». Вступит в силу после следующего запуска движков.";
-            this.Offer("Выход изменён");
+            Status.Text = $"Туннель идёт через {TunnelPaths.Name(path)}. Вступит в силу после следующего запуска движков.";
+            this.Offer("Путь туннеля изменён");
 
-            if (exit == ExitChoice.Warp)
+            if (path == TunnelPath.Warp)
                 _ = VerifyWarpAsync(next, TimeSpan.FromSeconds(90));
         }
         catch (Exception ex)
@@ -1957,7 +1947,7 @@ public partial class VpnView : UserControl
 
         // Выбирать страну есть из чего только с подпиской: без неё в списке одно «Как есть».
         // Здесь, а не в ShowWarp: серверы подписки доходят позже, и список досоздаётся.
-        WarpCountryPanel.Visibility = Exits.Of(settings) == ExitChoice.Warp && Warp.FileServer() is null
+        WarpCountryPanel.Visibility = TunnelPaths.Of(settings) == TunnelPath.Warp && Warp.FileServer() is null
             && (servers.Count > 0 || !string.IsNullOrWhiteSpace(saved))
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -2073,7 +2063,7 @@ public partial class VpnView : UserControl
         var watch = _warpWatch = new CancellationTokenSource();
         var token = watch.Token;
 
-        if (Exits.Of(settings) != ExitChoice.Warp)
+        if (TunnelPaths.Of(settings) != TunnelPath.Warp)
         {
             WarpExitLine.Text = string.Empty;
             return;
@@ -2257,15 +2247,15 @@ public partial class VpnView : UserControl
             Warp.SaveFile(dialog.FileName);
 
             var settings = AppSettings.Load(AppSettings.DefaultPath);
-            // Загрузка файла — явное намерение: выходом становится WARP.
-            var next = Exits.Apply(settings, ExitChoice.Warp);
+            // Загрузка файла — явное намерение: туннель идёт через WARP.
+            var next = TunnelPaths.Apply(settings, TunnelPath.Warp);
             next.Save(AppSettings.DefaultPath);
 
             ShowWarp(next);
             ShowPick(next);
             ShowQuick(next);
             Reshow();
-            Status.Text = $"Выходом выбран WARP через ваш файл «{System.IO.Path.GetFileName(dialog.FileName)}». "
+            Status.Text = $"Туннель идёт через WARP, через ваш файл «{System.IO.Path.GetFileName(dialog.FileName)}». "
                 + "Вступит в силу после перезапуска движков.";
             this.Offer("Загружен файл WARP");
         }
@@ -2289,7 +2279,7 @@ public partial class VpnView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Убрать файл не удалось: " + ex.GetBaseException().Message;
+            Status.Text = "Удалить файл не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2307,7 +2297,7 @@ public partial class VpnView : UserControl
         else
             AddSubscription(request.Input, request.Name, request.InPool);
 
-        // Выход само добавление не меняет: если он не «Мой VPN», плашка над
+        // Выход само добавление не меняет: если он не «VPN», плашка над
         // подписками предложит «Сделать выходом» (владелец, 07.11).
     }
 
@@ -2397,7 +2387,7 @@ public partial class VpnView : UserControl
                   + "Вступит в силу после следующего запуска движков."
                 : inPool == 0
                     ? $"«{name}» выведена из работы, и в работе не осталось ни одной — VPN будет "
-                      + (Exits.Of(AppSettings.Load(AppSettings.DefaultPath)) == ExitChoice.Warp ? "только через WARP." : "недоступен.")
+                      + (TunnelPaths.Of(AppSettings.Load(AppSettings.DefaultPath)) == TunnelPath.Warp ? "только через WARP." : "недоступен.")
                     : $"«{name}» выведена из работы. В работе подписок: {inPool}. "
                       + "Вступит в силу после следующего запуска движков.";
 
@@ -2456,7 +2446,7 @@ public partial class VpnView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Ключ убрать не удалось: " + ex.GetBaseException().Message;
+            Status.Text = "Ключ удалить не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -2650,7 +2640,7 @@ public partial class VpnView : UserControl
         menu.Items.Add(Item("", "Скопировать ссылку", () => CopyUrl(row)));
         menu.Items.Add(Item("", "Править…", () => Edit(row)));
         menu.Items.Add(new Separator { Style = (Style)FindResource("MenuLine") });
-        menu.Items.Add(Item("", "Убрать…", () => ConfirmRemove(name)));
+        menu.Items.Add(Item("", "Удалить…", () => ConfirmRemove(name)));
 
         menu.IsOpen = true;
     }
@@ -2865,7 +2855,7 @@ public partial class VpnView : UserControl
         }
         catch (Exception ex)
         {
-            Status.Text = "Убрать не удалось: " + ex.GetBaseException().Message;
+            Status.Text = "Удалить не удалось: " + ex.GetBaseException().Message;
         }
     }
 
@@ -3066,7 +3056,7 @@ public partial class VpnView : UserControl
 
         // Выходы WARP замеряются вместе со всеми: в конфиге они лежат рядом
         // с серверами подписки, и знать про них надо то же самое.
-        if (Exits.Of(settings) == ExitChoice.Warp && onlyTag is null)
+        if (TunnelPaths.Of(settings) == TunnelPath.Warp && onlyTag is null)
         {
             servers.AddRange(Warp.Exits().Where(s => s.IsMeasurable));
 

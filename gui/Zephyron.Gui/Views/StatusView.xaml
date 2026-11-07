@@ -6,6 +6,35 @@
              Background="{DynamicResource Chrome}">
 
     <UserControl.Resources>
+        <!--
+            Сегмент режима: выбранный отмечен рамкой Accent и подложкой AccentSoft,
+            без свечения — как выбранный пункт меню.
+        -->
+        <Style x:Key="ModeSegment" TargetType="RadioButton">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Shape" Background="{DynamicResource Wash}"
+                                BorderBrush="{DynamicResource LineStrong}" BorderThickness="{StaticResource Stroke}"
+                                CornerRadius="{StaticResource RMd}" Padding="12,10">
+                            <ContentPresenter HorizontalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource WashHover}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Shape" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                                <Setter TargetName="Shape" Property="Background" Value="{DynamicResource AccentSoft}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Строка компонента: нейтральная, состояние говорит знак (StateMark) и слово. -->
         <Style x:Key="EnginePill" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource Wash}" />
@@ -396,16 +425,16 @@
                     </Grid.ColumnDefinitions>
 
                 <!--
-                    Выход за границу (владелец 07.11): «Нет / WARP / Мой VPN» вместо трёх
-                    режимов. Десинк работает всегда, пока включено. Хранится прежними
-                    полями (Rules.Exits): переносить настройки не нужно. Под сегментами —
-                    «Весь трафик через выход» и пояснение выбранного.
+                    Режим — выбором из трёх (владелец 04.10, docs/ideas.md №12):
+                    «Десинк», «Туннель», «Гибрид». Хранится выключателями движков
+                    (Rules.WorkModes): переносить настройки не нужно. Под
+                    сегментами — пояснение выбранного режима и его движки.
                 -->
                 <views:FitWidth Grid.Column="0">
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                                <TextBlock Text="Выход за границу" Style="{StaticResource Eyebrow}" VerticalAlignment="Bottom" />
+                                <TextBlock Text="Режим работы" Style="{StaticResource Eyebrow}" VerticalAlignment="Bottom" />
                                 <TextBlock x:Name="ModeTag" Style="{StaticResource MonoTag}" Margin="12,0,0,0" VerticalAlignment="Bottom" />
                             </StackPanel>
 
@@ -418,58 +447,93 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
 
-                                <RadioButton x:Name="ExitNone" Grid.Column="0" Style="{StaticResource ModeSegment}"
-                                             GroupName="Exit" Tag="None" Click="OnExit" AutomationProperties.Name="Выход: нет">
+                                <RadioButton x:Name="ModeDesync" Grid.Column="0" Style="{StaticResource ModeSegment}"
+                                             GroupName="WorkMode" Tag="Desync" Click="OnMode">
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                         <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE9E9;"
                                                    Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
-                                        <TextBlock x:Name="ExitNoneName" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
+                                        <TextBlock x:Name="ModeDesyncName" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
                                         <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                        Content="Работает один десинк: winws2 меняет рукопожатие (TLS) так, что фильтр оператора не узнаёт имя сайта. Трафик идёт напрямую, адрес остаётся домашним.&#x0a;&#x0a;Помогает при блокировке по имени. Если сайт закрыт для вашей страны, не поможет: он увидит тот же адрес, что и раньше." />
+                                                        Content="winws2 меняет рукопожатие (TLS) так, что фильтр оператора не узнаёт имя сайта. Трафик идёт своим обычным путём, напрямую, адрес остаётся домашним.&#x0a;&#x0a;Помогает при блокировке по имени. Если сайт закрыт для вашей страны, не поможет: он увидит тот же адрес, что и раньше." />
                                     </StackPanel>
                                 </RadioButton>
 
-                                <RadioButton x:Name="ExitWarp" Grid.Column="2" Style="{StaticResource ModeSegment}"
-                                             GroupName="Exit" Tag="Warp" Click="OnExit" AutomationProperties.Name="Выход: WARP">
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE753;"
-                                                   Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
-                                        <TextBlock x:Name="ExitWarpName" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
-                                        <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                        Content="Бесплатный выход Cloudflare: встроенный или ваш файл WARP, страна выхода — в карточке WARP на вкладке VPN.&#x0a;&#x0a;Выпускает трафик в ближайшем городе Cloudflare, из России — в Москве: от блокировок оператора спасает, от отказов по стране — нет, пока не выбрана страна." />
-                                    </StackPanel>
-                                </RadioButton>
-
-                                <RadioButton x:Name="ExitVpn" Grid.Column="4" Style="{StaticResource ModeSegment}"
-                                             GroupName="Exit" Tag="Vpn" Click="OnExit" AutomationProperties.Name="Выход: Мой VPN">
+                                <RadioButton x:Name="ModeTunnel" Grid.Column="2" Style="{StaticResource ModeSegment}"
+                                             GroupName="WorkMode" Tag="Tunnel" Click="OnMode">
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                         <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE774;"
                                                    Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
-                                        <TextBlock x:Name="ExitVpnName" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
+                                        <TextBlock x:Name="ModeTunnelName" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
                                         <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                        Content="Ваши подписки и ключи с вкладки VPN: sing-box создаёт сетевой адаптер, адрес становится зарубежным, поэтому открываются сайты, закрытые по стране.&#x0a;&#x0a;Без подписок и ключей выбор откроет вкладку VPN с добавлением." />
+                                                        Content="sing-box создаёт сетевой адаптер и пускает трафик через него. Адрес становится зарубежным, поэтому открываются сайты, закрытые по стране.&#x0a;&#x0a;В этом режиме в туннель уходит всё, кроме сайтов с пометкой «напрямую», как в обычном VPN. С включённым «Без исключений» — вообще всё.&#x0a;&#x0a;Нужна подписка или WARP: без них туннелю нечего поднимать." />
+                                    </StackPanel>
+                                </RadioButton>
+
+                                <RadioButton x:Name="ModeRoute" Grid.Column="4" Style="{StaticResource ModeSegment}"
+                                             GroupName="WorkMode" Tag="Route" Click="OnMode">
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE8AB;"
+                                                   Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
+                                        <TextBlock x:Name="ModeRouteName" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
+                                        <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
+                                                        Content="Оба движка вместе. Сайты с маршрутом «через VPN» идут в туннель, остальные — без него, а блокировку по имени снимает десинк.&#x0a;&#x0a;У сайтов из списка маршрутов адрес зарубежный, у прочих домашний, поэтому российские сервисы не замечают VPN." />
                                     </StackPanel>
                                 </RadioButton>
                             </Grid>
 
-                            <!-- «Весь трафик» — только при выбранном выходе; без него переключатель неактивен, и подпись говорит почему. -->
-                            <Grid Margin="2,16,0,0">
+                            <!--
+                                Пояснение выбранного режима; его движки — в «Компонентах» (0.18).
+                                Место — под две строки всегда: ряд, растущий только
+                                у одного режима, дёргал бы страницу.
+                            -->
+                            <Grid Margin="2,16,0,0" MinHeight="36">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <ToggleButton x:Name="AllTrafficSwitch" Style="{StaticResource Switch}" VerticalAlignment="Top"
-                                              Click="OnAllTraffic" AutomationProperties.Name="Весь трафик через выход" />
-                                <StackPanel Grid.Column="1" Margin="10,0,0,0">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="Весь трафик через выход" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                        <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                        Content="Выключено — через выход идут только сайты с маршрутом «через выход» (вкладка «Маршруты»), остальное напрямую, закрытое чинит десинк.&#x0a;&#x0a;Включено — в выход уходит всё, кроме сайтов с пометкой «напрямую», как в обычном VPN; десинк при этом не нужен." />
-                                    </StackPanel>
-                                    <TextBlock x:Name="ModeText" Style="{StaticResource Caption}" FontSize="12.5" Margin="0,3,0,0"
-                                               TextWrapping="Wrap" LineHeight="19" LineStackingStrategy="BlockLineHeight" />
-                                </StackPanel>
+
+                                <TextBlock x:Name="ModeText" Style="{StaticResource Caption}" FontSize="12.5" VerticalAlignment="Center"
+                                           TextWrapping="Wrap" TextTrimming="CharacterEllipsis" LineHeight="19"
+                                           LineStackingStrategy="BlockLineHeight" MaxHeight="38" Margin="0,0,20,0" />
+
                             </Grid>
+
+                            <!--
+                                Путь туннеля (владелец, 07.11): через что он идёт — подписка или WARP.
+                                Виден в «Туннеле» и «Гибриде»; «Десинк» туннеля не поднимает. Хранится
+                                в WarpEnabled (Rules.TunnelPaths); тот же выбор — наверху вкладки VPN.
+                            -->
+                            <StackPanel x:Name="PathRow" Margin="2,14,0,0" Visibility="Collapsed">
+                                <TextBlock Text="Туннель идёт через" Style="{StaticResource Eyebrow}" Margin="0,0,0,8" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <RadioButton x:Name="PathVpn" Grid.Column="0" Style="{StaticResource ModeSegment}"
+                                                 GroupName="TunnelPath" Tag="Vpn" Click="OnPath" Padding="0"
+                                                 AutomationProperties.Name="Туннель идёт через VPN">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                            <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE774;"
+                                                       Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
+                                            <TextBlock x:Name="PathVpnName" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </RadioButton>
+
+                                    <RadioButton x:Name="PathWarp" Grid.Column="2" Style="{StaticResource ModeSegment}"
+                                                 GroupName="TunnelPath" Tag="Warp" Click="OnPath" Padding="0"
+                                                 AutomationProperties.Name="Туннель идёт через WARP">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                            <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE753;"
+                                                       Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
+                                            <TextBlock x:Name="PathWarpName" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </RadioButton>
+                                </Grid>
+                                <TextBlock x:Name="PathText" Style="{StaticResource Caption}" FontSize="12.5" Margin="0,8,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
 
                             <!-- Жалоба на сочетание движков; пусто — полосы нет вовсе. -->
                             <Border Margin="0,14,0,0" Padding="12,9" CornerRadius="{StaticResource RSm}"

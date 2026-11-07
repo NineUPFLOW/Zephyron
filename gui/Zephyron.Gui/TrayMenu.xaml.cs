@@ -98,14 +98,14 @@ internal sealed record TrayStatus(
 public partial class TrayMenu : Window
 {
     private readonly Action _toggle;
-    private readonly Action<ExitChoice> _chooseExit;
+    private readonly Action<WorkMode> _chooseMode;
     private readonly Action _showWindow;
     private readonly Action<bool> _quit;
 
-    internal TrayMenu(Action toggle, Action<ExitChoice> chooseExit, Action showWindow, Action<bool> quit)
+    internal TrayMenu(Action toggle, Action<WorkMode> chooseMode, Action showWindow, Action<bool> quit)
     {
         _toggle = toggle;
-        _chooseExit = chooseExit;
+        _chooseMode = chooseMode;
         _showWindow = showWindow;
         _quit = quit;
 
@@ -113,9 +113,9 @@ public partial class TrayMenu : Window
 
         Version.Text = MainWindow.Version();
 
-        ExitNoneName.Text = Exits.Name(ExitChoice.None);
-        ExitWarpName.Text = Exits.Name(ExitChoice.Warp);
-        ExitVpnName.Text = Exits.Name(ExitChoice.Vpn);
+        ModeDesyncName.Text = WorkModes.Name(WorkMode.Desync);
+        ModeTunnelName.Text = WorkModes.Name(WorkMode.Tunnel);
+        ModeRouteName.Text = WorkModes.Name(WorkMode.Route);
     }
 
     internal void Render(TrayStatus status)
@@ -136,11 +136,11 @@ public partial class TrayMenu : Window
             : status.Running || status.Starting ? "Выключить" : "Включить";
         Toggle.IsEnabled = !status.Busy;
 
-        ShowExits(status);
+        ShowModes(status);
     }
 
-    /// <summary>Выбранный выход — по настройкам, как бы он ни был выбран: здесь, на «Главной» или руками в файле.</summary>
-    private void ShowExits(TrayStatus status)
+    /// <summary>Выбранный режим — по настройкам, как бы он ни был выбран: здесь, на «Главной» или руками в файле.</summary>
+    private void ShowModes(TrayStatus status)
     {
         AppSettings settings;
 
@@ -150,32 +150,32 @@ public partial class TrayMenu : Window
         }
         catch (Exception)
         {
-            ExitButtons.IsEnabled = false;
-            ModeNote.Text = "Не удалось прочитать настройки: выход выбирается в окне";
+            Modes.IsEnabled = false;
+            ModeNote.Text = "Не удалось прочитать настройки: режим выбирается в окне";
             return;
         }
 
-        var current = Exits.Of(settings);
+        var current = WorkModes.Of(settings.Engines);
 
-        foreach (var (button, exit) in new[] { (ExitNone, ExitChoice.None), (ExitWarp, ExitChoice.Warp), (ExitVpn, ExitChoice.Vpn) })
+        foreach (var (button, mode) in new[] { (ModeDesync, WorkMode.Desync), (ModeTunnel, WorkMode.Tunnel), (ModeRoute, WorkMode.Route) })
         {
-            button.IsChecked = current == exit;
-            button.IsEnabled = current == exit || Exits.CanChoose(settings, exit);
+            button.IsChecked = current == mode;
+            button.IsEnabled = current == mode || WorkModes.CanChoose(settings, mode);
         }
 
-        ExitButtons.IsEnabled = !status.Busy;
+        Modes.IsEnabled = !status.Busy;
 
-        ModeNote.Text = !settings.HasSubscriptionExit
-            ? "Для «Мой VPN» нужна подписка или ключ во вкладке VPN"
+        ModeNote.Text = !settings.HasTunnelExit
+            ? "Для режима «Туннель» нужна подписка или WARP во вкладке VPN"
             : status.Running
                 ? "Выбор сразу перезапустит движки"
                 : "Выбор сразу запустит движки";
     }
 
-    private void OnExit(object sender, RoutedEventArgs e)
+    private void OnMode(object sender, RoutedEventArgs e)
     {
-        if (sender is FrameworkElement { Tag: string tag } && Enum.TryParse<ExitChoice>(tag, out var exit))
-            _chooseExit(exit);
+        if (sender is FrameworkElement { Tag: string tag } && Enum.TryParse<WorkMode>(tag, out var mode))
+            _chooseMode(mode);
     }
 
     /// <summary>Показывает меню у указателя, в пределах рабочей области его экрана.</summary>

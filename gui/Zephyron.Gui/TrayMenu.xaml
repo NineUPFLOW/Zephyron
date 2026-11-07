@@ -150,15 +150,15 @@
                     </Grid>
 
                     <!--
-                        Выход за границу — тем же выбором из трёх, что на «Главной»
-                        (владелец 07.11). Выбор сам перезапускает движки
-                        (TrayIcon.ChooseExit): ради этого переключатель в трее
+                        Режим работы — тем же выбором из трёх, что на «Главной»
+                        (владелец 04.10). Выбор сам перезапускает движки
+                        (TrayIcon.ChooseMode): ради этого переключатель в трее
                         и просили — не открывать окно.
                     -->
-                    <TextBlock Text="Выход за границу" Margin="0,14,0,7" FontSize="11.5" FontWeight="SemiBold"
+                    <TextBlock Text="Режим работы" Margin="0,14,0,7" FontSize="11.5" FontWeight="SemiBold"
                                Foreground="{DynamicResource Muted}" />
 
-                    <Grid x:Name="ExitButtons">
+                    <Grid x:Name="Modes">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="6" />
@@ -167,28 +167,28 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <RadioButton x:Name="ExitNone" Grid.Column="0" Style="{StaticResource ModeSegment}"
-                                     GroupName="TrayExit" Tag="None" Click="OnExit" AutomationProperties.Name="Выход: нет">
+                        <RadioButton x:Name="ModeDesync" Grid.Column="0" Style="{StaticResource ModeSegment}"
+                                     GroupName="TrayMode" Tag="Desync" Click="OnMode">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Style="{StaticResource LineGlyph}" FontSize="12.5" Text="&#xE9E9;"
                                            Foreground="{DynamicResource Accent}" Margin="0,0,5,0" />
-                                <TextBlock x:Name="ExitNoneName" VerticalAlignment="Center" />
+                                <TextBlock x:Name="ModeDesyncName" VerticalAlignment="Center" />
                             </StackPanel>
                         </RadioButton>
-                        <RadioButton x:Name="ExitWarp" Grid.Column="2" Style="{StaticResource ModeSegment}"
-                                     GroupName="TrayExit" Tag="Warp" Click="OnExit" AutomationProperties.Name="Выход: WARP">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <TextBlock Style="{StaticResource LineGlyph}" FontSize="12.5" Text="&#xE753;"
-                                           Foreground="{DynamicResource Accent}" Margin="0,0,5,0" />
-                                <TextBlock x:Name="ExitWarpName" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-                        <RadioButton x:Name="ExitVpn" Grid.Column="4" Style="{StaticResource ModeSegment}"
-                                     GroupName="TrayExit" Tag="Vpn" Click="OnExit" AutomationProperties.Name="Выход: Мой VPN">
+                        <RadioButton x:Name="ModeTunnel" Grid.Column="2" Style="{StaticResource ModeSegment}"
+                                     GroupName="TrayMode" Tag="Tunnel" Click="OnMode">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Style="{StaticResource LineGlyph}" FontSize="12.5" Text="&#xE774;"
                                            Foreground="{DynamicResource Accent}" Margin="0,0,5,0" />
-                                <TextBlock x:Name="ExitVpnName" VerticalAlignment="Center" />
+                                <TextBlock x:Name="ModeTunnelName" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="ModeRoute" Grid.Column="4" Style="{StaticResource ModeSegment}"
+                                     GroupName="TrayMode" Tag="Route" Click="OnMode">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock Style="{StaticResource LineGlyph}" FontSize="12.5" Text="&#xE8AB;"
+                                           Foreground="{DynamicResource Accent}" Margin="0,0,5,0" />
+                                <TextBlock x:Name="ModeRouteName" VerticalAlignment="Center" />
                             </StackPanel>
                         </RadioButton>
                     </Grid>

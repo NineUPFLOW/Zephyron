@@ -384,7 +384,7 @@ public sealed record UserRuleEntry
 
     public string DescribeMode() => Off ? "выключено" : Mode switch
     {
-        RoutingMode.Proxy => "через выход",
+        RoutingMode.Proxy => "VPN",
         RoutingMode.Desync => "десинк",
         _ => "напрямую",
     };

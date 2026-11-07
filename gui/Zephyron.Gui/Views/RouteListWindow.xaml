@@ -96,7 +96,7 @@
                 <StackPanel Orientation="Horizontal">
                     <RadioButton x:Name="PathDirect" Style="{StaticResource PathSegment}" GroupName="ListPath" Content="Напрямую" IsChecked="True" Checked="OnChanged" />
                     <RadioButton x:Name="PathDesync" Style="{StaticResource PathSegment}" GroupName="ListPath" Content="Десинк" Checked="OnChanged" />
-                    <RadioButton x:Name="PathVpn" Style="{StaticResource PathSegment}" GroupName="ListPath" Content="Через выход" Checked="OnChanged" />
+                    <RadioButton x:Name="PathVpn" Style="{StaticResource PathSegment}" GroupName="ListPath" Content="Через VPN" Checked="OnChanged" />
                 </StackPanel>
             </Border>
         </StackPanel>

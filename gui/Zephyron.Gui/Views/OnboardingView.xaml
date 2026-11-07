@@ -118,9 +118,9 @@
                         </Border>
                         <Border Style="{StaticResource Card}" Margin="5,0" Opacity="0">
                             <StackPanel>
-                                <TextBlock Text="Выход и маршруты" FontWeight="SemiBold" />
+                                <TextBlock Text="Гибрид" FontWeight="SemiBold" />
                                 <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
-                                           Text="Десинк работает всегда, а выход — WARP или ваш VPN — берёт названное вами или весь трафик. Банки, игры и российские сайты работают как раньше." />
+                                           Text="Десинк и VPN вместе: в туннель уходит только названное вами. Банки, игры и российские сайты работают как раньше." />
                             </StackPanel>
                         </Border>
                         <Border Style="{StaticResource Card}" Margin="5,0" Opacity="0">
@@ -200,16 +200,15 @@
                     подписки; владелец 21.10: «3 вкладку есть ли впн перенеси на
                     4 вкладку». Поэтому «Туннель» выбирается и без подписки: её
                     спросит следующий шаг, а не подключат — останется «Десинк».
-                    Выбор пишется при «Дальше» (Exits.Apply).
+                    Выбор пишется при «Дальше» (WorkModes.Choose).
                 -->
                 <StackPanel x:Name="StepMode" Visibility="Collapsed">
-                    <TextBlock Text="Выход за границу" FontSize="17" FontWeight="SemiBold" />
+                    <TextBlock Text="Режим работы" FontSize="17" FontWeight="SemiBold" />
                     <TextBlock Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap"
-                               Text="Десинк работает всегда. Выход добавляет зарубежный адрес для сайтов, закрытых по стране. Выбор можно сменить в любой момент: на «Главной» и в меню значка в трее." />
+                               Text="Так программа обходит блокировки. Режим можно сменить в любой момент: на «Главной» и в меню значка в трее." />
 
                     <StackPanel Margin="0,18,0,0">
-                        <RadioButton x:Name="PickNone" Style="{StaticResource ModeCard}" GroupName="OnboardingExit" Tag="None" Checked="OnModePicked"
-                                     AutomationProperties.Name="Выход: нет">
+                        <RadioButton x:Name="PickDesync" Style="{StaticResource ModeCard}" GroupName="OnboardingMode" Tag="Desync" Checked="OnModePicked">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -219,33 +218,14 @@
                                     <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE9E9;" Foreground="{DynamicResource Muted}" />
                                 </Border>
                                 <StackPanel Grid.Column="1">
-                                    <TextBlock x:Name="PickNoneName" FontWeight="SemiBold" FontSize="15" />
+                                    <TextBlock x:Name="PickDesyncName" FontWeight="SemiBold" FontSize="15" />
                                     <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                               Text="Только десинк: обходит блокировку прямо в вашем соединении, фильтр оператора не узнаёт имя сайта. Трафик идёт напрямую, адрес остаётся домашним, подписка не нужна. Не поможет, если сайт закрыт по стране (ChatGPT) или по адресу (Telegram, Instagram). Для Telegram есть вкладка TG Proxy." />
+                                               Text="Обходит блокировку прямо в вашем соединении: искажает рукопожатие, и фильтр оператора не узнаёт имя сайта. Трафик идёт напрямую, адрес остаётся домашним, подписка не нужна. Не поможет, если сайт закрыт по стране (ChatGPT) или по адресу (Telegram, Instagram). Для Telegram есть вкладка TG Proxy." />
                                 </StackPanel>
                             </Grid>
                         </RadioButton>
 
-                        <RadioButton x:Name="PickWarp" Style="{StaticResource ModeCard}" GroupName="OnboardingExit" Tag="Warp" Checked="OnModePicked"
-                                     AutomationProperties.Name="Выход: WARP">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border Style="{StaticResource IconTile}" Margin="0,0,14,0">
-                                    <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE753;" Foreground="{DynamicResource Muted}" />
-                                </Border>
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock x:Name="PickWarpName" FontWeight="SemiBold" FontSize="15" />
-                                    <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                               Text="Бесплатный выход Cloudflare, подписка не нужна. Сайты с маршрутом «через выход» идут через него; остальное напрямую, закрытое чинит десинк. Выпускает трафик в ближайшем городе Cloudflare, из России — в Москве. Страну и свой файл WARP можно задать на вкладке VPN." />
-                                </StackPanel>
-                            </Grid>
-                        </RadioButton>
-
-                        <RadioButton x:Name="PickVpn" Style="{StaticResource ModeCard}" GroupName="OnboardingExit" Tag="Vpn" Checked="OnModePicked"
-                                     AutomationProperties.Name="Выход: Мой VPN">
+                        <RadioButton x:Name="PickTunnel" Style="{StaticResource ModeCard}" GroupName="OnboardingMode" Tag="Tunnel" Checked="OnModePicked">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -255,12 +235,29 @@
                                     <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE774;" Foreground="{DynamicResource Muted}" />
                                 </Border>
                                 <StackPanel Grid.Column="1">
-                                    <TextBlock x:Name="PickVpnName" FontWeight="SemiBold" FontSize="15" />
+                                    <TextBlock x:Name="PickTunnelName" FontWeight="SemiBold" FontSize="15" />
                                     <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                               Text="Ваши подписки и ключи: адрес зарубежный, открывается всё, что открывает ваш сервер. Что идёт через выход — всё или только названное в маршрутах, — выбирается на «Главной». Нужна подписка или ключ." />
-                                    <TextBlock x:Name="PickVpnNote" Style="{StaticResource Caption}" Margin="0,4,0,0"
+                                               Text="Весь трафик идёт через туннель, кроме сайтов с пометкой «напрямую». Работает как обычный VPN-клиент: адрес зарубежный, открывается всё, что открывает ваш сервер. Российские сайты тоже увидят зарубежный адрес. Нужна подписка или WARP." />
+                                    <TextBlock x:Name="PickTunnelNote" Style="{StaticResource Caption}" Margin="0,4,0,0"
                                                TextWrapping="Wrap" Foreground="{DynamicResource Warn}" Visibility="Collapsed"
-                                               Text="Подписки пока нет — её спросит следующий шаг. Без неё этот выход поднимать нечем, и останется «Нет»." />
+                                               Text="Подписки пока нет — её спросит следующий шаг. Без неё этот режим поднимать нечем, и останется «Десинк»." />
+                                </StackPanel>
+                            </Grid>
+                        </RadioButton>
+
+                        <RadioButton x:Name="PickRoute" Style="{StaticResource ModeCard}" GroupName="OnboardingMode" Tag="Route" Checked="OnModePicked">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource IconTile}" Margin="0,0,14,0">
+                                    <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE8AB;" Foreground="{DynamicResource Muted}" />
+                                </Border>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="PickRouteName" FontWeight="SemiBold" FontSize="15" />
+                                    <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
+                                               Text="Оба сразу. Что в «Маршрутах» стоит «через VPN», уходит в туннель — с зарубежным адресом; остальное идёт напрямую, и закрытое по имени чинит десинк. Российские сервисы видят домашний адрес. Без подписки работает как «Десинк»." />
                                 </StackPanel>
                             </Grid>
                         </RadioButton>
@@ -387,7 +384,7 @@
         <StackPanel x:Name="StepVpnButtons" Orientation="Horizontal" HorizontalAlignment="Right" Visibility="Collapsed">
             <Button Style="{StaticResource Ghost}" Content="Вернуться" Margin="0,0,8,0" Click="OnBack" />
             <Button x:Name="NoSubscription" Style="{StaticResource Ghost}" Content="Нет подписки" Margin="0,0,8,0" Click="OnNoSubscription" />
-            <Button x:Name="VpnLoad" Style="{StaticResource Primary}" Content="Подключить" Click="OnAddSubscription" />
+            <Button x:Name="VpnLoad" Style="{StaticResource Primary}" Content="Добавить" Click="OnAddSubscription" />
             <Button x:Name="VpnDone" Style="{StaticResource Primary}" Content="Готово" Click="OnFinish" Visibility="Collapsed" />
         </StackPanel>
     </Grid>

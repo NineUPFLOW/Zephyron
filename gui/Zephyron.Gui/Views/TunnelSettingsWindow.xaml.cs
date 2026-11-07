@@ -123,7 +123,7 @@ public partial class TunnelSettingsWindow : Window
         // Как у прочих строк — сказать, когда настройка ничего не делает:
         // пулы при WARP и заведённые пулы при выключенной.
         Line(SelectiveLine, selective
-            ? Exits.Of(settings) == ExitChoice.Warp ? "Сейчас не работает: выбран выход WARP, пулы работают с «Мой VPN»." : string.Empty
+            ? TunnelPaths.Of(settings) == TunnelPath.Warp ? "Сейчас не работает: туннель идёт через WARP, пулы работают с VPN." : string.Empty
             : settings.Pools.Count > 0
                 ? $"Заведённые пулы ({settings.Pools.Count}) сохранены, но не действуют: их маршруты идут через любые серверы."
                 : string.Empty);
@@ -318,14 +318,14 @@ public partial class TunnelSettingsWindow : Window
     private void OnFakeIpMemory(object sender, RoutedEventArgs e) =>
         Save(s => s with { FakeIpMemory = FakeIpMemory.IsChecked == true },
             FakeIpMemory.IsChecked == true
-                ? "Подставные адреса имён «через выход» сохранятся после перезапуска движков."
+                ? "Подставные адреса имён «через VPN» сохранятся после перезапуска движков."
                 : "После перезапуска движков подставные адреса выдаются заново, как до 20.10.");
 
     private void OnSelective(object sender, RoutedEventArgs e) =>
         Save(s => s with { SelectiveRouting = Selective.IsChecked == true },
             Selective.IsChecked == true
                 ? "Selective Routing включён: пулы серверов — на вкладке VPN, над подписками."
-                : "Selective Routing выключен: пулов на вкладке нет, маршруты «через выход» идут через любые серверы.");
+                : "Selective Routing выключен: пулов на вкладке нет, маршруты «через VPN» идут через любые серверы.");
 
     private void OnDeadPool(object sender, RoutedEventArgs e) =>
         Save(s => s with { DeadPoolToDefault = DeadPool.IsChecked == true },

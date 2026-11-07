@@ -15,7 +15,7 @@ namespace Zephyron.Gui.Views;
 /// перезапуск Discord, второй читает сторож голоса (DiscordVoiceWatch)
 /// на каждом круге. Перезапуск движков предлагают только пины напрямую:
 /// десинк подхватывает список щита сам, а туннелю прибитые адреса имён
-/// «через выход» достаются только при сборке конфига.
+/// «через VPN» достаются только при сборке конфига.
 /// </remarks>
 public partial class RoutesSettingsWindow : Window
 {
@@ -128,7 +128,7 @@ public partial class RoutesSettingsWindow : Window
             var direct = blockers.Any(b => b.Why == DesyncBypass.Direct);
 
             return $" Но {blockers.Count} из {solution.Names.Count} имён "
-                + (direct ? "стоят «напрямую»" : "стоят «через выход», а туннель выключен")
+                + (direct ? "стоят «напрямую»" : "стоят «через VPN», а туннель выключен")
                 + " — десинка им не будет. Поставьте части сервиса «десинк» в «Маршрутах».";
         }
         catch (Exception)
@@ -157,7 +157,7 @@ public partial class RoutesSettingsWindow : Window
         bool on = LearnRoblox.IsChecked == true;
 
         Save(s => s with { LearnRobloxServers = on },
-            on ? "Адреса серверов Roblox добавляются, пока его серверы идут «через выход»."
+            on ? "Адреса серверов Roblox добавляются, пока его серверы идут «через VPN»."
                : "Список серверов Roblox больше не пополняется автоматически.");
     }
 
@@ -166,7 +166,7 @@ public partial class RoutesSettingsWindow : Window
         bool on = LearnArc.IsChecked == true;
 
         Save(s => s with { LearnArcRaidersServers = on },
-            on ? "Адреса серверов ARC Raiders добавляются, пока её серверы идут «через выход» и игра запущена."
+            on ? "Адреса серверов ARC Raiders добавляются, пока её серверы идут «через VPN» и игра запущена."
                : "Список серверов ARC Raiders больше не пополняется автоматически.");
     }
 
@@ -184,7 +184,7 @@ public partial class RoutesSettingsWindow : Window
         bool on = Learn.IsChecked == true;
 
         Save(s => s with { LearnDiscordVoice = on },
-            on ? "Адреса голоса Discord добавляются, пока голос идёт «через выход»."
+            on ? "Адреса голоса Discord добавляются, пока голос идёт «через VPN»."
                : "Список голоса Discord больше не пополняется автоматически.");
     }
 

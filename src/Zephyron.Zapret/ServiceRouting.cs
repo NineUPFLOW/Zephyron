@@ -11,7 +11,7 @@ namespace Zephyron.Zapret;
 /// <remarks>
 /// <para>
 /// Сервис — способ показа и редактирования, а не новая сущность. Выбор
-/// «голос Discord через выход» разворачивается в обычное правило
+/// «голос Discord через VPN» разворачивается в обычное правило
 /// <c>match: hostlist, value: lists/discord-media.txt</c> в пользовательском
 /// слое. Второго формата, который пришлось бы согласовывать с первым,
 /// не появляется.
@@ -75,14 +75,14 @@ public static class ServiceRouting
 
         public string DescribeDefault() => DefaultOff ? "выключено" : DefaultMode switch
         {
-            RoutingMode.Proxy => "через выход",
+            RoutingMode.Proxy => "через VPN",
             RoutingMode.Desync => "десинк",
             _ => "напрямую",
         };
 
         public string DescribeMode() => Off ? "выключено" : Mode switch
         {
-            RoutingMode.Proxy => "через выход",
+            RoutingMode.Proxy => "через VPN",
             RoutingMode.Desync => "десинк",
             _ => "напрямую",
         };
@@ -129,8 +129,8 @@ public static class ServiceRouting
 
             // Путь части — по имени, которое не забрала узкая часть внутри неё
             // (ServicePart.Within): её правило проверяется раньше. 05.11 «Квесты
-            // и API» (discord.com) ушли через выход, и «Сайт и переписка», чьё
-            // первое имя тоже discord.com, показывалась «через выход» при своём
+            // и API» (discord.com) ушли через VPN, и «Сайт и переписка», чьё
+            // первое имя тоже discord.com, показывалась «через VPN» при своём
             // правиле «десинк» — выглядело как зависимость маршрутов.
             var probe = part.ByAddress ? entries[0] : OwnName(service, part, entries, zapretRoot);
 

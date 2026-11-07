@@ -107,20 +107,20 @@ public sealed class TrayMenuTests
         });
     }
 
-    /// <summary>Выход выбирается в трее теми же тремя названиями, что на «Главной» (07.11).</summary>
+    /// <summary>Режим выбирается в трее теми же тремя названиями, что на «Главной» (04.10).</summary>
     [Fact]
-    public void ExitsAreChosenByTheirNames()
+    public void ModesAreChosenByTheirNames()
     {
         Sta.Run(() =>
         {
-            ExitChoice? chosen = null;
-            var menu = new TrayMenu(() => { }, exit => chosen = exit, () => { }, _ => { });
+            WorkMode? chosen = null;
+            var menu = new TrayMenu(() => { }, mode => chosen = mode, () => { }, _ => { });
             menu.Render(new TrayStatus(Running: false, AllHealthy: false, Tunnel: null, Desync: null, Busy: false));
 
-            Assert.Equal("Мой VPN", ((TextBlock)menu.FindName("ExitVpnName")).Text);
+            Assert.Equal(WorkModes.RouteName, ((TextBlock)menu.FindName("ModeRouteName")).Text);
 
-            ((RadioButton)menu.FindName("ExitWarp")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-            Assert.Equal(ExitChoice.Warp, chosen);
+            ((RadioButton)menu.FindName("ModeRoute")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.Equal(WorkMode.Route, chosen);
 
             menu.Close();
         });

@@ -101,7 +101,7 @@
 
             <ContentControl Style="{StaticResource PageHead}"
                             gui:PageHead.Title="TG Proxy"
-                            gui:PageHead.Subtitle="Прокси для Telegram Desktop на этом компьютере. Работает без выхода и VPN — трафик идёт через WebSocket к Telegram и через домены за Cloudflare, в том же шифровании.">
+                            gui:PageHead.Subtitle="Прокси для Telegram Desktop на этом компьютере. Работает без VPN — трафик идёт через WebSocket к Telegram и через домены за Cloudflare, в том же шифровании.">
 
                 <Button x:Name="HowButton" Style="{StaticResource Ghost}" Click="OnHow"
                         Content="Как это устроено?" gui:ButtonGlyph.Lead="&#xE736;" VerticalAlignment="Center" />
@@ -112,7 +112,7 @@
                 <StackPanel>
                     <TextBlock Text="Когда он пригодится" FontWeight="SemiBold" FontSize="15" />
                     <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,0" TextWrapping="Wrap"
-                               Text="Когда Telegram не идёт через выход: адреса Telegram закрыты, а через прокси он работает целиком, с фото и видео. Работает прокси только вместе с десинком — без него соединения самого прокси режет DPI, и Telegram не подключится. Если маршрут Telegram — «через выход» и выход выбран, Telegram и так идёт через него — прокси не нужен." />
+                               Text="Когда Telegram не идёт через VPN: адреса Telegram закрыты, а через прокси он работает целиком, с фото и видео. Работает прокси только вместе с десинком — без него соединения самого прокси режет DPI, и Telegram не подключится. Если маршрут Telegram — «через VPN» и туннель включён, Telegram и так идёт через него — прокси не нужен." />
                     <TextBlock Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap"
                                Text="Только Telegram Desktop на этом компьютере — телефон через него не подключить. Прокси: tg-ws-proxy-rs (valnesfjord) — порт программы tg-ws-proxy (Flowseal), обе под MIT. Журнал — runtime\tg-ws-proxy.log." />
                 </StackPanel>
@@ -156,9 +156,9 @@
                             </StackPanel>
 
                             <TextBlock x:Name="StateText" Style="{StaticResource Caption}" FontSize="13.5" Margin="0,7,0,0" TextWrapping="Wrap" />
-                            <TextBlock x:Name="ViaExitNote" Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
+                            <TextBlock x:Name="ViaTunnelNote" Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
                                        Visibility="Collapsed"
-                                       Text="Маршрут Telegram — «через выход», и выход выбран: Telegram идёт через него, прокси не нужен." />
+                                       Text="Маршрут Telegram — «через VPN», а режим с туннелем: Telegram идёт через туннель, прокси не нужен." />
                             <!-- Предупреждение: панель WarnSoft с ромбом «частично»; Visibility пишет код у DesyncWarning. -->
                             <Border Margin="0,8,0,0" Padding="12,8" CornerRadius="{StaticResource RMd}"
                                     Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}"
@@ -173,7 +173,7 @@
                                              VerticalAlignment="Top" />
                                     <TextBlock x:Name="DesyncWarning" Grid.Column="1" TextWrapping="Wrap" FontSize="12.5"
                                                Visibility="Collapsed"
-                                               Text="Без десинка прокси не работает: его соединения к Telegram и к доменам за Cloudflare режет DPI. Включите десинк: на «Главной» выход «Нет» или выключенный «Весь трафик через выход», либо вкладка «Десинк»." />
+                                               Text="Без десинка прокси не работает: его соединения к Telegram и к доменам за Cloudflare режет DPI. Включите десинк: режим «Десинк» или «Гибрид» на «Главной», либо вкладка «Десинк»." />
                                 </Grid>
                             </Border>
                         </StackPanel>
@@ -468,7 +468,7 @@
                                          ToolTip="Адрес воркера, например tg.имя.workers.dev; пусто — без воркера" />
                                 <Button Grid.Column="1" Style="{StaticResource Ghost}" Content="Запомнить" Margin="8,0,0,0" Click="OnWorker" />
                                 <Button Grid.Column="2" Style="{StaticResource Ghost}" Content="Очистить" Margin="8,0,0,0" Click="OnWorkerClear"
-                                        ToolTip="Убрать свой воркер" />
+                                        ToolTip="Удалить свой воркер" />
                                 <Button Grid.Column="3" Style="{StaticResource Ghost}" Content="Скопировать код" Margin="8,0,0,0" Click="OnWorkerCode"
                                         gui:ButtonGlyph.Lead="&#xE8C8;"
                                         ToolTip="Код воркера — в буфер обмена" />

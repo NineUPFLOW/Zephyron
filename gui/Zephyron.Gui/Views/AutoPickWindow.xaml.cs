@@ -132,7 +132,7 @@ public sealed class AutoPickItem : INotifyPropertyChanged
         : Row.CurrentMode switch
         {
             RoutingMode.Direct => "напрямую",
-            RoutingMode.Proxy => "через выход",
+            RoutingMode.Proxy => "VPN",
             _ => string.IsNullOrEmpty(Row.CurrentRecipe) || Row.CurrentRecipe == DesyncRecipes.FromPreset
                 ? "десинк: пресет"
                 : "десинк: " + (Row.RuleRecipe ?? Row.CurrentRecipe),
@@ -178,16 +178,16 @@ public sealed class AutoPickItem : INotifyPropertyChanged
         AutoPickWay.Preset => "Пресет",
         AutoPickWay.Recipe => "Рецепт «" + t.Title + "»",
         AutoPickWay.Pin => "Пин " + t.Address + " (" + t.Title + ")",
-        _ => "Выход (" + t.Server + ")",
+        _ => "VPN (" + t.Server + ")",
     };
 
-    private string ChoiceText(AutoPickChoice choice) => (choice.Optional ? "можно без выхода: " : "") + choice.Way switch
+    private string ChoiceText(AutoPickChoice choice) => (choice.Optional ? "можно без VPN: " : "") + choice.Way switch
     {
         AutoPickWay.Direct => "напрямую",
         AutoPickWay.Preset => "десинк: пресет",
         AutoPickWay.Recipe => "десинк: " + choice.Title,
         AutoPickWay.Pin => "пин в hosts: " + choice.Title,
-        _ => "через выход",
+        _ => "через VPN",
     };
 
     /// <summary>Итог: цвет и текст идут парой, смысл не только в цвете.</summary>
@@ -295,7 +295,7 @@ public partial class AutoPickWindow : Window
 {
     private enum Phase { Idle, Running, Done, Writing, Written, Checking }
 
-    private static readonly string[] StageNames = ["Напрямую", "Пресет", "Рецепты", "Пин", "Выход"];
+    private static readonly string[] StageNames = ["Напрямую", "Пресет", "Рецепты", "Пин", "VPN"];
 
     private readonly ObservableCollection<AutoPickItem> _items = [];
     private readonly Dictionary<string, AutoPickItem> _byHost = new(StringComparer.Ordinal);
@@ -321,15 +321,15 @@ public partial class AutoPickWindow : Window
     private int _ticks;
     private string _filter = "all";
 
-    /// <summary>Выключатель выхода — по умолчанию выключен; подпись говорит, что за выход выбран.</summary>
+    /// <summary>Выключатель выхода за границу — по умолчанию выключен; подпись говорит, через что пойдёт туннель.</summary>
     private void ShowAllowExit()
     {
-        var exit = Exits.Of(AppSettings.Load(AppSettings.DefaultPath));
+        var settings = AppSettings.Load(AppSettings.DefaultPath);
 
-        AllowExitLine.Text = exit == ExitChoice.None
-            ? "Выход не выбран на «Главной»: пробовать нечего, подбор ищет только напрямую, десинком и пином."
+        AllowExitLine.Text = !settings.Engines.Tunnel
+            ? "Сейчас режим «Десинк», туннеля нет: пробовать нечего, подбор ищет только напрямую, десинком и пином."
             : AllowExit.IsChecked == true
-                ? $"Если ни напрямую, ни десинк, ни пин не помогут, сайт предложат вести через выход «{Exits.Name(exit)}»."
+                ? $"Если ни напрямую, ни десинк, ни пин не помогут, сайт предложат вести «через VPN» — через {TunnelPaths.Name(TunnelPaths.Of(settings))}."
                 : "Выключено: сайты не уводятся за границу, подбор ищет только напрямую, десинком и пином.";
     }
 
@@ -950,12 +950,13 @@ public partial class AutoPickWindow : Window
 
             var settings = AppSettings.Load(AppSettings.DefaultPath);
 
-            var exit = Exits.Of(settings);
+            var path = TunnelPaths.Of(settings);
+            bool tunnel = settings.Engines.Tunnel;
             bool allowExit = AllowExit.IsChecked == true;
 
             // До остановки движков: подписка может читаться через сам туннель.
-            // Выход пробуется, только если он выбран и разрешён; WARP — если его проба возможна (свой файл).
-            if (allowExit && exit == ExitChoice.Vpn && settings.NeedsProxy)
+            // Путь туннеля пробуется, только если туннель включён и выход разрешён; WARP — если его проба возможна (свой файл).
+            if (allowExit && tunnel && path == TunnelPath.Vpn && settings.NeedsProxy)
             {
                 try
                 {
@@ -963,24 +964,24 @@ public partial class AutoPickWindow : Window
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    _warnings.Add("Подписка не прочиталась (" + ex.GetBaseException().Message + ") — этап «Выход» пропущен.");
+                    _warnings.Add("Подписка не прочиталась (" + ex.GetBaseException().Message + ") — этап «VPN» пропущен.");
                 }
             }
 
-            if (allowExit && exit == ExitChoice.Warp && Zephyron.Subscriptions.Warp.Exits() is [{ IsMeasurable: true } warp])
+            if (allowExit && tunnel && path == TunnelPath.Warp && Zephyron.Subscriptions.Warp.Exits() is [{ IsMeasurable: true } warp])
                 servers = [warp];
 
             _stageSkip[4] = !allowExit ? "выход не разрешён"
-                : exit == ExitChoice.None ? "выход не выбран"
-                : exit == ExitChoice.Warp && servers.Count == 0 ? "встроенный WARP пробой не проверить"
+                : !tunnel ? "режим «Десинк»: туннеля нет"
+                : path == TunnelPath.Warp && servers.Count == 0 ? "встроенный WARP пробой не проверить"
                 : servers.Count == 0 ? "нет выбранного живого сервера"
                 : null;
 
-            if (allowExit && exit != ExitChoice.None && servers.Count == 0 && _warnings.Count == 0)
+            if (allowExit && tunnel && servers.Count == 0 && _warnings.Count == 0)
             {
-                _warnings.Add(exit == ExitChoice.Warp
-                    ? "Встроенный WARP пробой проверить нельзя (загрузите свой файл WARP на вкладке VPN) — этап «Выход» пропущен."
-                    : "Нет подписки либо выбранный сервер не отвечает — этап «Выход» пропущен.");
+                _warnings.Add(path == TunnelPath.Warp
+                    ? "Встроенный WARP пробой проверить нельзя (загрузите свой файл WARP на вкладке VPN) — этап «VPN» пропущен."
+                    : "Нет подписки либо выбранный сервер не отвечает — этап «VPN» пропущен.");
             }
 
             var paths = ZapretPaths.Discover();

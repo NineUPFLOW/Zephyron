@@ -112,7 +112,7 @@ public partial class RouteListWindow : Window
 
     private static string Word(RoutingMode mode) => mode switch
     {
-        RoutingMode.Proxy => "через выход",
+        RoutingMode.Proxy => "через VPN",
         RoutingMode.Desync => "через десинк",
         _ => "напрямую",
     };

@@ -3,7 +3,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:gui="clr-namespace:Zephyron.Gui"
-        Title="Подключить подписку" Width="560" SizeToContent="Height"
+        Title="Добавить подписку" Width="560" SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource Backdrop}"
         ResizeMode="NoResize">
@@ -15,7 +15,7 @@
         добавить. Ссылка и ключи — паролем: они равносильны паролю.
     -->
     <StackPanel LayoutTransform="{DynamicResource UiScaleTransform}" Margin="28,24,28,24">
-        <TextBlock Text="Подключить подписку" Style="{StaticResource Title}" FontSize="20" />
+        <TextBlock Text="Добавить подписку" Style="{StaticResource Title}" FontSize="20" />
 
         <Grid Margin="0,18,0,0">
             <Grid.ColumnDefinitions>

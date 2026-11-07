@@ -1503,7 +1503,7 @@ public partial class CheckView : UserControl
                 string.Join("\n", pinned.Take(12).Select(p => $"{p.Key} → {p.Value}"))
                 + (pinned.Count > 12 ? $"\n… и ещё {pinned.Count - 12}" : string.Empty)
                 + "\n\nИх строки в таблице описывают прибитый адрес, а не сайт. Пин бьёт "
-                + "любой резолв, включая наш: правило «через выход» на такое имя молча "
+                + "любой резолв, включая наш: правило «через VPN» на такое имя молча "
                 + "не работает, а десинк его не трогает вовсе.\n\nЗдесь читается весь файл, "
                 + "вместе с чужими записями — свои показывает и снимает раздел «Файл hosts».",
                 (Brush)FindResource("Muted")));
@@ -1927,6 +1927,6 @@ public partial class CheckView : UserControl
     {
         RoutingMode.Direct => "напрямую",
         RoutingMode.Desync => "десинк",
-        _ => "через выход",
+        _ => "VPN",
     };
 }

@@ -127,7 +127,7 @@ public sealed class ModeTableTests : IDisposable
     [Fact]
     public void Without_an_exit_names_via_exit_get_desync()
     {
-        // Туннеля нет, везти «через выход» некуда: имя идёт напрямую и
+        // Туннеля нет, везти «через VPN» некуда: имя идёт напрямую и
         // получает десинк. Не трогается только «напрямую».
         var found = HostsFile.DescribeDesyncExclusions(
             Book(OperatingMode.DesyncOnly), _hosts, tunnelUp: false);

@@ -105,7 +105,7 @@
                                                Foreground="{Binding VerdictColour}" />
 
                                     <Button Grid.Column="2" Style="{StaticResource Ghost}"
-                                            Content="взять" Padding="14,7"
+                                            Content="выбрать" Padding="14,7"
                                             Tag="{Binding Name}" Click="OnPick" />
                                 </Grid>
                             </Border>

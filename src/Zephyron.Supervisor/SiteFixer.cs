@@ -34,10 +34,10 @@ public sealed record SiteFixResult(
 /// Путь «напрямую» меряется честно, без перезапуска: имя на время кладётся
 /// в щит (<c>runtime\desync-exclude.txt</c>), а winws2 перечитывает списки
 /// сам при их изменении (документация bol-van: «перезапуск nfqws2 не нужен»).
-/// Путь через выход — через вход проверки движка: он ведёт в туннель.
+/// Путь через VPN — через вход проверки движка: он ведёт в туннель.
 /// </para>
 /// <para>
-/// Порядок — от дешёвого к дорогому: как есть, напрямую, через выход. Туннель
+/// Порядок — от дешёвого к дорогому: как есть, напрямую, через VPN. Туннель
 /// последним — он тратит трафик подписки и прибавляет задержку.
 /// </para>
 /// </remarks>
@@ -86,7 +86,7 @@ public static class SiteFixer
         {
             return new(host, steps, null, false,
                 "Движки не запущены — проверять нечего: путь «напрямую» меряется через десинк, "
-                + "путь через выход — через туннель. Запустите движки на «Главной» и повторите.");
+                + "путь через VPN — через туннель. Запустите движки на «Главной» и повторите.");
         }
 
         var settings = AppSettings.Load(AppSettings.DefaultPath);
@@ -141,7 +141,7 @@ public static class SiteFixer
         // 3. Через VPN.
         if (settings.NeedsProxy && route != RoutingMode.Proxy)
         {
-            progress?.Report($"Пробую {host} через выход…");
+            progress?.Report($"Пробую {host} через VPN…");
 
             var vpn = await ThroughTunnelAsync(host, now.Kind, cancellationToken);
             steps.Add(vpn);
@@ -158,24 +158,24 @@ public static class SiteFixer
 
         return new(host, steps, null, false,
             $"{host} не открылся ни одним путём ({tried}). Маршрут не менял. "
-            + (settings.NeedsProxy ? "Возможно, лежит сам сайт." : "Включите туннель — через выход он, возможно, откроется."));
+            + (settings.NeedsProxy ? "Возможно, лежит сам сайт." : "Включите туннель — через VPN он, возможно, откроется."));
     }
 
     /// <summary>
     /// Итог, когда открыл только VPN: что опробовано и чего не пробовали.
     /// </summary>
     /// <remarks>
-    /// Стояло «открывается только через выход» — неправда: рецепты десинка этот
+    /// Стояло «открывается только через VPN» — неправда: рецепты десинка этот
     /// путь не перебирает вовсе, а у имени «напрямую» не пробует и десинк
     /// пресета. Владелец 14.10: modrinth.com стоял «напрямую», итог сказал
-    /// «только через выход», а открылся он своим рецептом medium.
+    /// «только через VPN», а открылся он своим рецептом medium.
     /// </remarks>
     public static string ViaVpnSummary(string host, IReadOnlyList<SiteFixStep> steps)
     {
         var failed = steps.Where(s => !s.Works).Select(s => s.Path).ToList();
 
-        return $"{host} не открылся ({string.Join(", ", failed)}), а через выход открывается. "
-            + $"Записал маршрут «через выход» для {RuleValue(host)} — заработает после перезапуска движков. "
+        return $"{host} не открылся ({string.Join(", ", failed)}), а через VPN открывается. "
+            + $"Записал маршрут «через VPN» для {RuleValue(host)} — заработает после перезапуска движков. "
             + "Другие рецепты десинка я не пробовал: если хотите без VPN, поставьте сайту «десинк» "
             + "и выберите рецепт в «Маршрутах».";
     }
@@ -220,13 +220,13 @@ public static class SiteFixer
         return (new SiteFixStep("напрямую", works, report?.Describe() ?? "не проверилось"), works);
     }
 
-    /// <summary>Открылось ли через выход: код ответа через туннель и вердикт мимо него.</summary>
+    /// <summary>Открылось ли через VPN: код ответа через туннель и вердикт мимо него.</summary>
     /// <remarks>
     /// 403 через зарубежный выход — почти всегда проверка на робота Cloudflare,
     /// её браузер проходит; 451 — отказ по закону. Но если мимо туннеля сайт уже
     /// ответил 403 без объяснений (<see cref="BlockKind.Forbidden"/>), тот же 403
-    /// через выход — тот же отказ, а не открытие: ns.photonengine.io отвечает
-    /// «403 HTTP not supported» откуда угодно, и подбор записал бы ему «через выход»
+    /// через VPN — тот же отказ, а не открытие: ns.photonengine.io отвечает
+    /// «403 HTTP not supported» откуда угодно, и подбор записал бы ему «через VPN»
     /// на пустом месте (27.10).
     /// </remarks>
     public static bool TunnelOpens(int code, BlockKind here) =>
@@ -251,16 +251,16 @@ public static class SiteFixer
             int code = (int)response.StatusCode;
             bool works = TunnelOpens(code, here);
 
-            return new("через выход", works,
+            return new("через VPN", works,
                 !works && code == 403 ? "ответ 403 — тот же отказ, что и мимо туннеля" : $"ответ {code}");
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return new("через выход", false, "нет ответа за 10 с");
+            return new("через VPN", false, "нет ответа за 10 с");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return new("через выход", false, ex.GetBaseException().Message);
+            return new("через VPN", false, ex.GetBaseException().Message);
         }
     }
 
@@ -273,7 +273,7 @@ public static class SiteFixer
 
     private static string Word(RoutingMode mode) => mode switch
     {
-        RoutingMode.Proxy => "через выход",
+        RoutingMode.Proxy => "через VPN",
         RoutingMode.Desync => "десинк",
         _ => "напрямую",
     };

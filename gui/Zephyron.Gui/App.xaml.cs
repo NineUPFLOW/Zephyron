@@ -223,7 +223,7 @@ public partial class App : Application
         // Правый щелчок по тексту — «Копировать», во всех вкладках сразу.
         TextCopy.Register();
 
-        // Новые адреса голоса Discord — в список голоса, пока он «через выход».
+        // Новые адреса голоса Discord — в список голоса, пока он «через VPN».
         DiscordVoiceWatch.Start(Dispatcher);
         RobloxServerWatch.Start();
 

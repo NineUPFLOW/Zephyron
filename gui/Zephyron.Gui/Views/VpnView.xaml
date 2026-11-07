@@ -171,7 +171,7 @@
                                         Tag="{Binding Name}" Click="OnRefreshOne" />
 
                                 <Button Style="{StaticResource IconGhost}" Content="&#xEC4A;"
-                                        Margin="0,0,6,0" ToolTip="{Binding CheckLabel}" AutomationProperties.Name="Тест пинга подписки"
+                                        Margin="0,0,6,0" ToolTip="{Binding CheckLabel}" AutomationProperties.Name="Замерить серверы подписки"
                                         IsEnabled="{Binding CanCheck}"
                                         Tag="{Binding Name}" Click="OnCheckOne" />
                             </StackPanel>
@@ -384,10 +384,10 @@
                             </StackPanel>
 
                             <Grid Grid.Column="7" Width="108" Margin="0,0,8,0">
-                                <Button Style="{StaticResource Primary}" Content="Текущий" Padding="14,7"
+                                <Button Style="{StaticResource Primary}" Content="Выбран" Padding="14,7"
                                         IsHitTestVisible="False" Focusable="False"
                                         Visibility="{Binding ChosenShown}" />
-                                <Button Style="{StaticResource Ghost}" Content="Взять" Padding="14,7"
+                                <Button Style="{StaticResource Ghost}" Content="Выбрать" Padding="14,7"
                                         Visibility="{Binding ChooseShown}"
                                         Tag="{Binding Tag}" Click="OnChoose" />
                             </Grid>
@@ -417,11 +417,11 @@
 
                 <ContentControl Style="{StaticResource PageHead}"
                                 local:PageHead.Title="VPN"
-                                local:PageHead.Subtitle="Выход за границу: WARP или ваши подписки и ключи. Показан блок выбранного выхода.">
+                                local:PageHead.Subtitle="Через что идёт туннель: ваша подписка (или ключи) либо WARP. Показан блок выбранного пути.">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="RefreshButton" Style="{StaticResource Ghost}"
-                                Content="Перечитать" Click="OnRefresh" Margin="0,0,8,0"
-                                AutomationProperties.Name="Перечитать подписки" />
+                                Content="Обновить" Click="OnRefresh" Margin="0,0,8,0"
+                                AutomationProperties.Name="Обновить подписки" />
                         <!--
                             Настройки — отдельным окном. То, что задают
                             однажды, не должно занимать полосу над списком,
@@ -438,86 +438,72 @@
                 </ContentControl>
 
                 <!--
-                    Выход за границу (владелец, 07.11): наверху выбор «Нет / WARP / Мой VPN» с короткой
-                    подписью, под ним — только блок выбранного выхода целиком. Блок другого выхода
-                    сведён в одну строку с кнопкой «Выбрать». Тот же выбор, что на «Главной» (Rules.Exits).
+                    Путь туннеля (владелец, 07.11): наверху выбор «VPN / WARP» с короткой
+                    подписью, под ним — только блок выбранного пути целиком. Блок другого пути сведён
+                    в одну строку с кнопкой «Выбрать». Хранится в WarpEnabled (Rules.TunnelPaths), тот же
+                    выбор — на «Главной». Режимы «Десинк / Туннель / Гибрид» остаются на «Главной».
                 -->
                 <Border x:Name="ExitCard" Style="{StaticResource Card}" Margin="0,16,0,0">
                     <StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                            <TextBlock Text="Выход за границу" Style="{StaticResource Eyebrow}" VerticalAlignment="Bottom" />
-                        </StackPanel>
+                        <TextBlock Text="Туннель идёт через" Style="{StaticResource Eyebrow}" Margin="0,0,0,12" />
 
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="8" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="8" />
-                                <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
-                            <RadioButton x:Name="PickNone" Grid.Column="0" Style="{StaticResource ModeSegment}"
-                                         GroupName="VpnExit" Tag="None" Click="OnPickExit" AutomationProperties.Name="Выход: нет">
+                            <RadioButton x:Name="PickVpn" Grid.Column="0" Style="{StaticResource ModeSegment}"
+                                         GroupName="VpnPath" Tag="Vpn" Click="OnPickPath" AutomationProperties.Name="Туннель идёт через VPN">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE9E9;"
+                                    <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE774;"
                                                Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
-                                    <TextBlock Text="Нет" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
+                                    <TextBlock Text="VPN" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
                                 </StackPanel>
                             </RadioButton>
 
                             <RadioButton x:Name="PickWarp" Grid.Column="2" Style="{StaticResource ModeSegment}"
-                                         GroupName="VpnExit" Tag="Warp" Click="OnPickExit" AutomationProperties.Name="Выход: WARP">
+                                         GroupName="VpnPath" Tag="Warp" Click="OnPickPath" AutomationProperties.Name="Туннель идёт через WARP">
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE753;"
                                                Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
                                     <TextBlock Text="WARP" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
                                 </StackPanel>
                             </RadioButton>
-
-                            <RadioButton x:Name="PickVpn" Grid.Column="4" Style="{StaticResource ModeSegment}"
-                                         GroupName="VpnExit" Tag="Vpn" Click="OnPickExit" AutomationProperties.Name="Выход: Мой VPN">
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE774;"
-                                               Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
-                                    <TextBlock Text="Мой VPN" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </RadioButton>
                         </Grid>
 
                         <TextBlock x:Name="ExitNow" Style="{StaticResource Caption}" FontSize="12.5" Margin="2,12,0,0" TextWrapping="Wrap" />
+
+                        <!-- Невыбранный выход — одной строкой: что с ним и кнопка «Выбрать». Текст и кнопки пишет код (ShowExitSummaries). -->
+                        <Border x:Name="WarpSummary" Margin="0,12,0,0" Padding="0,10,0,0"
+                                BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0" Visibility="Collapsed">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="WarpSummaryLine" Style="{StaticResource Caption}" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource Text}" VerticalAlignment="Center" />
+                                <Button x:Name="WarpSummaryAction" Grid.Column="1" Style="{StaticResource Ghost}" Padding="12,4" Margin="12,-2,0,-2"
+                                        Content="Выбрать" Click="OnSummaryWarp" AutomationProperties.Name="Выбрать WARP для туннеля" />
+                            </Grid>
+                        </Border>
+
+                        <Border x:Name="VpnSummary" Margin="0,12,0,0" Padding="0,10,0,0"
+                                BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0" Visibility="Collapsed">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="VpnSummaryLine" Style="{StaticResource Caption}" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource Text}" VerticalAlignment="Center" />
+                                <Button x:Name="VpnSummaryAction" Grid.Column="1" Style="{StaticResource Ghost}" Padding="12,4" Margin="12,-2,0,-2"
+                                        Click="OnSummaryVpn" />
+                            </Grid>
+                        </Border>
                     </StackPanel>
-                </Border>
-
-                <!-- Невыбранный выход — одной строкой: что с ним и кнопка «Выбрать». Текст и кнопки пишет код (ShowExitSummaries). -->
-                <Border x:Name="WarpSummary" Margin="0,12,0,0" Padding="14,8" CornerRadius="{StaticResource RMd}"
-                        Background="{DynamicResource Raised}" BorderBrush="{DynamicResource Border}"
-                        BorderThickness="{StaticResource Stroke}" Visibility="Collapsed">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="WarpSummaryLine" Style="{StaticResource Caption}" TextWrapping="Wrap"
-                                   Foreground="{DynamicResource Text}" VerticalAlignment="Center" />
-                        <Button x:Name="WarpSummaryAction" Grid.Column="1" Style="{StaticResource Ghost}" Padding="12,4" Margin="12,-2,0,-2"
-                                Content="Выбрать" Click="OnSummaryWarp" AutomationProperties.Name="Выбрать WARP выходом" />
-                    </Grid>
-                </Border>
-
-                <Border x:Name="VpnSummary" Margin="0,12,0,0" Padding="14,8" CornerRadius="{StaticResource RMd}"
-                        Background="{DynamicResource Raised}" BorderBrush="{DynamicResource Border}"
-                        BorderThickness="{StaticResource Stroke}" Visibility="Collapsed">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="VpnSummaryLine" Style="{StaticResource Caption}" TextWrapping="Wrap"
-                                   Foreground="{DynamicResource Text}" VerticalAlignment="Center" />
-                        <Button x:Name="VpnSummaryAction" Grid.Column="1" Style="{StaticResource Ghost}" Padding="12,4" Margin="12,-2,0,-2"
-                                Click="OnSummaryVpn" />
-                    </Grid>
                 </Border>
 
                 <!-- Ответ на действие: одно место для всей вкладки, видно при любом выходе. -->
@@ -572,7 +558,7 @@
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                     <TextBlock Text="Cloudflare WARP" FontWeight="SemiBold" VerticalAlignment="Center" />
                                     <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                Content="Бесплатный выход Cloudflare: без счёта, без срока, без почты и ключей — учётную запись движок заводит себе сам.&#x0a;&#x0a;Это выбор выхода: пока выходом выбран WARP, подписки не используются. Выключили — выходом станет «Мой VPN», если есть подписки или ключи, иначе «Нет». Применяется после следующего запуска движков.&#x0a;&#x0a;Выпускает трафик в ближайшем городе Cloudflare, из России — в Москве. От блокировок оператора спасает, от отказов по стране — нет: адрес остаётся отечественным, пока не выбрана «Страна выхода» — тогда Cloudflare выпускает трафик в стране выбранного сервера подписки.&#x0a;&#x0a;Идёт по MASQUE поверх HTTP/2 на 443 порту. После запуска ему нужно около полуминуты, прежде чем пойдёт трафик." />
+                                                Content="Бесплатный выход Cloudflare: без счёта, без срока, без почты и ключей — учётную запись движок заводит себе сам.&#x0a;&#x0a;Пока туннель идёт через WARP, подписки не используются; вернуть их — переключателем «VPN» наверху вкладки. Применяется после следующего запуска движков.&#x0a;&#x0a;Выпускает трафик в ближайшем городе Cloudflare, из России — в Москве. От блокировок оператора спасает, от отказов по стране — нет: адрес остаётся отечественным, пока не выбрана «Страна выхода» — тогда Cloudflare выпускает трафик в стране выбранного сервера подписки.&#x0a;&#x0a;Идёт по MASQUE поверх HTTP/2 на 443 порту. После запуска ему нужно около полуминуты, прежде чем пойдёт трафик." />
                                 </StackPanel>
 
 
@@ -634,23 +620,12 @@
                     </views:FitWidth>
 
                 <!--
-                    Два столбца на сетке «Главной» (1.75 : 1, промежуток 12), плитки — в FitWidth:
-                    длинное имя сервера не раздвигает колонку. Слева — выход, через который идёт
-                    трафик, и под ним настройки выбранного выхода: при «Мой VPN» быстрая смена
-                    сервера, при WARP — карточка WARP. Справа — недавние серверы, а при остальных
-                    выходах под ними карточка WARP. Столбцы, а не ряды: пустот между карточками
-                    нет ни в одном состоянии (владелец, 07.11). Карточку WARP код переносит
-                    между столбцами (VpnView.ShowWarp).
+                    Блок «VPN» — один столбец полноширинных карточек сверху вниз (владелец, 07.11):
+                    текущий сервер, быстрая смена, недавние компактной строкой. Подписки, ключи и пулы — ниже,
+                    в списке. Карточки по высоте содержимого: пустот нет ни в одном состоянии.
                 -->
-                <Grid x:Name="VpnColumns" Margin="0,12,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1.75*" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="*" MinWidth="250" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel x:Name="LeftColumn" Grid.Column="0">
-                    <views:FitWidth VerticalAlignment="Top">
+                <StackPanel x:Name="VpnColumns" Margin="0,0,0,0">
+                    <views:FitWidth VerticalAlignment="Top" Margin="0,12,0,0">
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
                                 <Grid>
@@ -845,20 +820,18 @@
                                                       VerticalAlignment="Center" Click="OnKillSwitch" />
                                         <TextBlock Text="Kill switch" Margin="10,0,0,0" VerticalAlignment="Center" />
                                         <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                        Content="Работает при «Весь трафик через выход»: пока выход не работает — упал, перезапускается или ждёт сервера, — трафик мимо него с вашего адреса не уходит вовсе: выходить в сеть мимо выхода могут лишь сам движок, Zephyron и локальная сеть (роутер, принтеры, Radmin и Hamachi). Новый адаптер — второй Wi-Fi, телефон по USB — закрывается сразу, как появится.&#x0a;&#x0a;«Работа мимо туннеля» в параметрах туннеля при включённом kill switch не действует.&#x0a;&#x0a;Не включается, если рядом работает другой десинк на WinDivert (GoodbyeDPI, Zapret): его пакеты Windows видит без имени программы, и фильтр закрыл бы ими сам туннель.&#x0a;&#x0a;Фильтры Windows держит надзор: остановили движки или закрыли программу — Windows снимает их сама, сеть не остаётся закрытой.&#x0a;&#x0a;По умолчанию выключен. Применяется после следующего запуска движков." />
+                                                        Content="Работает при «Весь трафик через VPN»: пока выход не работает — упал, перезапускается или ждёт сервера, — трафик мимо него с вашего адреса не уходит вовсе: выходить в сеть мимо выхода могут лишь сам движок, Zephyron и локальная сеть (роутер, принтеры, Radmin и Hamachi). Новый адаптер — второй Wi-Fi, телефон по USB — закрывается сразу, как появится.&#x0a;&#x0a;«Работа мимо туннеля» в параметрах туннеля при включённом kill switch не действует.&#x0a;&#x0a;Не включается, если рядом работает другой десинк на WinDivert (GoodbyeDPI, Zapret): его пакеты Windows видит без имени программы, и фильтр закрыл бы ими сам туннель.&#x0a;&#x0a;Фильтры Windows держит надзор: остановили движки или закрыли программу — Windows снимает их сама, сеть не остаётся закрытой.&#x0a;&#x0a;По умолчанию выключен. Применяется после следующего запуска движков." />
                                     </StackPanel>
                                 </WrapPanel>
                             </StackPanel>
                         </Border>
                     </views:FitWidth>
-                    </StackPanel>
 
-                    <StackPanel x:Name="RightColumn" Grid.Column="2">
                     <!--
                         Недавние серверы — через которые шёл трафик, свежие первыми
                         (ExitHistory: пишется, когда программа спрашивает движок о выходе).
                     -->
-                    <views:FitWidth>
+                    <views:FitWidth Margin="0,12,0,0">
                         <Border Style="{StaticResource Card}">
                                 <StackPanel>
                                     <StackPanel Orientation="Horizontal">
@@ -868,9 +841,14 @@
                                     </StackPanel>
 
                                     <ItemsControl x:Name="RecentList" Margin="0,10,0,0">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Grid Margin="0,0,0,9">
+                                                <Grid Width="230" Margin="0,0,20,8">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto" />
                                                         <ColumnDefinition Width="*" />
@@ -903,28 +881,22 @@
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
 
-                                    <StackPanel x:Name="RecentEmptyBox" Margin="0,8,0,0" HorizontalAlignment="Center"
-                                                Visibility="Collapsed">
-                                        <Path Width="20" Height="20" Stretch="Uniform" HorizontalAlignment="Center"
-                                              Stroke="{DynamicResource Faint}" StrokeThickness="1.5" StrokeLineJoin="Round"
-                                              Data="M 3,22 A 3,3 0 1 1 9,22 A 3,3 0 1 1 3,22 Z M 21,8 A 3,3 0 1 1 27,8 A 3,3 0 1 1 21,8 Z M 21,24 A 3,3 0 1 1 27,24 A 3,3 0 1 1 21,24 Z M 8.1,20.2 L 21.9,9.8 M 9,22.3 L 21,23.7" />
-                                        <TextBlock Margin="0,6,0,0" HorizontalAlignment="Center" TextAlignment="Center"
-                                                   FontSize="13" FontWeight="SemiBold" Text="Серверов пока нет" />
+                                    <StackPanel x:Name="RecentEmptyBox" Margin="0,8,0,0" Visibility="Collapsed">
+                                        <TextBlock FontSize="13" FontWeight="SemiBold" Text="Серверов пока нет" />
                                         <TextBlock x:Name="RecentEmpty" Style="{StaticResource Caption}" TextWrapping="Wrap"
-                                                   Margin="0,4,0,0" MaxWidth="240" TextAlignment="Center" Visibility="Collapsed"
+                                                   Margin="0,4,0,0" Visibility="Collapsed"
                                                    Text="Журнал заполняется, пока движки работают и окно открыто." />
                                     </StackPanel>
                                 </StackPanel>
                         </Border>
                     </views:FitWidth>
-                    </StackPanel>
-                </Grid>
+                </StackPanel>
 
             </StackPanel>
 
             <!--
                 Пулы серверов (владелец 19.10, идеи №6): папки серверов через
-                все подписки, в которые ведут маршруты «через выход». Сервер
+                все подписки, в которые ведут маршруты «через VPN». Сервер
                 кладут в пул перетаскиванием на папку или из «⋯» строки.
                 Стоят над подписками: их мало, а подписки раскрываются
                 на сотни строк.
@@ -966,7 +938,7 @@
                         <Button x:Name="SortButton" Style="{StaticResource Ghost}" gui:ButtonGlyph.Menu="True"
                                 Content="В порядке подписки" Click="OnSort" Margin="0,0,8,0" />
                         <Button x:Name="AddToggle" Style="{StaticResource Ghost}"
-                                Content="Подключить подписку" Click="OnAddToggle" />
+                                Content="Добавить подписку" Click="OnAddToggle" />
                     </StackPanel>
                 </Grid>
 

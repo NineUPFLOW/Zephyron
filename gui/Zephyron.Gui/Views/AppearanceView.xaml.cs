@@ -458,7 +458,7 @@ public partial class AppearanceView : UserControl
         var answer = MessageBox.Show(
             Window.GetWindow(this)!,
             $"Удалить тему «{name}»?\n\nПапка themes\\{id} уйдёт в корзину Windows — оттуда её можно вернуть. Вместо неё встанет «Сигнал».",
-            "Убрать тему",
+            "Удалить тему",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question,
             MessageBoxResult.No);

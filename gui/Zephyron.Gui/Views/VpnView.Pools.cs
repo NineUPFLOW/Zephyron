@@ -79,7 +79,7 @@ public partial class VpnView
 
     private Dictionary<string, int> PoolRoutes() => _poolRoutes ??= CountPoolRoutes();
 
-    /// <summary>Маршруты «через выход», ведущие в пулы, — по своему файлу маршрутов.</summary>
+    /// <summary>Маршруты «через VPN», ведущие в пулы, — по своему файлу маршрутов.</summary>
     private static Dictionary<string, int> CountPoolRoutes()
     {
         try
@@ -145,7 +145,7 @@ public partial class VpnView
 
             detail += routed > 0
                 ? $" · маршрутов сюда: {routed}"
-                : " · маршрутов пока нет: пул выбирается в маршруты сайта «через выход»";
+                : " · маршрутов пока нет: пул выбирается в маршруты сайта «через VPN»";
 
             if (missing > 0)
                 detail += $" · нет в подписках в работе: {missing}";
@@ -160,7 +160,7 @@ public partial class VpnView
         _poolRows = rows;
 
         PoolsLine.Text = settings.Pools.Count == 0
-            ? "Пока все серверы в одном пуле, общем для всех, и все маршруты «через выход» идут через него. "
+            ? "Пока все серверы в одном пуле, общем для всех, и все маршруты «через VPN» идут через него. "
                 + "Свой пул — папка серверов для части маршрутов: «Россия» для госуслуг, «Скоростной» для загрузок."
             : "Сервер попадает в пул, если перетащить его строку на папку пула или выбрать «⋯» в строке; "
                 + "«Выбрать» в папке закрепляет сервер в этом пуле и выключает для пула автоподбор; "
@@ -180,7 +180,7 @@ public partial class VpnView
         {
             PoolId = pool.Id,
             CanChoose = !pinned,
-            ChooseLabel = pinned ? "текущий" : "взять",
+            ChooseLabel = pinned ? "выбран" : "выбрать",
             Edge = (Brush)FindResource(pinned ? "AccentLine" : "Border"),
 
             // «Сейчас» — про выход пула по умолчанию: в пуле он значил бы не то.
@@ -278,7 +278,7 @@ public partial class VpnView
         // Автоподбор — тумблером в шапке папки (20.10), не пунктом меню.
         menu.Items.Add(Item("", "Задать другое имя…", () => RenamePool(pool)));
         menu.Items.Add(new Separator { Style = (Style)FindResource("MenuLine") });
-        menu.Items.Add(Item("", "Убрать пул…", () => RemovePool(pool)));
+        menu.Items.Add(Item("", "Удалить пул…", () => RemovePool(pool)));
 
         menu.IsOpen = true;
     }
@@ -317,7 +317,7 @@ public partial class VpnView
             routed > 0
                 ? $"Удалить пул «{pool.Name}»? Маршруты, ведущие в него ({routed}), пойдут в пул по умолчанию. Серверы останутся в своих подписках."
                 : $"Удалить пул «{pool.Name}»? Серверы останутся в своих подписках.",
-            "Убрать пул",
+            "Удалить пул",
             MessageBoxButton.OKCancel,
             MessageBoxImage.Question);
 
@@ -376,7 +376,7 @@ public partial class VpnView
                     own.Id)));
             }
 
-            menu.Items.Add(Item("", $"Убрать из пула «{own.Name}»", () => SavePools(
+            menu.Items.Add(Item("", $"Удалить из пула «{own.Name}»", () => SavePools(
                 all => ServerPools.Take(all, own.Id, row.Tag),
                 $"«{row.Name}» убран из пула «{own.Name}».",
                 own.Id)));

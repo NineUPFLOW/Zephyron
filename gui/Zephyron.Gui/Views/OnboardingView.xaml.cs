@@ -43,9 +43,9 @@ namespace Zephyron.Gui.Views;
 /// 21.10 (владелец: «3 вкладку есть ли впн перенеси на 4 вкладку, а 5 вкладку
 /// удали») — четыре: режим третьим, подписка последней, «Запуск и проверка»
 /// убрана вместе с карточкой телеграм-канала. Движки поднимаются на «Главной».
-/// Выход теперь выбирают до подписки, поэтому «Мой VPN» без неё доступен:
+/// Режим теперь выбирают до подписки, поэтому «Туннель» без неё доступен:
 /// до подписки стоит «Десинк», а подключили её — встаёт «Туннель»
-/// (<see cref="_wantsVpn"/>).
+/// (<see cref="_wantsTunnel"/>).
 /// </para>
 /// <para>
 /// Шага «что у вас не работает» здесь нет — он был первым в исходном
@@ -729,34 +729,36 @@ public partial class OnboardingView : UserControl
     // --- Шаг 3: режим работы -------------------------------------------------
 
     /// <summary>
-    /// «Мой VPN» выбран без подписок — подписку спросит следующий шаг.
+    /// «Туннель» выбран без выхода — подписку спросит следующий шаг.
     /// </summary>
     /// <remarks>
-    /// Записать его сразу нельзя (<see cref="Exits.CanChoose"/>): выходу
-    /// не из чего. До подписки пишется «Нет» — ушёл человек из мастера, не
-    /// подключив её, у него работает хотя бы десинк, — а загрузилась
-    /// подписка — «Мой VPN» (<see cref="ChooseWantedVpn"/>).
+    /// Записать его сразу нельзя (<see cref="WorkModes.CanChoose"/>): у движков
+    /// не было бы ни одного движка. До подписки пишется «Десинк» — ушёл
+    /// человек из мастера, не подключив её, у него работает хотя бы он, — а
+    /// загрузилась подписка — «Туннель» (<see cref="ChooseWantedTunnel"/>).
     /// </remarks>
-    private bool _wantsVpn;
+    private bool _wantsTunnel;
 
     /// <summary>
-    /// Три выхода с объяснением; выбран тот, что стоит сейчас.
+    /// Три режима с объяснением; выбран тот, что стоит сейчас.
     /// </summary>
     /// <remarks>
-    /// «Мой VPN» доступен и без подписки: подписка — следующий шаг.
-    /// Подписки нет — под карточкой сказано, что останется «Нет».
+    /// «Туннель» доступен и без подписки и WARP: подписка — следующий шаг.
+    /// Выхода нет — под карточкой сказано, что без подписки останется «Десинк».
     /// </remarks>
     private void ShowModeStep()
     {
         var settings = AppSettings.Load(AppSettings.DefaultPath);
 
-        PickNoneName.Text = Exits.Name(ExitChoice.None);
-        PickWarpName.Text = Exits.Name(ExitChoice.Warp);
-        PickVpnName.Text = Exits.Name(ExitChoice.Vpn);
+        PickDesyncName.Text = WorkModes.Name(WorkMode.Desync);
+        PickTunnelName.Text = WorkModes.Name(WorkMode.Tunnel);
+        PickRouteName.Text = WorkModes.Name(WorkMode.Route);
 
-        PickVpnNote.Visibility = settings.HasSubscriptionExit ? Visibility.Collapsed : Visibility.Visible;
+        PickTunnelNote.Visibility = settings.HasTunnelExit ? Visibility.Collapsed : Visibility.Visible;
 
-        var current = _wantsVpn ? ExitChoice.Vpn : Exits.Of(settings);
+        var current = _wantsTunnel ? WorkMode.Tunnel
+            : WorkModes.Of(settings.Engines) is { } mode && WorkModes.CanChoose(settings, mode) ? mode
+            : WorkMode.Desync;
 
         // Путь DNS — какой стоит сейчас; выбор списка не пишется до «Дальше».
         DnsPick.SelectedIndex = settings.DnsVia switch
@@ -766,9 +768,9 @@ public partial class OnboardingView : UserControl
             _ => 0,
         };
 
-        PickNone.IsChecked = current == ExitChoice.None;
-        PickWarp.IsChecked = current == ExitChoice.Warp;
-        PickVpn.IsChecked = current == ExitChoice.Vpn;
+        PickDesync.IsChecked = current == WorkMode.Desync;
+        PickTunnel.IsChecked = current == WorkMode.Tunnel;
+        PickRoute.IsChecked = current == WorkMode.Route;
 
         // Прокси нет в поставке (сборка без tools\…\tg-ws-proxy.exe) — включать
         // нечего; уже включённый можно выключить.
@@ -795,10 +797,10 @@ public partial class OnboardingView : UserControl
             ShowTgState();
     }
 
-    private ExitChoice? PickedExit() =>
-        Enum.TryParse<ExitChoice>(new[] { PickNone, PickWarp, PickVpn }
-            .FirstOrDefault(p => p.IsChecked == true)?.Tag as string, out var exit)
-            ? exit
+    private WorkMode? PickedMode() =>
+        Enum.TryParse<WorkMode>(new[] { PickDesync, PickTunnel, PickRoute }
+            .FirstOrDefault(p => p.IsChecked == true)?.Tag as string, out var mode)
+            ? mode
             : null;
 
     private DnsRoute? PickedDns() =>
@@ -816,8 +818,8 @@ public partial class OnboardingView : UserControl
         {
             var settings = AppSettings.Load(AppSettings.DefaultPath);
 
-            if (PickedExit() is { } exit)
-                settings = Exits.Apply(settings, exit);
+            if (PickedMode() is { } mode && WorkModes.CanChoose(settings, mode))
+                settings = WorkModes.Choose(settings, mode);
 
             if (PickedDns() is { } route)
                 settings = settings with { DnsVia = route };
@@ -830,13 +832,13 @@ public partial class OnboardingView : UserControl
             DnsInfo.Content = null;
         }
 
-        // Нужен ли прокси Telegram — тоже по выбранному выходу и маршруту Telegram.
+        // Нужен ли прокси Telegram — тоже по выбранному режиму и маршруту Telegram.
         try
         {
             var picked = AppSettings.Load(AppSettings.DefaultPath);
 
-            if (PickedExit() is { } chosen)
-                picked = Exits.Apply(picked, chosen);
+            if (PickedMode() is { } chosen)
+                picked = WorkModes.Choose(picked, chosen);
 
             TgInfo.Content = TgWsProxy.Explain(picked, RouteWhy.ModeOf("telegram.org", picked));
         }
@@ -882,13 +884,13 @@ public partial class OnboardingView : UserControl
             var settings = AppSettings.Load(AppSettings.DefaultPath);
             var next = settings;
 
-            var exit = PickedExit();
-            _wantsVpn = exit == ExitChoice.Vpn && !Exits.CanChoose(next, ExitChoice.Vpn);
+            var mode = PickedMode();
+            _wantsTunnel = mode == WorkMode.Tunnel && !WorkModes.CanChoose(next, WorkMode.Tunnel);
 
-            if (_wantsVpn)
-                next = Exits.Apply(next, ExitChoice.None);
-            else if (exit is { } picked)
-                next = Exits.Apply(next, picked);
+            if (_wantsTunnel)
+                next = WorkModes.Choose(next, WorkMode.Desync);
+            else if (mode is { } picked)
+                next = WorkModes.Choose(next, picked);
 
             if (PickedDns() is { } route)
                 next = next with { DnsVia = route };
@@ -901,7 +903,7 @@ public partial class OnboardingView : UserControl
         }
         catch (Exception)
         {
-            // Не записалось — мастер идёт дальше со старым выходом, DNS и прокси;
+            // Не записалось — мастер идёт дальше со старым режимом, DNS и прокси;
             // они видны на «Главной» и вкладках DNS и «TG Proxy».
         }
 
@@ -917,18 +919,18 @@ public partial class OnboardingView : UserControl
     private void ShowVpnStep()
     {
         var settings = AppSettings.Load(AppSettings.DefaultPath);
-        var exit = _wantsVpn ? ExitChoice.Vpn : Exits.Of(settings);
+        var mode = _wantsTunnel ? WorkMode.Tunnel : WorkModes.Of(settings.Engines) ?? WorkMode.Desync;
 
-        VpnForMode.Text = exit switch
+        VpnForMode.Text = mode switch
         {
-            ExitChoice.Vpn when !settings.HasSubscriptionExit =>
-                "Выходу «Мой VPN» подписка нужна: без неё поднимать нечего, и останется «Нет».",
+            WorkMode.Tunnel when !settings.HasTunnelExit =>
+                $"Режиму «{WorkModes.Name(WorkMode.Tunnel)}» подписка нужна: без неё поднимать нечего, и останется «{WorkModes.Name(WorkMode.Desync)}».",
 
-            ExitChoice.None =>
-                "Выходу «Нет» подписка не нужна. Подключённая пригодится, если выход потом сменить на «Главной».",
+            WorkMode.Route when !settings.HasTunnelExit =>
+                $"«{WorkModes.Name(WorkMode.Route)}» без подписки работает как «{WorkModes.Name(WorkMode.Desync)}»: вести в туннель нечего.",
 
-            ExitChoice.Warp =>
-                "Выходу «WARP» подписка не нужна. Подключённая пригодится, если выход потом сменить на «Главной».",
+            WorkMode.Desync =>
+                $"Режиму «{WorkModes.Name(WorkMode.Desync)}» подписка не нужна. Подключённая пригодится, если режим потом сменить на «Главной».",
 
             _ => string.Empty,
         };
@@ -1008,8 +1010,8 @@ public partial class OnboardingView : UserControl
             int usable = info.Servers.Count(s => s.IsUsableOutbound);
             VpnStatus.Text = $"Подписка подключена, серверов: {usable}. Осталось нажать «Включить» на «Главной».";
 
-            if (_wantsVpn)
-                ChooseWantedVpn();
+            if (_wantsTunnel)
+                ChooseWantedTunnel();
 
             ShowVpnButtons(subscribed: true);
         }
@@ -1023,23 +1025,23 @@ public partial class OnboardingView : UserControl
         }
     }
 
-    /// <summary>Выход появился — ставит «Мой VPN», выбранный шагом раньше.</summary>
-    private void ChooseWantedVpn()
+    /// <summary>Выход появился — ставит «Туннель», выбранный шагом раньше.</summary>
+    private void ChooseWantedTunnel()
     {
         try
         {
             var settings = AppSettings.Load(AppSettings.DefaultPath);
 
-            if (Exits.CanChoose(settings, ExitChoice.Vpn))
+            if (WorkModes.CanChoose(settings, WorkMode.Tunnel))
             {
-                Exits.Apply(settings, ExitChoice.Vpn).Save(AppSettings.DefaultPath);
-                _wantsVpn = false;
-                VpnStatus.Text += $" Выход — «{Exits.Name(ExitChoice.Vpn)}».";
+                WorkModes.Choose(settings, WorkMode.Tunnel).Save(AppSettings.DefaultPath);
+                _wantsTunnel = false;
+                VpnStatus.Text += $" Режим — «{WorkModes.Name(WorkMode.Tunnel)}».";
             }
         }
         catch (Exception)
         {
-            // Не записалось — остаётся «Нет»; выход меняется на «Главной».
+            // Не записалось — остаётся «Десинк»; режим меняется на «Главной».
         }
     }
 

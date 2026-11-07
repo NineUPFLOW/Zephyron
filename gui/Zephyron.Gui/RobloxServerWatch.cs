@@ -11,7 +11,7 @@ namespace Zephyron.Gui;
 /// <remarks>
 /// <para>
 /// Раз в полминуты, пока движки работают и часть «Игровые серверы (адреса)»
-/// стоит «через выход» (<see cref="RobloxServerLearn.RoutedToVpn"/>): читает новые
+/// стоит «через VPN» (<see cref="RobloxServerLearn.RoutedToVpn"/>): читает новые
 /// строки журналов игрока Roblox и дописывает в список сети серверов, которых
 /// в нём нет, — плейсы на Amazon, вне сетей самой Roblox.
 /// </para>

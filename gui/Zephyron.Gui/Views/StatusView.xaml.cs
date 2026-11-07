@@ -746,12 +746,13 @@ public partial class StatusView : UserControl
         return $"{(broken.Count > 1 ? "Движки" : "Движок")} {names} {verb}{faulted} — {(broken.Count > 1 ? "их части" : "его части")} обхода нет. Подробности ниже.";
     }
 
-    /// <summary>Что несёт трафик при исправном обходе — по выбранному выходу.</summary>
-    private static string Carrying(AppSettings settings) => Exits.Of(settings) switch
+    /// <summary>Что несёт трафик при исправном обходе — по выбранному режиму.</summary>
+    private static string Carrying(AppSettings settings) => WorkModes.Of(settings.Engines) switch
     {
-        ExitChoice.None => "Десинк чинит блокировки по имени, трафик идёт напрямую.",
-        var exit when Exits.AllTraffic(settings) => $"Весь трафик идёт через выход «{Exits.Name(exit)}».",
-        var exit => $"Маршруты «через выход» — через «{Exits.Name(exit)}», остальное — напрямую, закрытое чинит десинк.",
+        WorkMode.Desync => "Трафик идёт через десинк.",
+        WorkMode.Tunnel => "Трафик идёт через туннель.",
+        WorkMode.Route => "Маршруты — через туннель, остальное — напрямую, закрытое чинит десинк.",
+        _ => "Движки работают.",
     };
 
     /// <summary>
@@ -1436,7 +1437,7 @@ public partial class StatusView : UserControl
 
         _warningsBusy = true;
         bool needsDesync = settings.NeedsDesync;
-        bool hybrid = Exits.Of(settings) != ExitChoice.None && !Exits.AllTraffic(settings);
+        bool hybrid = WorkModes.Of(settings.Engines) == WorkMode.Route;
 
         _ = Task.Run(() => CollectWarnings(needsDesync, hybrid)).ContinueWith(task =>
         {
@@ -1498,7 +1499,7 @@ public partial class StatusView : UserControl
     {
         var rows = new List<WarningRow>();
 
-        // По маршрутам решается, что через выход, по именам. Браузер со своим
+        // «Гибрид» решает, что через VPN, по именам. Браузер со своим
         // шифрованным DNS спрашивает имена мимо системы — наш резолвер их
         // не видит, правило не срабатывает, и сайт, которому нужен туннель,
         // идёт напрямую и не открывается. Со стороны это неотличимо от
@@ -1509,7 +1510,7 @@ public partial class StatusView : UserControl
             {
                 rows.Add(new WarningRow(
                     $"{browser.Browser} спрашивает имена сам, мимо системы",
-                    "Маршрут имени (через выход или напрямую) решает наш резолвер, "
+                    "В «Гибриде» маршрут имени (через туннель или напрямую) решает наш резолвер, "
                     + "а такой браузер его не спрашивает: сайт, которому нужен туннель, "
                     + "пойдёт напрямую и не откроется. Выключите свой DNS в браузере: "
                     + browser.Setting + "."));
@@ -1564,96 +1565,134 @@ public partial class StatusView : UserControl
     }
 
     /// <summary>
-    /// Выход и охват с ценой каждого.
+    /// Пять режимов с ценой каждого.
     /// </summary>
     /// <remarks>
-    /// Цена названа в самом описании, а не выясняется опытом: «без исключений»
-    /// ломает отечественные сервисы, и узнавать об этом по неработающим
-    /// госуслугам человек не должен.
+    /// Цена названа в самом описании, а не выясняется опытом: «всё через VPN
+    /// без исключений» ломает отечественные сервисы, и узнавать об этом
+    /// по неработающим госуслугам человек не должен.
     /// </remarks>
     private void ShowModes(AppSettings settings)
     {
         var engines = settings.Engines;
-        var exit = Exits.Of(settings);
-        bool all = Exits.AllTraffic(settings);
-        bool noExceptions = Exits.IgnoresExclusions(settings);
+        var mode = WorkModes.Of(engines);
 
-        ExitNoneName.Text = Exits.Name(ExitChoice.None);
-        ExitWarpName.Text = Exits.Name(ExitChoice.Warp);
-        ExitVpnName.Text = Exits.Name(ExitChoice.Vpn);
+        ModeDesyncName.Text = WorkModes.Name(WorkMode.Desync);
+        ModeTunnelName.Text = WorkModes.Name(WorkMode.Tunnel);
+        ModeRouteName.Text = WorkModes.Name(WorkMode.Route);
 
-        ExitNone.IsChecked = exit == ExitChoice.None;
-        ExitWarp.IsChecked = exit == ExitChoice.Warp;
-        ExitVpn.IsChecked = exit == ExitChoice.Vpn;
-
-        AllTrafficSwitch.IsChecked = all;
-        AllTrafficSwitch.IsEnabled = exit != ExitChoice.None;
-
-        // «Без исключений» — продвинутая опция окна параметров, но состояние одно и называется одним именем.
-        ModeText.Text = exit == ExitChoice.None
-            ? "Выход не выбран: переключатель недоступен, работает один десинк. Выберите WARP или Мой VPN."
-            : noExceptions
-                ? "Включено «Без исключений»: всё идёт через выход, выбор по сайтам и десинк не действуют."
-                : all
-                    ? "Через выход идёт всё, кроме сайтов с пометкой «напрямую»."
-                    : "Через выход идут только сайты с маршрутом «через выход»; остальное напрямую, закрытое чинит десинк.";
+        // Пояснение — выбранного режима. «Без исключений» — настройка внутри
+        // «Туннеля»: включённая, она меняет смысл режима, и молчать о ней нельзя.
+        // У «Гибрида» она отменяет само пояснение: маршруты не решают ничего,
+        // всё уходит в VPN, а десинк не поднимается (EngineChoice.DesyncRuns).
+        ModeText.Text = mode is not { } chosen
+            ? "Режим не выбран, движки не запустятся."
+            : chosen == WorkMode.Route && engines.IgnoreExclusions
+                ? "Включено «Без исключений»: всё идёт через туннель, выбор по сайтам и десинк не действуют."
+                : WorkModes.Explain(chosen)
+                    + (chosen == WorkMode.Tunnel && engines.IgnoreExclusions
+                        ? " Включено «Без исключений»: в туннель уходит и то, что помечено «напрямую»."
+                        : string.Empty);
         ModeText.ToolTip = ModeText.Text;
 
-        // Метка у заголовка: какие движки стоят за выбором — их имена,
+        // Метка у заголовка: какие движки стоят за режимом — их имена,
         // как в журнале и в диспетчере задач.
-        ModeTag.Text = exit == ExitChoice.None ? "desync · winws2"
-            : noExceptions ? "tunnel · sing-box · без исключений"
-            : engines.DesyncRuns ? "winws2 + sing-box"
-            : "tunnel · sing-box";
+        ModeTag.Text = mode switch
+        {
+            WorkMode.Desync => "desync · winws2",
+            WorkMode.Tunnel => engines.IgnoreExclusions ? "tunnel · sing-box · без исключений" : "tunnel · sing-box",
+            WorkMode.Route => engines.DesyncRuns ? "hybrid · winws2 + sing-box" : "hybrid · sing-box",
+            _ => "не выбран",
+        };
 
         _desyncIdle = engines.Desync && !engines.DesyncRuns
-            ? "Включено «Без исключений» в параметрах туннеля: всё идёт через выход, и десинку нечего чинить. "
+            ? "Включено «Без исключений» в параметрах туннеля: всё идёт через туннель, и десинку нечего чинить. "
                 + "Выключите его, и заработают десинк и выбор по сайтам."
             : null;
 
         if (_engines is { } shown)
             ShowEngines(shown);
 
-        // Туннель включён, а выхода нет: везти некуда, сказать об этом здесь, а не узнавать по неработающему VPN.
-        var complaint = engines.Tunnel && !settings.HasTunnelExit
-            ? "Выход не выбран — работает один десинк. WARP или подписка — на вкладке VPN."
-            : null;
+        // «Ничего не поднято» режимом не считается — ни один сегмент не выбран.
+        ModeDesync.IsChecked = mode == WorkMode.Desync;
+        ModeTunnel.IsChecked = mode == WorkMode.Tunnel;
+        ModeRoute.IsChecked = mode == WorkMode.Route;
 
+        // Режиму с туннелем без выхода везти некуда: «Туннель» не поднимет
+        // ничего, «Гибрид» сработает как «Десинк». Сказать об этом здесь,
+        // у выбора, а не узнавать по неработающему VPN.
+        var complaint = engines.Complaint
+            ?? (engines.Tunnel && !settings.HasTunnelExit
+                ? (engines.Desync
+                    ? $"VPN не задан — «{WorkModes.RouteName}» работает как «{WorkModes.Name(WorkMode.Desync)}». Подписка или WARP — на вкладке VPN."
+                    : $"Для «{WorkModes.Name(WorkMode.Tunnel)}» нужна подписка или WARP — вкладка VPN.")
+                : null);
+
+        // «Без исключений» меняет смысл режима с туннелем — на виду, не только в окне параметров.
+        bool noExceptions = engines.Tunnel && engines.IgnoreExclusions;
         string? stripText = noExceptions
-            ? string.Join("\n", new[] { "Включено «Без исключений»: всё идёт через выход, российские сервисы увидят зарубежный адрес — банки и госуслуги потребуют подтверждений, часть откажет.", complaint }.OfType<string>())
+            ? string.Join("\n", new[] { "Включено «Без исключений»: в туннель уходит всё, российские сервисы увидят зарубежный адрес.", complaint }.OfType<string>())
             : complaint;
 
         EnginesLine.Text = stripText ?? string.Empty;
         EnginesLine.Visibility = stripText is null ? Visibility.Collapsed : Visibility.Visible;
         EnginesSettings.Visibility = noExceptions ? Visibility.Visible : Visibility.Collapsed;
 
+        ShowPath(settings);
+
         // Автозапуск поднимает ровно это. Сказано здесь же, где задано:
-        // иначе про связь пришлось бы догадываться.
-        AutostartRaises.Text = exit == ExitChoice.None
-            ? "При входе в Windows поднимется десинк, выход не выбран."
-            : $"При входе в Windows поднимется выход «{Exits.Name(exit)}»{(all ? ", весь трафик" : " по маршрутам")}.";
+        // иначе про связь пришлось бы догадываться, а догадка — источник
+        // того самого «трей запускается, а движки нужно поднимать кнопкой».
+        AutostartRaises.Text = mode is { } raised
+            ? $"При входе в Windows поднимется режим «{WorkModes.Name(raised)}»."
+            : "При входе в Windows ничего не поднимется: режим не выбран.";
     }
 
-    /// <summary>
-    /// Записывает выбор выхода.
-    /// </summary>
-    /// <remarks>
-    /// Через <see cref="AppSettings.With(EngineChoice)"/>: тот пишет заодно
-    /// и выведенный режим, на языке которого говорят конфиг движка, отчёты
-    /// и консоль. Оставленный отставшим, режим развёл бы показания.
-    /// </remarks>
-    private void Choose(Func<AppSettings, AppSettings> change)
+    /// <summary>Путь туннеля: виден, когда туннель поднимается (режимы «Туннель» и «Гибрид»).</summary>
+    private void ShowPath(AppSettings settings)
     {
+        var path = TunnelPaths.Of(settings);
+
+        PathRow.Visibility = settings.Engines.Tunnel ? Visibility.Visible : Visibility.Collapsed;
+        PathVpnName.Text = TunnelPaths.Name(TunnelPath.Vpn);
+        PathWarpName.Text = TunnelPaths.Name(TunnelPath.Warp);
+        PathVpn.IsChecked = path == TunnelPath.Vpn;
+        PathWarp.IsChecked = path == TunnelPath.Warp;
+
+        PathText.Text = path == TunnelPath.Warp
+            ? "Бесплатный выход Cloudflare: встроенный или ваш файл WARP, страна — на вкладке VPN. Подписки не используются."
+            : settings.HasSubscriptionExit
+                ? "Серверы ваших подписок и ключей. WARP не используется."
+                : "Подписок и ключей пока нет — добавьте их на вкладке VPN.";
+    }
+
+    /// <summary>Выбран путь туннеля. VPN без подписок не сохраняется — вместо этого открывается добавление на вкладке VPN.</summary>
+    private void OnPath(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string tag } || !Enum.TryParse<TunnelPath>(tag, out var path))
+            return;
+
         try
         {
-            var next = change(AppSettings.Load(AppSettings.DefaultPath));
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
 
-            next.Save(AppSettings.DefaultPath);
+            if (!TunnelPaths.CanChoose(settings, path))
+            {
+                ShowPath(settings);
+                VpnView.OpenAddOnShow = true;
+                (Window.GetWindow(this) as MainWindow)?.Open("vpn");
+                return;
+            }
 
-            ShowModes(next);
+            var next = TunnelPaths.Apply(settings, path);
+
+            if (next != settings)
+                next.Save(AppSettings.DefaultPath);
+
+            ShowPath(next);
             Update();
 
-            this.Offer("Выбран выход: " + next.DescribeMode());
+            this.Offer("Туннель идёт через " + TunnelPaths.Name(path));
         }
         catch (Exception ex)
         {
@@ -1661,28 +1700,40 @@ public partial class StatusView : UserControl
         }
     }
 
-    /// <summary>Выбран выход — настройки под него; «Мой VPN» без подписок ведёт на вкладку VPN.</summary>
-    private void OnExit(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// Переключает движок.
+    /// </summary>
+    /// <remarks>
+    /// Через <see cref="AppSettings.With(EngineChoice)"/>: тот пишет заодно
+    /// и выведенный режим, на языке которого говорят конфиг движка, отчёты
+    /// и консоль. Оставленный отставшим, режим развёл бы показания.
+    /// </remarks>
+    private void Choose(Func<EngineChoice, EngineChoice> change)
     {
-        if (sender is not FrameworkElement { Tag: string tag } || !Enum.TryParse<ExitChoice>(tag, out var exit))
-            return;
-
-        var settings = AppSettings.Load(AppSettings.DefaultPath);
-
-        if (!Exits.CanChoose(settings, exit))
+        try
         {
-            // Выбор не сохраняется: выбирать нечего. Показываем прежний и ведём добавлять.
-            ShowModes(settings);
-            VpnView.OpenAddOnShow = true;
-            (Window.GetWindow(this) as MainWindow)?.Open("vpn");
-            return;
-        }
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
+            var next = settings.With(change(settings.Engines));
 
-        Choose(c => Exits.Apply(c, exit));
+            next.Save(AppSettings.DefaultPath);
+
+            ShowModes(next);
+            Update();
+
+            this.Offer("Выбран режим: " + next.Engines.Describe());
+        }
+        catch (Exception ex)
+        {
+            ShowProblem("Не записалось: " + ex.GetBaseException().Message);
+        }
     }
 
-    private void OnAllTraffic(object sender, RoutedEventArgs e) =>
-        Choose(c => Exits.Apply(c, Exits.Of(c), AllTrafficSwitch.IsChecked == true));
+    /// <summary>Выбран режим — выключатели под него (Rules.WorkModes) и предложение перезапустить.</summary>
+    private void OnMode(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string tag } && Enum.TryParse<WorkMode>(tag, out var mode))
+            Choose(c => WorkModes.Apply(c, mode));
+    }
 
     /// <summary>Что планировщик ответил в прошлый раз — на время работы окна.</summary>
     private static (bool Installed, bool Stale)? _autostart;

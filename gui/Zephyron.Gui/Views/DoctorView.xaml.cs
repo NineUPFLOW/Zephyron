@@ -596,7 +596,7 @@ public partial class DoctorView : UserControl
             {
                 RoutingMode.Direct => ("напрямую", "\uE72A", "Muted"),
                 RoutingMode.Desync => ("через десинк", "\uE9E9", "Warn"),
-                _ => ("через выход", "\uE774", "Accent"),
+                _ => ("через VPN", "\uE774", "Accent"),
             };
 
             var rule = decision.Rule;

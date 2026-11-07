@@ -216,17 +216,17 @@ public sealed class TgWsProxyTests
     }
 
     [Fact]
-    public void TheProxyIsNotNeededOnlyWhenTelegramGoesViaTheExit()
+    public void TheProxyIsNotNeededOnlyWhenTelegramGoesViaTheTunnel()
     {
-        var none = new AppSettings();
-        var hybrid = Rules.Exits.Apply(new AppSettings { SubscriptionUrl = "https://x.example/s" }, Rules.ExitChoice.Vpn, allTraffic: false);
-        var all = Rules.Exits.Apply(hybrid, Rules.ExitChoice.Vpn, allTraffic: true);
+        var desync = Rules.WorkModes.Choose(new AppSettings { SubscriptionUrl = "https://x.example/s" }, Rules.WorkMode.Desync);
+        var hybrid = Rules.WorkModes.Choose(desync, Rules.WorkMode.Route);
+        var tunnel = Rules.WorkModes.Choose(desync, Rules.WorkMode.Tunnel);
 
-        Assert.Contains("не подключится", TgWsProxy.Explain(none, Rules.RoutingMode.Proxy));
+        Assert.Contains("не подключится", TgWsProxy.Explain(desync, Rules.RoutingMode.Proxy));
         Assert.Contains("не подключится", TgWsProxy.Explain(hybrid, Rules.RoutingMode.Desync));
         Assert.Contains("не нужен", TgWsProxy.Explain(hybrid, Rules.RoutingMode.Proxy));
-        Assert.Contains("не нужен", TgWsProxy.Explain(all, Rules.RoutingMode.Desync));
-        Assert.DoesNotContain("мимо VPN", TgWsProxy.Explain(all, Rules.RoutingMode.Direct));
-        Assert.False(TgWsProxy.ViaExit(all, Rules.RoutingMode.Direct));
+        Assert.Contains("не нужен", TgWsProxy.Explain(tunnel, Rules.RoutingMode.Desync));
+        Assert.DoesNotContain("мимо VPN", TgWsProxy.Explain(tunnel, Rules.RoutingMode.Direct));
+        Assert.False(TgWsProxy.ViaTunnel(tunnel, Rules.RoutingMode.Direct));
     }
 }

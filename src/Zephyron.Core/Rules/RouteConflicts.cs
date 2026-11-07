@@ -114,7 +114,7 @@ public static class RouteConflicts
     /// <remarks>
     /// Так и задумано: «Маршруты» пишут свой путь сервису, а заводское правило
     /// остаётся умолчанием под ним. 14.10 карточка звала спором github.txt
-    /// «через выход» (выбор владельца) против заводского github.txt «десинк, pass»,
+    /// «через VPN» (выбор владельца) против заводского github.txt «десинк, pass»,
     /// и рядом с настоящими поломками это приучало раздел пропускать.
     /// </remarks>
     private static bool Overrides(RoutingRule winner, RoutingRule loser) =>
