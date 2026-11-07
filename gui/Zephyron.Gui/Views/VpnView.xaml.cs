@@ -1364,7 +1364,8 @@ public partial class VpnView : UserControl
     /// </remarks>
     private void ShowPage()
     {
-        var items = new List<object> { TopBlock };
+        // Прокси — сразу под выбором сервера (или WARP): при обоих путях, до длинного списка подписок.
+        var items = new List<object> { TopBlock, LocalProxyHost };
 
         // Подписки, пулы и подпись — блок «VPN»; при других выходах они свёрнуты в строку наверху.
         if (_path == TunnelPath.Vpn)
