@@ -308,6 +308,10 @@
                 <Button x:Name="CheckButton" Style="{StaticResource Ghost}" Content="Проверка после"
                         Click="OnCheck" Margin="0,0,8,0" Visibility="Collapsed" />
 
+                <Button x:Name="SavePresetButton" Style="{StaticResource Ghost}" Content="Сохранить как пресет"
+                        Click="OnSavePreset" Margin="0,0,8,0" Visibility="Collapsed"
+                        ToolTip="Сохранить подобранные рецепты вместе с текущим пресетом отдельным файлом: его можно включить на «Десинке», передать или взять на другой компьютер." />
+
                 <Button x:Name="UndoButton" Style="{StaticResource Ghost}" Content="Вернуть всё"
                         Click="OnUndo" Margin="0,0,8,0" Visibility="Collapsed" />
 
