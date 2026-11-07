@@ -42,10 +42,10 @@ env:
   # осознанно, вместе с проверкой вживую.
   SINGBOX_URL: https://github.com/shtorm-7/sing-box-extended/releases/download/v1.14.3-extended-2.7.3/sing-box-1.14.3-extended-2.7.3-windows-amd64.zip
   SINGBOX_DIR: sing-box-1.14.3-extended-2.7.3-windows-amd64
-  TGWS_URL: https://github.com/valnesfjord/tg-ws-proxy-rs/releases/download/v2.5.6/tg-ws-proxy-x86_64-pc-windows-gnu.zip
-  WINWS2_URL: https://git.zapret.moe/zapretdiscordyoutube/zapret2-fork/releases/download/v1.0.6-33-gcb4b3d2-native/winws2.exe
+  TGWS_URL: https://github.com/valnesfjord/tg-ws-proxy-rs/releases/download/v2.7.0/tg-ws-proxy-x86_64-pc-windows-gnu.zip
+  WINWS2_URL: https://git.zapret.moe/zapretdiscordyoutube/zapret2-fork/releases/download/v1.0.7-34-gfd8ae05-native/winws2.exe
   # Чужой сервер, а движок работает с правами администратора: файл сверяется по хешу.
-  WINWS2_SHA256: a8755b3734a7275fa55e50ebc7b193fa9c01120b44ead52fb8a7ae07ae17f061
+  WINWS2_SHA256: b24d1e85907ac2c7bd597ed14e70919e091479500a40083a54027af7c1136dee
 
 jobs:
   release:

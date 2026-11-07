@@ -106,7 +106,7 @@ GPLv3 прямо оговаривает такой случай: объедин�
 
 `engines/zapret/exe/winws2.exe` — с 07.10 родная сборка под Windows от loop-uh
 (автора Zapret GUI): [zapret2-fork](https://git.zapret.moe/zapretdiscordyoutube/zapret2-fork),
-выпуск `v1.0.6-33-gcb4b3d2-native` (с 0.19.3; до того — `v1.0.6-25-g26fb2e8-native`, а до 0.18.0 — `v1.0.5.2-41-g204fd66-native`).
+выпуск `v1.0.7-34-gfd8ae05-native` (с 1.3.0; до того — `v1.0.6-33-gcb4b3d2-native`, с 0.19.3; ещё раньше — `v1.0.6-25-g26fb2e8-native`, а до 0.18.0 — `v1.0.5.2-41-g204fd66-native`).
 Это исходники bol-van без изменений, новее выпуска 1.0.6, а вместо Cygwin — своя прослойка
 (`nfq2/winnative/` форка): файлы, пути, разбор командной строки, сигналы,
 пакетная отправка пакетов. Внутри статически собраны LuaJIT и zlib.
@@ -273,7 +273,7 @@ Flowseal** — обе строки стоят в его
 [github.com/valnesfjord/tg-ws-proxy-rs](https://github.com/valnesfjord/tg-ws-proxy-rs),
 порт на Rust программы **tg-ws-proxy** того же **Flowseal**:
 [github.com/Flowseal/tg-ws-proxy](https://github.com/Flowseal/tg-ws-proxy).
-Едет как есть, исполняемым файлом выпуска 2.5.6 (`engines/tg-ws-proxy/tg-ws-proxy.exe`,
+Едет как есть, исполняемым файлом выпуска 2.7.0, с ключом `--no-h2` (`engines/tg-ws-proxy/tg-ws-proxy.exe`,
 архив сверен с их `SHA256SUMS`); запускает его наш надзор. Список доменов
 за Cloudflare, через которые прокси ведёт Telegram, ведёт проект Flowseal:
 прокси берёт его из `.github/cfproxy-domains.txt` репозитория tg-ws-proxy,

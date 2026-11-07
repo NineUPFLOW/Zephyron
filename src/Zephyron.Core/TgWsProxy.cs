@@ -126,6 +126,9 @@ public static class TgWsProxy
             "--link-ip", "127.0.0.1",
             "--port", port.ToString(System.Globalization.CultureInfo.InvariantCulture),
             "--default-domains",
+            // С 2.7.0 медиа через Cloudflare по умолчанию идут HTTP/2, и на сетях с DPI
+            // такие сеансы висят без единого байта; WebSocket, как до 2.7.0, отдаёт медиа.
+            "--no-h2",
         };
 
         if (routes.DirectMain)

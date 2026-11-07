@@ -797,13 +797,13 @@ winget install Microsoft.DotNet.SDK.8
 чем в `vendor`, кладётся в `tools\` и накладывается поверх. Сейчас это родная сборка
 без Cygwin —
 [zapret2-fork](https://git.zapret.moe/zapretdiscordyoutube/zapret2-fork/releases)
-от loop-uh, выпуск `v1.0.6-33-gcb4b3d2-native`. Почему выбрана именно она и как
+от loop-uh, выпуск `v1.0.7-34-gfd8ae05-native`. Почему выбрана именно она и как
 проверять новый выпуск — в [tools/README.md](tools/README.md).
 
 **4. tg-ws-proxy-rs** — для вкладки «TG Proxy». Скачайте сборку
 `tg-ws-proxy-x86_64-pc-windows-gnu.zip` с
 [valnesfjord/tg-ws-proxy-rs](https://github.com/valnesfjord/tg-ws-proxy-rs/releases)
-и распакуйте с файлом `LICENSE` в `tools\tg-ws-proxy-rs-<версия>\`; в выпуске 2.5.6.
+и распакуйте с файлом `LICENSE` в `tools\tg-ws-proxy-rs-<версия>\`; в выпуске 2.7.0 (запускается с `--no-h2`).
 `build.cmd` соберётся и без него, `pack.cmd` — нет.
 
 Без sing-box работает всё, кроме VPN. Без winws2 — всё, кроме десинка. Без прокси —
