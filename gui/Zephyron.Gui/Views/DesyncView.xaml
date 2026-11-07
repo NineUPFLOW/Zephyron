@@ -168,14 +168,20 @@
                 <ContentControl Style="{StaticResource PageHead}"
                                 local:PageHead.Title="Десинк"
                                 local:PageHead.Subtitle="Пресет определяет, какой рецепт применять к какому сервису. Трафик никуда не уходит: пакеты правятся на лету, и сайт открывается напрямую.">
-                    <Button Style="{StaticResource Ghost}" Click="OnOpenFolder"
-                            VerticalAlignment="Center" ToolTip="Папка presets лежит рядом с программой">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE838;" Margin="0,0,9,0"
-                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                            <TextBlock Text="Показать папку" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Пресет перестал работать — подбор под свою сеть, а не поиск по «Маршрутам». -->
+                        <Button Style="{StaticResource Primary}" Click="OnAutoPick" Margin="0,0,8,0"
+                                Content="Подобрать под мою сеть"
+                                ToolTip="Проверит сервисы на вашей сети и подберёт для каждого рабочий способ: напрямую, рецепт десинка, пин или VPN. Движки на 2–5 минут остановятся. Записанное можно вернуть." />
+                        <Button Style="{StaticResource Ghost}" Click="OnOpenFolder"
+                                VerticalAlignment="Center" ToolTip="Папка presets лежит рядом с программой">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE838;" Margin="0,0,9,0"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                <TextBlock Text="Показать папку" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                 </ContentControl>
 
                 <!--
