@@ -57,68 +57,67 @@ internal static class TunnelConfig
             var (ruleSet, zapretRoot) = LoadRules(settings);
 
             // WARP и подписки — одно из двух (владелец, 01.10; Warp.TunnelExits).
-            // При включённом WARP подписки на паузе, и ходить за ними незачем:
-            // запуск не ждёт панелей, которые всё равно не понадобятся.
+            // При включённом WARP подписки на паузе как путь, но серверы читаем
+            // и тогда: через один из них MASQUE регистрируется и выходит
+            // в выбранной стране (Warp.Detour).
             IReadOnlyList<ProxyServer> fromSubscription = [];
             int sourceCount = 0, keyCount = 0, reserved = 0;
             IReadOnlyList<PoolPart> deferred = [];
 
-            if (!settings.WarpEnabled)
+            // Пул (0.9.0): серверы всех подписок в работе, а не одной
+            // действующей. Указатель из настроек — на случай, когда список
+            // подписок пуст, а ссылку поставила консоль.
+            var book = SubscriptionBook.Load();
+
+            var sources = book.Pool
+                .Select(e => new PoolSource(e.Name, e.Url))
+                .ToList();
+
+            if (sources.Count == 0 && !string.IsNullOrWhiteSpace(settings.SubscriptionUrl))
+                sources.Add(new PoolSource("Основная", settings.SubscriptionUrl));
+
+            // Отдельные ключи — последним источником пула (0.9.0). Панели
+            // с запасом моложе суток запуск не ждёт — их спросят после
+            // (SubscriptionPool.StartFromReserveFor, SubscriptionRecheck).
+            var pool = await SubscriptionPool.BuildAsync(sources, cancellationToken, keys: book.PoolKeys, deferPanels: true);
+            deferred = pool.Parts.Where(p => p.Deferred).ToList();
+            fromSubscription = pool.Servers;
+            sourceCount = sources.Count;
+            keyCount = book.PoolKeys.Count;
+            reserved = pool.Parts.Count(p => p.FromReserve);
+
+            // Подписки были, а серверов нет ни от одной, и запаса тоже:
+            // собирать не из чего, и сказать надо, почему. Имена подписок,
+            // не ссылки: ссылка — пароль.
+            // При WARP это не помеха: он работает и без посредника.
+            if (!settings.WarpEnabled && (sources.Count > 0 || book.PoolKeys.Count > 0) && fromSubscription.Count == 0)
             {
-                // Пул (0.9.0): серверы всех подписок в работе, а не одной
-                // действующей. Указатель из настроек — на случай, когда список
-                // подписок пуст, а ссылку поставила консоль.
-                var book = SubscriptionBook.Load();
+                return new BuildOutcome(false, "Конфиг не создан: ни подписки, ни ключи не дали серверов: "
+                    + string.Join("; ", pool.Parts.Select(p => $"«{p.Source.Name}» — {p.Error ?? "пусто"}")) + ".");
+            }
 
-                var sources = book.Pool
-                    .Select(e => new PoolSource(e.Name, e.Url))
-                    .ToList();
+            // Что поставщик сказал заголовками (15.10): перенёс подписку —
+            // ссылка в книге новая; срок кончается — напомнить, раз в сутки.
+            foreach (var part in pool.Parts.Where(p => p.Info is not null))
+            {
+                SubscriptionBook.Follow(book, part.Source.Url, part.Info!.NewUrl);
+                SubscriptionNotices.RemindExpiry(part.Source.Name, part.Source.Url, part.Info);
+            }
 
-                if (sources.Count == 0 && !string.IsNullOrWhiteSpace(settings.SubscriptionUrl))
-                    sources.Add(new PoolSource("Основная", settings.SubscriptionUrl));
+            // Кто пришёл из запаса — в журнал: без этого «сервер из вчерашнего
+            // списка» было бы нечем объяснить.
+            foreach (var part in pool.Parts.Where(p => p.FromReserve || p.Error is not null))
+            {
+                Journal.Write("подписка", part.FromReserve
+                    ? $"«{part.Source.Name}» не ответила{(PhysicalNetwork.Up() ? "" : $" ({PhysicalNetwork.Offline})")} — "
+                        + $"серверы из запаса от {part.ReserveAt:dd.MM HH:mm}"
+                    : $"«{part.Source.Name}» не прочиталась и запаса нет: {part.Error}");
+            }
 
-                // Отдельные ключи — последним источником пула (0.9.0). Панели
-                // с запасом моложе суток запуск не ждёт — их спросят после
-                // (SubscriptionPool.StartFromReserveFor, SubscriptionRecheck).
-                var pool = await SubscriptionPool.BuildAsync(sources, cancellationToken, keys: book.PoolKeys, deferPanels: true);
-                deferred = pool.Parts.Where(p => p.Deferred).ToList();
-                fromSubscription = pool.Servers;
-                sourceCount = sources.Count;
-                keyCount = book.PoolKeys.Count;
-                reserved = pool.Parts.Count(p => p.FromReserve);
-
-                // Подписки были, а серверов нет ни от одной, и запаса тоже:
-                // собирать не из чего, и сказать надо, почему. Имена подписок,
-                // не ссылки: ссылка — пароль.
-                if ((sources.Count > 0 || book.PoolKeys.Count > 0) && fromSubscription.Count == 0)
-                {
-                    return new BuildOutcome(false, "Конфиг не создан: ни подписки, ни ключи не дали серверов: "
-                        + string.Join("; ", pool.Parts.Select(p => $"«{p.Source.Name}» — {p.Error ?? "пусто"}")) + ".");
-                }
-
-                // Что поставщик сказал заголовками (15.10): перенёс подписку —
-                // ссылка в книге новая; срок кончается — напомнить, раз в сутки.
-                foreach (var part in pool.Parts.Where(p => p.Info is not null))
-                {
-                    SubscriptionBook.Follow(book, part.Source.Url, part.Info!.NewUrl);
-                    SubscriptionNotices.RemindExpiry(part.Source.Name, part.Source.Url, part.Info);
-                }
-
-                // Кто пришёл из запаса — в журнал: без этого «сервер из вчерашнего
-                // списка» было бы нечем объяснить.
-                foreach (var part in pool.Parts.Where(p => p.FromReserve || p.Error is not null))
-                {
-                    Journal.Write("подписка", part.FromReserve
-                        ? $"«{part.Source.Name}» не ответила{(PhysicalNetwork.Up() ? "" : $" ({PhysicalNetwork.Offline})")} — "
-                            + $"серверы из запаса от {part.ReserveAt:dd.MM HH:mm}"
-                        : $"«{part.Source.Name}» не прочиталась и запаса нет: {part.Error}");
-                }
-
-                foreach (var part in deferred)
-                {
-                    Journal.Write("подписка",
-                        $"«{part.Source.Name}»: запуск из запаса от {part.ReserveAt:dd.MM HH:mm}, панель спрошу после запуска");
-                }
+            foreach (var part in deferred)
+            {
+                Journal.Write("подписка",
+                    $"«{part.Source.Name}»: запуск из запаса от {part.ReserveAt:dd.MM HH:mm}, панель спрошу после запуска");
             }
 
             var servers = Warp.TunnelExits(settings, fromSubscription);
@@ -137,6 +136,12 @@ internal static class TunnelConfig
             // приносим ей мы.
             var options = new SingBoxOptions();
             var dead = ServerHealthCache.Load().Dead(options.DeadAfterFailures);
+
+            // Посредник для MASQUE: только при включённом WARP и только из подписки.
+            var warpDetour = settings.WarpEnabled
+                ? Warp.Detour(settings, fromSubscription, dead.ToHashSet(StringComparer.Ordinal),
+                    ServerHealthCache.Load().Latencies())
+                : null;
 
             // «В пуле только рабочие» (владелец, 28.09) — буквально: мёртвый
             // по замерам сервер в конфиг не идёт вовсе, а не только выводится
@@ -235,6 +240,7 @@ internal static class TunnelConfig
                 PanelHosts = SubscriptionHosts.From(
                     [settings.SubscriptionUrl, .. SubscriptionBook.Load().Entries.Select(e => e.Url)]),
                 PreferredServerTag = Warp.PreferredExit(settings),
+                WarpDetour = warpDetour,
 
                 // Без «Selective Routing» и при WARP пулов нет — их маршруты
                 // идут в пул по умолчанию.
