@@ -303,7 +303,7 @@
                                           Margin="0,1,9,0" VerticalAlignment="Center"
                                           Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                                     <!-- Вес — кнопки: общий стиль TextBlock его не наследует. -->
-                                    <TextBlock Text="Привязать Telegram" VerticalAlignment="Center"
+                                    <TextBlock Text="Подключить Telegram" VerticalAlignment="Center"
                                                FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=Button}}" />
                                 </StackPanel>
                             </Button>
