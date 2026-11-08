@@ -266,6 +266,18 @@
                                     <StackPanel Grid.Column="4" VerticalAlignment="Center" MinWidth="150" MaxWidth="230">
                                         <TextBlock Text="{Binding Result}" FontWeight="SemiBold" TextWrapping="Wrap"
                                                    Foreground="{Binding ResultColour}" ToolTip="{Binding ResultTip}" />
+                                        <TextBlock Text="{Binding PostText}" Margin="0,4,0,0"
+                                                   TextWrapping="Wrap" Foreground="{Binding PostColour}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource Caption}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding PostText}" Value="">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
                                             <Control Style="{StaticResource StateMark}" Tag="{Binding MarkTag}"
                                                      Visibility="{Binding MarkVisibility}" Margin="0,0,8,0"

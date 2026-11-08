@@ -184,6 +184,49 @@ public partial class WarpTests
         Assert.Equal([Warp.MasqueTag], Warp.TunnelExits(withKeys with { WarpEnabled = true }, [Ordinary()]).Select(s => s.Tag));
     }
 
+    /// <summary>
+    /// 08.11: WARP из своего файла (WireGuard) стоял в автоподборе наравне с VPN — прогрев надзора
+    /// ставил его, и назад не возвращало. Запасной — запасной, чем бы ни был.
+    /// </summary>
+    [Fact]
+    public void FileWarpIsOnlyAReserveInAutoLatency()
+    {
+        Assert.True(Warp.Parse("""
+            [Interface]
+            PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+            Address = 172.16.0.2
+
+            [Peer]
+            PublicKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+            AllowedIPs = 0.0.0.0/0
+            Endpoint = 162.159.192.1:2408
+            """, out var file, out _));
+
+        var root = Compile(Ordinary(), file!);
+
+        Assert.Equal(["NL"], Members(root, "auto-latency"));
+        Assert.Contains(Warp.MasqueTag, Members(root, "auto"));
+
+        // Путь WARP: он один — он и в автоподборе.
+        Assert.Equal([Warp.MasqueTag], Members(Compile(file!), "auto-latency"));
+    }
+
+    /// <summary>Перебор по одному не ставит запасной WARP и закреплённого, порядок — по замерам.</summary>
+    [Fact]
+    public void PickOrderSkipsFallbackAndExcept()
+    {
+        var known = new Dictionary<string, double> { [Warp.MasqueTag] = 120, ["SE"] = 147, ["FI"] = 130 };
+
+        Assert.Equal(["FI", "SE", "NEW"],
+            Supervisor.SingBoxService.PickOrder(["SE", Warp.MasqueTag, "NEW", "FI"], known, except: null, fallback: Warp.MasqueTag));
+        Assert.Equal(["SE", "NEW"],
+            Supervisor.SingBoxService.PickOrder(["SE", Warp.MasqueTag, "NEW", "FI"], known, except: "FI", fallback: Warp.MasqueTag));
+
+        // Без запасного (путь WARP) WARP — обычный участник.
+        Assert.Equal([Warp.MasqueTag, "FI"],
+            Supervisor.SingBoxService.PickOrder([Warp.MasqueTag, "FI"], known, except: null, fallback: null));
+    }
+
     [Fact]
     public void ExitsOnlyEscalateToWarpOnceThenBypass()
     {

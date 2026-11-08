@@ -238,6 +238,59 @@ public static class DohResolver
             .ToList();
     }
 
+    /// <summary>
+    /// Все адреса IPv4 имени у первого ответившего резолвера (один запрос, как у
+    /// <see cref="ResolveAsync"/>); DoH молчит — обычный DNS по TCP. Пусто — не выяснилось.
+    /// </summary>
+    /// <remarks>
+    /// Имя за CDN отвечает несколькими адресами, и оператор бывает закрыл лишь часть
+    /// (08.11: x.com — 162.159.140.229 открывается, 172.66.0.227 молчит).
+    /// </remarks>
+    public static async Task<IReadOnlyList<IPAddress>> ResolveAllAsync(
+        string host,
+        HttpClient http,
+        CancellationToken cancellationToken)
+    {
+        if (IPAddress.TryParse(host, out var literal))
+            return [literal];
+
+        static List<IPAddress> V4(IEnumerable<string> found) => found
+            .Where(a => !IsStub(a))
+            .Select(a => IPAddress.TryParse(a, out var ip) ? ip : null)
+            .OfType<IPAddress>()
+            .Where(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            .Distinct()
+            .ToList();
+
+        foreach (var endpoint in Endpoints)
+        {
+            try
+            {
+                using var request = new HttpRequestMessage(
+                    HttpMethod.Get,
+                    $"{endpoint}?name={Uri.EscapeDataString(host)}&type=A");
+
+                request.Headers.Accept.Add(new("application/dns-json"));
+
+                using var response = await http.SendAsync(request, cancellationToken);
+
+                if (!response.IsSuccessStatusCode)
+                    continue;
+
+                var found = V4(AllAddresses(await response.Content.ReadAsStringAsync(cancellationToken)));
+
+                if (found.Count > 0)
+                    return found;
+            }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                // Один резолвер не отвечает — спрашиваем следующего.
+            }
+        }
+
+        return V4(await TcpAddressesAsync(host, cancellationToken));
+    }
+
     /// <summary>Все записи A из ответа.</summary>
     internal static IEnumerable<string> AllAddresses(string json)
     {

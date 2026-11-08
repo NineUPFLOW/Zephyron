@@ -1355,17 +1355,17 @@ public sealed class SingBoxService : SupervisedService
         if (!_bypassWhenDead && _fallbackExit is null)
             return;
 
-        // Идём через WARP, а VPN, возможно, ожил: возвращаемся на него (замер ниже — того же рода, что снимает обход).
+        // Идём через WARP, а VPN, возможно, ожил: возвращаемся на первый ответивший сервер VPN —
+        // тем же замером, что снимает обход. До 08.11 мерился один автоподбор: стоял он на мёртвом — WARP навсегда.
         if (_onFallback && !_bypass.Engaged && tunnelWorks)
         {
             using var back = new ClashApi($"127.0.0.1:{_healthPort}", Talk, EngineKeys.Current(_configPath));
-            var vpn = _pinnedPlaced ? _preferredExit! : LatencyGroup;
 
-            if (await back.MeasureAsync(vpn, _watchUrl, CheckTimeout, cancellationToken) is not null
+            if (await LiveVpnAsync(back, notifyNoLive: false, cancellationToken) is { } vpn
                 && await SelectMainAsync(back, vpn, cancellationToken))
             {
                 _onFallback = false;
-                Note("VPN ожил — обратно");
+                Journal($"VPN ожил — трафик возвращён с WARP на «{vpn}».");
             }
 
             return;
@@ -1380,20 +1380,30 @@ public sealed class SingBoxService : SupervisedService
 
         if (TunnelBypass.GoesToWarp(action, _fallbackExit is not null, _onFallback))
         {
-            if (await SelectMainAsync(api, _fallbackExit!, cancellationToken))
+            // На WARP — только если он сам пропускает проверку: 08.11 Telegram через него висел.
+            bool warpAnswers = await api.MeasureAsync(_fallbackExit!, _watchUrl, CheckTimeout, cancellationToken) is not null;
+
+            if (warpAnswers && await SelectMainAsync(api, _fallbackExit!, cancellationToken))
             {
                 _onFallback = true;
 
                 // Три проверки через WARP считаются заново — прежние были про VPN.
                 _bypass.Forget();
-                Note("Серверы VPN не отвечают — выход через WARP");
-            }
-            else
-            {
-                _bypass.Forget();
+                Journal("серверы VPN не отвечают три проверки подряд — трафик переведён на запасной WARP. "
+                    + "Вернём на VPN, как только сервер ответит.");
+                return;
             }
 
-            return;
+            if (warpAnswers)
+            {
+                // Не переключилось — движок мог перезапускаться; решим на следующей проверке.
+                _bypass.Forget();
+                return;
+            }
+
+            Journal("серверы VPN не отвечают, запасной WARP тоже молчит.");
+
+            // Дальше — обычный обход мимо туннеля (или ничего при kill switch).
         }
 
         // Kill switch: мимо туннеля нельзя, WARP при этом остаётся в туннеле.
@@ -1421,15 +1431,15 @@ public sealed class SingBoxService : SupervisedService
 
             if (toWarp)
             {
-                Note("WARP снова отвечает — трафик возвращён в туннель через WARP.");
+                Journal("WARP снова отвечает — трафик возвращён в туннель через WARP.");
                 return;
             }
 
-            Note(_fallbackExit is not null ? "VPN ожил — обратно" : "выход подписки ожил — трафик возвращён в туннель.");
+            Journal(_fallbackExit is not null ? $"VPN ожил — трафик возвращён в туннель на «{target}»." : "выход подписки ожил — трафик возвращён в туннель.");
             return;
         }
 
-        Note("выходы подписки не отвечают три проверки подряд — трафик уведён мимо туннеля, "
+        Journal("выходы подписки не отвечают три проверки подряд — трафик уведён мимо туннеля, "
             + "чтобы не легла вся сеть. Он идёт открыто и с домашнего адреса. "
             + "Вернём в туннель, как только выход оживёт; отключается настройкой.");
     }
@@ -1448,7 +1458,29 @@ public sealed class SingBoxService : SupervisedService
     {
         using var api = new ClashApi($"127.0.0.1:{_healthPort}", Talk, EngineKeys.Current(_configPath));
 
-        // Выбранный руками — первым: снять обход на него, а не в автоподбор
+        var vpn = await LiveVpnAsync(api, notifyNoLive: true, cancellationToken);
+        _returnTo = vpn == LatencyGroup ? null : vpn;
+
+        if (vpn is not null)
+            return true;
+
+        // VPN молчит, а WARP мог ожить: вернуть на него, не дожидаясь серверов.
+        if (_fallbackExit is not null
+            && await api.MeasureAsync(_fallbackExit, _watchUrl, CheckTimeout, cancellationToken) is not null)
+        {
+            _returnTo = _fallbackExit;
+        }
+
+        return _returnTo is not null;
+    }
+
+    /// <summary>
+    /// Живой выход VPN, куда ставить селектор: закреплённый, автоподбор или первый ответивший
+    /// по одному; <c>null</c> — VPN молчит. WARP сюда не входит (<see cref="PickOrder"/>).
+    /// </summary>
+    private async Task<string?> LiveVpnAsync(ClashApi api, bool notifyNoLive, CancellationToken cancellationToken)
+    {
+        // Выбранный руками — первым: вернуть на него, а не в автоподбор
         // (до 01.10 выбор человека так терялся до перезапуска).
         if (_pinnedPlaced)
         {
@@ -1456,37 +1488,28 @@ public sealed class SingBoxService : SupervisedService
             Record(_preferredExit!, pinned);
 
             if (pinned is not null)
-            {
-                _returnTo = _preferredExit;
-                return true;
-            }
+                return _preferredExit;
 
             if (!_watch.MayLeaveBypassElsewhere)
-            {
-                _returnTo = null;
-                return false;
-            }
+                return null;
         }
 
-        // В обходе селектор стоит на direct — меряем автоподбор, а не его.
+        // Селектор стоит на direct или WARP — меряем автоподбор, а не его.
         if (await api.MeasureAsync(LatencyGroup, _watchUrl, CheckTimeout, cancellationToken) is not null)
-        {
-            _returnTo = null;
-            return true;
-        }
+            return LatencyGroup;
 
-        // Выбранный автоподбором молчит — ищем живого по одному. Найден —
-        // обход снимется, и селектор встанет прямо на него (_returnTo).
-        _returnTo = await PickOneByOneAsync(api, cancellationToken, notifyNoLive: true);
+        // Выбранный автоподбором молчит — ищем живого по одному и ставим прямо его.
+        return await PickOneByOneAsync(api, cancellationToken, notifyNoLive: notifyNoLive);
+    }
 
-        // VPN молчит, а WARP мог ожить: вернуть на него, не дожидаясь серверов.
-        if (_returnTo is null && _fallbackExit is not null
-            && await api.MeasureAsync(_fallbackExit, _watchUrl, CheckTimeout, cancellationToken) is not null)
-        {
-            _returnTo = _fallbackExit;
-        }
-
-        return _returnTo is not null;
+    /// <summary>
+    /// Пишет решение о выходе и в журнал движка, и в журнал супервизора (его вывод — supervisor.log):
+    /// 08.11 смену на WARP искали в supervisor.log и не нашли.
+    /// </summary>
+    private void Journal(string line)
+    {
+        Note(line);
+        Console.WriteLine($"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss} {Name}: {line}");
     }
 
     /// <summary>Куда вернуть трафик при выходе из обхода; <c>null</c> — в автоподбор.</summary>
@@ -1552,14 +1575,7 @@ public sealed class SingBoxService : SupervisedService
         // сервера». Перебор всех по 3 с — до полуминуты без сети сверх
         // полуминуты ожидания проверки; в порядке замеров первый живой
         // обычно и есть быстрейший, и находится за секунды.
-        var known = ServerHealthCache.Load().Latencies();
-
-        var ordered = members
-            .Where(tag => tag != except)
-            .OrderBy(tag => known.TryGetValue(tag, out var ms) ? ms : double.MaxValue)
-            .ToList();
-
-        foreach (var tag in ordered)
+        foreach (var tag in PickOrder(members, ServerHealthCache.Load().Latencies(), except, _fallbackExit))
         {
             var delay = await api.MeasureAsync(tag, _watchUrl, CheckTimeout, cancellationToken);
             Record(tag, delay);
@@ -1576,6 +1592,18 @@ public sealed class SingBoxService : SupervisedService
         if (notifyNoLive && run == _run) RequestSubscriptionRefresh();
         return null;
     }
+
+    /// <summary>
+    /// Порядок перебора по одному: по последним замерам, без <paramref name="except"/>
+    /// и без запасного WARP — он не сервер VPN. 08.11 WARP стоял в автоподборе, прогрев брал
+    /// его первым по задержке, и надзор, не зная, что он на запасном, назад не возвращал.
+    /// </summary>
+    public static IReadOnlyList<string> PickOrder(
+        IEnumerable<string> members, IReadOnlyDictionary<string, double> known, string? except, string? fallback) =>
+        members
+            .Where(tag => tag != except && tag != fallback)
+            .OrderBy(tag => known.TryGetValue(tag, out var ms) ? ms : double.MaxValue)
+            .ToList();
 
     /// <summary>
     /// Кладёт проверку в общий файл замеров — тот, что показывает вкладка VPN.

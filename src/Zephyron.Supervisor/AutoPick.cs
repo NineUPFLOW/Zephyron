@@ -715,12 +715,13 @@ public static class AutoPick
         {
             var address = await RecipeTrial.AddressForAsync(row.Host, cancellationToken);
 
-            if (await DohResolver.ResolveAsync(row.Host, dohClient, cancellationToken) is { } doh
-                && IPAddress.TryParse(doh, out var parsed)
-                && !HostsFile.IsBlocking(parsed))
-            {
-                address = parsed;
-            }
+            // Один запрос DoH даёт и главный адрес, и прочие адреса имени.
+            var doh = (await DohResolver.ResolveAllAsync(row.Host, dohClient, cancellationToken))
+                .Where(a => !HostsFile.IsBlocking(a))
+                .ToList();
+
+            if (doh.Count > 0)
+                address = doh[0];
 
             // Резолверы отмену глотают и отвечают «нет адреса»: это не исход имени.
             cancellationToken.ThrowIfCancellationRequested();
@@ -731,13 +732,8 @@ public static class AutoPick
             {
                 addresses[row] = address;
 
-                // Имя за CDN отвечает несколькими адресами, и оператор бывает закрыл лишь часть
-                // (08.11: x.com — 162.159.140.229 открывается, 172.66.0.227 молчит).
-                var others = (await DohResolver.CandidatesAsync(row.Host, dohClient, cancellationToken))
-                    .Select(a => IPAddress.TryParse(a, out var ip) ? ip : null)
-                    .OfType<IPAddress>()
-                    .Where(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
-                        && !a.Equals(address) && !HostsFile.IsBlocking(a))
+                var others = doh
+                    .Where(a => !a.Equals(address))
                     .Take(2)
                     .ToArray();
 

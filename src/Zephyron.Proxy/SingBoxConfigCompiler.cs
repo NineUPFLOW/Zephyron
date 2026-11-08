@@ -717,6 +717,9 @@ public sealed class SingBoxConfigCompiler
     /// <summary>Тег автоподбора по задержке; спрятан за селектором.</summary>
     private const string LatencyTag = "auto-latency";
 
+    /// <summary>Выход WARP — встроенный MASQUE или свой файл: имя у обоих одно.</summary>
+    private static bool IsWarp(ProxyServer server) => server.IsSelfRegistering || server.Tag == Warp.MasqueTag;
+
     /// <summary>Резолвер для имён самих серверов подписки, всегда в обход туннеля.</summary>
     private const string BootstrapTag = "bootstrap";
 
@@ -1620,8 +1623,10 @@ public sealed class SingBoxConfigCompiler
         // пустоты» видела в нём живого и выводила все девять серверов
         // подписки — отмеченных мёртвыми по замерам, сделанным ещё
         // с неверной набивкой XHTTP.
-        var primary = eligible.Where(s => !s.IsSelfRegistering).ToList();
-        var reserve = eligible.Where(s => s.IsSelfRegistering).ToList();
+        // WARP из своего файла (WireGuard) — тоже запасной, хоть сам и не регистрируется:
+        // 08.11 он стоял в автоподборе, прогрев надзора ставил его первым, и назад к VPN не возвращало.
+        var primary = eligible.Where(s => !IsWarp(s)).ToList();
+        var reserve = eligible.Where(IsWarp).ToList();
 
         var alive = primary
             .Where(s => !options.DeadServerTags.Contains(tags[s]))

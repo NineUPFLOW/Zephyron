@@ -62,6 +62,9 @@ public sealed class AutoPickItem : INotifyPropertyChanged
     /// <summary>Проверка после записи: <c>true</c> открывается, <c>false</c> нет, <c>null</c> не делалась.</summary>
     public bool? Post { get; set; }
 
+    /// <summary>Почему не открылось после записи (коротко); для <see cref="Post"/> == false.</summary>
+    public string? PostWhy { get; set; }
+
     /// <summary>Вызывается при смене галочки — окно пересчитывает кнопки «Записать».</summary>
     public Action? ApplyChanged { get; set; }
 
@@ -109,6 +112,10 @@ public sealed class AutoPickItem : INotifyPropertyChanged
 
             if (!Finished)
                 return Kind.Waiting;
+
+            // После записи «изменено» — только записанное: снятые галочки и отказы остались как были.
+            if (Declined || Row.Written == false)
+                return Kind.Same;
 
             if (Row.Choice is not null)
                 return Kind.Changed;
@@ -163,7 +170,8 @@ public sealed class AutoPickItem : INotifyPropertyChanged
 
     public Brush VerdictColour => _brush(Verdict switch
     {
-        "не открывается" => "Danger",
+        // Служебное имя — не страница: «не открывается» там не провал.
+        "не открывается" => Row is not null && AutoPick.NotASite(Row) is not null ? "Muted" : "Danger",
         var v when v.StartsWith("открывается", StringComparison.Ordinal) => "Success",
         _ => "Muted",
     });
@@ -224,10 +232,10 @@ public sealed class AutoPickItem : INotifyPropertyChanged
 
         return Category switch
         {
-            Kind.Changed => (ChoiceText(Row.Choice!) + (Row.Confirm is null ? "" : " · " + Row.Confirm), "Success"),
+            Kind.Changed => (ChoiceText(Row.Choice!) + (Row.Confirm is null ? "" : " · " + ConfirmText(Row.Confirm)), "Success"),
             Kind.Failed => ((Row.Tries.Any(t => t.Works)
                 ? "ничего устойчивого — оставлено как есть"
-                : "ничего не помогло") + (Row.Confirm is null ? "" : " · " + Row.Confirm), "Danger"),
+                : "ничего не помогло") + (Row.Confirm is null ? "" : " · " + ConfirmText(Row.Confirm)), "Danger"),
             Kind.Same => (Row.Tries.Count > 0 && Row.Tries.Max(t => t.Level) == 1
                 ? "менять нечего: сайт везде отказывает по стране"
                 : AutoPick.CurrentWorks(Row) == true ? "менять не нужно: открывается нынешним путём"
@@ -253,6 +261,15 @@ public sealed class AutoPickItem : INotifyPropertyChanged
 
     public double RowOpacity => Category == Kind.Skipped ? 0.7 : 1;
 
+    /// <summary>
+    /// Одна проверка — без названия способа: он уже написан в строке
+    /// («напрямую · подтверждено 3/3», а не «напрямую · напрямую: …»).
+    /// </summary>
+    private static string ConfirmText(string confirm) =>
+        !confirm.Contains(';') && confirm.IndexOf(": ", StringComparison.Ordinal) is var at and > 0
+            ? confirm[(at + 2)..]
+            : confirm;
+
     public Visibility ApplyVisibility => Selectable ? Visibility.Visible : Visibility.Hidden;
 
     public string AutoName => "Записать изменение: " + Label;
@@ -268,6 +285,15 @@ public sealed class AutoPickItem : INotifyPropertyChanged
     public string MarkTag => Post == true ? "Running" : "Failed";
 
     public string MarkName => Post == true ? "Проверка после: открывается" : "Проверка после: не открывается";
+
+    public string PostText => Post switch
+    {
+        true => "✓ открывается",
+        false => "✕ не открылся после записи" + (string.IsNullOrWhiteSpace(PostWhy) ? "" : ": " + PostWhy),
+        _ => "",
+    };
+
+    public Brush PostColour => _brush(Post == false ? "Danger" : "Success");
 
     public string RowName => $"{Label}, сейчас {CurrentText}, итог {Result}";
 
@@ -319,6 +345,7 @@ public partial class AutoPickWindow : Window
     private bool _stoppedEngines;
     private bool _checked;
     private bool _leaving;
+    private readonly HashSet<string> _addressed = new(StringComparer.Ordinal);
     private int _stage;
     private int _ticks;
     private string _filter = "all";
@@ -502,6 +529,19 @@ public partial class AutoPickWindow : Window
             return;
 
         int live = Math.Max(1, LiveCount());
+
+        // Первый этап — узнавание адресов: проб ещё нет, но подбор уже идёт.
+        if (_stage == 0 && WayCount(AutoPickWay.Direct) == 0)
+        {
+            string lookup = $"Узнаю адреса имён: {_addressed.Count} из {_items.Count}…";
+
+            if (_warnings.Count > 0)
+                lookup += " " + string.Join(" ", _warnings);
+
+            Say(lookup, "Muted", busy: true);
+            return;
+        }
+
         string count = _stage == 0 ? $"Готово {WayCount(AutoPickWay.Direct)} из {live}" : $"Проб: {WayCount((AutoPickWay)_stage)}";
         string text = $"Проверяю: {StageNames[_stage].ToLowerInvariant()}. {count}, прошло {_clock.Elapsed:mm\\:ss}.";
 
@@ -685,7 +725,9 @@ public partial class AutoPickWindow : Window
         int Count(AutoPickItem.Kind k) => _items.Count(i => i.Category == k);
 
         FilterAll.Content = $"Все {_items.Count}";
-        FilterChanged.Content = $"Будет изменено {Count(AutoPickItem.Kind.Changed)}";
+        bool wrote = _items.Any(i => i.Row?.Written is not null || i.Entry is not null);
+
+        FilterChanged.Content = $"{(wrote ? "Изменено" : "Будет изменено")} {Count(AutoPickItem.Kind.Changed)}";
         FilterFailed.Content = $"Не помогло {Count(AutoPickItem.Kind.Failed)}";
         FilterSkipped.Content = $"Пропущено {Count(AutoPickItem.Kind.Skipped)}";
 
@@ -771,6 +813,8 @@ public partial class AutoPickWindow : Window
         // «Закрыть» после записи — главная кнопка.
         CloseButton.Style = (Style)FindResource(_phase == Phase.Written || nothing ? "Primary" : "Ghost");
 
+        // После записи главная — «Закрыть окно»; «начать заново» второстепенна.
+        StartButton.Style = (Style)FindResource(_phase == Phase.Written ? "Ghost" : "Primary");
         StartButton.IsEnabled = _phase is Phase.Idle or Phase.Written;
         StopButton.IsEnabled = busy;
 
@@ -918,6 +962,7 @@ public partial class AutoPickWindow : Window
         _engineCame = false;
         _checked = false;
         _stage = 0;
+        _addressed.Clear();
         _report = null;
         _warnings.Clear();
         Array.Fill(_stageSkip, null);
@@ -1036,7 +1081,7 @@ public partial class AutoPickWindow : Window
 
             if (EnginesAlive())
             {
-                Say("Останавливаю движки…", "Muted", busy: true);
+                Say("Останавливаю движки на время замера…", "Muted", busy: true);
 
                 // Отметка до ожидания: «Стоп» или сбой посреди остановки оставили бы
                 // движки лежать, а окно — не знающим, что их надо поднять.
@@ -1081,9 +1126,16 @@ public partial class AutoPickWindow : Window
 
         item.Row ??= row;
         item.Refresh();
+        _addressed.Add(row.Host);
 
         if (_phase == Phase.Running)
+        {
             UpdateStages();
+
+            // Пока идёт узнавание адресов, смены этапа нет — счёт обновляем сами.
+            if (_stage == 0 && WayCount(AutoPickWay.Direct) == 0)
+                SayProgress();
+        }
     }
 
     private void Finish(AutoPickReport report)
@@ -1468,6 +1520,9 @@ public partial class AutoPickWindow : Window
                     await Dispatcher.InvokeAsync(() =>
                     {
                         item.Post = report.Kind is BlockKind.None or BlockKind.Forbidden;
+
+                        var why = report.Http.Detail ?? report.Data.Detail ?? report.Tcp.Detail ?? report.Kind.ToString();
+                        item.PostWhy = why.Length > 70 ? why[..70] + "…" : why;
                         item.Refresh();
 
                         if (item.Post == true) open++; else shut++;
@@ -1477,7 +1532,14 @@ public partial class AutoPickWindow : Window
                 });
 
             _checked = true;
-            Say($"Проверка после: ✓ {open}, ✕ {shut}.", shut > 0 ? "Warn" : "Success");
+            var bad = rows.Where(i => i.Post == false).Select(i => i.Label).ToList();
+
+            Say($"Проверка после: ✓ {open}, ✕ {shut}."
+                + (bad.Count > 0
+                    ? $" Не открылись после записи: {string.Join(", ", bad.Take(5))}{(bad.Count > 5 ? $" и ещё {bad.Count - 5}" : "")}"
+                        + " — их можно вернуть кнопкой «Вернуть» в строке."
+                    : ""),
+                shut > 0 ? "Warn" : "Success");
         }
         catch (OperationCanceledException)
         {
