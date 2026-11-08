@@ -156,10 +156,22 @@ rules:
     mode: proxy
     server: "auto"
 
-  # ── Не взято десинком, по данным blockcheck ─────────────────────────────
-  - match: domain
-    value: "*.rutracker.org"
+  # Сайт и веб-версия — по именам: в «Гибриде» имя «напрямую» получает настоящий
+  # адрес, и TUN его не видит. Замер 08.11: web.telegram.org и telegram.org
+  # напрямую и под десинком — таймаут TCP (адрес закрыт), через выход — 200.
+  - match: hostlist
+    value: config/lists/telegram.txt
     mode: proxy
+
+  # Отказ по стране: 08.11 crunchyroll.com без туннеля отвечает отказом
+  # на любом пути, через выход — открывается. Десинк такое не чинит.
+  - match: hostlist
+    value: config/lists/crunchyroll.txt
+    mode: proxy
+
+  # ── Не взято десинком, по данным blockcheck ─────────────────────────────
+  # rutracker.org отсюда убран 08.11: автоподбор открыл его десинком пресета
+  # трижды подряд — туннель только если иначе никак (владелец 08.11).
 
   - match: domain
     value: "*.linkedin.com"

@@ -3,7 +3,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:gui="clr-namespace:Zephyron.Gui"
-        Title="Моя подписка" Width="520" SizeToContent="Height"
+        Title="Подписка" Width="520" SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource Backdrop}"
         ResizeMode="NoResize">
@@ -14,7 +14,7 @@
         заменить. Пустое поле — оставить как есть.
     -->
     <StackPanel LayoutTransform="{DynamicResource UiScaleTransform}" Margin="28,24,28,24">
-        <TextBlock Text="Моя подписка" Style="{StaticResource Title}" FontSize="20" />
+        <TextBlock Text="Подписка" Style="{StaticResource Title}" FontSize="20" />
 
         <TextBlock Text="Имя" FontWeight="SemiBold" Margin="0,18,0,6" />
         <TextBox x:Name="NameBox" gui:Hint.Text="Название для себя" />

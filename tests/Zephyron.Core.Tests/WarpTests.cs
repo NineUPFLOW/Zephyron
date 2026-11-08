@@ -172,7 +172,8 @@ public partial class WarpTests
     [Fact]
     public void FallbackWarpFollowsPathAndSubscription()
     {
-        var withKeys = new AppSettings { SubscriptionUrl = "https://x.example/sub" };
+        var withKeys = new AppSettings { SubscriptionUrl = "https://x.example/sub", WarpFallback = true };
+        Assert.False(Warp.UsesFallback(withKeys with { WarpFallback = new AppSettings().WarpFallback }));
 
         Assert.True(Warp.UsesFallback(withKeys));
         Assert.False(Warp.UsesFallback(withKeys with { WarpFallback = false }));

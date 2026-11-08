@@ -555,7 +555,8 @@ public static class AutoPick
         ProxyServer? warp = null)
     {
         // Без разрешения выход не пробуется вовсе: подбор не должен гнать сайты за границу сам.
-        vpnServers = allowExit ? ExitOrder(vpnServers, warp) : [];
+        // WARP — только для тех, у кого нет подписки (владелец 08.11): есть VPN — меряем его.
+        vpnServers = allowExit ? ExitOrder(vpnServers, vpnServers.Count > 0 ? null : warp) : [];
 
         var state = SupervisorState.Load(SupervisorState.DefaultPath);
 

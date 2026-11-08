@@ -445,7 +445,7 @@
                 -->
                 <Border x:Name="ExitCard" Style="{StaticResource Card}" Margin="0,16,0,0">
                     <StackPanel>
-                        <TextBlock Text="Туннель идёт через" Style="{StaticResource Eyebrow}" Margin="0,0,0,12" />
+                        <TextBlock Text="Выход туннеля" Style="{StaticResource Eyebrow}" Margin="0,0,0,12" />
 
                         <Grid>
                             <Grid.ColumnDefinitions>

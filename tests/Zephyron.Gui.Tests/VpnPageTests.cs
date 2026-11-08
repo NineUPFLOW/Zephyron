@@ -71,6 +71,10 @@ public sealed class VpnPageTests
             typeof(VpnView).GetField("_poolRows", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .SetValue(view, new List<PoolRow> { pool });
 
+            // Папки пулов — блок пути «VPN»; без подписки умолчание — WARP, и списка не было бы.
+            typeof(VpnView).GetField("_path", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .SetValue(view, Zephyron.Core.Rules.TunnelPath.Vpn);
+
             var show = typeof(VpnView).GetMethod("ShowPage", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
             // Раскрыть, свернуть и снова — плашки подписок и подпись съезжают

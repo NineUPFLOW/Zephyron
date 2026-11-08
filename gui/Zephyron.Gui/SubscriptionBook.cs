@@ -299,7 +299,7 @@ public sealed class SubscriptionBook
         var pool = Entries.Where(e => e.InPool ?? Same(e.Url, settings.SubscriptionUrl)).ToList();
 
         return Entries.Count == 1
-            ? pool.Count == 0 ? "1, не в работе" : $"1: {pool[0].Name}"
+            ? pool.Count == 0 ? "1, не в работе" : pool[0].Name
             : pool.Count == 0
                 ? $"{Entries.Count}, в работе ни одной"
                 : $"{Entries.Count}, в работе: {string.Join(", ", pool.Select(e => $"«{e.Name}»"))}";
