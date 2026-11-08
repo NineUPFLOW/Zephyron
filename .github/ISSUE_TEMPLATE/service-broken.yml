@@ -79,6 +79,6 @@ body:
     attributes:
       label: Версия Zephyron
       description: Вкладка «Прочее» → «О программе».
-      placeholder: 1.4.0
+      placeholder: 1.4.1
     validations:
       required: true
