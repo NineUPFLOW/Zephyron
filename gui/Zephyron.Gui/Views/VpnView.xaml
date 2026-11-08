@@ -918,52 +918,6 @@
                 <TextBlock x:Name="PoolsLine" Style="{StaticResource Caption}" Margin="4,8,0,0" TextWrapping="Wrap" />
             </StackPanel>
 
-                    <!--
-                        Локальный прокси: адрес для программ, которым туннель нужен точечно.
-                        Живёт и при VPN, и при WARP — выход берётся у выбранного пути;
-                        внизу, чтобы не отодвигать выбор сервера.
-                    -->
-                    <views:FitWidth x:Name="LocalProxyHost" Margin="0,16,0,0">
-                        <Border Style="{StaticResource Card}">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <Border Grid.Column="0" Style="{StaticResource IconTile}" VerticalAlignment="Center" Margin="0,0,12,0">
-                                    <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE774;" />
-                                </Border>
-
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="Локальный прокси" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                    <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                    Content="Адрес на вашем компьютере, через который можно пустить в туннель одну программу, не трогая остальные: расширение браузера, Telegram, лаунчер игр. Укажите адрес в её настройках прокси — SOCKS5 или HTTP.&#x0a;&#x0a;Через прокси идут только те программы, где он указан. Выход — тот же, что у туннеля; если серверы не отвечают, соединения не проходят, а не уходят с домашнего адреса. Адреса домашней сети идут напрямую.&#x0a;&#x0a;Применяется после следующего запуска движков. Порт меняется в параметрах туннеля." />
-                                </StackPanel>
-
-                                <TextBlock Grid.Column="2" x:Name="LocalProxyWord" Style="{StaticResource Caption}"
-                                           VerticalAlignment="Center" Margin="0,0,10,0" />
-                                <ToggleButton Grid.Column="3" x:Name="LocalProxyToggle" Style="{StaticResource Switch}"
-                                              Click="OnLocalProxy" VerticalAlignment="Center"
-                                              AutomationProperties.Name="Локальный прокси" />
-
-                                <StackPanel Grid.Row="1" Grid.ColumnSpan="4">
-                                    <TextBlock x:Name="LocalProxyAddress" FontWeight="SemiBold" Margin="0,10,0,0" TextWrapping="Wrap" />
-                                    <TextBlock x:Name="LocalProxyHint" Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap" />
-                                    <Button x:Name="LocalProxyCopy" Style="{StaticResource Ghost}" Padding="12,4" Margin="0,10,0,0"
-                                            HorizontalAlignment="Left" Content="Скопировать адрес" Click="OnLocalProxyCopy"
-                                            AutomationProperties.Name="Скопировать адрес локального прокси" />
-                                </StackPanel>
-
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                            </Grid>
-                        </Border>
-                    </views:FitWidth>
 
             <StackPanel x:Name="SubsBlock">
                 <!-- Подписки: заголовок со сводкой, добавление — по кнопке (макет 01.10). -->

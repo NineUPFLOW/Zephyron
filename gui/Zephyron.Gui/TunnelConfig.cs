@@ -217,18 +217,8 @@ internal static class TunnelConfig
                 ? AddressListReader.Expand(ProgramCapture.KeepOut(ruleSet), zapretRoot, out _)
                 : [];
 
-            // До записи конфига: «наш ли порт» решает тот, с которым движок работает сейчас.
-            var proxyProblem = settings.LocalProxy
-                ? LocalProxyInbound.Problem(settings.LocalProxyPort, settings.ProxyConfigPath)
-                : null;
-
-            if (proxyProblem is not null)
-                Journal.Write("Локальный прокси", "не запущен: " + proxyProblem);
-
             var result = new SingBoxConfigCompiler().Compile(ruleSet, servers, new SingBoxOptions
             {
-                LocalProxy = settings.LocalProxy && proxyProblem is null,
-                LocalProxyPort = settings.LocalProxyPort,
                 Scope = narrow ? TunnelScope.ProxyOnly : TunnelScope.Everything,
                 Ipv6 = !Zephyron.Core.Diagnostics.WindowsIpv6.Disabled(),
                 DnsServerAddresses = narrow ? SystemResolvers.Discover() : Array.Empty<string>(),
@@ -317,7 +307,6 @@ internal static class TunnelConfig
 
             SingBoxConfigCompiler.WriteToFile(settings.ProxyConfigPath, result.Json);
             RouterDnsBuildState.Save(settings.ProxyConfigPath, requestedDns, routerDns.Warning);
-            LocalProxyInbound.SaveOutcome(settings.ProxyConfigPath, settings.LocalProxy, settings.LocalProxyPort, proxyProblem);
 
             var note = settings.WarpEnabled
                 ? "Конфиг создан: туннель через WARP, подписки приостановлены"
@@ -338,9 +327,6 @@ internal static class TunnelConfig
 
             if (result.SkippedServers.Count > 0)
                 note += $", {result.SkippedServers.Count} пропущено";
-
-            if (proxyProblem is not null)
-                note += $". Локальный прокси не запущен: {proxyProblem}";
 
             // Не ждём: запуск идёт следом и не должен стоять за панелью.
             if (deferred.Count > 0)

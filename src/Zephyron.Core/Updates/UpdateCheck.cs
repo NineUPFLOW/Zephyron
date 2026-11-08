@@ -68,12 +68,59 @@ public static class UpdateCheck
 
             using var document = JsonDocument.Parse(json);
 
-            return Read(document.RootElement) is { ArchiveUrl.Length: > 0 } release ? release : null;
+            return Read(document.RootElement) is { ArchiveUrl.Length: > 0 } release ? release : await FromPageAsync(cancellationToken);
         }
-        catch (Exception)
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // API отказал (08.11: 403 «rate limit exceeded» — 60 запросов в час на адрес,
+            // а за NAT оператора адрес общий) — версию скажет страница выпуска.
+            return await FromPageAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Последний выпуск по переадресации страницы <c>releases/latest</c> — без API и его лимита.
+    /// </summary>
+    /// <remarks>Ни размера, ни контрольной суммы так не узнать; архив берётся по имени, как его выкладывает сборка.</remarks>
+    private static async Task<ReleaseInfo?> FromPageAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var handler = new HttpClientHandler { AllowAutoRedirect = false };
+            using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
+            http.DefaultRequestHeaders.Add("User-Agent", "Zephyron");
+
+            using var response = await http.GetAsync($"https://github.com/{Repository}/releases/latest", cancellationToken);
+
+            if (response.Headers.Location is not { } where || TagFrom(where.ToString()) is not { } tag)
+                return null;
+
+            var version = tag.TrimStart('v', 'V');
+
+            return new ReleaseInfo
+            {
+                Version = version,
+                Tag = tag,
+                ArchiveUrl = $"https://github.com/{Repository}/releases/download/{tag}/Zephyron-{version}.zip",
+            };
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
             return null;
         }
+    }
+
+    /// <summary>Тег из адреса <c>…/releases/tag/v1.4.0</c>; не похож на версию — <c>null</c>.</summary>
+    internal static string? TagFrom(string location)
+    {
+        var at = location.LastIndexOf("/tag/", StringComparison.Ordinal);
+
+        if (at < 0)
+            return null;
+
+        var tag = Uri.UnescapeDataString(location[(at + 5)..].Split('?', '#')[0]);
+
+        return System.Text.RegularExpressions.Regex.IsMatch(tag, @"^v?\d+(\.\d+){1,3}$") ? tag : null;
     }
 
     /// <summary>

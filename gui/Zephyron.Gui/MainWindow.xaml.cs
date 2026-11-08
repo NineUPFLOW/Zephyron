@@ -22,9 +22,9 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        // Не выше рабочей области: низ с кнопками не уходит под панель задач.
-        MaxHeight = Math.Min(MaxHeight, SystemParameters.WorkArea.Height - 40);
-        Height = Math.Min(Height, MaxHeight);
+        // Стартовая высота — не выше рабочей области. Без MaxHeight: он не даёт
+        // развёрнутому окну занять экран (08.11, окно «как бы на весь экран»).
+        Height = Math.Min(Height, SystemParameters.WorkArea.Height - 40);
 
         // Горячие клавиши разделов (OnPreviewKeyDown) — в подсказке пункта, иначе о них не узнать.
         foreach (var item in Items().Where(i => Array.IndexOf(Numbered, i.Tag as string) >= 0))

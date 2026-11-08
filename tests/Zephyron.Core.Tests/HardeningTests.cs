@@ -89,4 +89,12 @@ public sealed class HardeningTests : IDisposable
 
         Assert.Single(Directory.GetFiles(_root, "zephyron.json.bad-*"));
     }
+
+    [Theory]
+    [InlineData("https://github.com/NineUPFLOW/Zephyron/releases/tag/v1.4.0", "v1.4.0")]
+    [InlineData("https://github.com/NineUPFLOW/Zephyron/releases/tag/1.2.0.1", "1.2.0.1")]
+    [InlineData("https://github.com/NineUPFLOW/Zephyron/releases", null)]
+    [InlineData("https://github.com/x/y/releases/tag/v1.4.0%2F..%2Fevil", null)]
+    public void Latest_page_redirect_gives_the_tag(string location, string? tag) =>
+        Assert.Equal(tag, Zephyron.Core.Updates.UpdateCheck.TagFrom(location));
 }
