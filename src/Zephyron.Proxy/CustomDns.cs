@@ -181,7 +181,7 @@ public static class CustomDns
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
 
-        File.WriteAllText(target, JsonSerializer.Serialize(entries, Json), new UTF8Encoding(false));
+        Zephyron.Core.AtomicFile.WriteAllText(target, JsonSerializer.Serialize(entries, Json));
     }
 
     private static readonly JsonSerializerOptions Json = new()

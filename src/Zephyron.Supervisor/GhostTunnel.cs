@@ -68,7 +68,12 @@ public static class GhostTunnel
         }
 
         // Живой sing-box держит адаптер законно — может, это не наш; не трогаем.
-        if (Process.GetProcessesByName("sing-box").Length > 0)
+        var singBoxes = Process.GetProcessesByName("sing-box");
+
+        foreach (var p in singBoxes)
+            p.Dispose();
+
+        if (singBoxes.Length > 0)
             return "адаптер от прошлого запуска на месте, но sing-box жив — не трогаю";
 
         foreach (var guid in Find())
@@ -97,7 +102,9 @@ public static class GhostTunnel
                 RedirectStandardError = true,
             });
 
-            process?.WaitForExit(15_000);
+            // Завис — не оставляем powershell висеть до конца сеанса.
+            if (process is { } p && !p.WaitForExit(15_000))
+                p.Kill(entireProcessTree: true);
         }
         catch (Exception)
         {

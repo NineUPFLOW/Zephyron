@@ -58,8 +58,7 @@ public sealed class SingBoxRunner : IAsyncDisposable
             WorkingDirectory = Path.GetDirectoryName(Path.GetFullPath(_executablePath)) ?? ".",
             UseShellExecute = false,
             CreateNoWindow = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
+            // Потоки не читаем (лог идёт в файл), а переполненный пайп вешает процесс — не перенаправляем.
         };
 
         _process = Process.Start(startInfo)
@@ -134,7 +133,12 @@ public sealed class SingBoxRunner : IAsyncDisposable
         _disposed = true;
 
         await StopAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
-        _process?.Dispose();
-        _process = null;
+
+        // Живой процесс не отпускаем: забытый описатель — осиротевший sing-box с занятым TUN.
+        if (_process is null || _process.HasExited)
+        {
+            _process?.Dispose();
+            _process = null;
+        }
     }
 }

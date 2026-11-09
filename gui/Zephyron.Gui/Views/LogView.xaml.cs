@@ -233,6 +233,61 @@ public partial class LogView : UserControl
         }
     }
 
+    /// <summary>Журналы движков в runtime, которые чистит «Очистить».</summary>
+    private static readonly string[] ClearNames = ["supervisor.log", "sing-box.log", "winws2.log", "tg-ws-proxy.log"];
+
+    /// <summary>
+    /// Обнуляет файлы журналов, не удаляя их: движок держит файл открытым, и удалённый
+    /// он продолжил бы писать в безымянный. Возвращает сколько очищено и что не вышло.
+    /// </summary>
+    internal static (int Cleared, List<string> Failed) ClearLogs(string root)
+    {
+        var failed = new List<string>();
+        int cleared = 0;
+
+        foreach (var name in ClearNames)
+        {
+            var path = System.IO.Path.Combine(root, "runtime", name);
+
+            if (!File.Exists(path))
+                continue;
+
+            try
+            {
+                // Share Delete|ReadWrite: не мешаем движку, который пишет в тот же файл.
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+                stream.SetLength(0);
+                cleared++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                failed.Add($"{name}: {ex.Message}");
+            }
+        }
+
+        return (cleared, failed);
+    }
+
+    private void OnClear(object sender, RoutedEventArgs e)
+    {
+        var answer = MessageBox.Show(
+            "Очистить журналы движков (sing-box, winws2, супервизор, tg-ws-proxy)?\n\n"
+            + "Файлы останутся, пропадёт только записанное. Вернуть нельзя.",
+            "Zephyron", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+
+        if (answer != MessageBoxResult.Yes)
+            return;
+
+        var (cleared, failed) = ClearLogs(Root);
+
+        Reload();
+
+        if (failed.Count > 0)
+            Status.Text = "Не все журналы очищены (файл занят или нет прав): " + string.Join("; ", failed);
+        else if (cleared > 0)
+            Status.Text = $"Очищено журналов: {cleared}.";
+    }
+
     private void OnReload(object sender, RoutedEventArgs e) => Reload();
 
     private void OnSource(object sender, SelectionChangedEventArgs e)

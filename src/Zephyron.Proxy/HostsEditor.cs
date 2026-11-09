@@ -1471,7 +1471,23 @@ public static class HostsEditor
         // оставляет её в первой строке как обычный символ, и запись возвращала
         // её на место — перед прежней. В этом файле их накопилось уже
         // восемнадцать: каждая правка добавляла ещё одну.
-        File.WriteAllText(path, content.TrimStart('﻿'), new UTF8Encoding(false));
+        var temp = path + ".zephyron.tmp";
+
+        try
+        {
+            File.WriteAllText(temp, content.TrimStart('﻿'), new UTF8Encoding(false));
+
+            // Replace переносит права и атрибуты прежнего hosts; Move их бы потерял.
+            if (File.Exists(path))
+                File.Replace(temp, path, null);
+            else
+                File.Move(temp, path);
+        }
+        catch
+        {
+            try { File.Delete(temp); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            throw;
+        }
     }
 
     /// <summary>Сбрасывает кэш DNS; без этого правка не вступит в силу.</summary>
@@ -1493,8 +1509,16 @@ public static class HostsEditor
                 RedirectStandardOutput = true,
             });
 
-            process?.WaitForExit(10_000);
-            return process?.ExitCode == 0;
+            if (process is null)
+                return false;
+
+            if (!process.WaitForExit(10_000))
+            {
+                process.Kill(entireProcessTree: true);
+                return false;
+            }
+
+            return process.ExitCode == 0;
         }
         catch (Exception)
         {

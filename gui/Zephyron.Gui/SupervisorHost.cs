@@ -268,7 +268,9 @@ internal static class SupervisorHost
                 StatePath = statePath,
             })
             {
-                OnEvent = Console.WriteLine,
+                // Вывод уже уходит в тот же журнал — второй раз писать ту же строку незачем
+                // (каждое событие в отчётах стояло дважды).
+                OnEvent = log is null ? Console.WriteLine : null,
             };
 
             Console.WriteLine(

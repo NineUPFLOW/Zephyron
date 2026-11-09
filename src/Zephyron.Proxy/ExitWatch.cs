@@ -46,7 +46,7 @@ public sealed class ExitWatch
     /// <summary>Сколько ответов подряд до возврата выбранного сервера.</summary>
     public const int AnswersBeforeRestore = 2;
 
-    private readonly string? _pinned;
+    private string? _pinned;
     private readonly bool _replacePinned;
 
     private int _misses;
@@ -128,6 +128,13 @@ public sealed class ExitWatch
         _misses = 0;
 
         return ExitAction.Restore;
+    }
+
+    /// <summary>Человек сменил выбранный сервер на ходу — судить уже по новому, счётчики с нуля.</summary>
+    public void Repin(string? pinned)
+    {
+        _pinned = string.IsNullOrWhiteSpace(pinned) ? null : pinned;
+        Forget();
     }
 
     /// <summary>Забыть всё — движок перезапущен.</summary>

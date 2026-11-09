@@ -71,7 +71,9 @@ public sealed class ProcessSupervisor
 
     /// <summary>С какого момента держится нынешнее состояние службы.</summary>
     private readonly Dictionary<string, DateTimeOffset> _since = new();
-    private readonly RollingLog _log;
+    // Общий писатель: в тот же файл пишут окно (Journal) и прокси Telegram.
+    // Свой RollingLog держал позицию в файле и затирал их строки («�ии» в отчётах).
+    private readonly SharedLogWriter? _log;
 
     /// <summary>
     /// Когда поднят надзор — один раз, при создании.
@@ -93,7 +95,7 @@ public sealed class ProcessSupervisor
     {
         _services = services;
         _options = options ?? new SupervisorOptions();
-        _log = new RollingLog(_options.LogPath);
+        _log = SharedLogWriter.TryOpen(_options.LogPath);
 
         foreach (var service in services)
         {
@@ -166,19 +168,37 @@ public sealed class ProcessSupervisor
         {
             // Штатная остановка.
         }
+        catch (Exception ex)
+        {
+            Log($"супервизор упал: {ex}");
+            throw;
+        }
         finally
         {
             Log("останавливаю службы");
 
-            foreach (var service in _services)
+            try
             {
-                await service.StopAsync(CancellationToken.None);
-                SetHealth(service, ServiceHealth.Stopped);
+                foreach (var service in _services)
+                {
+                    // Сбой одной службы не должен оставить остальные живыми.
+                    try
+                    {
+                        await service.StopAsync(CancellationToken.None);
+                        SetHealth(service, ServiceHealth.Stopped);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"{service.Name}: не остановилась: {ex.GetBaseException().Message}");
+                    }
+                }
             }
-
-            SupervisorState.Clear(_options.StatePath);
-            Log("супервизор остановлен");
-            _log.Dispose();
+            finally
+            {
+                SupervisorState.Clear(_options.StatePath);
+                Log("супервизор остановлен");
+                _log?.Dispose();
+            }
         }
     }
 
@@ -370,6 +390,6 @@ public sealed class ProcessSupervisor
         var line = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss} {message}";
 
         OnEvent?.Invoke(line);
-        _log.AppendLine(line);
+        _log?.WriteLine(line);
     }
 }

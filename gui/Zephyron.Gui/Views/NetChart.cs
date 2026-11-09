@@ -6,8 +6,8 @@ using System.Windows.Media.Animation;
 namespace Zephyron.Gui.Views;
 
 /// <summary>
-/// График сети на «Главной» («Сигнал»): сетка, шкала значений, шкала
-/// времени и одна-две линии замеров. Вторая линия отличается не цветом, а штрихом.
+/// График сети на «Главной» («Сигнал»): линия нуля, заголовок и верх шкалы
+/// внутри области и одна-две линии замеров. Вторая линия отличается не цветом, а штрихом.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -46,8 +46,8 @@ public sealed class NetChart : FrameworkElement
     /// <summary>Подпись единицы на шкале значений: «Мбит/с», «мс».</summary>
     public string Unit { get; set; } = string.Empty;
 
-    /// <summary>Подписи шкалы времени слева направо: «−60 с», «−30 с», «сейчас».</summary>
-    public IReadOnlyList<string> TimeLabels { get; set; } = ["−60 с", "−30 с", "сейчас"];
+    /// <summary>Заголовок в левом верхнем углу области графика: «Скорость · 1 мин».</summary>
+    public string Title { get; set; } = string.Empty;
 
     /// <summary>Что сказать, пока замеров нет.</summary>
     public string Empty { get; set; } = "нет данных";
@@ -96,46 +96,25 @@ public sealed class NetChart : FrameworkElement
         double dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         var face = new Typeface(TryFindResource("MonoFont") as FontFamily ?? new FontFamily("Consolas"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
 
-        // Подписи шкал — как MonoTag: моноширинным, 11, третьим планом.
-        FormattedText Label(string s) => new(s, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, face, 11, text, dpi);
 
         bool any = _series.Any(s => s.Values.Any(v => !double.IsNaN(v)));
         double top = any ? Nice(Math.Max(Floor, _series.SelectMany(s => s.Values).Where(v => !double.IsNaN(v)).DefaultIfEmpty(0).Max())) : Floor;
 
-        // Поля под подписи: снизу — время, справа — значения по ширине самой длинной.
-        var scale = Enumerable.Range(0, 3).Select(i => Label(i == 2 ? "0" : $"{Format(top * (2 - i) / 2)} {Unit}".Trim())).ToArray();
-        const double bottom = 18;
-        double right = scale.Max(l => l.Width) + 10;
-        double plotH = h - bottom, plotW = w - right;
+        // Подписи — внутри области, в полосе сверху: заголовок слева, верх шкалы справа.
+        // Боковой стопки осей нет: на 60 px она съедала ширину и читалась хуже одной цифры.
+        const double head = 14;
+        double plotH = h - 1, plotW = w;
 
-        // Сетка: Border вполсилы, три линии значений и шкала справа; подложки нет.
         var pen = new Pen(Brush("Border"), 1);
         pen.Freeze();
 
-        dc.PushOpacity(0.5);
+        // Линия нуля — единственная линия сетки.
+        dc.DrawLine(pen, new Point(0, plotH + 0.5), new Point(plotW, plotH + 0.5));
 
-        for (int i = 0; i <= 2; i++)
-        {
-            double y = Math.Round(plotH * i / 2) + 0.5;
-            dc.DrawLine(pen, new Point(0, y), new Point(plotW, y));
-        }
-
-        dc.Pop();
-
-        for (int i = 0; i <= 2; i++)
-        {
-            double y = Math.Round(plotH * i / 2) + 0.5;
-            var label = scale[i];
-            dc.DrawText(label, new Point(plotW + 8, Math.Clamp(y - label.Height / 2, 0, plotH - label.Height)));
-        }
-
-        // Шкала времени.
-        for (int i = 0; i < TimeLabels.Count; i++)
-        {
-            var label = Label(TimeLabels[i]);
-            double x = TimeLabels.Count == 1 ? plotW : plotW * i / (TimeLabels.Count - 1);
-            dc.DrawText(label, new Point(Math.Clamp(x - label.Width / 2, 0, plotW - label.Width), plotH + 4));
-        }
+        var title = new FormattedText(Title, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+            new Typeface(TryFindResource("UiFont") as FontFamily ?? new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
+            10.5, Brush("Muted"), dpi);
+        dc.DrawText(title, new Point(6, 1));
 
         if (!any)
         {
@@ -147,6 +126,9 @@ public sealed class NetChart : FrameworkElement
             return;
         }
 
+        var scale = new FormattedText($"до {Format(top)} {Unit}".Trim(), CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, face, 10, text, dpi);
+        dc.DrawText(scale, new Point(plotW - scale.Width - 6, 2));
+
         double stepX = plotW / Math.Max(1, Capacity - 1);
 
         dc.PushClip(new RectangleGeometry(new Rect(0, 0, plotW, plotH + 1)));
@@ -156,7 +138,7 @@ public sealed class NetChart : FrameworkElement
             int n = series.Values.Count;
             int offset = Capacity - n;
 
-            Point At(int i) => new((offset + i + Shift) * stepX, plotH - Math.Max(0, series.Values[i]) / top * (plotH - 4));
+            Point At(int i) => new((offset + i + Shift) * stepX, plotH - Math.Max(0, series.Values[i]) / top * (plotH - 4 - head));
 
             var line = new StreamGeometry();
             var area = new StreamGeometry();

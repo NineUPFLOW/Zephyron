@@ -498,43 +498,6 @@
 
                             </Grid>
 
-                            <!--
-                                Путь туннеля (владелец, 07.11): через что он идёт — подписка или WARP.
-                                Виден в «Туннеле» и «Гибриде»; «Десинк» туннеля не поднимает. Хранится
-                                в WarpEnabled (Rules.TunnelPaths); тот же выбор — наверху вкладки VPN.
-                            -->
-                            <StackPanel x:Name="PathRow" Margin="2,14,0,0" Visibility="Collapsed">
-                                <TextBlock Text="Выход туннеля" Style="{StaticResource Eyebrow}" Margin="0,0,0,8" />
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-
-                                    <RadioButton x:Name="PathVpn" Grid.Column="0" Style="{StaticResource ModeSegment}"
-                                                 GroupName="TunnelPath" Tag="Vpn" Click="OnPath" Padding="0"
-                                                 AutomationProperties.Name="Туннель идёт через VPN">
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                            <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE774;"
-                                                       Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
-                                            <TextBlock x:Name="PathVpnName" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
-                                        </StackPanel>
-                                    </RadioButton>
-
-                                    <RadioButton x:Name="PathWarp" Grid.Column="2" Style="{StaticResource ModeSegment}"
-                                                 GroupName="TunnelPath" Tag="Warp" Click="OnPath" Padding="0"
-                                                 AutomationProperties.Name="Туннель идёт через WARP">
-                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                            <TextBlock Style="{StaticResource LineGlyph}" FontSize="14" Text="&#xE753;"
-                                                       Foreground="{DynamicResource Accent}" Margin="0,0,9,0" />
-                                            <TextBlock x:Name="PathWarpName" FontWeight="Medium" FontSize="12.5" VerticalAlignment="Center" />
-                                        </StackPanel>
-                                    </RadioButton>
-                                </Grid>
-                                <TextBlock x:Name="PathText" Style="{StaticResource Caption}" FontSize="12.5" Margin="0,8,0,0" TextWrapping="Wrap" />
-                            </StackPanel>
-
                             <!-- Жалоба на сочетание движков; пусто — полосы нет вовсе. -->
                             <Border Margin="0,14,0,0" Padding="12,9" CornerRadius="{StaticResource RSm}"
                                     Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}"
@@ -782,9 +745,9 @@
                 <Border Style="{StaticResource Card}" Margin="0,0,0,12" Padding="14,10">
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="230" />
+                            <ColumnDefinition Width="16" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -792,55 +755,68 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <TextBlock Text="Трафик" Style="{StaticResource SectionHead}" VerticalAlignment="Center" Margin="0,0,20,0" />
-                        <TextBlock Grid.Column="2" Style="{StaticResource MonoTag}" VerticalAlignment="Center"
-                                   Text="все адаптеры · ICMP до 1.1.1.1" />
+                        <TextBlock Text="Трафик" Style="{StaticResource SectionHead}" VerticalAlignment="Center" Margin="0,0,20,6" />
+                        <TextBlock Grid.Column="2" Style="{StaticResource MonoTag}" VerticalAlignment="Center" HorizontalAlignment="Right"
+                                   Margin="0,0,0,6" Text="все адаптеры · ICMP до 1.1.1.1" />
 
-                        <!-- В компактной раскладке (Compact) числа уходят строкой ниже, по два. -->
-                        <UniformGrid x:Name="NetMetrics" Grid.Column="1" Columns="4" VerticalAlignment="Center">
-                            <StackPanel x:Name="NetDownCell" Orientation="Horizontal" Margin="0,0,16,0" Background="Transparent"
-                                        ToolTip="Приём по всем сетевым адаптерам машины">
-                                <Rectangle Width="12" Height="2" Fill="{DynamicResource Accent2}" VerticalAlignment="Center" />
-                                <TextBlock Style="{StaticResource Caption}" Text="Приём" VerticalAlignment="Center" Margin="6,0,8,0" />
-                                <TextBlock x:Name="NetDown" Style="{StaticResource Metric}" FontSize="15" Foreground="{DynamicResource Muted}" Text="—"
-                                           VerticalAlignment="Center" />
-                                <TextBlock x:Name="NetDownUnit" Style="{StaticResource NetUnit}" Margin="4,0,0,0" VerticalAlignment="Center" />
+                        <!-- Плитки 2x2: значение с единицей, под ним подпись с маркером цвета линии графика. -->
+                        <UniformGrid x:Name="NetMetrics" Grid.Row="1" Columns="2" VerticalAlignment="Center">
+                            <StackPanel x:Name="NetDownCell" Margin="0,0,12,0" Background="Transparent"
+                                        ToolTip="Приём по всем сетевым адаптерам машины" AutomationProperties.Name="Приём">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="NetDown" Style="{StaticResource Metric}" FontSize="15" LineHeight="17"
+                                               LineStackingStrategy="BlockLineHeight" Foreground="{DynamicResource Muted}" Text="—" />
+                                    <TextBlock x:Name="NetDownUnit" Style="{StaticResource NetUnit}" Margin="4,0,0,0" VerticalAlignment="Bottom" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                    <Rectangle Width="8" Height="2" Fill="{DynamicResource Accent2}" VerticalAlignment="Center" />
+                                    <TextBlock Style="{StaticResource Caption}" FontSize="10.5" Text="Приём" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                </StackPanel>
                             </StackPanel>
-
-                            <StackPanel x:Name="NetUpCell" Orientation="Horizontal" Margin="0,0,16,0" Background="Transparent"
-                                        ToolTip="Отдача по всем сетевым адаптерам машины">
-                                <Line X2="12" Y1="1" Y2="1" Width="12" Height="2" Stroke="{DynamicResource Text}" Opacity="0.75"
-                                      StrokeThickness="2" StrokeDashArray="3,2" VerticalAlignment="Center" />
-                                <TextBlock Style="{StaticResource Caption}" Text="Исходящий" VerticalAlignment="Center" Margin="6,0,8,0" />
-                                <TextBlock x:Name="NetUp" Style="{StaticResource Metric}" FontSize="15" Foreground="{DynamicResource Muted}" Text="—"
-                                           VerticalAlignment="Center" />
-                                <TextBlock x:Name="NetUpUnit" Style="{StaticResource NetUnit}" Margin="4,0,0,0" VerticalAlignment="Center" />
+                            <StackPanel x:Name="NetUpCell" Margin="0,0,12,0" Background="Transparent"
+                                        ToolTip="Отдача по всем сетевым адаптерам машины" AutomationProperties.Name="Исходящий">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="NetUp" Style="{StaticResource Metric}" FontSize="15" LineHeight="17"
+                                               LineStackingStrategy="BlockLineHeight" Foreground="{DynamicResource Muted}" Text="—" />
+                                    <TextBlock x:Name="NetUpUnit" Style="{StaticResource NetUnit}" Margin="4,0,0,0" VerticalAlignment="Bottom" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                    <Line X2="8" Y1="1" Y2="1" Width="8" Height="2" Stroke="{DynamicResource Text}" Opacity="0.75"
+                                          StrokeThickness="2" StrokeDashArray="3,2" VerticalAlignment="Center" />
+                                    <TextBlock Style="{StaticResource Caption}" FontSize="10.5" Text="Исходящий" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                </StackPanel>
                             </StackPanel>
-
-                            <StackPanel x:Name="NetPingCell" Orientation="Horizontal" Margin="0,0,16,0" Background="Transparent"
-                                        ToolTip="Задержка до 1.1.1.1 по ICMP, раз в пять секунд">
-                                <Rectangle Width="12" Height="2" Fill="{DynamicResource Accent2}" VerticalAlignment="Center" />
-                                <TextBlock Style="{StaticResource Caption}" Text="Задержка" VerticalAlignment="Center" Margin="6,0,8,0" />
-                                <TextBlock x:Name="NetPing" Style="{StaticResource Metric}" FontSize="15" Foreground="{DynamicResource Muted}" Text="—"
-                                           VerticalAlignment="Center" />
-                                <TextBlock x:Name="NetPingUnit" Style="{StaticResource NetUnit}" Margin="4,0,0,0" VerticalAlignment="Center" Text="мс" />
+                            <StackPanel x:Name="NetPingCell" Margin="0,0,12,0" Background="Transparent"
+                                        ToolTip="Задержка до 1.1.1.1 по ICMP, раз в пять секунд" AutomationProperties.Name="Задержка">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="NetPing" Style="{StaticResource Metric}" FontSize="15" LineHeight="17"
+                                               LineStackingStrategy="BlockLineHeight" Foreground="{DynamicResource Muted}" Text="—" />
+                                    <TextBlock x:Name="NetPingUnit" Style="{StaticResource NetUnit}" Margin="4,0,0,0" VerticalAlignment="Bottom" Text="мс" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                    <Rectangle Width="8" Height="2" Fill="{DynamicResource Accent2}" VerticalAlignment="Center" />
+                                    <TextBlock Style="{StaticResource Caption}" FontSize="10.5" Text="Задержка" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                </StackPanel>
                             </StackPanel>
-
-                            <StackPanel x:Name="NetLossCell" Orientation="Horizontal" Margin="0,0,16,0" Background="Transparent"
-                                        ToolTip="Доля потерянных проверок задержки за последние две минуты">
-                                <Path Data="M 4,0 L 8,4 L 4,8 L 0,4 Z" Width="8" Height="8" Fill="{DynamicResource Warn}" VerticalAlignment="Center" Margin="2,0" />
-                                <TextBlock Style="{StaticResource Caption}" Text="Потери" VerticalAlignment="Center" Margin="6,0,8,0" />
-                                <TextBlock x:Name="NetLoss" Style="{StaticResource Metric}" FontSize="15" Foreground="{DynamicResource Muted}" Text="—"
-                                           VerticalAlignment="Center" />
-                                <TextBlock x:Name="NetLossUnit" Style="{StaticResource NetUnit}" Margin="4,0,0,0" VerticalAlignment="Center" Text="%" />
+                            <StackPanel x:Name="NetLossCell" Margin="0,0,12,0" Background="Transparent"
+                                        ToolTip="Доля потерянных проверок задержки за последние две минуты" AutomationProperties.Name="Потери">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="NetLoss" Style="{StaticResource Metric}" FontSize="15" LineHeight="17"
+                                               LineStackingStrategy="BlockLineHeight" Foreground="{DynamicResource Muted}" Text="—" />
+                                    <TextBlock x:Name="NetLossUnit" Style="{StaticResource NetUnit}" Margin="4,0,0,0" VerticalAlignment="Bottom" Text="%" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                    <Path Data="M 4,0 L 8,4 L 4,8 L 0,4 Z" Width="8" Height="8" Fill="{DynamicResource Warn}" VerticalAlignment="Center" />
+                                    <TextBlock Style="{StaticResource Caption}" FontSize="10.5" Text="Потери" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                </StackPanel>
                             </StackPanel>
                         </UniformGrid>
 
                         <!-- Два графика в ряд; в компактной раскладке — друг под другом. -->
-                        <Grid x:Name="Charts" Grid.Row="2" Grid.ColumnSpan="3" Margin="0,8,0,0">
+                        <Grid x:Name="Charts" Grid.Row="1" Grid.Column="2">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="2*" />
-                                <ColumnDefinition Width="20" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
@@ -849,12 +825,12 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
-                            <views:NetChart x:Name="ThroughputChart" Height="56" Capacity="60" Unit="Мбит/с" Floor="1"
-                                            Empty="Скорость начнёт писаться с запуском обхода"
+                            <views:NetChart x:Name="ThroughputChart" Height="60" Capacity="60" Unit="Мбит/с" Floor="1" Title="Скорость · 1 мин"
+                                            Empty="Скорость и задержка пойдут с запуском обхода"
                                             AutomationProperties.Name="График скорости за минуту" />
 
-                            <views:NetChart x:Name="LatencyChart" Grid.Column="2" Height="56" Capacity="24" Unit="мс" Floor="20"
-                                            Empty="Нет данных" AutomationProperties.Name="График задержки за две минуты" />
+                            <views:NetChart x:Name="LatencyChart" Grid.Column="2" Height="60" Capacity="24" Unit="мс" Floor="20" Title="Задержка · 2 мин"
+                                            Empty="" AutomationProperties.Name="График задержки за две минуты" />
                         </Grid>
                     </Grid>
                 </Border>

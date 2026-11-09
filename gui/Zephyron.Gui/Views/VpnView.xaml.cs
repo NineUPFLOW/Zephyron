@@ -197,6 +197,15 @@ public sealed class SubRow : System.ComponentModel.INotifyPropertyChanged
 
     public Visibility AnnounceShown => Announce is null ? Visibility.Collapsed : Visibility.Visible;
 
+    /// <summary>Вердикт SubscriptionTrust: «Подозрительная» / «Похоже на фальшивую» и причины; <c>null</c> — всё в порядке.</summary>
+    public string? Trust { get; set; }
+
+    public bool TrustFake { get; set; }
+
+    public Brush TrustBrush => (Brush)Application.Current.FindResource(TrustFake ? "Danger" : "Warn");
+
+    public Visibility TrustShown => Trust is null ? Visibility.Collapsed : Visibility.Visible;
+
     public Visibility WarningShown => Warning is null ? Visibility.Collapsed : Visibility.Visible;
 
     /// <summary>
@@ -886,6 +895,9 @@ public partial class VpnView : UserControl
             ApplyPool(settings);
             FillWarpCountry(settings);
 
+        // Не блокирует выбор: только предупреждает, что последние проверки WARP молчали.
+        WarpBlockedNote.Visibility = Zephyron.Proxy.WarpReach.LooksBlocked() ? Visibility.Visible : Visibility.Collapsed;
+
 
             // Замеры исчезнувших серверов — вон, иначе файл копит их вечно,
             // а по ним судят о свежести всего списка. Звала это только
@@ -1068,6 +1080,13 @@ public partial class VpnView : UserControl
         row.WebPageUrl = info.WebPageUrl;
         row.Announce = info.Announce;
         row.Warning = info.ExpiryWarningText(DateTimeOffset.Now);
+
+        var verdict = Zephyron.Subscriptions.SubscriptionTrust.Assess(info, DateTimeOffset.Now);
+        row.TrustFake = verdict.Level == Zephyron.Subscriptions.TrustLevel.Fake;
+        row.Trust = verdict.Level == Zephyron.Subscriptions.TrustLevel.Ok ? null
+            : (row.TrustFake ? "Похоже на фальшивую" : "Подозрительная")
+              + (verdict.Reasons.Count > 0 ? ": " + string.Join("; ", verdict.Reasons) : string.Empty)
+              + (verdict.PseudoServers.Count > 0 ? $". Служебных записей скрыто: {verdict.PseudoServers.Count}" : string.Empty);
 
         return (usable.Count, info.Servers.Count - usable.Count);
     }
@@ -1877,12 +1896,12 @@ public partial class VpnView : UserControl
         VpnSummaryLine.Text = hasVpn
             ? $"{string.Join(", ", parts)}, не используются — выбран WARP."
             : "Подписок и ключей нет.";
-        VpnSummaryAction.Content = hasVpn ? "Выбрать" : "Добавить";
+        // «Выбрать» повторяло переключатель выхода выше — остаётся только «Добавить».
+        VpnSummaryAction.Visibility = hasVpn ? Visibility.Collapsed : Visibility.Visible;
+        VpnSummaryAction.Content = "Добавить";
         System.Windows.Automation.AutomationProperties.SetName(VpnSummaryAction,
             hasVpn ? "Выбрать VPN для туннеля" : "Добавить подписку или ключ");
     }
-
-    private void OnSummaryWarp(object sender, RoutedEventArgs e) => ChoosePath(TunnelPath.Warp);
 
     private void OnSummaryVpn(object sender, RoutedEventArgs e) => PickPath(TunnelPath.Vpn);
 
@@ -2178,8 +2197,33 @@ public partial class VpnView : UserControl
     /// <summary>Выбор сервера при туннеле через WARP ничего не меняет — так и говорим.</summary>
     internal const string WarpPickNote = "Сейчас выход — WARP; выбор сервера действует, когда туннель идёт через VPN.";
 
-    private void ChooseAuto()
+    /// <summary>Идёт живая смена сервера — повторные нажатия игнорируются.</summary>
+    private bool _switching;
+
+    /// <summary>Сменить выход на ходу; <c>false</c> — нельзя, нужен перезапуск (или уже идёт смена).</summary>
+    private async Task<bool> TrySwitchLive(string? tag)
     {
+        _switching = true;
+
+        try
+        {
+            return await EngineControl.SwitchExitAsync(tag);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+        finally
+        {
+            _switching = false;
+        }
+    }
+
+    private async void ChooseAuto()
+    {
+        if (_switching)
+            return;
+
         bool warp = TunnelPaths.Of(AppSettings.Load(AppSettings.DefaultPath)) == TunnelPath.Warp;
 
         // Выключить автоподбор плиткой «Авто» нечем: чтобы закрепить сервер,
@@ -2197,13 +2241,19 @@ public partial class VpnView : UserControl
             var settings = AppSettings.Load(AppSettings.DefaultPath) with { PreferredServer = null };
             settings.Save(AppSettings.DefaultPath);
 
+            bool live = await TrySwitchLive(null);
+
             Reshow();
             ShowPick(settings);
 
             Status.Text = warp
                 ? WarpPickNote
-                : "Сервер откреплён: снова выбирается самый быстрый по задержке.";
-            this.Offer("Сервер выбран");
+                : live
+                    ? "Автоподбор включён без перезапуска — соединения не оборвались."
+                    : "Сервер откреплён: снова выбирается самый быстрый по задержке.";
+
+            if (!live)
+                this.Offer("Сервер выбран");
         }
         catch (Exception ex)
         {
@@ -2584,14 +2634,7 @@ public partial class VpnView : UserControl
             || pick(row) is not { } url)
             return;
 
-        try
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = url, UseShellExecute = true });
-        }
-        catch (Exception ex)
-        {
-            Status.Text = "Ссылку открыть не удалось: " + ex.GetBaseException().Message;
-        }
+        Links.Open(url);
     }
 
     private async void OnRefreshOne(object sender, RoutedEventArgs e)
@@ -2854,14 +2897,6 @@ public partial class VpnView : UserControl
             Remove(name);
     }
 
-    private void OnRemove(object sender, RoutedEventArgs e)
-    {
-        e.Handled = true;
-
-        if (sender is FrameworkElement { Tag: string name })
-            Remove(name);
-    }
-
     private void Remove(string name)
     {
         try
@@ -3078,6 +3113,22 @@ public partial class VpnView : UserControl
             return;
         }
 
+        // Флаг — до первого await: двойной щелчок иначе запускал второй замер,
+        // и тот отменял первый (_work?.Cancel() ниже).
+        _sweeping = true;
+
+        try
+        {
+            await MeasureCoreAsync(which, onlyTag);
+        }
+        finally
+        {
+            _sweeping = false;
+        }
+    }
+
+    private async Task MeasureCoreAsync(IReadOnlyList<SubRow> which, string? onlyTag)
+    {
         var settings = AppSettings.Load(AppSettings.DefaultPath);
 
         // Уже прочитанные серверы, с тегами пула, а не свежее чтение панели:
@@ -3123,7 +3174,6 @@ public partial class VpnView : UserControl
         _work?.Cancel();
         _work = new CancellationTokenSource();
 
-        _sweeping = true;
         _stoppedByHand = false;
 
         MeasureButton.Content = "Остановить";
@@ -3378,8 +3428,11 @@ public partial class VpnView : UserControl
         return tag;
     }
 
-    private void Choose(ServerRow row)
+    private async void Choose(ServerRow row)
     {
+        if (_switching)
+            return;
+
         if (row.PoolId is { } pool)
         {
             PinInPool(pool, row);
@@ -3391,19 +3444,27 @@ public partial class VpnView : UserControl
             var settings = AppSettings.Load(AppSettings.DefaultPath);
             var tag = IntoWork(row, settings, out bool switched);
 
-            (AppSettings.Load(AppSettings.DefaultPath) with { PreferredServer = tag })
-                .Save(AppSettings.DefaultPath);
+            var saved = AppSettings.Load(AppSettings.DefaultPath) with { PreferredServer = tag };
+            saved.Save(AppSettings.DefaultPath);
+
+            // Подпись «Закреплён: …» — сразу: иначе под лентой висело прежнее имя.
+            ShowPick(saved);
 
             // Раньше перерисовки, а не после. Выбор уже записан, и движки уже
             // работают со старой настройкой — сказать об этом надо независимо
             // от того, как пройдёт перерисовка. Стояло последним, и любая
             // её заминка съедала уведомление целиком: настройка менялась
             // молча, а человек узнавал об этом в следующий раз.
-            this.Offer($"Теперь используется {tag}");
+            bool live = await TrySwitchLive(tag);
+
+            if (!live)
+                this.Offer($"Теперь используется {tag}");
 
             Reshow();
 
-            Status.Text = switched
+            Status.Text = live
+                ? $"Переключено на «{tag}» без перезапуска — соединения не оборвались."
+                : switched
                 ? $"Выбран {tag}, и подписка «{row.Owner}» поставлена в работу — иначе "
                   + "его не было бы в конфиге. Вступит в силу после следующего запуска движков."
                 : $"Выбран {tag}. Вступит в силу после следующего запуска движков.";
@@ -3467,6 +3528,9 @@ public partial class VpnView : UserControl
     /// <summary>
     /// Лента быстрой смены: «Авто» и серверы подписок в работе, быстрые первыми.
     /// </summary>
+    /// <summary>Порядок плиток с первого показа вкладки — держится, пока она открыта.</summary>
+    private List<string> _quickOrder = [];
+
     private void ShowQuick(AppSettings settings)
     {
         bool auto = string.IsNullOrWhiteSpace(settings.PreferredServer);
@@ -3487,7 +3551,20 @@ public partial class VpnView : UserControl
             .DistinctBy(s => s.Tag)
             .OrderBy(s => settings.StableFirst && Seen(s.Tag) is { Flaky: true } ? 1 : 0)
             .ThenBy(s => Seen(s.Tag) is { Success: true, LatencyMs: { } ms } ? ms : double.MaxValue)
-            .Take(24);
+            .Take(24)
+            .ToList();
+
+        // Порядок задаётся один раз при открытии вкладки и дальше не меняется: свежий
+        // замер переставлял плитки прямо под курсором, и щелчок по «Франции» выбирал
+        // соседнюю. Новые серверы встают в конец; пересортирует следующий заход на вкладку.
+        if (_quickOrder.Count > 0)
+        {
+            servers = servers
+                .OrderBy(s => _quickOrder.IndexOf(s.Tag) is var at && at >= 0 ? at : int.MaxValue)
+                .ToList();
+        }
+
+        _quickOrder = servers.Select(s => s.Tag).ToList();
 
         foreach (var server in servers)
         {

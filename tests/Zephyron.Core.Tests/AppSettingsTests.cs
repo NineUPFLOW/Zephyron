@@ -17,6 +17,35 @@ public sealed class AppSettingsTests : IDisposable
             File.Delete(_path);
     }
 
+    [Fact]
+    public void Locked_settings_are_never_saved_over_the_file()
+    {
+        File.WriteAllText(_path, "{}");
+        AppSettings loaded;
+
+        using (new FileStream(_path, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            loaded = AppSettings.Load(_path);
+        }
+
+        loaded.Save(_path);
+
+        Assert.Equal("{}", File.ReadAllText(_path));
+    }
+
+    [Fact]
+    public void Broken_settings_are_backed_up_and_then_healed()
+    {
+        File.WriteAllText(_path, "{ не json");
+        var loaded = AppSettings.Load(_path);
+
+        loaded.Save(_path);
+
+        Assert.NotEqual("{ не json", File.ReadAllText(_path));
+        Assert.Contains(Directory.GetFiles(Path.GetDirectoryName(_path)!, Path.GetFileName(_path) + ".bad-*"),
+            f => File.ReadAllText(f) == "{ не json");
+    }
+
     /// <summary>
     /// «Файла нет» и «файл не прочитался» — разные ответы (30.09): второй
     /// до того выдавал мастер первого запуска человеку, прошедшему его давно.
@@ -181,6 +210,20 @@ public sealed class AppSettingsTests : IDisposable
         (AppSettings.Fresh with { GameFilter = true }).Save(_path);
 
         Assert.True(AppSettings.Load(_path).GameFilter);
+    }
+
+    [Fact]
+    public void VerifyTraffic_is_on_for_new_and_old_files_once_then_respects_choice()
+    {
+        Assert.True(AppSettings.Fresh.VerifyTraffic);
+
+        File.WriteAllText(_path, "{\"VerifyTraffic\":false}");
+        var old = AppSettings.Load(_path);
+        Assert.True(old.VerifyTraffic);
+
+        // Отметка переводa записана — выключенное потом остаётся выключенным.
+        (old with { VerifyTraffic = false }).Save(_path);
+        Assert.False(AppSettings.Load(_path).VerifyTraffic);
     }
 
     [Fact]

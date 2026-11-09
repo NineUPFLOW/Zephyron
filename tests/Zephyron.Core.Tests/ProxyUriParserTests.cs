@@ -163,6 +163,32 @@ public class ProxyUriParserTests
     }
 
     [Fact]
+    public void ShadowsocksPluginIsKeptAndUnknownOnesAreRefused()
+    {
+        var userInfo = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("aes-128-gcm:pw"));
+
+        var obfs = Parse($"ss://{userInfo}@h.example.com:8388/?plugin=obfs-local%3Bobfs%3Dhttp%3Bobfs-host%3Da.com#N");
+        var plugin = ShadowsocksMethods.Plugin(obfs.Extra);
+        Assert.Equal("obfs-local", plugin!.Value.Name);
+        Assert.Equal("obfs=http;obfs-host=a.com", plugin.Value.Options);
+        Assert.Null(obfs.TransportRefusal);
+
+        var exotic = Parse($"ss://{userInfo}@h.example.com:8388/?plugin=shadow-tls%3Bhost%3Da.com#N");
+        Assert.NotNull(exotic.TransportRefusal);
+    }
+
+    [Theory]
+    [InlineData("hiddify://import/https://p.example.com/sub/abc#Name")]
+    [InlineData("sing-box://import-remote-profile?url=https%3A%2F%2Fp.example.com%2Fsub%2Fabc#Name")]
+    [InlineData("v2rayng://install-config?url=https%3A%2F%2Fp.example.com%2Fsub%2Fabc&name=x")]
+    public void ClientDeepLinksUnwrapToTheSubscriptionUrl(string link)
+    {
+        var inner = SubscriptionClient.Unwrap(new Uri(link));
+        Assert.Equal("p.example.com", inner.Host);
+        Assert.Equal("/sub/abc", inner.AbsolutePath);
+    }
+
+    [Fact]
     public void IPv6HostIsParsed()
     {
         var server = Parse("vless://b7f3c1d2-4a5e-4c11-9f2b-8e7d6a1c0f33@[2001:db8::1]:443?type=tcp#v6");
@@ -271,6 +297,13 @@ public class SubscriptionParserTests
             userInfo: "upload=0; download=10; total=0", title: null, updateInterval: null);
 
         Assert.Null(info.RemainingBytes);
+    }
+
+    [Fact]
+    public void AmpersandIsKeptInHappLinkButCutInUrlParameter()
+    {
+        Assert.Equal("https://e.com/s?a=1&b=2", SubscriptionClient.Unwrap(new Uri("happ://add/https://e.com/s?a=1&b=2")).ToString());
+        Assert.Equal("https://e.com/s", SubscriptionClient.Unwrap(new Uri("clash://install-config?url=https%3A%2F%2Fe.com%2Fs&name=x")).ToString());
     }
 
     [Theory]

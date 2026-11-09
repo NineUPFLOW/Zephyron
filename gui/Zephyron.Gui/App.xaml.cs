@@ -460,7 +460,22 @@ public partial class App : Application
     /// процессов отличался бы рабочим каталогом, правами или ключами,
     /// и разбор вёлся бы не над тем, что у человека.
     /// </remarks>
-    private async void RunStart() => Shutdown(await Headless.StartAsync(CancellationToken.None));
+    private async void RunStart()
+    {
+        // Без Shutdown в любом исходе окна не будет, а процесс останется висеть.
+        int code;
+
+        try
+        {
+            code = await Headless.StartAsync(CancellationToken.None);
+        }
+        catch (Exception)
+        {
+            code = 1;
+        }
+
+        Shutdown(code);
+    }
 
     /// <summary>Окно подмены файлов после закрытия прежней версии.</summary>
     private void RunApply(string[] args)
@@ -482,9 +497,18 @@ public partial class App : Application
     private async void RunStop()
     {
         Journal.Write("движки", "остановка — ключ --stop");
-        await SupervisorHost.StopAsync(CancellationToken.None);
+        int code = 0;
 
-        Shutdown(0);
+        try
+        {
+            await SupervisorHost.StopAsync(CancellationToken.None);
+        }
+        catch (Exception)
+        {
+            code = 1;
+        }
+
+        Shutdown(code);
     }
 
     /// <summary>
@@ -498,11 +522,20 @@ public partial class App : Application
     private async void RunQuit()
     {
         Journal.Write("движки", "остановка и выход окна — ключ --quit (build.cmd)");
-        await SupervisorHost.StopAsync(CancellationToken.None);
+        int code;
 
-        bool gone = await Task.Run(() => SingleInstance.RequestQuit(TimeSpan.FromSeconds(10)));
+        try
+        {
+            await SupervisorHost.StopAsync(CancellationToken.None);
 
-        Shutdown(gone ? 0 : 1);
+            code = await Task.Run(() => SingleInstance.RequestQuit(TimeSpan.FromSeconds(10))) ? 0 : 1;
+        }
+        catch (Exception)
+        {
+            code = 1;
+        }
+
+        Shutdown(code);
     }
 
     /// <summary>

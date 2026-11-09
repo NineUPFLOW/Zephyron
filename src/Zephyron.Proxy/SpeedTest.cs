@@ -25,8 +25,9 @@ public enum SpeedPhase
 /// <param name="Fraction">Доля пройденного этапа, 0–1.</param>
 /// <param name="PingMs">Последний ответ при замере задержки.</param>
 /// <param name="Done">Этап кончился, и это его итог, а не показание на ходу.</param>
+/// <param name="LoadedMs">Отклик с соседнего соединения, пока идёт этап; у такого показания Mbps не в счёт.</param>
 public readonly record struct SpeedReading(
-    SpeedPhase Phase, double Mbps, double Fraction, double? PingMs = null, bool Done = false);
+    SpeedPhase Phase, double Mbps, double Fraction, double? PingMs = null, bool Done = false, double? LoadedMs = null);
 
 /// <summary>Итог замера. Чего не удалось измерить — <c>null</c>, а не ноль.</summary>
 public sealed record SpeedResult
@@ -40,6 +41,9 @@ public sealed record SpeedResult
     public double? DownMbps { get; init; }
 
     public double? UpMbps { get; init; }
+
+    /// <summary>Отклик под нагрузкой (большая из медиан скачивания и отдачи), мс; рост над простоем — против <see cref="PingMs"/>.</summary>
+    public double? LoadedPingMs { get; init; }
 
     /// <summary>Сколько байт ушло на замер — у туннеля это трафик подписки.</summary>
     public long DownBytes { get; init; }
@@ -309,6 +313,10 @@ public sealed class SpeedTest
         long bytes;
         double seconds;
 
+        using var probeStop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var probe = Task.Run(() => ProbeAsync(SpeedPhase.Download, progress, probeStop.Token), CancellationToken.None);
+        List<double> loaded;
+
         try
         {
             (bytes, seconds) = await WatchAsync(
@@ -317,9 +325,13 @@ public sealed class SpeedTest
         finally
         {
             // И при отмене тоже: потоки не должны пережить замер.
+            await probeStop.CancelAsync();
             await stop.CancelAsync();
             await Task.WhenAll(streams);
+            loaded = await probe;
         }
+
+        result = result with { LoadedPingMs = Max(result.LoadedPingMs, Median(loaded)) };
 
         long received = Interlocked.Read(ref total);
 
@@ -408,6 +420,10 @@ public sealed class SpeedTest
             }
         }, CancellationToken.None)).ToList();
 
+        using var probeStop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var probe = Task.Run(() => ProbeAsync(SpeedPhase.Upload, progress, probeStop.Token), CancellationToken.None);
+        List<double> loaded;
+
         try
         {
             await WatchAsync(SpeedPhase.Upload, duration, watch, () => Interlocked.Read(ref written), progress, cancellationToken);
@@ -422,8 +438,12 @@ public sealed class SpeedTest
         }
         finally
         {
+            await probeStop.CancelAsync();
             await Task.WhenAll(streams);
+            loaded = await probe;
         }
+
+        result = result with { LoadedPingMs = Max(result.LoadedPingMs, Median(loaded)) };
 
         long sent = Interlocked.Read(ref accepted);
 
@@ -445,6 +465,62 @@ public sealed class SpeedTest
 
         return result with { UpMbps = speed };
     }
+
+    /// <summary>
+    /// Отклик под нагрузкой: короткие запросы по отдельному соединению, пока на других идёт поток.
+    /// </summary>
+    /// <remarks>
+    /// Своё соединение, а не общий пул: иначе запрос встал бы в очередь за потоками замера.
+    /// Первый ответ не в счёт (рукопожатие). Сбой пробы замер не рвёт — просто меньше точек.
+    /// </remarks>
+    private async Task<List<double>> ProbeAsync(SpeedPhase phase, IProgress<SpeedReading>? progress, CancellationToken token)
+    {
+        var times = new List<double>();
+
+        try
+        {
+            using var handler = new SocketsHttpHandler
+            {
+                UseProxy = _options.Proxy is not null,
+                Proxy = _options.Proxy,
+                AutomaticDecompression = DecompressionMethods.None,
+                MaxConnectionsPerServer = 1,
+                ConnectTimeout = TimeSpan.FromSeconds(10),
+            };
+
+            using var http = new HttpClient(handler) { BaseAddress = _options.Server, Timeout = Timeout.InfiniteTimeSpan };
+
+            for (int i = 0; !token.IsCancellationRequested; i++)
+            {
+                var watch = Stopwatch.StartNew();
+
+                using var limit = CancellationTokenSource.CreateLinkedTokenSource(token);
+                limit.CancelAfter(TimeSpan.FromSeconds(5));
+
+                using var response = await http.GetAsync("/__down?bytes=0", limit.Token);
+                await response.Content.ReadAsByteArrayAsync(limit.Token);
+
+                double server = response.Headers.TryGetValues("Server-Timing", out var timing) ? ServerTime(timing) : 0;
+                double ms = Math.Max(0, watch.Elapsed.TotalMilliseconds - server);
+
+                if (i > 0)
+                {
+                    times.Add(ms);
+                    progress?.Report(new SpeedReading(phase, 0, 0, LoadedMs: ms));
+                }
+
+                await Task.Delay(250, token);
+            }
+        }
+        catch (Exception)
+        {
+            // Отмена — конец этапа; прочее — проба сломалась, берём что успели.
+        }
+
+        return times;
+    }
+
+    private static double? Max(double? a, double? b) => a is null ? b : b is null ? a : Math.Max(a.Value, b.Value);
 
     /// <summary>
     /// Следит за счётчиком весь срок этапа: шлёт показания и возвращает, сколько
@@ -571,6 +647,9 @@ public sealed class SpeedTest
 
         if (result.PingMs is { } ping)
             parts.Add($"задержка {ping:0} мс");
+
+        if (result.LoadedPingMs is { } loaded)
+            parts.Add($"под нагрузкой {loaded:0} мс");
 
         if (result.Problem is { Length: > 0 } problem)
             parts.Add(problem);

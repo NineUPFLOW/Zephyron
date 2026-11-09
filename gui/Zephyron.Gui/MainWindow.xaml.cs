@@ -61,6 +61,19 @@ public partial class MainWindow : Window
 
         _toastTimer.Tick += (_, _) => HideToast();
 
+        // Развёрнутое окно запоминается (окно из трея создаётся заново — читаем при создании).
+        try
+        {
+            if (AppSettings.Load(AppSettings.DefaultPath).WindowMaximized)
+                WindowState = WindowState.Maximized;
+        }
+        catch (Exception)
+        {
+            // Настройки не прочитались — обычный размер.
+        }
+
+        StateChanged += (_, _) => SaveMaximized();
+
         // Подписка на статическое событие держала бы закрытое окно живым:
         // с 15.10 окно в трее закрывается по-настоящему (Release).
         _onUpdate = () => Dispatcher.InvokeAsync(() =>
@@ -665,6 +678,12 @@ public partial class MainWindow : Window
         }
 
         _dotMode = ModeOf(key);
+
+        // Движки остановлены или поднимаются заново (трей, автоподбор, меню «Выключить») —
+        // новый запуск уже берёт свежие настройки, ждать перезапуска нечего.
+        if (_dotMode is FieldMode.Off or FieldMode.Starting)
+            _restartPending = false;
+
         ShowState();
         ApplyBackdropKind();
     }
@@ -731,11 +750,20 @@ public partial class MainWindow : Window
             _ => "Выключен",
         };
 
+        bool pending = _restartPending && mode != FieldMode.Off && mode != FieldMode.Starting;
+
+        if (pending)
+        {
+            TopStatus.Text = "Ждёт перезапуска ↻";
+            TopMark.Tag = nameof(FieldMode.Degraded);
+        }
+
         // Дыхание — только при «Работает» (и не в «Лёгком»: Breathe проверит).
         Breathe(mode == FieldMode.Running);
 
         // В сжатой полосе слова не видно — оно остаётся подсказкой.
-        StatusRow.ToolTip = TopStatus.Text + " — подробности на «Главной»";
+        StatusRow.ToolTip = pending ? "Движки работают по старой настройке — нажмите, чтобы перезапустить"
+            : TopStatus.Text + " — подробности на «Главной»";
     }
 
     /// <summary>
@@ -762,7 +790,41 @@ public partial class MainWindow : Window
         MoveIndicator(animate: false);
     }
 
-    private void OnStatusRow(object sender, RoutedEventArgs e) => Open("status");
+    private void SaveMaximized()
+    {
+        // Свёрнутое не пишем: после разворота из панели задач вернётся прежнее.
+        if (WindowState == WindowState.Minimized)
+            return;
+
+        try
+        {
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
+            bool max = WindowState == WindowState.Maximized;
+
+            if (settings.WindowMaximized != max)
+                (settings with { WindowMaximized = max }).Save(AppSettings.DefaultPath);
+        }
+        catch (Exception)
+        {
+            // Не записалось — окно запомнит размер в следующий раз.
+        }
+    }
+
+    private void OnStatusRow(object sender, RoutedEventArgs e)
+    {
+        if (_restartPending && EffectiveMode() is not (FieldMode.Off or FieldMode.Starting) && ToastAct.IsEnabled)
+        {
+            Toast.BeginAnimation(OpacityProperty, null);
+            Toast.Visibility = Visibility.Visible;
+            ToastAct.Visibility = Visibility.Visible;
+            ToastLater.Content = "Не сейчас";
+            OnToastRestart(sender, e);
+
+            return;
+        }
+
+        Open("status");
+    }
 
     private bool _breathing;
 
@@ -950,14 +1012,22 @@ public partial class MainWindow : Window
         ToastLater.Content = "Не сейчас";
         ShowToastKind("Degraded", assertive: false);
 
+        // Пока движки на старой настройке, плашка не уходит сама; после «Не сейчас»
+        // остаётся метка в полосе состояния (ShowState) до перезапуска или остановки.
+        _restartPending = true;
+        ShowState();
+
         // Угасание от прошлого «Позже» могло ещё идти — снимаем, иначе оно
         // спрятало бы только что показанное.
         Toast.BeginAnimation(OpacityProperty, null);
         Toast.Visibility = Visibility.Visible;
         Motion.Arrive(Toast, dy: 8, ms: 180);
-
-        ArmToast();
+        _toastTimer.Stop();
+        _toastArmed = false;
     }
+
+    /// <summary>Движки ещё работают по старой настройке: слово в полосе — «Ждёт перезапуска».</summary>
+    private bool _restartPending;
 
     /// <summary>Знак тоста (ромб — предложение, диск — готово, треугольник — не вышло) и как его читает скринридер.</summary>
     private void ShowToastKind(string mark, bool assertive)
@@ -1093,6 +1163,8 @@ public partial class MainWindow : Window
         ToastTitle.Text = "Движки перезапущены";
         ToastBody.Text = "Открытые вкладки держат старые соединения. Чтобы увидеть перемену, обновите страницу через Ctrl+F5 или откройте её в окне инкогнито."
             + "";
+        _restartPending = false;
+        ShowState();
         ToastAct.Visibility = Visibility.Collapsed;
         ToastLater.Content = "Хорошо";
         ShowToastKind("Running", assertive: false);

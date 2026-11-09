@@ -89,9 +89,13 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0" Margin="22,0">
+                        <StackPanel Grid.Column="0" Margin="14,0">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE896;" FontSize="14"
                                            Foreground="{DynamicResource Accent2}" Margin="0,0,8,0" VerticalAlignment="Center" />
@@ -107,7 +111,7 @@
 
                         <Border Grid.Column="1" Width="1" Background="{DynamicResource Border}" Margin="0,4" />
 
-                        <StackPanel Grid.Column="2" Margin="22,0">
+                        <StackPanel Grid.Column="2" Margin="14,0">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE898;" FontSize="14"
                                            Foreground="{DynamicResource Text}" Margin="0,0,8,0" VerticalAlignment="Center" />
@@ -123,7 +127,7 @@
 
                         <Border Grid.Column="3" Width="1" Background="{DynamicResource Border}" Margin="0,4" />
 
-                        <StackPanel Grid.Column="4" Margin="22,0">
+                        <StackPanel Grid.Column="4" Margin="14,0">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE916;" FontSize="14"
                                            Foreground="{DynamicResource Accent2}" Margin="0,0,8,0" VerticalAlignment="Center" />
@@ -134,6 +138,47 @@
                             <views:Sparkline x:Name="PingLine" Height="34" Margin="0,8,0,0" Headroom="2"
                                              Stroke="{DynamicResource Accent2}" />
                             <TextBlock x:Name="PingWord" Style="{StaticResource Caption}" HorizontalAlignment="Center"
+                                       Margin="0,6,0,0" />
+                        </StackPanel>
+
+                        <Border Grid.Column="5" Width="1" Background="{DynamicResource Border}" Margin="0,4" />
+
+                        <StackPanel Grid.Column="6" Margin="14,0">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE9D9;" FontSize="14"
+                                           Foreground="{DynamicResource Text}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <TextBlock Text="Джиттер" Style="{StaticResource GroupHead}"
+                                           ToolTip="Разброс отклика: средняя разница соседних ответов" />
+                            </StackPanel>
+                            <TextBlock x:Name="JitText" Text="—" Style="{StaticResource SpeedMetric}" Margin="0,4,0,0" />
+                            <TextBlock Text="мс" Style="{StaticResource MetricUnit}" HorizontalAlignment="Center" />
+                            <views:Sparkline x:Name="JitLine" Height="34" Margin="0,8,0,0" Headroom="2"
+                                             Stroke="{DynamicResource Text}" />
+                            <TextBlock Style="{StaticResource Caption}" HorizontalAlignment="Center" Margin="0,6,0,0" Text=" " />
+                        </StackPanel>
+
+                        <Border Grid.Column="7" Width="1" Background="{DynamicResource Border}" Margin="0,4" />
+
+                        <StackPanel Grid.Column="8" Margin="14,0">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <TextBlock Style="{StaticResource LineGlyph}" Text="&#xE9D2;" FontSize="14"
+                                           Foreground="{DynamicResource Accent2}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <TextBlock Text="Под нагрузкой" Style="{StaticResource GroupHead}"
+                                           ToolTip="Отклик, пока идёт скачивание и отдача" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0">
+                                <TextBlock x:Name="LoadText" Text="—" Style="{StaticResource Metric}" VerticalAlignment="Center" />
+                                <Border x:Name="LoadGrade" Width="28" Height="28" CornerRadius="{StaticResource RMd}" Margin="10,0,0,0"
+                                        Background="{DynamicResource Wash}" BorderBrush="{DynamicResource Border}"
+                                        BorderThickness="{StaticResource Stroke}" Visibility="Collapsed" VerticalAlignment="Center">
+                                    <TextBlock x:Name="LoadLetter" FontWeight="Bold" FontSize="14"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                            </StackPanel>
+                            <TextBlock Text="мс" Style="{StaticResource MetricUnit}" HorizontalAlignment="Center" />
+                            <views:Sparkline x:Name="LoadLine" Height="34" Margin="0,8,0,0" Headroom="2"
+                                             Stroke="{DynamicResource Accent2}" />
+                            <TextBlock x:Name="LoadWord" Style="{StaticResource Caption}" HorizontalAlignment="Center"
                                        Margin="0,6,0,0" />
                         </StackPanel>
                     </Grid>
@@ -255,6 +300,226 @@
                 </Border>
 
                 <!--
+                    Скорость до сайта: путь именно до этого адреса. Напрямую всё
+                    разложено по этапам одного соединения; через туннель DNS, TCP
+                    и TLS происходят по ту сторону, и там они «—», а не нули.
+                -->
+                <Border x:Name="SiteCard" Style="{StaticResource Card}" Margin="0,12,0,0" Padding="18,14">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Скорость до сайта" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Text="Замеряет путь именно до этого адреса" Style="{StaticResource Caption}"
+                                       Margin="12,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox x:Name="SiteBox" Grid.Column="0" Height="{StaticResource HControl}"
+                                     local:Hint.Text="example.com или https://example.com/путь"
+                                     AutomationProperties.Name="Адрес сайта" TextChanged="OnSiteText" KeyDown="OnSiteKey" />
+                            <Button x:Name="SiteGo" Grid.Column="2" Style="{StaticResource Primary}" Padding="18,0" IsEnabled="False"
+                                    Height="{StaticResource HControl}" Click="OnSiteGo" Content="Измерить" />
+                            <Button x:Name="SiteCompare" Grid.Column="4" Style="{StaticResource Ghost}" Padding="14,0" IsEnabled="False"
+                                    Height="{StaticResource HControl}" Click="OnSiteCompare" local:ButtonGlyph.Lead="&#xE8AB;"
+                                    Content="Сравнить пути" ToolTip="Замер напрямую, затем через туннель" />
+                        </Grid>
+
+                        <TextBlock x:Name="SiteHost" Style="{StaticResource Caption}" Margin="2,6,0,0" />
+                        <TextBlock x:Name="SiteStatus" Style="{StaticResource Caption}" Margin="2,4,0,0" Visibility="Collapsed"
+                                   AutomationProperties.LiveSetting="Polite" />
+
+                        <Border x:Name="SiteError" Visibility="Collapsed" Margin="0,10,0,0" Padding="12,9"
+                                CornerRadius="{StaticResource RSm}" Background="{DynamicResource DangerSoft}"
+                                BorderBrush="{DynamicResource DangerLine}" BorderThickness="{StaticResource Stroke}"
+                                AutomationProperties.LiveSetting="Polite">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Left" Style="{StaticResource LineGlyph}" Text="&#xE783;" FontSize="13"
+                                           Foreground="{DynamicResource Danger}" Margin="0,0,10,0" VerticalAlignment="Top" />
+                                <TextBlock x:Name="SiteErrorText" FontSize="12.5" TextWrapping="Wrap" Foreground="{DynamicResource Danger}" />
+                            </DockPanel>
+                        </Border>
+
+                        <ContentControl x:Name="SiteEmpty" Style="{StaticResource EmptyState}"
+                                        local:PageHead.Title="Введите адрес сайта"
+                                        local:PageHead.Subtitle="Чтобы увидеть, где теряется время." />
+
+                        <Grid x:Name="SiteResultGrid" Margin="0,14,0,0" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition x:Name="SiteGap" Width="24" />
+                                <ColumnDefinition x:Name="SiteSide" Width="300" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <StackPanel>
+                                <!-- Полоса времени: сегменты пропорциональны этапам, подписи — в плитках ниже. -->
+                                <Border Height="10" CornerRadius="{StaticResource RSm}" ClipToBounds="True"
+                                        Background="{DynamicResource Wash}" AutomationProperties.Name="Время по этапам">
+                                    <Grid x:Name="SiteBar" />
+                                </Border>
+
+                                <UniformGrid x:Name="SiteTiles" Columns="5" Margin="0,10,0,0">
+                                    <Border x:Name="TileDns" Padding="0,0,8,0" Background="Transparent" ToolTip="Время разрешения имени">
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Rectangle Width="8" Height="8" Fill="{DynamicResource Accent2}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                <TextBlock Text="DNS" Style="{StaticResource Caption}" />
+                                            </StackPanel>
+                                            <TextBlock x:Name="DnsVal" Style="{StaticResource Metric}" FontSize="17" Text="—" HorizontalAlignment="Left" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border x:Name="TileTcp" Padding="0,0,8,0" Background="Transparent" ToolTip="Установка соединения">
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Rectangle Width="8" Height="8" Fill="{DynamicResource Accent}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                <TextBlock Text="TCP" Style="{StaticResource Caption}" />
+                                            </StackPanel>
+                                            <TextBlock x:Name="TcpVal" Style="{StaticResource Metric}" FontSize="17" Text="—" HorizontalAlignment="Left" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border x:Name="TileTls" Padding="0,0,8,0" Background="Transparent" ToolTip="Рукопожатие шифрования">
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Rectangle Width="8" Height="8" Fill="{DynamicResource Success}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                <TextBlock Text="TLS" Style="{StaticResource Caption}" />
+                                            </StackPanel>
+                                            <TextBlock x:Name="TlsVal" Style="{StaticResource Metric}" FontSize="17" Text="—" HorizontalAlignment="Left" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border x:Name="TileTtfb" Padding="0,0,8,0" Background="Transparent" ToolTip="Время до первого байта ответа">
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Rectangle Width="8" Height="8" Fill="{DynamicResource Warn}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                <TextBlock Text="Ответ (TTFB)" Style="{StaticResource Caption}" />
+                                            </StackPanel>
+                                            <TextBlock x:Name="TtfbVal" Style="{StaticResource Metric}" FontSize="17" Text="—" HorizontalAlignment="Left" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border x:Name="TileDown" Padding="0,0,8,0" Background="Transparent" ToolTip="Скорость скачивания страницы">
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Rectangle Width="8" Height="8" Fill="{DynamicResource Muted}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                <TextBlock Text="Загрузка" Style="{StaticResource Caption}" />
+                                            </StackPanel>
+                                            <TextBlock x:Name="DownVal" Style="{StaticResource Metric}" FontSize="17" Text="—" HorizontalAlignment="Left" />
+                                        </StackPanel>
+                                    </Border>
+                                </UniformGrid>
+
+                                <TextBlock x:Name="SiteSummary" Style="{StaticResource Caption}" Margin="0,10,0,0" TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <Grid x:Name="SiteFacts" Grid.Column="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Text="Адрес" Style="{StaticResource FactLabel}" />
+                                <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                                    <TextBlock x:Name="IpVal" Style="{StaticResource FactValue}" FontFamily="{DynamicResource MonoFont}" Text="—" />
+                                    <Button x:Name="IpCopy" Style="{StaticResource IconGhost}" Content="&#xE8C8;" Width="24" Height="24" MinWidth="0" MinHeight="0"
+                                            Padding="0" FontSize="12" Margin="6,0,0,0" VerticalAlignment="Center" Click="OnIpCopy"
+                                            ToolTip="Скопировать" AutomationProperties.Name="Скопировать адрес" Visibility="Collapsed" />
+                                </StackPanel>
+
+                                <TextBlock Grid.Row="1" Text="Маршрут" Style="{StaticResource FactLabel}" />
+                                <StackPanel Grid.Row="1" Grid.Column="1">
+                                    <Border x:Name="RouteChip" HorizontalAlignment="Left" Margin="0,4,0,0" Padding="8,2"
+                                            CornerRadius="{StaticResource RSm}" Background="{DynamicResource Wash}"
+                                            BorderBrush="{DynamicResource Border}" BorderThickness="{StaticResource Stroke}">
+                                        <TextBlock x:Name="RouteVal" FontSize="12" Text="—" />
+                                    </Border>
+                                    <TextBlock x:Name="RouteWhyText" Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <TextBlock Grid.Row="2" Text="HTTP" Style="{StaticResource FactLabel}" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" x:Name="HttpVal" Style="{StaticResource FactValue}" Text="—" />
+
+                                <TextBlock Grid.Row="3" Text="Сервер" Style="{StaticResource FactLabel}" />
+                                <TextBlock Grid.Row="3" Grid.Column="1" x:Name="ServerVal" Style="{StaticResource FactValue}" Text="—"
+                                           MaxWidth="260" HorizontalAlignment="Left" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+
+                                <TextBlock Grid.Row="4" Text="Джиттер" Style="{StaticResource FactLabel}" />
+                                <TextBlock Grid.Row="4" Grid.Column="1" x:Name="JitterVal" Style="{StaticResource FactValue}" Text="—"
+                                           ToolTip="Разброс времени установки соединения: стандартное отклонение" />
+
+                                <TextBlock Grid.Row="5" Text="Под нагрузкой" Style="{StaticResource FactLabel}" />
+                                <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal">
+                                    <Border x:Name="GradeBox" Width="28" Height="28" CornerRadius="{StaticResource RMd}" Margin="0,2,10,2"
+                                            Background="{DynamicResource Wash}" BorderBrush="{DynamicResource Border}"
+                                            BorderThickness="{StaticResource Stroke}" Visibility="Collapsed">
+                                        <TextBlock x:Name="GradeLetter" FontWeight="Bold" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <TextBlock x:Name="LoadedVal" Style="{StaticResource FactValue}" Text="—" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Grid>
+
+                            <StackPanel Grid.Row="2" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,12,0,0">
+                                <Button x:Name="SiteAgain" Style="{StaticResource Ghost}" Padding="14,6" Click="OnSiteGo" Content="Измерить снова" />
+                                <Button x:Name="SiteCopy" Style="{StaticResource Ghost}" Padding="14,6" Margin="8,0,0,0" Click="OnSiteCopy"
+                                        local:ButtonGlyph.Lead="&#xE8C8;" Content="Копировать итог" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Похоже на блокировку: напрямую не идёт, через туннель идёт. -->
+                        <StackPanel x:Name="SiteBlock" Orientation="Horizontal" Margin="0,12,0,0" Visibility="Collapsed">
+                            <TextBlock Style="{StaticResource Caption}" Foreground="{DynamicResource Warn}" VerticalAlignment="Center"
+                                       Text="Похоже на блокировку. Откройте «Маршруты» и добавьте сайт." />
+                            <Button Style="{StaticResource Ghost}" Padding="12,5" Margin="12,0,0,0" Click="OnSiteRoutes"
+                                    Content="Добавить в маршруты" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Сравнение путей: появляется после «Сравнить пути». -->
+                <Border x:Name="CompareCard" Style="{StaticResource Card}" Margin="0,12,0,0" Padding="18,14" Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Text="Напрямую и через туннель" FontWeight="SemiBold" />
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Padding="12" CornerRadius="{StaticResource RMd}" Background="{DynamicResource Wash}">
+                                <StackPanel>
+                                    <TextBlock Text="Напрямую" Style="{StaticResource GroupHead}" />
+                                    <TextBlock x:Name="CmpDirect" Margin="0,6,0,0" FontSize="12.5" LineHeight="20" LineStackingStrategy="BlockLineHeight" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Padding="12" CornerRadius="{StaticResource RMd}" Background="{DynamicResource Wash}">
+                                <StackPanel>
+                                    <TextBlock Text="Через туннель" Style="{StaticResource GroupHead}" />
+                                    <TextBlock x:Name="CmpTunnel" Margin="0,6,0,0" FontSize="12.5" LineHeight="20" LineStackingStrategy="BlockLineHeight" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                        <TextBlock x:Name="CmpVerdict" Margin="0,12,0,0" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"
+                                   AutomationProperties.LiveSetting="Polite" />
+                    </StackPanel>
+                </Border>
+
+                <!--
                     Прошлые замеры и вывод. На узком окне вывод уходит под
                     таблицу (OnPageSize): пять столбцов в трёхстах точках
                     не читаются.
@@ -272,7 +537,22 @@
 
                     <Border x:Name="HistoryCard" Grid.Column="0" Style="{StaticResource Card}" Padding="18,14,18,12">
                         <StackPanel>
-                            <TextBlock Text="Недавние замеры" FontWeight="SemiBold" />
+                            <DockPanel>
+                                <TextBlock Text="Недавние замеры" FontWeight="SemiBold" VerticalAlignment="Center" DockPanel.Dock="Left" />
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button x:Name="TrendDown" Style="{StaticResource Choice}" Tag="0" Click="OnTrend" Content="Загрузка"
+                                            Margin="0,0,4,0" Padding="10,0" MinHeight="24" AutomationProperties.Name="График: загрузка" />
+                                    <Button x:Name="TrendUp" Style="{StaticResource Choice}" Tag="1" Click="OnTrend" Content="Отправка"
+                                            Margin="0,0,4,0" Padding="10,0" MinHeight="24" AutomationProperties.Name="График: отправка" />
+                                    <Button x:Name="TrendPing" Style="{StaticResource Choice}" Tag="2" Click="OnTrend" Content="Отклик"
+                                            Margin="0,0,4,0" Padding="10,0" MinHeight="24" AutomationProperties.Name="График: отклик" />
+                                    <Button x:Name="TrendLoad" Style="{StaticResource Choice}" Tag="3" Click="OnTrend" Content="Под нагрузкой"
+                                            Margin="0" Padding="10,0" MinHeight="24" AutomationProperties.Name="График: под нагрузкой" />
+                                </StackPanel>
+                            </DockPanel>
+
+                            <views:Sparkline x:Name="TrendLine" Height="34" Margin="0,10,0,0" Stroke="{DynamicResource Accent2}" />
+                            <TextBlock x:Name="TrendCaption" Style="{StaticResource Caption}" Margin="0,4,0,0" />
 
                             <Grid Margin="10,10,10,4">
                                 <Grid.ColumnDefinitions>
@@ -281,13 +561,16 @@
                                     <ColumnDefinition Width="104" />
                                     <ColumnDefinition Width="104" />
                                     <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="56" />
                                 </Grid.ColumnDefinitions>
 
-                                <TextBlock Grid.Column="0" Text="Длительность" Style="{StaticResource Caption}" />
+                                <TextBlock Grid.Column="0" Text="Когда" Style="{StaticResource Caption}" />
                                 <TextBlock Grid.Column="1" Text="Путь" Style="{StaticResource Caption}" />
                                 <TextBlock Grid.Column="2" Text="Загрузка" Style="{StaticResource Caption}" />
                                 <TextBlock Grid.Column="3" Text="Отправка" Style="{StaticResource Caption}" />
                                 <TextBlock Grid.Column="4" Text="Отклик" Style="{StaticResource Caption}" />
+                                <TextBlock Grid.Column="5" Text="Класс" Style="{StaticResource Caption}"
+                                           ToolTip="Класс сети под нагрузкой, A лучший" />
                             </Grid>
 
                             <StackPanel x:Name="HistoryRows" />
@@ -295,7 +578,7 @@
                             <!-- Код пишет только Visibility, поэтому элемент сам — ContentControl состояния «пусто». -->
                             <ContentControl x:Name="HistoryEmpty" Style="{StaticResource EmptyState}"
                                             local:PageHead.Title="Замеров ещё не было"
-                                            local:PageHead.Subtitle="Нажмите «Начать замер» — результат появится здесь." />
+                                            local:PageHead.Subtitle="Нажмите «Запустить» — результат появится здесь." />
                         </StackPanel>
                     </Border>
 

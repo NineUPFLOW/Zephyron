@@ -1926,6 +1926,15 @@ public sealed class SingBoxConfigCompiler
                 // Короткие имена Xray и Clash — полными: sing-box их не знает (№38).
                 outbound["method"] = ShadowsocksMethods.ForSingBox(server.Method) ?? ShadowsocksMethods.Default;
                 outbound["password"] = server.Credential;
+
+                if (ShadowsocksMethods.Plugin(server.Extra) is { } plugin && ShadowsocksMethods.Supported(plugin.Name))
+                {
+                    outbound["plugin"] = plugin.Name;
+
+                    if (plugin.Options.Length > 0)
+                        outbound["plugin_opts"] = plugin.Options;
+                }
+
                 break;
 
             case ProxyProtocol.Hysteria2:

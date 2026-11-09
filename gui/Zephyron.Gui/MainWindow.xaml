@@ -173,6 +173,10 @@
         </Canvas>
 
         <Grid Grid.Row="1" x:Name="SectionArea">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
             <ContentControl x:Name="Section" Focusable="False">
                 <views:StatusView />
             </ContentControl>
@@ -188,7 +192,7 @@
                 Всплывающие карточки — стопкой внизу справа, над кнопкой журнала,
                 чтобы две разом не легли одна на другую.
             -->
-            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,24,20">
+            <StackPanel Grid.Row="1" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,24,8">
 
             <!--
                 После обновления: звезда на GitHub и канал. Один раз на каждую
@@ -238,7 +242,9 @@
             </Border>
 
             <!--
-                Предложение перезапустить движки. Внизу справа и само уходит:
+                Предложение перезапустить движки. Внизу справа, в своей строке под
+                разделом (не поверх кнопок страницы), и само не уходит, пока движки
+                на старой настройке; после «Не сейчас» остаётся слово в полосе. Раньше уходило само:
                 почти всё, что меняется в окне, применяется перезапуском,
                 и говорить об этом строкой в глубине раздела значит не сказать
                 вовсе. Но и держать перед глазами нельзя — правок за один

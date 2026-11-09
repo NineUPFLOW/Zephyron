@@ -400,12 +400,22 @@ public sealed record ProxyServer
     /// в восьми местах, и забытое в одном из них означало бы разделитель
     /// в конфиге при чистом списке на экране.
     /// </remarks>
-    public bool IsUsableOutbound => IsSupportedBySingBox && HasDialableAddress;
+    public bool IsUsableOutbound => IsSupportedBySingBox && HasDialableAddress && !IsPseudo;
+
+    /// <summary>
+    /// Служебная запись панели, а не сервер: «Истекла», «Продлите», «Telegram @…» на адресе-пустышке.
+    /// </summary>
+    /// <remarks>
+    /// Панели кладут такие строки в список, чтобы показать их в клиенте; выходом они быть не могут,
+    /// а в автоподборе и замерах только жгли время. Признаки — в <see cref="SubscriptionTrust"/>.
+    /// </remarks>
+    public bool IsPseudo => SubscriptionTrust.PseudoWhy(this) is not null;
 
     /// <summary>Почему сервер мимо конфига — словами для отчёта; <c>null</c> — годен.</summary>
     public string? UnusableWhy =>
         IsUsableOutbound ? null
         : !HasDialableAddress ? "нет адреса (разделитель панели)"
+        : SubscriptionTrust.PseudoWhy(this) is { } pseudo ? "служебная запись панели: " + pseudo
         : Protocol == ProxyProtocol.Shadowsocks && ShadowsocksMethods.ForSingBox(Method) is null ? $"шифр «{Method}» движок не знает"
         : Security.Equals("reality", StringComparison.OrdinalIgnoreCase) && !IsRealityKey(RealityPublicKey) ? "ключ REALITY пуст или испорчен"
         : Protocol == ProxyProtocol.Vless && VlessEncryption.ForSingBox(Encryption) is null ? "шифрование VLESS в виде, которого движок не разбирает"

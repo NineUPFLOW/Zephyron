@@ -13,16 +13,13 @@
         DynamicResource — те же ключи, что у карточек окна.
 
         «Сигнал»: меню как всплывающий слой окна — Raised, рамка LineStrong,
-        RLg, тень; пункты высотой HControlSm, наведение WashHover. Ни частиц,
-        ни свечения, ни срезов: окно слоистое (AllowsTransparency), и каждый
-        лишний слой перерисовывается при каждом показе.
+        RLg, тень. Ни частиц, ни свечения, ни срезов: окно слоистое
+        (AllowsTransparency), и каждый лишний слой перерисовывается при каждом показе.
 
         Подложка — размытый снимок того, что под меню, а не прозрачность
-        (владелец 24.09: «сделай в трее размытость, а не прозрачность»).
-        Системное размытие Windows (подложка DWM и политика акцента) под этим
-        окном давало сплошной тёмный слой — снято на экране поверх ярких
-        полос, — поэтому размытие своё: снимок в миг открытия, как у стекла
-        под карточками окна (Themes.RenderLayer). Подробности — TrayMenu.Blurred.
+        (владелец 24.09). Системное размытие Windows под этим окном давало
+        сплошной тёмный слой, поэтому размытие своё: снимок в миг открытия
+        (Themes.RenderLayer). Подробности — TrayMenu.Blurred.
     -->
     <Window.Resources>
         <!-- Строка выхода: значок и подпись, подсветка WashHover при наведении. -->
@@ -62,8 +59,8 @@
         </Style>
 
         <!--
-            Сегмент режима — как выбор в «Оформлении» (Choice): выбранный — рамка
-            AccentLine, AccentSoft, текст Accent; без свечения.
+            Сегмент режима — ячейка общей ленты (рамку и подложку даёт лента):
+            выбранный — AccentSoft и AccentLine, текст Accent; без свечения.
         -->
         <Style x:Key="ModeSegment" TargetType="RadioButton">
             <Setter Property="Cursor" Value="Hand" />
@@ -74,9 +71,8 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Shape" Background="{DynamicResource Wash}"
-                                BorderBrush="{DynamicResource Border}" BorderThickness="1"
-                                CornerRadius="{StaticResource RMd}" Padding="4,7">
+                        <Border x:Name="Shape" Background="Transparent" BorderBrush="Transparent"
+                                BorderThickness="1" Height="26" CornerRadius="{StaticResource RSm}" Padding="4,0">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -90,6 +86,103 @@
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Shape" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Круглая кнопка питания; вид по Tag: Off / On / Failed (его ставит код). -->
+        <Style x:Key="TrayPower" TargetType="Button">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontFamily" Value="{DynamicResource IconFont}" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Disc" CornerRadius="18" Background="{DynamicResource Wash}"
+                                BorderBrush="{DynamicResource Border}" BorderThickness="{StaticResource Stroke}">
+                            <!-- Шрифт явно: неявный стиль TextBlock темы перебивал IconFont, и значок питания был квадратом. -->
+                            <TextBlock Text="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       FontFamily="{TemplateBinding FontFamily}" FontSize="{TemplateBinding FontSize}"
+                                       Foreground="{TemplateBinding Foreground}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Tag" Value="On">
+                                <Setter TargetName="Disc" Property="Background" Value="{DynamicResource Accent}" />
+                                <Setter TargetName="Disc" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                                <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+                            </Trigger>
+                            <Trigger Property="Tag" Value="Failed">
+                                <Setter TargetName="Disc" Property="BorderBrush" Value="{DynamicResource Danger}" />
+                                <Setter Property="Foreground" Value="{DynamicResource Danger}" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Disc" Property="Opacity" Value="0.9" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Disc" Property="Opacity" Value="0.6" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Плашка-кнопка (выход): Wash, наведение WashHover. -->
+        <Style x:Key="TrayCard" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Plate" Background="{DynamicResource Wash}" BorderBrush="{DynamicResource Border}"
+                                BorderThickness="{StaticResource Stroke}" CornerRadius="{StaticResource RMd}" Padding="10,7">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Plate" Property="Background" Value="{DynamicResource WashHover}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Быстрое действие: значок (Tag) сверху, подпись снизу; высота 48. -->
+        <Style x:Key="TrayQuick" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{DynamicResource Text}" />
+            <Setter Property="Height" Value="48" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Plate" Background="{DynamicResource Wash}" BorderBrush="{DynamicResource Border}"
+                                BorderThickness="{StaticResource Stroke}" CornerRadius="{StaticResource RMd}">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock HorizontalAlignment="Center" FontFamily="{DynamicResource IconFont}" FontSize="15"
+                                           Text="{TemplateBinding Tag}" Foreground="{TemplateBinding Foreground}" />
+                                <TextBlock HorizontalAlignment="Center" Margin="0,3,0,0" Text="{TemplateBinding Content}"
+                                           Foreground="{TemplateBinding Foreground}" />
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Plate" Property="Background" Value="{DynamicResource WashHover}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Plate" Property="Opacity" Value="0.5" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -113,112 +206,150 @@
         <!-- Оттенок темы над размытым: сквозь него видно, текст на нём читается. -->
         <Border x:Name="Plate" Width="300" CornerRadius="7">
             <Grid>
-                <StackPanel Margin="16,14,16,10" TextElement.FontSize="12.5">
-                    <DockPanel>
+                <StackPanel Margin="14,12,14,10" TextElement.FontSize="12.5">
+                    <DockPanel Height="24">
                         <TextBlock x:Name="Version" DockPanel.Dock="Right" VerticalAlignment="Center"
                                    Style="{StaticResource MonoTag}" />
-                        <Image Width="20" Height="20" Margin="0,0,8,0" VerticalAlignment="Center"
+                        <Image Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"
                                Source="pack://application:,,,/Zephyron;component/Assets/logo.png"
                                RenderOptions.BitmapScalingMode="HighQuality" />
                         <TextBlock Text="Zephyron" FontFamily="{DynamicResource UiFont}" VerticalAlignment="Center"
-                                   FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource Text}" />
+                                   FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource Text}" />
                     </DockPanel>
 
-                    <!-- Главное — идёт ли обход; ради этого меню и открывают. -->
-                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                        <Control x:Name="Mark" Style="{StaticResource StateMark}" Width="14" Height="14" Tag="Off"
-                                 VerticalAlignment="Center" />
-                        <TextBlock x:Name="State" Margin="10,0,0,0" FontFamily="{DynamicResource DisplayFont}"
-                                   FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource Text}" Text="Проверяю…" />
-                    </StackPanel>
-
-                    <Grid Margin="24,6,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <TextBlock Text="Туннель" Foreground="{DynamicResource Faint}" FontSize="11.5" Margin="0,0,0,2" />
-                        <TextBlock x:Name="Tunnel" Grid.Column="1" Margin="12,0,0,2" FontSize="11.5"
-                                   FontFamily="{DynamicResource MonoFont}" Foreground="{DynamicResource Muted}" Text="—" />
-                        <TextBlock Grid.Row="1" Text="Десинк" Foreground="{DynamicResource Faint}" FontSize="11.5" />
-                        <TextBlock x:Name="Desync" Grid.Row="1" Grid.Column="1" Margin="12,0,0,0" FontSize="11.5"
-                                   FontFamily="{DynamicResource MonoFont}" Foreground="{DynamicResource Muted}" Text="—" />
-                    </Grid>
-
-                    <!--
-                        Режим работы — тем же выбором из трёх, что на «Главной»
-                        (владелец 04.10). Выбор сам перезапускает движки
-                        (TrayIcon.ChooseMode): ради этого переключатель в трее
-                        и просили — не открывать окно.
-                    -->
-                    <TextBlock Text="Режим работы" Margin="0,14,0,7" FontSize="11.5" FontWeight="SemiBold"
-                               Foreground="{DynamicResource Muted}" />
-
-                    <Grid x:Name="Modes">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="6" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="6" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <RadioButton x:Name="ModeDesync" Grid.Column="0" Style="{StaticResource ModeSegment}"
-                                     GroupName="TrayMode" Tag="Desync" Click="OnMode">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <TextBlock Style="{StaticResource LineGlyph}" FontSize="12.5" Text="&#xE9E9;"
-                                           Foreground="{DynamicResource Accent}" Margin="0,0,5,0" />
-                                <TextBlock x:Name="ModeDesyncName" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-                        <RadioButton x:Name="ModeTunnel" Grid.Column="2" Style="{StaticResource ModeSegment}"
-                                     GroupName="TrayMode" Tag="Tunnel" Click="OnMode">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <TextBlock Style="{StaticResource LineGlyph}" FontSize="12.5" Text="&#xE774;"
-                                           Foreground="{DynamicResource Accent}" Margin="0,0,5,0" />
-                                <TextBlock x:Name="ModeTunnelName" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-                        <RadioButton x:Name="ModeRoute" Grid.Column="4" Style="{StaticResource ModeSegment}"
-                                     GroupName="TrayMode" Tag="Route" Click="OnMode">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <TextBlock Style="{StaticResource LineGlyph}" FontSize="12.5" Text="&#xE8AB;"
-                                           Foreground="{DynamicResource Accent}" Margin="0,0,5,0" />
-                                <TextBlock x:Name="ModeRouteName" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-                    </Grid>
-
-                    <TextBlock x:Name="ModeNote" FontSize="10.5" Margin="1,7,0,0" TextWrapping="Wrap"
-                               Foreground="{DynamicResource Muted}" />
-
+                    <!-- Главное — идёт ли обход; ради этого меню и открывают. Состояние — формой знака, цветом кольца и словом. -->
                     <Grid Margin="0,12,0,0">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="28" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="8" />
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="36" />
                         </Grid.ColumnDefinitions>
-                        <Button x:Name="Toggle" Style="{StaticResource Primary}" Content="Включить"
-                                Padding="12,8" Click="OnToggle" />
-                        <Button Grid.Column="2" Style="{StaticResource Ghost}" Content="Показать окно"
-                                local:ButtonGlyph.Lead="&#xE8A7;" Padding="12,8" Click="OnShowWindow" />
+
+                        <Grid Width="28" Height="28" VerticalAlignment="Center">
+                            <Ellipse x:Name="Ring" Stroke="{DynamicResource Muted}" StrokeThickness="2" Opacity="0.35" />
+                            <Control x:Name="Mark" Style="{StaticResource StateMark}" Width="14" Height="14" Tag="Off"
+                                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="State" FontFamily="{DynamicResource DisplayFont}" TextTrimming="CharacterEllipsis"
+                                       FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource Text}" Text="Проверяю…" />
+                            <TextBlock x:Name="Uptime" FontSize="11.5" Foreground="{DynamicResource Muted}" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+
+                        <Button x:Name="Toggle" Grid.Column="2" Style="{StaticResource TrayPower}" Content="&#xE7E8;"
+                                IsEnabled="False" Click="OnToggle" />
                     </Grid>
 
-                    <Border Height="1" Margin="-4,12,-4,4" Background="{DynamicResource Border}" />
+                    <!-- Куда сейчас идёт туннель; нажатие открывает окно на вкладке VPN. -->
+                    <Button x:Name="ExitCard" Style="{StaticResource TrayCard}" Margin="0,10,0,0" Visibility="Collapsed"
+                            Click="OnExit">
+                        <StackPanel>
+                            <DockPanel>
+                                <TextBlock x:Name="ExitPing" DockPanel.Dock="Right" FontSize="12" FontFamily="{DynamicResource MonoFont}"
+                                           Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Text="—" />
+                                <Image x:Name="ExitFlag" DockPanel.Dock="Left" Width="16" Height="12" Margin="0,0,8,0" VerticalAlignment="Center"
+                                       Visibility="Collapsed" RenderOptions.BitmapScalingMode="HighQuality" />
+                                <TextBlock x:Name="ExitName" FontSize="12.5" FontWeight="SemiBold" MaxWidth="170" HorizontalAlignment="Left"
+                                           TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Text}" />
+                            </DockPanel>
+                            <TextBlock x:Name="ExitMode" Margin="0,2,0,0" FontSize="11" Foreground="{DynamicResource Muted}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="ExitWarn" Margin="0,2,0,0" FontSize="11" Foreground="{DynamicResource Danger}"
+                                       TextTrimming="CharacterEllipsis" Visibility="Collapsed" />
+                        </StackPanel>
+                    </Button>
 
                     <!--
-                        Два выхода, а не один с оговоркой: «убрать значок» и «выключить
-                        обход» — разные желания, и ошибка в любую сторону дорогая.
+                        Режим работы — тем же выбором из трёх, что на «Главной» (владелец 04.10).
+                        Выбор сам перезапускает движки (TrayIcon.ChooseMode): ради этого
+                        переключатель в трее и просили — не открывать окно. Подсказка — в ToolTip.
                     -->
-                    <Button Style="{StaticResource MenuRow}" Margin="-6,0" Click="OnQuitKeep" Tag="&#xE8BB;"
-                            Content="Выйти, движки продолжат работу" />
-                    <Button Style="{StaticResource MenuRow}" Margin="-6,0" Click="OnQuitStop" Tag="&#xE7E8;"
-                            Foreground="{DynamicResource Danger}" Content="Выйти и выключить движки" />
+                    <Border Margin="0,10,0,0" Padding="2" Background="{DynamicResource Wash}" BorderBrush="{DynamicResource Border}"
+                            BorderThickness="{StaticResource Stroke}" CornerRadius="{StaticResource RMd}">
+                        <Grid x:Name="Modes" AutomationProperties.Name="Режим работы">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <RadioButton x:Name="ModeDesync" Grid.Column="0" Style="{StaticResource ModeSegment}"
+                                         GroupName="TrayMode" Tag="Desync" Click="OnMode">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Style="{StaticResource LineGlyph}" FontSize="12" Text="&#xE9E9;"
+                                               Foreground="{DynamicResource Accent}" Margin="0,0,5,0" />
+                                    <TextBlock x:Name="ModeDesyncName" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="ModeTunnel" Grid.Column="1" Style="{StaticResource ModeSegment}"
+                                         GroupName="TrayMode" Tag="Tunnel" Click="OnMode">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Style="{StaticResource LineGlyph}" FontSize="12" Text="&#xE774;"
+                                               Foreground="{DynamicResource Accent}" Margin="0,0,5,0" />
+                                    <TextBlock x:Name="ModeTunnelName" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="ModeRoute" Grid.Column="2" Style="{StaticResource ModeSegment}"
+                                         GroupName="TrayMode" Tag="Route" Click="OnMode">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Style="{StaticResource LineGlyph}" FontSize="12" Text="&#xE8AB;"
+                                               Foreground="{DynamicResource Accent}" Margin="0,0,5,0" />
+                                    <TextBlock x:Name="ModeRouteName" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+                        </Grid>
+                    </Border>
+
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="6" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="6" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button Style="{StaticResource TrayQuick}" Content="Окно" Tag="&#xE8A7;" Click="OnShowWindow"
+                                AutomationProperties.Name="Показать окно" />
+                        <Button Grid.Column="2" Style="{StaticResource TrayQuick}" Content="Блокировки" Tag="&#xE721;" Click="OnCheck"
+                                AutomationProperties.Name="Что заблокировано?" ToolTip="Что заблокировано?" />
+                        <Button x:Name="Restart" Grid.Column="4" Style="{StaticResource TrayQuick}" Content="Перезапуск" Tag="&#xE72C;"
+                                Click="OnRestart" AutomationProperties.Name="Перезапустить движки" ToolTip="Перезапустить движки" />
+                    </Grid>
+
+                    <Border Height="1" Margin="-2,10,-2,0" Background="{DynamicResource Border}" />
+
+                    <!-- Подвал: слева только ошибка (иначе пусто), справа ⋯ с двумя выходами. -->
+                    <Grid Height="36">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="28" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="Problem" FontSize="11" Foreground="{DynamicResource Danger}" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                        <Button x:Name="More" Grid.Column="1" Style="{StaticResource IconGhost}" Content="&#xE712;" Width="28" Height="28"
+                                MinWidth="28" MinHeight="28" FontSize="14" VerticalAlignment="Center" Click="OnMore"
+                                AutomationProperties.Name="Выход" ToolTip="Выход" />
+                    </Grid>
                 </StackPanel>
+
+                <!--
+                    Два выхода, а не один с оговоркой: «убрать значок» и «выключить
+                    обход» — разные желания, и ошибка в любую сторону дорогая. Поверх
+                    меню, а не отдельным окном: фокус не уходит, меню не прячется,
+                    а размер окна (и снимок размытия под ним) остаётся прежним.
+                -->
+                <Border x:Name="Overflow" Visibility="Collapsed" VerticalAlignment="Bottom" HorizontalAlignment="Right"
+                        Margin="0,0,14,44" Width="260" Padding="4" Background="{DynamicResource Raised}"
+                        BorderBrush="{DynamicResource LineStrong}" BorderThickness="{StaticResource Stroke}"
+                        CornerRadius="{StaticResource RLg}">
+                    <StackPanel>
+                        <Button x:Name="QuitKeep" Style="{StaticResource MenuRow}" Click="OnQuitKeep" Tag="&#xE8BB;"
+                                Content="Выйти, движки продолжат работу" />
+                        <Button Style="{StaticResource MenuRow}" Click="OnQuitStop" Tag="&#xE7E8;"
+                                Foreground="{DynamicResource Danger}" Content="Выйти и выключить движки" />
+                    </StackPanel>
+                </Border>
             </Grid>
         </Border>
     </Border>

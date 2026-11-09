@@ -186,6 +186,17 @@ public abstract class SupervisedService
             return false;
         }
 
+        // Прежний процесс ещё жив — сначала погасить, иначе он осиротеет.
+        if (Process is not null)
+        {
+            await StopAsync(cancellationToken);
+
+            if (IsProcessAlive)
+            {
+                return false;
+            }
+        }
+
         // Новый процесс — новое положение. Всё, что служба помнит о прежнем
         // запуске, к нему не относится: память о прежнем обходе заставила бы
         // нас считать трафик уведённым, когда он идёт в туннель. Группу
@@ -280,43 +291,53 @@ public abstract class SupervisedService
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        if (Process is null || Process.HasExited)
+        if (Process is null)
         {
-            Process = null;
             StartedAt = null;
             return;
         }
 
-        try
+        if (!Process.HasExited)
         {
-            bool gone = false;
-
             try
             {
-                gone = await StopGentlyAsync(Process, cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                // Отмена не повод оставлять процесс живым: дальше обычный Kill.
-            }
+                bool gone = false;
 
-            if (!gone)
+                try
+                {
+                    gone = await StopGentlyAsync(Process, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Отмена не повод оставлять процесс живым: дальше обычный Kill.
+                }
+
+                if (!gone)
+                {
+                    Process.Kill(entireProcessTree: true);
+                    await Process.WaitForExitAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+                }
+            }
+            catch (Exception)
             {
-                Process.Kill(entireProcessTree: true);
-                await Process.WaitForExitAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
+                // Мог завершиться сам между проверкой и вызовом.
             }
         }
-        catch (Exception)
+
+        // Не вышел — держим описатель: забыть живой процесс значило бы поднять
+        // рядом второй, и тот упёрся бы в занятый адаптер или WinDivert.
+        if (IsProcessAlive)
         {
-            // Мог завершиться сам между проверкой и вызовом.
+            // Причину неудачного старта не затираем: она важнее для разбора.
+            const string stuck = "движок не остановился — завершите процесс вручную или перезагрузите компьютер";
+            LastError = LastError is null ? stuck : LastError + "; " + stuck;
+            return;
         }
-        finally
-        {
-            Process?.Dispose();
-            Process = null;
-            StartedAt = null;
-            OnStopped();
-        }
+
+        Process.Dispose();
+        Process = null;
+        StartedAt = null;
+        OnStopped();
     }
 
     /// <summary>
@@ -526,13 +547,32 @@ public sealed class SingBoxService : SupervisedService
         _watch = new ExitWatch(_preferredExit, replacePinned);
     }
 
-    private readonly string? _preferredExit;
+    private string? _preferredExit;
+
+    /// <summary>Штамп записки окна о смене сервера на ходу (<see cref="ExitPin"/>); прежние — не наши.</summary>
+    private DateTime _pinStamp = ExitPin.Stamp(ExitPin.DefaultPath);
+
+    /// <summary>Окно сменило выбранный сервер, не перезапуская движок, — принять новый, чтобы сторож не «вернул» старый.</summary>
+    private void AdoptPin()
+    {
+        if (!ExitPin.TryTake(ExitPin.DefaultPath, ref _pinStamp, out var tag))
+            return;
+
+        _preferredExit = tag;
+        _watch.Repin(tag);
+        _pinnedPlaced = tag is not null;
+        _exitMisses = 0;
+        Remark = null;
+    }
 
     /// <summary>Запасной выход (WARP при подписке): в группу автоподбора не входит, ставится при мёртвом VPN.</summary>
     private readonly string? _fallbackExit;
 
     /// <summary>Сейчас выбран запасной выход, а не VPN.</summary>
     private bool _onFallback;
+
+    /// <summary>Промахи подключённого выхода подряд — по сторожу выхода.</summary>
+    private int _exitMisses;
 
     /// <summary>Движок только ради DNS — см. параметр конструктора.</summary>
     private readonly bool _dnsOnly;
@@ -1021,6 +1061,7 @@ public sealed class SingBoxService : SupervisedService
         _warm = false;
         _run++;
         _watchCounter = 0;
+        _exitMisses = 0;
         _watch.Forget();
         _pinnedPlaced = false;
         Remark = null;
@@ -1218,6 +1259,14 @@ public sealed class SingBoxService : SupervisedService
             // службы она не меняет.
             if (DnsWatched)
                 await WatchDnsAsync(tunnel: _dnsViaAuto, cancellationToken);
+
+            // Без «Проверки прохода» о мёртвом выходе знает только сторож. 09.11:
+            // WARP молчал минутами, а «Главная» синим писала «Работает».
+            if (_exitMisses >= ExitWatch.MissesBeforeReplace && !_bypass.Engaged)
+            {
+                LastError = "выход туннеля не отвечает — трафик через туннель не проходит. Выберите другой сервер или выход в разделе «VPN»";
+                return ServiceCheck.UpstreamDown;
+            }
 
             return ServiceCheck.Healthy;
         }
@@ -1691,6 +1740,8 @@ public sealed class SingBoxService : SupervisedService
     /// </remarks>
     private async Task WatchExitAsync(CancellationToken cancellationToken)
     {
+        AdoptPin();
+
         // В обходе трафик идёт мимо туннеля — о замене говорить нечего.
         if (_bypass.Engaged)
             Remark = null;
@@ -1713,6 +1764,8 @@ public sealed class SingBoxService : SupervisedService
 
         if (exit is not null)
             Record(exit, delay);
+
+        _exitMisses = delay is null ? _exitMisses + 1 : 0;
 
         bool replaced = _pinnedPlaced && _watch.Replaced(exit);
 
@@ -1815,13 +1868,13 @@ public sealed class SingBoxService : SupervisedService
     /// двух имён — хуже: супервизор о сборке конфига ничего не знает
     /// и знать не должен.
     /// </remarks>
-    private const string SelectorGroup = "auto";
+    internal const string SelectorGroup = "auto";
 
     /// <summary>
     /// Ставит выбор основной группы; группа локального прокси идёт за ним, но мимо туннеля — никогда.
     /// </summary>
     /// <remarks>Группы может не быть (прокси выключен) — отказ движка тогда не ошибка.</remarks>
-    private static async Task<bool> SelectMainAsync(ClashApi api, string exit, CancellationToken cancellationToken)
+    internal static async Task<bool> SelectMainAsync(ClashApi api, string exit, CancellationToken cancellationToken)
     {
         if (!await api.SelectAsync(SelectorGroup, exit, cancellationToken))
             return false;
@@ -1833,7 +1886,7 @@ public sealed class SingBoxService : SupervisedService
     }
 
     /// <summary>Группа автоподбора — куда возвращаемся.</summary>
-    private const string LatencyGroup = "auto-latency";
+    internal const string LatencyGroup = "auto-latency";
 
     /// <summary>Пулы серверов с маршрутами — у каждого своя группа выбора и свой сторож.</summary>
     private readonly IReadOnlyList<PoolState> _pools;
@@ -2155,9 +2208,22 @@ public sealed class SingBoxService : SupervisedService
             };
 
             using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
-            var text = await http.GetStringAsync("https://api.ipify.org", cancellationToken);
 
-            return System.Net.IPAddress.TryParse(text.Trim(), out _);
+            // Второй адрес — с проверкой включённой у всех, один заглохший сервис
+            // проверки не должен объявлять мёртвым весь туннель и уводить в обход.
+            try
+            {
+                var text = await http.GetStringAsync("https://api.ipify.org", cancellationToken);
+
+                if (System.Net.IPAddress.TryParse(text.Trim(), out _))
+                    return true;
+            }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            {
+            }
+
+            using var reply = await http.GetAsync("http://www.gstatic.com/generate_204", cancellationToken);
+            return reply.StatusCode == System.Net.HttpStatusCode.NoContent;
         }
         catch (Exception)
         {

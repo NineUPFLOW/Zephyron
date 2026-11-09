@@ -551,14 +551,7 @@ public partial class MoreView : UserControl
         if (sender is not Button { Tag: string url })
             return;
 
-        try
-        {
-            Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
-        }
-        catch (Exception ex)
-        {
-            Status.Text = "Ссылку открыть не удалось: " + ex.GetBaseException().Message;
-        }
+        Links.Open(url);
     }
 
     private void OnOpen(object sender, RoutedEventArgs e)
@@ -576,7 +569,7 @@ public partial class MoreView : UserControl
 
         try
         {
-            Process.Start(new ProcessStartInfo { FileName = target, UseShellExecute = true });
+            Process.Start(new ProcessStartInfo { FileName = target, UseShellExecute = true })?.Dispose();
         }
         catch (Exception ex)
         {

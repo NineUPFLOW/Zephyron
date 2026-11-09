@@ -55,7 +55,19 @@ public static class AgentMemory
             if (Path.GetDirectoryName(Path.GetFullPath(file)) is { } directory)
                 Directory.CreateDirectory(directory);
 
-            File.WriteAllText(file, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+            // Через временный файл: оборванная запись не оставит обрубок.
+            var temp = file + "." + Guid.NewGuid().ToString("N") + ".tmp";
+
+            try
+            {
+                File.WriteAllText(temp, JsonSerializer.Serialize(all, new JsonSerializerOptions { WriteIndented = true }));
+                File.Move(temp, file, overwrite: true);
+            }
+            catch
+            {
+                try { File.Delete(temp); } catch (Exception) { }
+                throw;
+            }
         }
         catch (Exception)
         {

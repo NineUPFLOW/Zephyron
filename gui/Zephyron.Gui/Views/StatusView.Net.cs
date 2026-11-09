@@ -306,6 +306,14 @@ public partial class StatusView
         SetMetric(NetPing, NetPingUnit, ms is { } value ? value.ToString() : null, "Accent2");
         NetPingCell.Opacity = ms is null ? 0.45 : 1;
 
+        if (ms is null)
+        {
+            NetPing.SetResourceReference(TextBlock.ForegroundProperty, "Danger");
+            NetPingCell.ToolTip = "ICMP до 1.1.1.1 не отвечает";
+        }
+        else
+            NetPingCell.ToolTip = "Задержка до 1.1.1.1 по ICMP, раз в пять секунд";
+
         // Ноль потерь — настоящий замер (Text); потери есть — Warn.
         int lost = _pings.Count(ok => !ok);
         SetMetric(NetLoss, NetLossUnit, $"{100.0 * lost / _pings.Count:0}", lost == 0 ? "Text" : "Warn");

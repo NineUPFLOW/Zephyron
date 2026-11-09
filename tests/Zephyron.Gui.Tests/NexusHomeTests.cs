@@ -38,6 +38,36 @@ public sealed class NexusHomeTests
         }
     }
 
+    [Theory]
+    [InlineData("[15:44:44] окно: уведомление", "15:44:44", "окно:", "уведомление")]
+    [InlineData("2026-11-09 15:46:22 winws2: не запустился — код 5: windivert: error", "15:46:22", "winws2:", "не запустился — код 5: windivert: error")]
+    [InlineData("2026-11-09 15:47:13 супервизор остановлен", "15:47:13", "надзор:", "супервизор остановлен")]
+    public void Both_journal_formats_reach_the_feed(string line, string time, string source, string message)
+    {
+        Assert.Equal((time, source, message), StatusView.Split(line));
+    }
+
+    [Fact]
+    public void Window_stall_notes_stay_out_of_the_feed()
+    {
+        Assert.True(StatusView.IsStallNote("[15:52:23] окно: поток окна был занят 1842 мс, раздел «VPN»"));
+        Assert.False(StatusView.IsStallNote("[15:52:23] окно: уведомление после обновления"));
+    }
+
+    [Fact]
+    public void Same_autopick_reason_is_said_once()
+    {
+        var notes = new[]
+        {
+            "пресет: winws2 не поднялся",
+            "рецепт «a»: winws2 не поднялся",
+            "рецепт «b: c»: winws2 не поднялся",
+            "рецепт «d»: другая причина",
+        };
+
+        Assert.Equal(["winws2 не поднялся — так у 3 проб", "рецепт «d»: другая причина"], AutoPickWindow.Squeeze(notes));
+    }
+
     [Fact]
     public void A_missing_journal_means_no_events()
     {

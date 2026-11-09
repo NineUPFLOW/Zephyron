@@ -15,7 +15,25 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="44" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                <Grid Margin="0,0,8,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <!-- Значок только у программ; у сайтов его нет. -->
+                    <local:ProcessIcon Process="{Binding Name}" Margin="0,0,7,0" VerticalAlignment="Center">
+                        <local:ProcessIcon.Style>
+                            <Style TargetType="local:ProcessIcon">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSite}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </local:ProcessIcon.Style>
+                    </local:ProcessIcon>
+                    <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                </Grid>
                 <Border Grid.Column="1" Height="5" CornerRadius="2.5" Background="{DynamicResource Raised}" VerticalAlignment="Center"
                         Width="{Binding Track}">
                     <Border Height="5" CornerRadius="2.5" Background="{DynamicResource Accent2}"
@@ -259,7 +277,7 @@
                     <Grid>
                     <!-- Пусто: показывается, пока в таблице нет строк (отбор или наблюдение выключено). -->
                     <ContentControl local:PageHead.Title="Соединений пока нет"
-                                    local:PageHead.Subtitle="Нажмите «Начать» — они появятся по мере открытия. Если наблюдение идёт, смягчите отбор.">
+                                    local:PageHead.Subtitle="Нажмите «Запустить» — они появятся по мере открытия. Если наблюдение идёт, смягчите отбор.">
                         <ContentControl.Style>
                             <Style TargetType="ContentControl" BasedOn="{StaticResource EmptyState}">
                                 <Style.Triggers>
@@ -311,10 +329,17 @@
                                             <TextBlock Text="{Binding Mode}" Foreground="{Binding Colour}" />
                                         </StackPanel>
 
-                                        <TextBlock Grid.Column="2" Text="{Binding Process}" VerticalAlignment="Center"
-                                                   TextTrimming="CharacterEllipsis" Margin="0,0,10,0"
-                                                   Cursor="Hand" ToolTip="Только это приложение"
-                                                   MouseLeftButtonUp="OnProcessClick" />
+                                        <!-- Значок — из самого файла программы (ProcessIcons), пока не нашёлся — общий глиф. -->
+                                        <Grid Grid.Column="2" Margin="0,0,10,0" VerticalAlignment="Center" Background="Transparent"
+                                              Cursor="Hand" ToolTip="Только это приложение" MouseLeftButtonUp="OnProcessClick">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <local:ProcessIcon Process="{Binding Process}" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Process}" VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </Grid>
 
                                         <StackPanel Grid.Column="3" Margin="0,0,10,0" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Endpoint}" TextTrimming="CharacterEllipsis" />
@@ -388,7 +413,7 @@
                             <views:WatchRing x:Name="Ring" />
                             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                                 <TextBlock x:Name="RingTotal" Text="0" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                                <TextBlock x:Name="RingCaption" Text="всего соединений" Style="{StaticResource Caption}" HorizontalAlignment="Center" />
+                                <TextBlock x:Name="RingCaption" Text="соединений" Style="{StaticResource Caption}" HorizontalAlignment="Center" />
                             </StackPanel>
                         </Grid>
                         <ItemsControl x:Name="RingLegend" Grid.Row="1" Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">

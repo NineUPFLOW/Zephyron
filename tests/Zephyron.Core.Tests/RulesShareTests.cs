@@ -74,6 +74,29 @@ public sealed class RulesShareTests : IDisposable
     /// это верно, а файл, выбранный для загрузки, чужой.
     /// </remarks>
     [Fact]
+    public void Imported_proxy_rule_keeps_its_server_and_foreign_paths_are_dropped()
+    {
+        var path = Write("s.yaml", """
+            rules:
+              - match: domain
+                value: "a.com"
+                mode: proxy
+                server: "pool-x"
+              - match: hostlist
+                value: "../../etc/x.txt"
+                mode: desync
+              - match: hostlist
+                value: "C:/x.txt"
+                mode: desync
+            """);
+
+        var read = RulesShare.Read(path);
+
+        Assert.Single(read);
+        Assert.Equal("pool-x", read[0].Server);
+    }
+
+    [Fact]
     public void A_broken_file_is_refused_and_left_where_it_was()
     {
         var path = Write("broken.yaml", "rules:\n  - match: nonsense\n    value: x\n    mode: sideways\n");

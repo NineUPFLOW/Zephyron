@@ -48,16 +48,29 @@ public static class RulesShare
     public static IReadOnlyList<UserRuleEntry> Read(string path) =>
         RuleSetLoader.LoadRawRules(path)
             .Where(r => r.Match != MatchKind.Process)
+            .Where(r => r.Match is not (MatchKind.HostList or MatchKind.IpSet) || IsRelativeInside(r.Value))
             .Select(r => new UserRuleEntry
             {
                 Match = r.Match,
                 Value = r.Value,
                 Mode = r.Mode,
                 Recipe = r.Recipe,
+                Server = r.Mode == RoutingMode.Proxy ? r.Server : null,
                 Enabled = r.Enabled,
                 Off = r.Off,
             })
             .ToList();
+
+    // Чужой файл не должен вести список за пределы каталога установки.
+    internal static bool IsRelativeInside(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var v = value.Replace((char)92, '/').Trim();
+
+        return !Path.IsPathRooted(v) && !v.StartsWith('/') && !v.Contains(':') && !v.Split('/').Contains("..");
+    }
 
     /// <summary>Что добавится, что уйдёт и что сменит маршрут.</summary>
     /// <remarks>
@@ -90,6 +103,7 @@ public static class RulesShare
 
     private static bool Differs(UserRuleEntry one, UserRuleEntry other) =>
         one.Mode != other.Mode
+        || !string.Equals(one.Server ?? string.Empty, other.Server ?? string.Empty, StringComparison.OrdinalIgnoreCase)
         || one.Enabled != other.Enabled
         || one.Off != other.Off
         || !string.Equals(one.Recipe ?? string.Empty, other.Recipe ?? string.Empty, StringComparison.OrdinalIgnoreCase);

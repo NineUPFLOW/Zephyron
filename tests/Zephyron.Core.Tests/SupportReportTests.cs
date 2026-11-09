@@ -295,6 +295,23 @@ public sealed class SupportReportTests : IDisposable
         Assert.Contains("  [ПОЛОМКА] sing-box: процесс умер.", text);
     }
 
+    /// <summary>Ссылка подписки, ключи прокси, UUID, пароли и секрет TG Proxy не доезжают до архива.</summary>
+    [Fact]
+    public void SubscriptionUrlKeysUuidAndPasswordsAreRedacted()
+    {
+        const string url = "https://panel.example.net/sub/abcDEF123token";
+        var text = string.Join("\n",
+            $"GET {url}",
+            "vless://b7f3c1d2-4a5e-4c11-9f2b-8e7d6a1c0f33@h.example.com:443?security=reality&pbk=KEY#N",
+            "{\"password\": \"hunter2hunter2\", \"uuid\": \"b7f3c1d2-4a5e-4c11-9f2b-8e7d6a1c0f33\"}",
+            "{\"TelegramProxySecret\": \"0123456789abcdef0123456789abcdef\"}");
+
+        var redacted = SupportReport.Redact(text, [url]);
+
+        foreach (var leak in new[] { "abcDEF123token", "b7f3c1d2", "hunter2", "pbk=KEY", "0123456789abcdef" })
+            Assert.DoesNotContain(leak, redacted);
+    }
+
     [Fact]
     public void ALinkKeepsItsHostButNotItsPath()
     {

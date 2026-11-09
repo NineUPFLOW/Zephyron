@@ -203,8 +203,19 @@ public static class AutostartTask
             if (process is null)
                 return (false, "не удалось запустить schtasks.exe");
 
-            var output = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
-            process.WaitForExit();
+            // Оба потока читаем сразу: полный пайп stderr остановил бы чтение stdout.
+            var stdout = process.StandardOutput.ReadToEndAsync();
+            var stderr = process.StandardError.ReadToEndAsync();
+
+            if (!process.WaitForExit(30_000))
+            {
+                process.Kill(entireProcessTree: true);
+                return (false, "schtasks.exe не ответил за 30 с");
+            }
+
+            Task.WaitAll([stdout, stderr], TimeSpan.FromSeconds(5));
+            var output = (stdout.IsCompletedSuccessfully ? stdout.Result : "")
+                + (stderr.IsCompletedSuccessfully ? stderr.Result : "");
 
             return (process.ExitCode == 0, output.Trim());
         }

@@ -38,7 +38,27 @@ public partial class StatusView
     /// <summary>Сколько байтов с конца файла читать: с запасом на шесть длинных строк.</summary>
     private const int TailBytes = 16 * 1024;
 
-    private static readonly Regex Line = new(@"^\[(?<time>\d{2}:\d{2}:\d{2})\]\s*(?<source>[^:]{1,40}):\s*(?<message>.+)$", RegexOptions.Compiled);
+    // Окно пишет «[чч:мм:сс] кто: что», надзор — «гггг-мм-дд чч:мм:сс кто: что», а свои
+    // строки («останавливаю службы») и вовсе без «кто». Без второго вида лента молчала
+    // ровно о падениях движков.
+    private static readonly Regex Line = new(
+        @"^(?:\[(?<time>\d{2}:\d{2}:\d{2})\]|(?:\d{4}-\d{2}-\d{2}\s+)?(?<time>\d{2}:\d{2}:\d{2}))\s*(?:(?<source>[^:\s][^:]{0,39}):\s+)?(?<message>.+)$",
+        RegexOptions.Compiled);
+
+    /// <summary>Замер подвисания окна — для разбора в журнале, человеку в ленте это шум.</summary>
+    internal static bool IsStallNote(string line) => line.Contains("окно: поток окна был занят", StringComparison.Ordinal);
+
+    /// <summary>Время, источник и текст строки журнала; <c>null</c> — строка не из журнала.</summary>
+    internal static (string Time, string Source, string Message)? Split(string line)
+    {
+        var match = Line.Match(line);
+
+        if (!match.Success)
+            return null;
+
+        var source = match.Groups["source"];
+        return (match.Groups["time"].Value, source.Success ? source.Value + ":" : "надзор:", match.Groups["message"].Value);
+    }
 
     private readonly DispatcherTimer _events = new() { Interval = EventsInterval };
     private bool _eventsBusy;
@@ -63,7 +83,9 @@ public partial class StatusView
 
         try
         {
-            var lines = await Task.Run(() => Tail(Path.Combine("runtime", "supervisor.log"), TailBytes, EventsShown));
+            // С запасом: строки подвисаний отсеиваются, а показать надо шесть живых.
+            var lines = await Task.Run(() => Tail(Path.Combine("runtime", "supervisor.log"), TailBytes, EventsShown * 6)
+                .Where(l => !IsStallNote(l)).TakeLast(EventsShown).ToList());
             var key = string.Join("\n", lines);
 
             // Те же строки — не трогаем список: новые элементы на каждом тике
@@ -108,13 +130,10 @@ public partial class StatusView
 
     private EventRow? Parse(string line)
     {
-        var match = Line.Match(line);
-
-        if (!match.Success)
+        if (Split(line) is not var (time, source, message))
             return null;
 
-        string message = match.Groups["message"].Value;
-        return new EventRow(match.Groups["time"].Value, match.Groups["source"].Value + ":", message, (Brush)FindResource(Tone(message)));
+        return new EventRow(time, source, message, (Brush)FindResource(Tone(message)));
     }
 
     /// <summary>Цвет смысла по словам строки: сбой красным, оговорка жёлтым, прочее — третьим планом.</summary>
@@ -124,7 +143,8 @@ public partial class StatusView
 
         // Отрицания раньше «Success»: «не работает» содержит «работает».
         if (text.Contains("ошибк") || text.Contains("упал") || text.Contains("не удал") || text.Contains("сбой")
-            || text.Contains("не работает") || text.Contains("не запущен") || text.Contains("не поднят")
+            || text.Contains("не работает") || text.Contains("не запущен") || text.Contains("не запустил") || text.Contains("не поднят")
+            || text.Contains("исчез")
             || text.Contains("error") || text.Contains("failed") || text.Contains("exception"))
             return "Danger";
 

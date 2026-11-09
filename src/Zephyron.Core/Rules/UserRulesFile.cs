@@ -302,7 +302,7 @@ public sealed class UserRulesFile
     /// </remarks>
     public static void WriteAtomic(string path, byte[] content)
     {
-        var temp = path + ".tmp";
+        var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
 
         try
         {
@@ -317,7 +317,7 @@ public sealed class UserRulesFile
             }
             catch (Exception)
             {
-                // Остаток не мешает: следующая запись его перезапишет.
+                // Остаток не мешает: имя у каждой записи своё.
             }
 
             throw;

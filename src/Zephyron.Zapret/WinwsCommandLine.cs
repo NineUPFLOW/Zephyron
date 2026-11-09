@@ -558,10 +558,7 @@ public static class WinwsCommandLine
 
                 var path = Path.Combine(root, Sanitize(name) + ".txt");
 
-                File.WriteAllText(
-                    path,
-                    string.Join(Environment.NewLine, domains) + Environment.NewLine,
-                    new UTF8Encoding(false));
+                WriteAtomic(path, string.Join(Environment.NewLine, domains) + Environment.NewLine);
 
                 profiles.Add(new OwnDesyncProfile
                 {
@@ -572,7 +569,7 @@ public static class WinwsCommandLine
                 });
             }
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Не записалось — работаем без своих профилей: пресет остаётся
             // как был. Хуже, чем задумано, но не хуже, чем до этой возможности.
@@ -622,9 +619,11 @@ public static class WinwsCommandLine
 
             try
             {
+                var rootFull = Path.GetFullPath(zapretRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
                 var parent = Path.GetDirectoryName(Path.GetFullPath(Path.Combine(zapretRoot, dir)));
 
-                if (!string.IsNullOrEmpty(parent))
+                // Не создаём папок вне корня Zapret, что бы ни стояло в пресете.
+                if (!string.IsNullOrEmpty(parent) && (parent + Path.DirectorySeparatorChar).StartsWith(rootFull, StringComparison.OrdinalIgnoreCase))
                     Directory.CreateDirectory(parent);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
@@ -694,6 +693,24 @@ public static class WinwsCommandLine
     public static string? WriteKeepList(IReadOnlyList<string> names, string? path = null) =>
         WriteList(names, path ?? DefaultKeepListPath);
 
+    // winws2 перечитывает списки по времени изменения: через временный файл рядом,
+    // чтобы он не поймал наполовину записанный.
+    private static void WriteAtomic(string path, string text)
+    {
+        var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+
+        try
+        {
+            File.WriteAllText(temp, text, new UTF8Encoding(false));
+            File.Move(temp, path, overwrite: true);
+        }
+        catch
+        {
+            try { File.Delete(temp); } catch (Exception) { }
+            throw;
+        }
+    }
+
     private static string? WriteList(IReadOnlyList<string> names, string path)
     {
         var target = Path.GetFullPath(path);
@@ -713,7 +730,7 @@ public static class WinwsCommandLine
             if (!string.IsNullOrEmpty(directory))
                 Directory.CreateDirectory(directory);
 
-            File.WriteAllLines(target, names);
+            WriteAtomic(target, string.Concat(names.Select(n => n + Environment.NewLine)));
             return target;
         }
         catch (Exception)

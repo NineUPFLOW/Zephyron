@@ -35,6 +35,21 @@ public sealed class LogViewTests : IDisposable
         Write("logs/gui.log", "окно: открыт раздел «Главная»");
     }
 
+    [Fact]
+    public void ClearLogs_truncates_even_when_the_engine_holds_the_file_open()
+    {
+        var path = Path.Combine(_root, "runtime", "sing-box.log");
+
+        // Движок держит файл открытым на запись.
+        using var held = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+
+        var (cleared, failed) = LogView.ClearLogs(_root);
+
+        Assert.True(cleared >= 1);
+        Assert.Empty(failed);
+        Assert.Equal(0, new FileInfo(path).Length);
+    }
+
     public void Dispose()
     {
         try

@@ -172,7 +172,7 @@ public static class PinRefresh
         if (Path.GetDirectoryName(target) is { Length: > 0 } dir)
             Directory.CreateDirectory(dir);
 
-        File.WriteAllText(target, now.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        Zephyron.Core.AtomicFile.WriteAllText(target, now.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture));
     }
 
     private static readonly SemaphoreSlim Gate = new(1, 1);
@@ -668,7 +668,7 @@ public static class PinRefresh
             if (Path.GetDirectoryName(path) is { Length: > 0 } dir)
                 Directory.CreateDirectory(dir);
 
-            File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(addresses.Order(StringComparer.Ordinal).ToArray()));
+            Zephyron.Core.AtomicFile.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(addresses.Order(StringComparer.Ordinal).ToArray()));
         }
         catch (IOException)
         {

@@ -553,7 +553,7 @@ public partial class AppearanceView : UserControl
         try
         {
             Directory.CreateDirectory(ThemeLoader.DefaultRoot);
-            Process.Start(new ProcessStartInfo { FileName = ThemeLoader.DefaultRoot, UseShellExecute = true });
+            Process.Start(new ProcessStartInfo { FileName = ThemeLoader.DefaultRoot, UseShellExecute = true })?.Dispose();
         }
         catch (Exception ex)
         {

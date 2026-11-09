@@ -87,6 +87,8 @@ internal sealed class TrayIcon : IDisposable
 
     private bool _busy;
 
+    private Action<string, string>? _exitReplaced;
+
     /// <summary>Трей сам гасит движки — «Останавливается…», а не «Работает» до последней секунды.</summary>
     private bool _stopping;
 
@@ -127,7 +129,8 @@ internal sealed class TrayIcon : IDisposable
 
         // Сервер отвалился и надзор сам поставил другой — сказать, а не только записать
         // в журнал: окно в трее, человек в игре, и смену иначе не видно.
-        Zephyron.Supervisor.SingBoxService.ExitReplaced += (title, text) => Notify(title, text, link: null);
+        _exitReplaced = (title, text) => Notify(title, text, link: null);
+        Zephyron.Supervisor.SingBoxService.ExitReplaced += _exitReplaced;
 
         _icon.BalloonTipClicked += (_, _) =>
         {
@@ -398,7 +401,7 @@ internal sealed class TrayIcon : IDisposable
 
         try
         {
-            _menu ??= new TrayMenu(Toggle, ChooseMode, Show, Quit);
+            _menu ??= new TrayMenu(Toggle, ChooseMode, Show, Quit, OpenSection, RestartEngines);
             _menu.Render(TrayStatus.Read(_busy, _stopping));
 
             try
@@ -415,7 +418,7 @@ internal sealed class TrayIcon : IDisposable
                 // состояния, так что его не жалко собрать заново.
                 Discard(_menu);
 
-                _menu = new TrayMenu(Toggle, ChooseMode, Show, Quit);
+                _menu = new TrayMenu(Toggle, ChooseMode, Show, Quit, OpenSection, RestartEngines);
                 _menu.Render(TrayStatus.Read(_busy, _stopping));
                 _menu.PopUp();
             }
@@ -435,6 +438,40 @@ internal sealed class TrayIcon : IDisposable
         catch (Exception)
         {
             // Окно и так сломано — закрыть его не обязательно.
+        }
+    }
+
+    /// <summary>Окно на нужном разделе («vpn», «check»).</summary>
+    private static void OpenSection(string section)
+    {
+        Show();
+        Application.Current.Windows.OfType<MainWindow>().FirstOrDefault()?.Open(section);
+    }
+
+    /// <summary>Перезапуск движков кнопкой из меню.</summary>
+    private async void RestartEngines()
+    {
+        if (_busy || !EngineControl.IsRunning)
+            return;
+
+        _busy = true;
+        Update();
+
+        try
+        {
+            var outcome = await EngineControl.RestartAsync("меню трея: перезапуск", CancellationToken.None);
+
+            if (!outcome.Ok)
+                Notify("Движки не запустились", outcome.Message, null);
+        }
+        catch (Exception ex)
+        {
+            Notify("Перезапустить не вышло", ex.GetBaseException().Message, null);
+        }
+        finally
+        {
+            _busy = false;
+            Update();
         }
     }
 
@@ -588,9 +625,10 @@ internal sealed class TrayIcon : IDisposable
                     : outcome.Message,
                 outcome.Ok ? ToolTipIcon.Info : ToolTipIcon.Warning);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Разбор — в окне: там есть куда написать причину.
+            // Окно может быть скрыто — без этого неудавшийся перезапуск остался бы незамеченным.
+            Notify("Перезапустить не вышло", ex.GetBaseException().Message, link: null);
         }
         finally
         {
@@ -610,8 +648,22 @@ internal sealed class TrayIcon : IDisposable
 
         window.Show();
 
+        // Из свёрнутого — в то состояние, в котором окно закрывали (MainWindow пишет флаг).
         if (window.WindowState == WindowState.Minimized)
-            window.WindowState = WindowState.Normal;
+        {
+            bool maximized;
+
+            try
+            {
+                maximized = Zephyron.Core.AppSettings.Load(Zephyron.Core.AppSettings.DefaultPath).WindowMaximized;
+            }
+            catch (Exception)
+            {
+                maximized = false;
+            }
+
+            window.WindowState = maximized ? WindowState.Maximized : WindowState.Normal;
+        }
 
         window.Activate();
     });
@@ -633,11 +685,16 @@ internal sealed class TrayIcon : IDisposable
     /// </remarks>
     public static async void Exit(bool stopEngines)
     {
+        if (_quitting)
+            return;
+
         if (Current is { } tray)
         {
             tray.Quit(stopEngines);
             return;
         }
+
+        _quitting = true;
 
         if (stopEngines)
         {
@@ -655,8 +712,16 @@ internal sealed class TrayIcon : IDisposable
         Application.Current.Shutdown();
     }
 
+    // Второй выход, пока первый ждёт остановки движков, пошёл бы в StopAsync снова.
+    private static bool _quitting;
+
     private async void Quit(bool stopEngines)
     {
+        if (_quitting)
+            return;
+
+        _quitting = true;
+
         if (stopEngines)
         {
             _busy = true;
@@ -683,6 +748,9 @@ internal sealed class TrayIcon : IDisposable
     {
         if (Current == this)
             Current = null;
+
+        // Событие статическое: без отписки значок жил бы, пока жив процесс.
+        Zephyron.Supervisor.SingBoxService.ExitReplaced -= _exitReplaced;
 
         _refresh.Stop();
         _menu?.Close();

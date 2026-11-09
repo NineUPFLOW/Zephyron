@@ -46,6 +46,18 @@ public sealed class ThemeLoaderTests : IDisposable
         return ThemeLoader.Load(id, _root);
     }
 
+    [Fact]
+    public void Wrong_json_kinds_do_not_break_the_list()
+    {
+        Write("bad-kinds", "{\"base\":\"dark\",\"colors\":{\"accent\":5},\"fonts\":{\"files\":[1]}}");
+        Write("bad-root", "[1,2]");
+
+        var all = ThemeLoader.LoadAll(_root);
+
+        Assert.Contains(all, t => t.Id == "bad-kinds");
+        Assert.Contains(all, t => t.Id == "bad-root" && t.Theme is null);
+    }
+
     /// <summary>Свои темы проходят ту же проверку, что потребуем с художников.</summary>
     [Fact]
     public void BuiltInThemesLoadAndReadWell()

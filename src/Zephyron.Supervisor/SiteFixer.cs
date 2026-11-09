@@ -212,11 +212,11 @@ public static class SiteFixer
 
         bool works = false;
         TargetReport? report = null;
+        var patched = original.TrimEnd('\r', '\n') + Environment.NewLine + bare + Environment.NewLine;
 
         try
         {
-            var patched = original.TrimEnd('\r', '\n') + Environment.NewLine + bare + Environment.NewLine;
-            await File.WriteAllTextAsync(path, patched, cancellationToken);
+            await Zephyron.Core.AtomicFile.WriteAllTextAsync(path, patched, cancellationToken: cancellationToken);
 
             await Task.Delay(ShieldReload, cancellationToken);
 
@@ -225,11 +225,24 @@ public static class SiteFixer
         }
         finally
         {
-            if (!works)
-                await File.WriteAllTextAsync(path, original, CancellationToken.None);
+            // Откат только если файл всё ещё наш: правку человека за это время не затираем.
+            if (!works && await StillOursAsync(path, patched))
+                await Zephyron.Core.AtomicFile.WriteAllTextAsync(path, original);
         }
 
         return (new SiteFixStep("напрямую", works, report?.Describe() ?? "не проверилось"), works);
+    }
+
+    private static async Task<bool> StillOursAsync(string path, string patched)
+    {
+        try
+        {
+            return await File.ReadAllTextAsync(path) == patched;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
     }
 
     /// <summary>Открылось ли через VPN: код ответа через туннель и вердикт мимо него.</summary>

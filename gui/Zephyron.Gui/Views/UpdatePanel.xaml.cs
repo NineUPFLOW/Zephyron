@@ -187,10 +187,32 @@ public partial class UpdatePanel : UserControl
     /// </remarks>
     private void OnInstallUpdate(object sender, RoutedEventArgs e) => _ = InstallAsync(askFirst: true);
 
+    /// <summary>Закачка идёт — на всю программу, а не на карточку: карточек с кнопкой бывает несколько.</summary>
+    private static bool _installing;
+
     private async Task InstallAsync(bool askFirst)
+    {
+        // Второе «Обновить» запускало вторую закачку, и проценты двух писали в одну строку.
+        if (_release is null || _installing)
+            return;
+
+        _installing = true;
+
+        try
+        {
+            await InstallCoreAsync(askFirst);
+        }
+        finally
+        {
+            _installing = false;
+        }
+    }
+
+    private async Task InstallCoreAsync(bool askFirst)
     {
         if (_release is null)
             return;
+
 
         if (askFirst)
         {
@@ -221,8 +243,14 @@ public partial class UpdatePanel : UserControl
             // остаётся на секунды подмены, а не на время закачки.
             string via = string.Empty;
 
+            bool staging = true;
+
             var progress = new Progress<double>(fraction =>
             {
+                // Отчёт приходит в поток окна с опозданием — после конца закачки он затёр бы «Останавливаю…».
+                if (!staging)
+                    return;
+
                 Say($"Скачиваю {_release.Version}{via}… {fraction * 100:0} %");
                 InstallButton.Content = $"{fraction * 100:0} %";
             });
@@ -230,6 +258,8 @@ public partial class UpdatePanel : UserControl
             var note = new Progress<string>(_ => via = " через туннель");
 
             var plan = await UpdateInstaller.StageAsync(_release, progress, CancellationToken.None, TunnelForDownload(), note);
+
+            staging = false;
 
             // Без движков у человека может не быть DNS: новая версия поднимает их сама.
             if (SupervisorState.Load(SupervisorState.DefaultPath)?.IsSupervisorAlive() == true)
@@ -265,7 +295,7 @@ public partial class UpdatePanel : UserControl
                     // и кириллица в пути становилась вопросами (12.10).
                     Arguments = UpdateInstaller.ApplyArguments(Environment.ProcessId, plan, installedAt),
                     UseShellExecute = true,
-                });
+                })?.Dispose();
             }
 
             App.Exiting = true;

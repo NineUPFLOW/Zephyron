@@ -157,6 +157,9 @@ public static class NetworkSnapshot
 
     private static T? Wait<T>(Task<T> task, TimeSpan timeout) where T : class
     {
+        // Бросаем задачу по сроку — её позднюю ошибку всё равно надо прочесть.
+        _ = task.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+
         try
         {
             return task.Wait(timeout) ? task.Result : null;

@@ -57,4 +57,25 @@ public static class ShadowsocksMethods
 
         return Known.Contains(name) ? name : null;
     }
+
+    /// <summary>
+    /// Плагин из ссылки (<c>plugin=obfs-local;obfs=http;…</c>); <c>null</c> — плагина нет.
+    /// </summary>
+    /// <remarks>sing-box знает два: obfs-local и v2ray-plugin, остальные <see cref="Supported"/> отсекает.</remarks>
+    public static (string Name, string Options)? Plugin(IReadOnlyDictionary<string, string>? extra)
+    {
+        if (extra is null || !extra.TryGetValue("plugin", out var value) || string.IsNullOrWhiteSpace(value))
+            return null;
+
+        int semicolon = value.IndexOf(';');
+        var name = (semicolon < 0 ? value : value[..semicolon]).Trim();
+
+        // simple-obfs — прежнее имя obfs-local.
+        if (name == "simple-obfs")
+            name = "obfs-local";
+
+        return (name, semicolon < 0 ? string.Empty : value[(semicolon + 1)..]);
+    }
+
+    public static bool Supported(string pluginName) => pluginName is "obfs-local" or "v2ray-plugin";
 }

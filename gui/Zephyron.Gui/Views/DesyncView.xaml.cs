@@ -711,7 +711,7 @@ public partial class DesyncView : UserControl
         }));
 
         menu.Items.Add(MenuEntry("", "Показать файл в каталоге", () =>
-            Process.Start(new ProcessStartInfo { FileName = "explorer.exe", Arguments = $"/select,\"{path}\"" })));
+            Process.Start(new ProcessStartInfo { FileName = "explorer.exe", Arguments = $"/select,\"{path}\"" })?.Dispose()));
 
         menu.Items.Add(new Separator());
         menu.Items.Add(MenuEntry("", "Сделать копию…", () => DuplicatePreset(file)));
@@ -838,7 +838,7 @@ public partial class DesyncView : UserControl
             {
                 FileName = ZapretPaths.PresetDirectory,
                 UseShellExecute = true,
-            });
+            })?.Dispose();
         }
         catch (Exception ex)
         {
@@ -910,11 +910,11 @@ public partial class DesyncView : UserControl
     {
         try
         {
-            Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
+            Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true })?.Dispose();
         }
         catch (System.ComponentModel.Win32Exception)
         {
-            Process.Start(new ProcessStartInfo { FileName = "notepad.exe", Arguments = $"\"{path}\"" });
+            Process.Start(new ProcessStartInfo { FileName = "notepad.exe", Arguments = $"\"{path}\"" })?.Dispose();
         }
     }
 

@@ -55,11 +55,11 @@ public partial class SpeedView : UserControl
     /// был взят на глаз: на окне владельца в 765 точек столбцу пути осталось
     /// сорок, и «Через туннель» легло поверх скорости (снимок 30.09).
     /// </remarks>
-    private const double NarrowBelow = 356 + 150 + 56 + 312 + 6;
+    private const double NarrowBelow = 412 + 150 + 56 + 312 + 6;
 
     /// <summary>Последний замер пути со всем, чего нет в истории.</summary>
     internal sealed record Shot(
-        SpeedEntry Entry, string? Address, List<double> Down, List<double> Up, List<double> Ping);
+        SpeedEntry Entry, string? Address, List<double> Down, List<double> Up, List<double> Ping, List<double>? Loaded = null);
 
     private static Shot? _tunnelShot;
     private static Shot? _directShot;
@@ -132,6 +132,10 @@ public partial class SpeedView : UserControl
     {
         InitializeComponent();
         DrawDial();
+
+        // Замер до сайта короткий; уход со страницы его обрывает.
+        Unloaded += (_, _) => _site?.Cancel();
+        SiteResultGrid.SizeChanged += (_, e) => SiteLayout(e.NewSize.Width);
 
         StreamsText.Text = $"{new SpeedTestOptions().Streams} разом";
 
@@ -243,6 +247,7 @@ public partial class SpeedView : UserControl
             + (tunnel ? " — из трафика подписки" : string.Empty);
 
         ShowShot(shot);
+        ShowTrend(SpeedHistory.Load());
         _ = ShowQuotaAsync(tunnel && _tunnelUp);
     }
 
@@ -347,8 +352,9 @@ public partial class SpeedView : UserControl
         _down = [];
         _up = [];
         _ping = [];
+        _loaded = [];
         _phase = string.Empty;
-        _pingNow = _downNow = _upNow = _nowNow = "—";
+        _pingNow = _downNow = _upNow = _nowNow = _loadedNow = "—";
         _needleNow = 0;
 
         ShowRunning(true);
@@ -371,7 +377,7 @@ public partial class SpeedView : UserControl
         {
             var result = await Task.Run(() => new SpeedTest(options).RunAsync(progress, run.Token));
             var entry = SpeedEntry.From(result, tunnel, ExitName(exit), DateTimeOffset.Now);
-            var shot = new Shot(entry, result.Address, _down, _up, _ping);
+            var shot = new Shot(entry, result.Address, _down, _up, _ping, _loaded);
 
             // Напрямую нас видят под своим адресом — его прячем во всём, что пишется в файл.
             if (!tunnel)
@@ -491,6 +497,7 @@ public partial class SpeedView : UserControl
         PingLine.Show(_ping);
         DownLine.Show(_down);
         UpLine.Show(_up);
+        ShowLiveExtra();
 
         _value.SetResourceReference(Shape.StrokeProperty, _strokeNow);
         Move(_needleNow);
@@ -518,6 +525,15 @@ public partial class SpeedView : UserControl
     {
         if (_run is null)
             return;
+
+        // Отклик под нагрузкой — отдельное показание: скорости в нём нет.
+        if (reading.LoadedMs is { } loadedMs)
+        {
+            _loaded.Add(loadedMs);
+            _loadedNow = $"{loadedMs:0}";
+            _open?.ShowLive();
+            return;
+        }
 
         switch (reading.Phase)
         {
@@ -583,6 +599,7 @@ public partial class SpeedView : UserControl
         DownLine.Show(shot?.Down ?? []);
         UpLine.Show(shot?.Up ?? []);
         PingLine.Show(shot?.Ping ?? []);
+        ShowExtra(shot);
 
         DownWord.Text = Steadiness(shot?.Down);
         UpWord.Text = Steadiness(shot?.Up);
@@ -617,6 +634,7 @@ public partial class SpeedView : UserControl
 
         HistoryRows.Children.Clear();
         HistoryEmpty.Visibility = history.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        ShowTrend(history);
 
         for (int i = 0; i < Math.Min(HistoryShown, history.Count); i++)
             HistoryRows.Children.Add(Row(history[i], latest: i == 0));
@@ -631,6 +649,9 @@ public partial class SpeedView : UserControl
 
         var (title, text) = SpeedVerdict.Describe(history[0], SpeedVerdict.Pair(history[0], history));
 
+        if (history[0].Grade() is { } grade)
+            text += " " + SpeedBloat.Sentence(grade, history[0].LoadedIncrease() ?? 0);
+
         VerdictTitle.Text = title;
         VerdictText.Text = text;
         CopyButton.IsEnabled = true;
@@ -644,7 +665,7 @@ public partial class SpeedView : UserControl
         foreach (var width in new[]
         {
             new GridLength(78), new GridLength(1, GridUnitType.Star),
-            new GridLength(104), new GridLength(104), new GridLength(70),
+            new GridLength(104), new GridLength(104), new GridLength(70), new GridLength(56),
         })
         {
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = width });
@@ -685,6 +706,7 @@ public partial class SpeedView : UserControl
         Add(2, entry.DownMbps is { } down ? $"{SpeedVerdict.Number(down)} Мбит/с" : "—");
         Add(3, entry.UpMbps is { } up ? $"{SpeedVerdict.Number(up)} Мбит/с" : "—");
         Add(4, entry.PingMs is { } ping ? $"{ping:0} мс" : "—");
+        Add(5, entry.Grade()?.ToString() ?? "—");
 
         var row = new Border
         {

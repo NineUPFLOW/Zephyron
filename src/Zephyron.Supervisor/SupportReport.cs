@@ -96,7 +96,7 @@ public static class SupportReport
             // Ссылку из настроек убираем до сериализации, а не надеемся
             // на вычистку: поле ради того и названо.
             ("settings.json", JsonSerializer.Serialize(
-                settings with { SubscriptionUrl = null },
+                settings with { SubscriptionUrl = null, TelegramProxySecret = null },
                 new JsonSerializerOptions { WriteIndented = true })),
         };
 
@@ -207,7 +207,8 @@ public static class SupportReport
 
         text.AppendLine($"Zephyron {version}");
         text.AppendLine($"Снят: {when:dd.MM.yyyy HH:mm:ss}");
-        text.AppendLine($"Windows: {Environment.OSVersion.Version}");
+        text.AppendLine($"Windows: {System.Runtime.InteropServices.RuntimeInformation.OSDescription} ({Environment.OSVersion.Version}), "
+            + $"{System.Runtime.InteropServices.RuntimeInformation.OSArchitecture}, .NET {Environment.Version}");
         text.AppendLine();
         text.AppendLine($"Режим: {settings.Engines.Describe()}");
         text.AppendLine($"Игнорировать исключения: {YesNo(settings.Engines.IgnoreExclusions)}");
@@ -301,6 +302,10 @@ public static class SupportReport
                 text.AppendLine($"  {(s.IsUsableOutbound ? "+" : "−")} сервер {++i} — {s.ProtocolName} {s.Transport}/{s.Security}"
                     + (s.UnusableWhy is { } reason ? $": {reason}" : string.Empty));
 
+            // Служебные строки панели и признаки пустышки — без адресов и названий.
+            var verdict = Subscriptions.SubscriptionTrust.Assess(new() { Servers = servers }, DateTimeOffset.Now);
+            text.AppendLine($"  доверие: {verdict.Level}" + (verdict.Reasons.Count > 0 ? "; " + string.Join("; ", verdict.Reasons) : string.Empty));
+
             text.AppendLine();
         }
 
@@ -370,6 +375,8 @@ public static class SupportReport
                 text.AppendLine($"DNS движка: {dns.Trim()}");
             }
         }
+
+        text.AppendLine($"WARP у провайдера, похоже, недоступен: {YesNo(WarpReach.LooksBlocked(At(root, ServerHealthCache.DefaultPath)))}");
 
         var winws = Zephyron.Zapret.ZapretPaths.Discover()?.ExecutablePath;
         var singBox = Path.Combine(AppContext.BaseDirectory, "engines", "sing-box", "sing-box.exe");

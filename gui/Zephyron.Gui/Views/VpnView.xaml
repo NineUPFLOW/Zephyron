@@ -127,6 +127,10 @@
                                            Foreground="{DynamicResource Warn}" Margin="0,4,0,0" TextWrapping="Wrap"
                                            Visibility="{Binding WarningShown}" />
 
+                                <TextBlock Text="{Binding Trust}" Style="{StaticResource Caption}" ToolTip="{Binding Trust}"
+                                           Foreground="{Binding TrustBrush}" Margin="0,4,0,0" TextWrapping="Wrap"
+                                           Visibility="{Binding TrustShown}" />
+
                                 <!-- Объявление поставщика из заголовка announce: его слова, не наши. -->
                                 <TextBlock Text="{Binding Announce}" Margin="0,5,0,0" TextWrapping="Wrap"
                                            FontSize="13" Foreground="{DynamicResource Text}"
@@ -485,8 +489,6 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock x:Name="WarpSummaryLine" Style="{StaticResource Caption}" TextWrapping="Wrap"
                                            Foreground="{DynamicResource Text}" VerticalAlignment="Center" />
-                                <Button x:Name="WarpSummaryAction" Grid.Column="1" Style="{StaticResource Ghost}" Padding="12,4" Margin="12,-2,0,-2"
-                                        Content="Выбрать" Click="OnSummaryWarp" AutomationProperties.Name="Выбрать WARP для туннеля" />
                             </Grid>
                         </Border>
 
@@ -571,6 +573,9 @@
                                         он идёт сюда, а не в подписки, и работает тем же переключателем.
                                     -->
                                     <StackPanel Margin="0,10,0,0">
+                                        <TextBlock x:Name="WarpBlockedNote" Style="{StaticResource Caption}" Foreground="{DynamicResource Warn}"
+                                                   Margin="0,0,0,8" TextWrapping="Wrap" Visibility="Collapsed"
+                                                   Text="WARP у вашего провайдера, похоже, недоступен: последние проверки без ответа. Выход через VPN надёжнее." />
                                         <TextBlock x:Name="WarpSourceLine" FontWeight="SemiBold" TextWrapping="Wrap" />
                                         <TextBlock x:Name="WarpSourceHint" Style="{StaticResource Caption}" Margin="0,3,0,0" TextWrapping="Wrap" />
                                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">

@@ -2592,13 +2592,6 @@ public partial class RoutesView : UserControl
         }
     }
 
-    /// <summary>«Убрать» в шапке папки программы: маршруты, списки и запись — разом.</summary>
-    private void OnRemoveProgram(object sender, RoutedEventArgs e)
-    {
-        if (sender is FrameworkElement { Tag: string program })
-            RemoveProgram(program);
-    }
-
     private void RemoveProgram(string program)
     {
         if (MessageBox.Show(Window.GetWindow(this),

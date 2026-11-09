@@ -264,7 +264,7 @@ public partial class StatusView : UserControl
                 FileName = "explorer.exe",
                 ArgumentList = { File.Exists(file) ? "/select," + file : Path.GetDirectoryName(file)! },
                 UseShellExecute = false,
-            });
+            })?.Dispose();
         }
         catch (Exception ex)
         {
@@ -300,7 +300,6 @@ public partial class StatusView : UserControl
         _clock.Tick += (_, _) => ShowUptime();
 
         // Задержка меряется раз в пять секунд — на графике две минуты.
-        LatencyChart.TimeLabels = ["−2 мин", "−1 мин", "сейчас"];
 
         // Лента событий из журнала (StatusView.Events.cs) — пока раздел на экране.
         Loaded += (_, _) => StartEvents();
@@ -545,6 +544,11 @@ public partial class StatusView : UserControl
             }
             while (_updateAgain);
         }
+        catch (Exception ex)
+        {
+            // async void: необработанное роняло бы процесс; строка в плашке, не окно.
+            ShowProblem("Состояние прочитать не удалось: " + ex.GetBaseException().Message);
+        }
         finally
         {
             _updating = false;
@@ -706,12 +710,14 @@ public partial class StatusView : UserControl
         ShowHero(
             healthy ? HomeState.Running : broken ? HomeState.Failed : HomeState.Degraded,
             healthy
-                ? Carrying(settings)
+                ? Carrying(settings, services)
                 : broken
                     ? BrokenHint(services)
                     : dnsDown
                         ? "Резолвер движка молчит: сайты открываются с задержкой или совсем не открываются. Подробности ниже."
-                        : "Часть движков работает с ошибками. Подробности ниже.");
+                        : services.FirstOrDefault(s => s.Health == ServiceHealth.Degraded && s.LastError is { Length: > 0 }) is { } degraded
+                            ? $"{degraded.Name}: {degraded.LastError}."
+                            : "Часть движков работает с ошибками. Подробности ниже.");
 
         // Причина упавшего движка — целиком строкой ниже, а не только подсказкой
         // его строки: та в одну строку и обрезается. 22.10 у знакомого владельца
@@ -737,7 +743,21 @@ public partial class StatusView : UserControl
     }
 
     /// <summary>Что несёт трафик при исправном обходе — по выбранному режиму.</summary>
-    private static string Carrying(AppSettings settings) => WorkModes.Of(settings.Engines) switch
+    private static string Carrying(AppSettings settings, IReadOnlyCollection<ServiceState> services)
+    {
+        // Выбор режима действует со следующего запуска: пока работают прежние
+        // движки, говорить «трафик идёт через десинк» при живом туннеле — неправда.
+        bool desync = services.Any(s => s.Name == "winws2");
+        bool tunnel = services.Any(s => s.Name == "sing-box");
+
+        if (WorkModes.Of(settings.Engines) is { } chosen && WorkModes.Of(new EngineChoice { Desync = desync, Tunnel = tunnel }) is { } running
+            && chosen != running)
+            return $"Работает прежний режим «{WorkModes.Name(running)}». «{WorkModes.Name(chosen)}» вступит после перезапуска движков.";
+
+        return Carrying(settings);
+    }
+
+    internal static string Carrying(AppSettings settings) => WorkModes.Of(settings.Engines) switch
     {
         WorkMode.Desync => "Трафик идёт через десинк.",
         WorkMode.Tunnel => "Трафик идёт через туннель.",
@@ -1014,17 +1034,17 @@ public partial class StatusView : UserControl
         Chips.Columns = compact ? 2 : 1;
         DesyncChip.Margin = new Thickness(0, 0, compact ? 8 : 0, compact ? 0 : 8);
 
-        // Узко: числа строкой под заголовком, по два; широко — в строке заголовка.
-        NetMetrics.Columns = compact ? 2 : 4;
-        Grid.SetRow(NetMetrics, compact ? 1 : 0);
-        Grid.SetColumn(NetMetrics, compact ? 0 : 1);
+        // Узко: числа под заголовком по два, графики друг под другом по 40; широко — плитки слева, графики справа.
+        NetMetrics.Columns = 2;
+        Grid.SetColumn(NetMetrics, 0);
         Grid.SetColumnSpan(NetMetrics, compact ? 3 : 1);
-        NetMetrics.Margin = new Thickness(0, compact ? 8 : 0, 0, 0);
-
-        foreach (var cell in new FrameworkElement[] { NetDownCell, NetUpCell, NetPingCell, NetLossCell })
-            cell.Margin = new Thickness(0, 0, 16, compact ? 4 : 0);
+        Grid.SetRow(Charts, compact ? 2 : 1);
+        Grid.SetColumn(Charts, compact ? 0 : 2);
+        Grid.SetColumnSpan(Charts, compact ? 3 : 1);
+        Charts.Margin = new Thickness(0, compact ? 8 : 0, 0, 0);
 
         ChartRowGap.Height = new GridLength(compact ? 8 : 0);
+        ThroughputChart.Height = LatencyChart.Height = compact ? 40 : 60;
         Grid.SetColumnSpan(ThroughputChart, compact ? 3 : 1);
         Grid.SetRow(LatencyChart, compact ? 2 : 0);
         Grid.SetColumn(LatencyChart, compact ? 0 : 2);
@@ -1628,66 +1648,12 @@ public partial class StatusView : UserControl
         EnginesLine.Visibility = stripText is null ? Visibility.Collapsed : Visibility.Visible;
         EnginesSettings.Visibility = noExceptions ? Visibility.Visible : Visibility.Collapsed;
 
-        ShowPath(settings);
-
         // Автозапуск поднимает ровно это. Сказано здесь же, где задано:
         // иначе про связь пришлось бы догадываться, а догадка — источник
         // того самого «трей запускается, а движки нужно поднимать кнопкой».
         AutostartRaises.Text = mode is { } raised
             ? $"При входе в Windows поднимется режим «{WorkModes.Name(raised)}»."
             : "При входе в Windows ничего не поднимется: режим не выбран.";
-    }
-
-    /// <summary>Путь туннеля: виден, когда туннель поднимается (режимы «Туннель» и «Гибрид»).</summary>
-    private void ShowPath(AppSettings settings)
-    {
-        var path = TunnelPaths.Of(settings);
-
-        PathRow.Visibility = settings.Engines.Tunnel ? Visibility.Visible : Visibility.Collapsed;
-        PathVpnName.Text = TunnelPaths.Name(TunnelPath.Vpn);
-        PathWarpName.Text = TunnelPaths.Name(TunnelPath.Warp);
-        PathVpn.IsChecked = path == TunnelPath.Vpn;
-        PathWarp.IsChecked = path == TunnelPath.Warp;
-
-        PathText.Text = path == TunnelPath.Warp
-            ? "Бесплатный выход Cloudflare: встроенный или ваш файл WARP, страна — на вкладке VPN. Подписки не используются."
-            : settings.HasSubscriptionExit
-                ? Zephyron.Subscriptions.Warp.UsesFallback(settings) ? "Серверы ваших подписок и ключей. WARP — запасной, если серверы VPN не ответят." : "Серверы ваших подписок и ключей. WARP не используется."
-                : "Подписок и ключей пока нет — добавьте их на вкладке VPN.";
-    }
-
-    /// <summary>Выбран путь туннеля. VPN без подписок не сохраняется — вместо этого открывается добавление на вкладке VPN.</summary>
-    private void OnPath(object sender, RoutedEventArgs e)
-    {
-        if (sender is not FrameworkElement { Tag: string tag } || !Enum.TryParse<TunnelPath>(tag, out var path))
-            return;
-
-        try
-        {
-            var settings = AppSettings.Load(AppSettings.DefaultPath);
-
-            if (!TunnelPaths.CanChoose(settings, path))
-            {
-                ShowPath(settings);
-                VpnView.OpenAddOnShow = true;
-                (Window.GetWindow(this) as MainWindow)?.Open("vpn");
-                return;
-            }
-
-            var next = TunnelPaths.Apply(settings, path);
-
-            if (next != settings)
-                next.Save(AppSettings.DefaultPath);
-
-            ShowPath(next);
-            Update();
-
-            this.Offer("Туннель идёт через " + TunnelPaths.Name(path));
-        }
-        catch (Exception ex)
-        {
-            ShowProblem("Не записалось: " + ex.GetBaseException().Message);
-        }
     }
 
     /// <summary>
@@ -1921,10 +1887,22 @@ public partial class StatusView : UserControl
         ShowHero(HomeState.Starting, "Собираю конфиг: читаю подписку и правила.");
         Pulse();
 
-        var outcome = await EngineControl.StartAsync("кнопка «Запустить» на «Главной»", CancellationToken.None);
+        EngineOutcome outcome;
 
-        _building = false;
-        StartButton.IsEnabled = true;
+        try
+        {
+            outcome = await EngineControl.StartAsync("кнопка «Запустить» на «Главной»", CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            // Без этого кнопка оставалась бы погашенной, а «сборка» — идущей.
+            outcome = new(false, "Запустить не удалось: " + ex.GetBaseException().Message);
+        }
+        finally
+        {
+            _building = false;
+            StartButton.IsEnabled = true;
+        }
 
         if (!outcome.Ok)
         {

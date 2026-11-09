@@ -79,9 +79,10 @@ public static class ExitHistory
         }
     }
 
-    /// <summary>Последние разные выходы, свежие первыми.</summary>
+    /// <summary>Последние разные выходы, свежие первыми; WARP — не в списке: у него свой раздел.</summary>
     public static IReadOnlyList<ExitSeen> Recent(int count, string? path = null) =>
-        Read(path).Reverse().DistinctBy(e => e.Tag).Take(count).ToList();
+        Read(path).Where(e => e.Tag != Zephyron.Subscriptions.Warp.MasqueTag)
+            .Reverse().DistinctBy(e => e.Tag).Take(count).ToList();
 
     private static void Write(string target, IReadOnlyList<ExitSeen> seen)
     {

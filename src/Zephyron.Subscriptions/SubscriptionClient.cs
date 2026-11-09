@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 
 namespace Zephyron.Subscriptions;
 
@@ -150,10 +151,9 @@ public sealed class SubscriptionClient : IDisposable
                 return fallback.Info;
             }
 
+            // Сюда доходят только после отказов 401/403/404 на всех именах: успех возвращается в цикле.
             response!.EnsureSuccessStatusCode();
-
-            AgentMemory.Set(target, used == _userAgents[0] ? null : used, _memory);
-            return await ParseAsync(response, cancellationToken);
+            throw new HttpRequestException("панель не отдала подписку");
         }
         finally
         {
@@ -180,11 +180,40 @@ public sealed class SubscriptionClient : IDisposable
     /// <remarks>Пароль, как и ссылка: не печатается и не пишется в журнал.</remarks>
     public string? LastBody { get; private set; }
 
+    private const int MaxBodyBytes = 16 * 1024 * 1024;
+    private const int MaxServers = 5000;
+
     private async Task<SubscriptionInfo> ParseAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        // Предел размера: чужой ответ не должен съесть память.
+        if (response.Content.Headers.ContentLength > MaxBodyBytes)
+            throw new InvalidDataException("ответ подписки слишком большой");
+
+        string body;
+        await using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
+        {
+            using var buffer = new MemoryStream();
+            var chunk = new byte[81920];
+            int read;
+            while ((read = await stream.ReadAsync(chunk, cancellationToken)) > 0)
+            {
+                if (buffer.Length + read > MaxBodyBytes)
+                    throw new InvalidDataException("ответ подписки слишком большой");
+                buffer.Write(chunk, 0, read);
+            }
+
+            var charset = response.Content.Headers.ContentType?.CharSet;
+            Encoding enc;
+            try { enc = charset is null ? Encoding.UTF8 : Encoding.GetEncoding(charset); }
+            catch (ArgumentException) { enc = Encoding.UTF8; }
+            body = enc.GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
+        }
+
         LastBody = body;
         var (servers, errors) = SubscriptionParser.ParseBody(body);
+
+        if (servers.Count > MaxServers)
+            servers = servers.Take(MaxServers).ToList();
 
         return SubscriptionParser.BuildInfo(
             servers,
@@ -200,15 +229,24 @@ public sealed class SubscriptionClient : IDisposable
     /// </summary>
     public static Uri Unwrap(Uri url)
     {
-        var text = url.ToString();
+        var text = url.OriginalString;
 
-        foreach (var prefix in new[] { "happ://add/", "clash://install-config?url=", "sn://subscription?url=" })
+        // Обёртки клиентов: ссылка подписки лежит внутри (hiddify, v2rayNG, sing-box, Streisand и др.).
+        foreach (var prefix in new[]
+        {
+            "happ://add/", "clash://install-config?url=", "sn://subscription?url=",
+            "hiddify://import/", "sing-box://import-remote-profile?url=", "v2rayng://install-config?url=",
+            "v2box://install-sub?url=", "streisand://import/", "karing://install-config?url=",
+            "flclash://install-config?url=", "stash://install-config?url=", "clashmeta://install-config?url=",
+            "koala-clash://install-config?url=", "clash-verge://install-config?url=",
+        })
         {
             if (!text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 continue;
 
             var inner = text[prefix.Length..];
-            int amp = inner.IndexOf('&');
+            // '&' отделяет следующий параметр только у url=...; в happ://add/<адрес> он часть самого адреса.
+            int amp = prefix.EndsWith("url=", StringComparison.Ordinal) ? inner.IndexOf('&') : -1;
             if (amp >= 0)
                 inner = inner[..amp];
 

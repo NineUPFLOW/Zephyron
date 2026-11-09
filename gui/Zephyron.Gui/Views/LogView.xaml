@@ -53,7 +53,9 @@
 
                 <Button x:Name="ErrorsButton" Style="{StaticResource Ghost}"
                         Content="Только ошибки" Click="OnErrors" Margin="0,0,8,0" />
-                <Button Style="{StaticResource Ghost}" Content="Перечитать" Click="OnReload" />
+                <Button Style="{StaticResource Ghost}" Content="Перечитать" Click="OnReload" Margin="0,0,8,0" />
+                <Button Style="{StaticResource Ghost}" Content="Очистить" Click="OnClear"
+                        ToolTip="Очистить журналы движков: sing-box, winws2, супервизор, tg-ws-proxy" />
 
                 <!-- Только в панели главного окна (ShowClose): у окна журнала есть свой крестик. -->
                 <Button x:Name="CloseButton" Style="{StaticResource IconGhost}" Content="&#xE711;"

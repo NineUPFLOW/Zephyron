@@ -62,7 +62,8 @@ public static class XrayConfigParser
 
             foreach (var root in roots)
             {
-                if (!root.TryGetProperty("outbounds", out var outbounds)
+                if (root.ValueKind != JsonValueKind.Object
+                    || !root.TryGetProperty("outbounds", out var outbounds)
                     || outbounds.ValueKind != JsonValueKind.Array)
                 {
                     continue;
@@ -72,6 +73,10 @@ public static class XrayConfigParser
 
                 foreach (var outbound in outbounds.EnumerateArray())
                 {
+                    // Кривой выход (не объект) пропускается один, а не роняет подписку.
+                    if (outbound.ValueKind != JsonValueKind.Object)
+                        continue;
+
                     // Конфиг sing-box устроен так же — outbounds в корне, —
                     // но сервер описан другими полями. Панель отдаёт его
                     // в ответ на наш заголовок sing-box/1.14.0 (issue #3).
@@ -146,7 +151,7 @@ public static class XrayConfigParser
             return false;
         }
 
-        if (!outbound.TryGetProperty("settings", out var settings))
+        if (!outbound.TryGetProperty("settings", out var settings) || settings.ValueKind != JsonValueKind.Object)
             return false;
 
         string? host = null;
@@ -223,7 +228,7 @@ public static class XrayConfigParser
             shortId = Empty(Text(tls, "shortId"));
 
             if (tls.TryGetProperty("alpn", out var names) && names.ValueKind == JsonValueKind.Array)
-                alpn = names.EnumerateArray().Select(a => a.GetString() ?? string.Empty).Where(a => a.Length > 0).ToList();
+                alpn = names.EnumerateArray().Select(a => a.ValueKind == JsonValueKind.String ? a.GetString() ?? string.Empty : string.Empty).Where(a => a.Length > 0).ToList();
         }
 
         var (path, hostHeader, serviceName) = Stream(stream, transport);
@@ -371,7 +376,7 @@ public static class XrayConfigParser
             && tls.TryGetProperty("alpn", out var names)
             && names.ValueKind == JsonValueKind.Array)
         {
-            alpn = names.EnumerateArray().Select(a => a.GetString() ?? string.Empty).Where(a => a.Length > 0).ToList();
+            alpn = names.EnumerateArray().Select(a => a.ValueKind == JsonValueKind.String ? a.GetString() ?? string.Empty : string.Empty).Where(a => a.Length > 0).ToList();
         }
 
         var (obfsType, obfsPassword) = Salamander(stream);

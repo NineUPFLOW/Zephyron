@@ -27,6 +27,9 @@ public sealed record SpeedEntry
 
     public double? JitterMs { get; init; }
 
+    /// <summary>Отклик под нагрузкой, мс; в старых записях его нет — <c>null</c>.</summary>
+    public double? LoadedPingMs { get; init; }
+
     /// <summary>Страна, из которой нас видел сервер замера.</summary>
     public string? Country { get; init; }
 
@@ -38,6 +41,13 @@ public sealed record SpeedEntry
 
     public string? Problem { get; init; }
 
+    /// <summary>Рост отклика под нагрузкой над простоем, мс; нет данных — <c>null</c>.</summary>
+    public double? LoadedIncrease() =>
+        LoadedPingMs is { } loaded && PingMs is { } idle ? Math.Max(0, loaded - idle) : null;
+
+    /// <summary>Класс A–F по росту отклика под нагрузкой; нет данных — <c>null</c>.</summary>
+    public char? Grade() => LoadedIncrease() is { } inc ? SpeedBloat.Grade(inc) : null;
+
     public static SpeedEntry From(SpeedResult result, bool tunnel, string? exit, DateTimeOffset at) => new()
     {
         At = at,
@@ -47,10 +57,27 @@ public sealed record SpeedEntry
         UpMbps = result.UpMbps,
         PingMs = result.PingMs,
         JitterMs = result.JitterMs,
+        LoadedPingMs = result.LoadedPingMs,
         Country = result.Country,
         Node = result.Node,
         Bytes = result.DownBytes + result.UpBytes,
         Problem = result.Problem,
+    };
+}
+
+/// <summary>Класс сети под нагрузкой (bufferbloat) по росту отклика над простоем.</summary>
+public static class SpeedBloat
+{
+    /// <summary>Пороги, мс: A &lt; 5, B &lt; 30, C &lt; 60, D &lt; 200, E &lt; 400, иначе F.</summary>
+    public static char Grade(double increaseMs) =>
+        increaseMs < 5 ? 'A' : increaseMs < 30 ? 'B' : increaseMs < 60 ? 'C' : increaseMs < 200 ? 'D' : increaseMs < 400 ? 'E' : 'F';
+
+    /// <summary>Слова о классе для вывода.</summary>
+    public static string Sentence(char grade, double increaseMs) => grade switch
+    {
+        'A' or 'B' => $"Нагруженная сеть: класс {grade}. При загрузке задержка растёт на {increaseMs:0} мс — звонки и игры не пострадают.",
+        'C' => $"Нагруженная сеть: класс {grade}. При загрузке задержка растёт на {increaseMs:0} мс, в играх это заметно.",
+        _ => $"Нагруженная сеть: класс {grade}. При загрузке задержка растёт на {increaseMs:0} мс, видеозвонки могут заикаться.",
     };
 }
 
@@ -136,7 +163,7 @@ public static class SpeedHistory
             if (Path.GetDirectoryName(Path.GetFullPath(target)) is { Length: > 0 } directory)
                 Directory.CreateDirectory(directory);
 
-            File.WriteAllText(target, JsonSerializer.Serialize(entries, Json));
+            Zephyron.Core.AtomicFile.WriteAllText(target, JsonSerializer.Serialize(entries, Json));
         }
         catch (Exception)
         {
@@ -247,6 +274,9 @@ public static class SpeedVerdict
 
         if (entry.PingMs is { } ping)
             parts.Add($"задержка {ping:0} мс");
+
+        if (entry.Grade() is { } grade)
+            parts.Add($"под нагрузкой +{entry.LoadedIncrease():0} мс, класс {grade}");
 
         if (entry.Problem is { Length: > 0 } problem)
             parts.Add(problem);

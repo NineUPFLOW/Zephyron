@@ -44,9 +44,6 @@ public static class AmneziaSettings
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-    /// <summary>Параметр AmneziaWG 3.0/3.1 — в CamelCase файла или через «_», как в JSON AmneziaVPN.</summary>
-    public static bool IsGeneration3(string key) => Generation3Name(key) is not null;
-
     /// <summary>
     /// Оговорка к серверу WireGuard/AmneziaWG по ключам, которых движок не знает;
     /// <c>null</c> — говорить не о чем.

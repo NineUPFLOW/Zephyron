@@ -106,7 +106,7 @@ public static class LocalProxyInbound
             if (!wanted || InConfig(configPath, port))
                 File.Delete(path);
             else
-                File.WriteAllText(path, $"{port}|{problem ?? "нет работающих серверов выхода"}");
+                Zephyron.Core.AtomicFile.WriteAllText(path, $"{port}|{problem ?? "нет работающих серверов выхода"}");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

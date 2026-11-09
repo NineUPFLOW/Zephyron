@@ -149,8 +149,25 @@ public static class Warp
             throw new InvalidDataException(error ?? "файл не читается");
 
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(FilePath))!);
-        File.WriteAllText(FilePath, text);
-        File.WriteAllText(FileNamePath, Path.GetFileName(sourcePath));
+        WriteAtomic(FilePath, text);
+        WriteAtomic(FileNamePath, Path.GetFileName(sourcePath));
+    }
+
+    // Подмена файла целиком: оборванная запись не оставит обрубок вместо рабочего файла.
+    private static void WriteAtomic(string path, string text)
+    {
+        var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+
+        try
+        {
+            File.WriteAllText(temp, text);
+            File.Move(temp, path, overwrite: true);
+        }
+        catch
+        {
+            try { File.Delete(temp); } catch (Exception) { }
+            throw;
+        }
     }
 
     /// <summary>Убирает свой файл: WARP снова встроенный.</summary>

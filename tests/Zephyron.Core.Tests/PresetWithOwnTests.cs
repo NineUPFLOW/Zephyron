@@ -43,8 +43,8 @@ public class PresetWithOwnTests
             Assert.True(text.IndexOf("--lua-desync=multisplit:pos=1") < text.IndexOf("--name=youtube"));
             Assert.True(text.IndexOf("--new") < text.IndexOf("--name=youtube"));
             Assert.True(text.IndexOf("--wf-tcp-out=443") < text.IndexOf("--name=Подбор: split"));
-            Assert.Equal(["example.com"], File.ReadAllLines(Path.Combine(lists, "zy-own-мойподбор-1.txt")));
-            Assert.Contains("--hostlist=lists/zy-own-мойподбор-1.txt", text);
+            Assert.Equal(["example.com"], File.ReadAllLines(Path.Combine(lists, "zy-own-" + WinwsCommandLine.Sanitize("Мой подбор").ToLowerInvariant() + "-1.txt")));
+            Assert.Contains("--hostlist=lists/zy-own-" + WinwsCommandLine.Sanitize("Мой подбор").ToLowerInvariant() + "-1.txt", text);
         }
         finally
         {

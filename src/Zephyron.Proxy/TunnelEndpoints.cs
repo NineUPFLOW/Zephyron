@@ -65,6 +65,10 @@ public static class TunnelEndpoints
                 : Dns.GetHostAddressesAsync(host))
             .ToList();
 
+        // Не дождавшиеся поиски бросаем — их поздние ошибки надо прочесть.
+        foreach (var lookup in lookups)
+            _ = lookup.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+
         try
         {
             Task.WaitAll([.. lookups], ResolveTimeout);

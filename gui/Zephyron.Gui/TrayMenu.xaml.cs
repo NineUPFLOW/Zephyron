@@ -28,7 +28,8 @@ internal sealed record TrayStatus(
     ServiceHealth? Desync,
     bool Busy,
     bool Starting = false,
-    bool Stopping = false)
+    bool Stopping = false,
+    DateTimeOffset? Since = null)
 {
     /// <summary>Сколько после подъёма ждать здоровья движков — как «Главная» (StatusView.StartupPatience).</summary>
     private static readonly TimeSpan StartupPatience = TimeSpan.FromSeconds(90);
@@ -62,7 +63,7 @@ internal sealed record TrayStatus(
               && DateTimeOffset.Now - state!.StartedAt < StartupPatience
             : busy || EngineControl.IsRunning);
 
-        return new TrayStatus(running, healthy, Of("sing-box"), Of("winws2"), busy, starting, stopping);
+        return new TrayStatus(running, healthy, Of("sing-box"), Of("winws2"), busy, starting, stopping, running ? state!.StartedAt : null);
     }
 
     /// <param name="tunnel">
@@ -101,42 +102,254 @@ public partial class TrayMenu : Window
     private readonly Action<WorkMode> _chooseMode;
     private readonly Action _showWindow;
     private readonly Action<bool> _quit;
+    private readonly Action<string>? _open;
+    private readonly Action? _restart;
 
-    internal TrayMenu(Action toggle, Action<WorkMode> chooseMode, Action showWindow, Action<bool> quit)
+    /// <param name="open">Открыть окно на разделе («vpn», «check»); <c>null</c> — просто показать окно.</param>
+    /// <param name="restart">Перезапуск движков; <c>null</c> — кнопка ничего не делает.</param>
+    internal TrayMenu(Action toggle, Action<WorkMode> chooseMode, Action showWindow, Action<bool> quit,
+        Action<string>? open = null, Action? restart = null)
     {
         _toggle = toggle;
         _chooseMode = chooseMode;
         _showWindow = showWindow;
         _quit = quit;
+        _open = open;
+        _restart = restart;
 
         InitializeComponent();
 
-        Version.Text = MainWindow.Version();
+        // В шапке «1.4.1», полный вид со сборкой — в подсказке.
+        var full = MainWindow.Version();
+        Version.Text = full.Split(' ')[0];
+        Version.ToolTip = full;
 
         ModeDesyncName.Text = WorkModes.Name(WorkMode.Desync);
         ModeTunnelName.Text = WorkModes.Name(WorkMode.Tunnel);
         ModeRouteName.Text = WorkModes.Name(WorkMode.Route);
+
+        _hold.Tick += (_, _) =>
+        {
+            _hold.Stop();
+            _holding = false;
+            Render(_last);
+        };
+
+        IsVisibleChanged += (_, _) =>
+        {
+            if (!IsVisible)
+                Overflow.Visibility = Visibility.Collapsed;
+        };
     }
+
+    private TrayStatus _last = new(false, false, null, null, false);
+    private readonly System.Windows.Threading.DispatcherTimer _hold = new() { Interval = TimeSpan.FromSeconds(2.5) };
+    private bool _holding;
 
     internal void Render(TrayStatus status)
     {
-        State.Text = status.Headline;
-        // Форма знака — состояние (StateMark): кольцо, дуга, диск, ромб, треугольник.
-        Mark.Tag = TrayIcon.StateOf(status).ToString();
+        _last = status;
 
-        // До файла состояния движков в нём нет — пока надзор их поднимает,
-        // так и говорится, а не «—», как у остановленных.
-        Tunnel.Text = status.Running ? TrayStatus.Describe(status.Tunnel, tunnel: true) : status.Starting ? "запускается" : "—";
-        Desync.Text = status.Running ? TrayStatus.Describe(status.Desync) : status.Starting ? "запускается" : "—";
+        var state = TrayIcon.StateOf(status);
 
-        // Пока идёт запуск, кнопка — «Остановить», как на «Главной»: второй
-        // «Запустить» тут не нужен, а остановить запуск можно.
-        Toggle.Content = status.Busy
-            ? (status.Stopping ? "Выключаю…" : status.Running ? "Запускаю заново…" : "Включаю…")
-            : status.Running || status.Starting ? "Выключить" : "Включить";
+        Mark.Tag = state.ToString();
+        Ring.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, state switch
+        {
+            FieldMode.Running => "Success",
+            FieldMode.Starting or FieldMode.Degraded => "Warn",
+            FieldMode.Failed => "Danger",
+            _ => "Muted",
+        });
+
+        State.Text =
+            status.Stopping ? "Выключаю…"
+            : status.Busy && status.Running ? "Перезапускаю…"
+            : status.Starting ? "Запускаю…"
+            : !status.Running ? "Обход выключен"
+            : state == FieldMode.Failed ? "Не запустился"
+            : status.AllHealthy ? "Обход включён"
+            : "Работает частично";
+
+        // Строка под словом: аптайм или причина. Подсказке режима она уступает на 2.5 с (OnMode).
+        if (!_holding)
+            Uptime.Text =
+                status.Busy || status.Starting ? "Проверяю движки"
+                : !status.Running ? "Нажмите ⏻, чтобы включить"
+                : state == FieldMode.Failed ? "Нажмите ⏻, чтобы повторить"
+                : status.AllHealthy ? "Работает " + Span(status.Since)
+                : status.Tunnel is { } t && t != ServiceHealth.Healthy ? "Туннель: " + TrayStatus.Describe(t, tunnel: true)
+                : "Десинк: " + TrayStatus.Describe(status.Desync);
+
+        Problem.Text = state == FieldMode.Failed
+            ? "Ошибка: " + (status.Tunnel is ServiceHealth.Dead or ServiceHealth.Faulted
+                ? "туннель — " + TrayStatus.Describe(status.Tunnel, tunnel: true)
+                : "десинк — " + TrayStatus.Describe(status.Desync))
+            : string.Empty;
+        Problem.ToolTip = Problem.Text.Length > 0 ? Problem.Text : null;
+
+        string name = status.Running || status.Starting ? "Выключить обход" : "Включить обход";
+        bool spinner = status.Busy || status.Starting && !status.Running;
+
+        // Запуск — спиннер E895 (без движения — статичный E712), кнопка занята.
+        Toggle.Content = spinner ? (Motion.Enabled ? "" : "") : state == FieldMode.Failed ? "" : "";
+        Toggle.Tag = state == FieldMode.Failed ? "Failed" : status.Running && state != FieldMode.Starting ? "On" : "Off";
         Toggle.IsEnabled = !status.Busy;
+        System.Windows.Automation.AutomationProperties.SetName(Toggle, name);
+        Toggle.ToolTip = name;
+        Spin(status.Busy && Motion.Enabled);
+
+        Restart.IsEnabled = status.Running && !status.Busy;
+
+        ExitCard.Visibility = status.Running && !status.Busy ? Visibility.Visible : Visibility.Collapsed;
+
+        if (ExitCard.Visibility == Visibility.Visible)
+        {
+            ShowExitMode(status);
+
+            if (IsVisible)
+                _ = ReadExitAsync();
+        }
 
         ShowModes(status);
+    }
+
+    private static string Span(DateTimeOffset? since)
+    {
+        if (since is not { } at)
+            return "—";
+
+        var span = DateTimeOffset.Now - at;
+
+        return span.TotalDays >= 1 ? $"{(int)span.TotalDays} д {span.Hours} ч"
+            : span.TotalHours >= 1 ? $"{span.Hours} ч {span.Minutes} мин"
+            : span.TotalMinutes >= 1 ? $"{span.Minutes} мин"
+            : "меньше минуты";
+    }
+
+    /// <summary>Вращение значка запуска; без движения (Motion) — статичный значок.</summary>
+    private void Spin(bool on)
+    {
+        if (on)
+        {
+            if (Toggle.RenderTransform is not RotateTransform rotate || rotate.IsFrozen)
+                Toggle.RenderTransform = rotate = new RotateTransform();
+
+            if (!_spinning)
+            {
+                rotate.BeginAnimation(RotateTransform.AngleProperty,
+                    new System.Windows.Media.Animation.DoubleAnimation(0, 360, TimeSpan.FromSeconds(1.2))
+                    { RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever });
+                _spinning = true;
+            }
+        }
+        else if (_spinning && Toggle.RenderTransform is RotateTransform r)
+        {
+            r.BeginAnimation(RotateTransform.AngleProperty, null);
+            _spinning = false;
+        }
+    }
+
+    private bool _spinning;
+
+    /// <summary>Режим словами — по настройкам; движок упал — отдельной строкой Danger.</summary>
+    private void ShowExitMode(TrayStatus status)
+    {
+        try
+        {
+            var engines = AppSettings.Load(AppSettings.DefaultPath).Engines;
+
+            ExitMode.Text = engines.Tunnel && engines.Desync ? "Гибрид: туннель и десинк"
+                : engines.Tunnel ? "Только туннель"
+                : "Только десинк";
+
+            bool down = engines.Tunnel && status.Tunnel is { } t && t != ServiceHealth.Healthy;
+
+            ExitWarn.Text = down ? "Туннель не отвечает" : string.Empty;
+            ExitWarn.Visibility = down ? Visibility.Visible : Visibility.Collapsed;
+
+            if (!engines.Tunnel)
+            {
+                // Туннеля нет — ни сервера, ни задержки выдумывать нечего.
+                ExitName.Text = "Без туннеля";
+                ExitPing.Text = string.Empty;
+                ExitFlag.Visibility = Visibility.Collapsed;
+            }
+            else if (_exitTag is null)
+            {
+                ExitName.Text = "—";
+                ExitPing.Text = "—";
+                ExitPing.SetResourceReference(TextBlock.ForegroundProperty, "Danger");
+            }
+        }
+        catch (Exception)
+        {
+            ExitMode.Text = string.Empty;
+        }
+    }
+
+    private string? _exitTag;
+    private DateTime _exitAt = DateTime.MinValue;
+    private bool _exitBusy;
+
+    /// <summary>
+    /// Через какой сервер идёт туннель и за сколько он отвечает — у самого движка.
+    /// Не чаще раза в десять секунд и только у открытого меню.
+    /// </summary>
+    private async Task ReadExitAsync()
+    {
+        if (_exitBusy || DateTime.UtcNow - _exitAt < TimeSpan.FromSeconds(10))
+            return;
+
+        _exitBusy = true;
+        _exitAt = DateTime.UtcNow;
+
+        try
+        {
+            var (tag, ping) = await Task.Run(async () =>
+            {
+                var settings = AppSettings.Load(AppSettings.DefaultPath);
+
+                if (!settings.Engines.Tunnel)
+                    return ((string?)null, (TimeSpan?)null);
+
+                var (server, _) = await Zephyron.Proxy.TunnelStatus.CurrentExitAsync(CancellationToken.None);
+
+                if (server is null || server.StartsWith("auto", StringComparison.OrdinalIgnoreCase)
+                    || server.Equals("direct", StringComparison.OrdinalIgnoreCase))
+                    return (server, null);
+
+                using var api = new Zephyron.Proxy.ClashApi();
+
+                return (server, await api.MeasureAsync(server, Zephyron.Core.Ping.UrlOf(settings), TimeSpan.FromSeconds(3), CancellationToken.None));
+            });
+
+            _exitTag = tag;
+
+            if (tag is null)
+                return;
+
+            var (country, name) = Zephyron.Subscriptions.CountryTag.Split(tag);
+            var flag = country.Length == 2 ? FlagImages.For(country) : null;
+
+            ExitName.Text = name.Length > 0 ? name : tag;
+            ExitName.ToolTip = tag;
+            ExitFlag.Source = flag;
+            ExitFlag.Visibility = flag is null ? Visibility.Collapsed : Visibility.Visible;
+
+            // Меньше 80 мс — Success, до 200 — Warn, больше или без ответа — Danger.
+            double? ms = ping?.TotalMilliseconds;
+
+            ExitPing.Text = ms is { } m ? $"{m:0} мс" : "—";
+            ExitPing.SetResourceReference(TextBlock.ForegroundProperty, ms is not { } v ? "Danger" : v < 80 ? "Success" : v <= 200 ? "Warn" : "Danger");
+        }
+        catch (Exception)
+        {
+            // Плашка — справка: не вышло, остаётся прежнее.
+        }
+        finally
+        {
+            _exitBusy = false;
+        }
     }
 
     /// <summary>Выбранный режим — по настройкам, как бы он ни был выбран: здесь, на «Главной» или руками в файле.</summary>
@@ -151,7 +364,7 @@ public partial class TrayMenu : Window
         catch (Exception)
         {
             Modes.IsEnabled = false;
-            ModeNote.Text = "Не удалось прочитать настройки: режим выбирается в окне";
+            Modes.ToolTip = "Не удалось прочитать настройки: режим выбирается в окне";
             return;
         }
 
@@ -165,7 +378,8 @@ public partial class TrayMenu : Window
 
         Modes.IsEnabled = !status.Busy;
 
-        ModeNote.Text = !settings.HasTunnelExit
+        // Подсказка режима — в ToolTip, а не строкой: место в меню дорого.
+        Modes.ToolTip = !settings.HasTunnelExit
             ? "Для режима «Туннель» нужна подписка или WARP во вкладке VPN"
             : status.Running
                 ? "Выбор сразу перезапустит движки"
@@ -175,7 +389,15 @@ public partial class TrayMenu : Window
     private void OnMode(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { Tag: string tag } && Enum.TryParse<WorkMode>(tag, out var mode))
+        {
             _chooseMode(mode);
+
+            // На 2.5 с строка под словом говорит, что идёт перезапуск.
+            _holding = true;
+            Uptime.Text = "Перезапускаю движки…";
+            _hold.Stop();
+            _hold.Start();
+        }
     }
 
     /// <summary>Показывает меню у указателя, в пределах рабочей области его экрана.</summary>
@@ -228,6 +450,9 @@ public partial class TrayMenu : Window
 
         Show();
         Activate();
+
+        _exitAt = DateTime.MinValue;
+        _ = ReadExitAsync();
     }
 
     /// <summary>
@@ -340,8 +565,53 @@ public partial class TrayMenu : Window
 
     private void OnKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Escape)
+        if (e.Key != Key.Escape)
+            return;
+
+        // Esc сначала закрывает ⋯, потом само меню.
+        if (Overflow.Visibility == Visibility.Visible)
+        {
+            Overflow.Visibility = Visibility.Collapsed;
+            More.Focus();
+        }
+        else
             Hide();
+    }
+
+    private void OnMore(object sender, RoutedEventArgs e)
+    {
+        bool show = Overflow.Visibility != Visibility.Visible;
+
+        Overflow.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+
+        if (show)
+            QuitKeep.Focus();
+    }
+
+    private void OnExit(object sender, RoutedEventArgs e)
+    {
+        Hide();
+
+        if (_open is { } open)
+            open("vpn");
+        else
+            _showWindow();
+    }
+
+    private void OnCheck(object sender, RoutedEventArgs e)
+    {
+        Hide();
+
+        if (_open is { } open)
+            open("check");
+        else
+            _showWindow();
+    }
+
+    private void OnRestart(object sender, RoutedEventArgs e)
+    {
+        Hide();
+        _restart?.Invoke();
     }
 
     private void OnToggle(object sender, RoutedEventArgs e) => _toggle();

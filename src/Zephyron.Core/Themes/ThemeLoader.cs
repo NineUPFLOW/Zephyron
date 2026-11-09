@@ -80,7 +80,7 @@ public static class ThemeLoader
 
         return Directory.GetDirectories(folder)
             .Where(d => File.Exists(Path.Combine(d, FileName)))
-            .Select(d => LoadFolder(d, folder))
+            .Select(d => SafeLoad(d, folder))
             .OrderBy(t => Shipped.Contains(t.Id) ? Shipped.ToList().IndexOf(t.Id) : int.MaxValue)
             .ThenBy(t => t.Theme?.Name ?? t.Id, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
@@ -90,7 +90,21 @@ public static class ThemeLoader
     public static ThemeLoad Load(string id, string? root = null) =>
         LoadFolder(Path.Combine(root ?? DefaultRoot, id), root ?? DefaultRoot);
 
-    private static ThemeLoad LoadFolder(string folder, string root)
+    // Одна сломанная папка не должна ронять весь список тем.
+    private static ThemeLoad SafeLoad(string folder, string root)
+    {
+        try
+        {
+            return LoadFolder(folder, root);
+        }
+        catch (Exception ex)
+        {
+            var id = Path.GetFileName(folder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            return new ThemeLoad(id, folder, null, [$"тема не загрузилась: {ex.GetBaseException().Message}"]);
+        }
+    }
+
+    private static ThemeLoad LoadFolder(string folder, string root, bool allowBase = true)
     {
         var id = Path.GetFileName(folder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         var problems = new List<string>();
@@ -102,6 +116,9 @@ public static class ThemeLoader
             using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(folder, FileName)),
                 new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
             json = document.RootElement.Clone();
+
+            if (json.ValueKind != JsonValueKind.Object)
+                throw new JsonException("нужен объект JSON");
         }
         catch (Exception ex)
         {
@@ -111,7 +128,8 @@ public static class ThemeLoader
         // Основа: только встроенная и только одним уровнем.
         Theme? basis = null;
 
-        if (Text(json, "base") is { } baseId)
+        // У основы своя основа не берётся: dark↔light зациклили бы загрузку.
+        if (allowBase && Text(json, "base") is { } baseId)
         {
             if (!BuiltIn.Contains(baseId) || baseId == id)
             {
@@ -119,7 +137,7 @@ public static class ThemeLoader
             }
             else
             {
-                var loaded = LoadFolder(Path.Combine(root, baseId), root);
+                var loaded = LoadFolder(Path.Combine(root, baseId), root, allowBase: false);
 
                 if (loaded.Theme is null)
                     problems.Add($"основа «{baseId}» не прочиталась: {string.Join("; ", loaded.Problems)}");
@@ -136,7 +154,7 @@ public static class ThemeLoader
             {
                 if (!ThemeSlots.All.Contains(property.Name))
                     problems.Add($"незнакомый цвет «{property.Name}»; слоты: {string.Join(", ", ThemeSlots.All)}");
-                else if (!ThemeColor.TryParse(property.Value.GetString(), out var color))
+                else if (property.Value.ValueKind != JsonValueKind.String || !ThemeColor.TryParse(property.Value.GetString(), out var color))
                     problems.Add($"цвет «{property.Name}» = «{property.Value}» — нужно #RRGGBB или #AARRGGBB");
                 else
                     colors[property.Name] = color;
@@ -188,7 +206,7 @@ public static class ThemeLoader
         {
             foreach (var file in filesJson.EnumerateArray())
             {
-                if (Inside(folder, file.GetString(), FontTypes, MaxFontBytes, "шрифт", problems) is { } path)
+                if (Inside(folder, file.ValueKind == JsonValueKind.String ? file.GetString() : null, FontTypes, MaxFontBytes, "шрифт", problems) is { } path)
                     files.Add(path);
             }
         }

@@ -34,8 +34,8 @@ public sealed class TrayMenuTests
             var toggle = (Button)menu.FindName("Toggle");
 
             Assert.Equal("Running", mark.Tag);
-            Assert.Equal("Выключить", toggle.Content);
-            Assert.Equal("работает", ((TextBlock)menu.FindName("Tunnel")).Text);
+            Assert.Equal("Выключить обход", System.Windows.Automation.AutomationProperties.GetName(toggle));
+            Assert.Equal("Обход включён", ((TextBlock)menu.FindName("State")).Text);
 
             menu.Render(new TrayStatus(
                 Running: true,
@@ -46,11 +46,8 @@ public sealed class TrayMenuTests
                 Stopping: true));
 
             Assert.Equal("Starting", mark.Tag);
-            Assert.Equal("Выключаю…", toggle.Content);
+            Assert.Equal("Выключаю…", ((TextBlock)menu.FindName("State")).Text);
             Assert.False(toggle.IsEnabled);
-
-            // Службы нет в состоянии — её выключили, а не остановили.
-            Assert.Equal("выключен", ((TextBlock)menu.FindName("Desync")).Text);
 
             menu.Close();
         });
@@ -68,8 +65,8 @@ public sealed class TrayMenuTests
             var menu = new TrayMenu(() => { }, _ => { }, () => { }, _ => { });
             menu.Render(status);
 
-            Assert.Equal("Включить", ((Button)menu.FindName("Toggle")).Content);
-            Assert.Equal("—", ((TextBlock)menu.FindName("Tunnel")).Text);
+            Assert.Equal("Включить обход", System.Windows.Automation.AutomationProperties.GetName((Button)menu.FindName("Toggle")));
+            Assert.Equal("Обход выключен", ((TextBlock)menu.FindName("State")).Text);
 
             menu.Close();
         });
@@ -95,12 +92,11 @@ public sealed class TrayMenuTests
 
             var toggle = (Button)menu.FindName("Toggle");
 
-            Assert.Equal("Выключить", toggle.Content);
+            Assert.Equal("Выключить обход", System.Windows.Automation.AutomationProperties.GetName(toggle));
             Assert.True(toggle.IsEnabled);
-            Assert.Equal("запускается", ((TextBlock)menu.FindName("Tunnel")).Text);
+            Assert.Equal("Запускаю…", ((TextBlock)menu.FindName("State")).Text);
 
             menu.Render(status with { Busy = true });
-            Assert.Equal("Включаю…", toggle.Content);
             Assert.False(toggle.IsEnabled);
 
             menu.Close();

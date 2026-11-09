@@ -462,12 +462,12 @@ public partial class TgProxyView : UserControl
             // и сама Windows): запись tg:// в реестре часто ведёт на старое место
             // переносного Telegram, и тогда ShellExecute молча ничего не открывает.
             if (TelegramExe.Running() is { } exe)
-                Process.Start(new ProcessStartInfo(exe) { ArgumentList = { "--", link }, UseShellExecute = false });
+                Process.Start(new ProcessStartInfo(exe) { ArgumentList = { "--", link }, UseShellExecute = false })?.Dispose();
             else if (TelegramExe.Registered() is false)
                 throw new FileNotFoundException();
             else
                 // Через проводник: Telegram стартует от имени пользователя, а не администратора.
-                Process.Start(new ProcessStartInfo("explorer.exe") { ArgumentList = { link }, UseShellExecute = false });
+                Process.Start(new ProcessStartInfo("explorer.exe") { ArgumentList = { link }, UseShellExecute = false })?.Dispose();
 
             Status.Text = "Ссылка отправлена в Telegram: подтвердите подключение там.";
         }

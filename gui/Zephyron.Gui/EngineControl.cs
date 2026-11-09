@@ -87,6 +87,26 @@ internal static class EngineControl
         }
     });
 
+    /// <summary>
+    /// Меняет закреплённый сервер на работающих движках без перезапуска (null — автоподбор).
+    /// <c>false</c> — движки стоят или тега нет в запущенном конфиге: предложить перезапуск.
+    /// Настройку (PreferredServer) вызывающий сохраняет сам.
+    /// </summary>
+    public static async Task<bool> SwitchExitAsync(string? tag)
+    {
+        try
+        {
+            bool ok = await LiveExit.SwitchAsync(tag);
+            Journal.Write("движки", ok ? $"сервер сменён на ходу: {tag ?? "авто"}" : $"живая смена на «{tag ?? "авто"}» невозможна");
+            return ok;
+        }
+        catch (Exception ex)
+        {
+            Journal.Write("движки", "живая смена сервера не вышла: " + ex.GetBaseException().Message);
+            return false;
+        }
+    }
+
     /// <summary>Сколько ждать, пока поднятый супервизор станет виден остальным.</summary>
     private static readonly TimeSpan RegisterLimit = TimeSpan.FromSeconds(15);
 
@@ -98,6 +118,20 @@ internal static class EngineControl
     public static async Task<EngineOutcome> StartAsync(string who, CancellationToken cancellationToken)
     {
         Journal.Write("движки", $"запуск — {who}");
+
+        // Без прав драйвер перехвата и TUN не встанут, а супервизор крутил бы
+        // повторы с «Access is denied» в обрезанной подсказке — скажем сразу.
+        using (var identity = System.Security.Principal.WindowsIdentity.GetCurrent())
+        {
+            if (!new System.Security.Principal.WindowsPrincipal(identity)
+                    .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator))
+            {
+                Journal.Write("движки", $"запуск — {who}: окно без прав администратора");
+                return new EngineOutcome(false,
+                    "Окно запущено без прав администратора — движкам они нужны. Закройте Zephyron и откройте снова, согласившись на запрос Windows.");
+            }
+        }
+
         Interlocked.Increment(ref _starting);
 
         try

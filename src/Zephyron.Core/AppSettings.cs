@@ -190,7 +190,13 @@ public sealed record AppSettings
     public bool ProxyOnly { get; init; } = true;
 
     /// <summary>Проверять не только порт, но и реальный проход трафика.</summary>
-    public bool VerifyTraffic { get; init; }
+    public bool VerifyTraffic { get; init; } = true;
+
+    /// <summary>Включена ли проверка прохода разовым переводом (09.11); <c>null</c> — ещё нет.</summary>
+    public bool? VerifyTrafficReset { get; init; }
+
+    /// <summary>Окно было развёрнуто на весь экран — так и открыть в следующий раз.</summary>
+    public bool WindowMaximized { get; init; }
 
     /// <summary>
     /// Как движок туннеля спрашивает имена: напрямую, через туннель или сам решает.
@@ -889,6 +895,10 @@ public sealed record AppSettings
         Unreadable,
     }
 
+    /// <summary>Файл занят и не прочитался: <see cref="Save"/> ничего не пишет, чтобы не стереть его значениями по умолчанию.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool LoadFailed { get; init; }
+
     public static AppSettings Load(string? path = null) => TryLoad(path, out _);
 
     /// <summary>
@@ -1046,6 +1056,13 @@ public sealed record AppSettings
     /// Отметки разового перевода не нужно: прочитанное значение пишется
     /// первым же сохранением, и дальше выключатель значит то, что значит.
     /// </remarks>
+    /// <summary>
+    /// «Проверка прохода трафика» — по умолчанию вкладывается всем: без неё мёртвый туннель
+    /// с живым процессом не замечается. Выбор «нет» от «не выбирал» в файле не отличить, поэтому раз для всех.
+    /// </summary>
+    private static AppSettings VerifyTrafficOnce(AppSettings read) =>
+        read.VerifyTrafficReset == true ? read : read with { VerifyTraffic = true, VerifyTrafficReset = true };
+
     private static AppSettings SelectiveRoutingOnce(AppSettings read) =>
         read.SelectiveRouting is null ? read with { SelectiveRouting = read.Pools.Count > 0 } : read;
 
@@ -1089,6 +1106,7 @@ public sealed record AppSettings
         WarpEnabled = true,
         TelegramProxy = true,
         GameFilterReset = true,
+        VerifyTrafficReset = true,
         PresetV11Lite = true,
         PresetV12Lite = true,
     };
@@ -1128,7 +1146,7 @@ public sealed record AppSettings
         if (text is null)
         {
             result = ReadResult.Unreadable;
-            return Fresh;
+            return Fresh with { LoadFailed = true };
         }
 
         try
@@ -1152,11 +1170,11 @@ public sealed record AppSettings
             // Mullvad тоже: его убрали из списка 10.10, и выбравший его
             // остался бы с DoH на адрес без имени для сертификата — туннель
             // без имён.
-            return SelectiveRoutingOnce(LiteToV12Once(PresetOnce(GameFilterOnce(WarpAsPath(read with
+            return VerifyTrafficOnce(SelectiveRoutingOnce(LiteToV12Once(PresetOnce(GameFilterOnce(WarpAsPath(read with
             {
                 Mode = read.Engines.Mode,
                 DnsServer = read.DnsServer is "8.8.8.8" or MullvadDns ? GoogleDns : read.DnsServer,
-            })))));
+            }))))));
         }
         catch (Exception)
         {
@@ -1171,6 +1189,7 @@ public sealed record AppSettings
             {
             }
 
+            // Здесь копия уже снята — сохранение лечит файл, а не стирает подписку.
             result = ReadResult.Unreadable;
             return Fresh;
         }
@@ -1188,6 +1207,10 @@ public sealed record AppSettings
     /// </remarks>
     public void Save(string? path = null)
     {
+        // Не прочитанные настройки — это значения по умолчанию; запись стёрла бы файл человека.
+        if (LoadFailed)
+            return;
+
         var target = path ?? DefaultPath;
         var directory = Path.GetDirectoryName(target);
 

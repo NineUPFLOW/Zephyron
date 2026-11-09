@@ -112,7 +112,7 @@ public static class RecipeTrial
             await ReadyAsync(process, cancellationToken);
 
             if (process.HasExited)
-                return "winws2 не поднялся";
+                return Elevated() ? "winws2 не поднялся" : "winws2 не поднялся: окно без прав администратора";
 
             await body();
 
@@ -161,11 +161,13 @@ public static class RecipeTrial
             if (finished != line)
                 continue;
 
-            if (line.Result is null)
+            var text = await line;
+
+            if (text is null)
                 break;
 
             // «windivert initialized. capture is started.» — драйвер в разрыве.
-            if (line.Result.Contains("capture is started", StringComparison.OrdinalIgnoreCase))
+            if (text.Contains("capture is started", StringComparison.OrdinalIgnoreCase))
                 break;
 
             line = process.StandardOutput.ReadLineAsync(cancellationToken).AsTask();
@@ -783,5 +785,11 @@ public static class RecipeTrial
         }
 
         return null;
+    }
+
+    private static bool Elevated()
+    {
+        using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+        return new System.Security.Principal.WindowsPrincipal(identity).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
     }
 }

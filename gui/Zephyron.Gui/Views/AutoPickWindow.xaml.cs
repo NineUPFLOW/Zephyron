@@ -1098,7 +1098,10 @@ public partial class AutoPickWindow : Window
             // Progress создаётся здесь, в потоке окна: обратные вызовы возвращаются в него.
             _progress = new Progress<AutoPickRow>(OnRow);
 
-            var report = await AutoPick.RunAsync(targets, servers, _progress, token, allowExit, fallback);
+            // В пуле: синхронные куски прогона (запуск и гашение winws2 на каждый
+            // рецепт) иначе держали окно по ~1,8 с на рецепт.
+            var progress = _progress;
+            var report = await Task.Run(() => AutoPick.RunAsync(targets, servers, progress, token, allowExit, fallback), token);
 
             Finish(report);
         }
@@ -1167,12 +1170,38 @@ public partial class AutoPickWindow : Window
             text += " " + string.Join(" ", _warnings);
 
         if (report.Notes.Count > 0)
-            text += " " + string.Join("; ", report.Notes) + ".";
+            text += " " + string.Join("; ", Squeeze(report.Notes)) + ".";
 
         text += SaveLog(report);
 
         Say(text,_warnings.Count > 0 || report.Notes.Count > 0 ? "Warn" : "Success");
         FocusFirst(WriteButton);
+    }
+
+    /// <summary>
+    /// Одинаковая причина у многих проб — одной строкой: семнадцать «winws2 не поднялся»
+    /// подряд прятали саму причину. Полный список остаётся в журнале прогона.
+    /// </summary>
+    internal static IReadOnlyList<string> Squeeze(IReadOnlyList<string> notes)
+    {
+        static string Reason(string note)
+        {
+            int cut = note.IndexOf("»: ", StringComparison.Ordinal);
+            cut = cut >= 0 ? cut + 3 : note.IndexOf(": ", StringComparison.Ordinal) + 2;
+            return cut >= 2 ? note[cut..] : note;
+        }
+
+        var result = new List<string>();
+
+        foreach (var group in notes.GroupBy(Reason))
+        {
+            if (group.Count() >= 3)
+                result.Add($"{group.Key} — так у {group.Count()} проб");
+            else
+                result.AddRange(group);
+        }
+
+        return result;
     }
 
     /// <summary>

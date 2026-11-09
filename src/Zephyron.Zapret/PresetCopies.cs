@@ -90,7 +90,8 @@ public static class PresetCopies
 
         var lines = Retitle(File.ReadAllLines(Path.Combine(directory, file)), name, dropBuiltin: true).ToList();
         var block = new List<string>();
-        var slug = string.Concat(name.Where(char.IsLetterOrDigit)).ToLowerInvariant();
+        // Хвост-хеш: пустой слаг и разные имена с одинаковыми буквами не должны слиться в один файл.
+        var slug = WinwsCommandLine.Sanitize(name).ToLowerInvariant();
 
         Directory.CreateDirectory(listsDirectory);
 

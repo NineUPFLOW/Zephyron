@@ -267,7 +267,7 @@ public partial class UpdateApplyWindow : Window
             {
                 WorkingDirectory = _options.Target,
                 UseShellExecute = true,
-            });
+            })?.Dispose();
         }
         catch (Exception ex)
         {
@@ -283,7 +283,7 @@ public partial class UpdateApplyWindow : Window
     {
         try
         {
-            Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo(target) { UseShellExecute = true })?.Dispose();
         }
         catch (Exception)
         {

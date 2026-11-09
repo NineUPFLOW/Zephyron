@@ -456,7 +456,7 @@ public partial class DoctorView : UserControl
     {
         try
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(console) { UseShellExecute = true });
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(console) { UseShellExecute = true })?.Dispose();
         }
         catch (Exception)
         {
@@ -497,7 +497,7 @@ public partial class DoctorView : UserControl
 
             try
             {
-                System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{result.Path}\"");
+                System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{result.Path}\"")?.Dispose();
             }
             catch (Exception)
             {

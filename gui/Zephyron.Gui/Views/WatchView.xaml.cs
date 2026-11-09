@@ -285,6 +285,11 @@ public partial class WatchView : UserControl
         {
             started = await StartSessionAsync();
         }
+        catch (Exception ex)
+        {
+            started = false;
+            _note = ex.GetBaseException().Message;
+        }
         finally
         {
             PowerButton.IsEnabled = true;
@@ -1143,7 +1148,7 @@ public partial class WatchView : UserControl
 
         try
         {
-            Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
+            Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true })?.Dispose();
         }
         catch (Exception)
         {

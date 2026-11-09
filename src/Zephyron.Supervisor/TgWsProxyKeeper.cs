@@ -95,6 +95,21 @@ public static class TgWsProxyKeeper
             return;
 
         Stop();
+
+        Task? slow;
+
+        lock (Gate)
+        {
+            slow = _running;
+        }
+
+        // Прежний не успел уйти за 10 с — поднимем новый, когда уйдёт, а не оставим без прокси.
+        if (slow is not null)
+        {
+            slow.ContinueWith(_ => { Stop(); Sync(settings, enginesHoldIt); }, TaskScheduler.Default);
+            return;
+        }
+
         Sync(settings, enginesHoldIt);
     }
 
@@ -102,21 +117,36 @@ public static class TgWsProxyKeeper
     public static void Stop()
     {
         Task? running;
+        CancellationTokenSource? stop;
 
         lock (Gate)
         {
             _stop?.Cancel();
             running = _running;
-            _running = null;
+            stop = _stop;
         }
+
+        if (running is null)
+            return;
 
         try
         {
-            running?.Wait(TimeSpan.FromSeconds(10));
+            running.Wait(TimeSpan.FromSeconds(10));
         }
         catch (AggregateException)
         {
             // Упал сам — гасить уже нечего.
+        }
+
+        // Не успел уйти — ссылку держим: Start увидит живой прокси и не займёт порт вторым.
+        lock (Gate)
+        {
+            if (!running.IsCompleted || !ReferenceEquals(_running, running))
+                return;
+
+            _running = null;
+            _stop = null;
+            stop?.Dispose();
         }
     }
 }

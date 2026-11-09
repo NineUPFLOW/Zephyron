@@ -578,6 +578,9 @@ public static class ProxyUriParser
             Transport = "tcp",
             Security = "none",
             Extra = query,
+            TransportRefusal = ShadowsocksMethods.Plugin(query) is { } plugin && !ShadowsocksMethods.Supported(plugin.Name)
+                ? $"плагин Shadowsocks «{plugin.Name}» движок не поддерживает (только obfs-local и v2ray-plugin)"
+                : null,
         };
     }
 
