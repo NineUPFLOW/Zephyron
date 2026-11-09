@@ -192,7 +192,10 @@
                 Всплывающие карточки — стопкой внизу справа, над кнопкой журнала,
                 чтобы две разом не легли одна на другую.
             -->
-            <StackPanel Grid.Row="1" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,24,8">
+            <!-- Поверх страницы, а не строкой под ней: строка съедала низ страницы,
+                 пока висела карточка. Промахнуться по кнопке под ней нельзя — предложение
+                 перезапуска само не уходит (OfferRestart). -->
+            <StackPanel Grid.Row="0" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,24,8">
 
             <!--
                 После обновления: звезда на GitHub и канал. Один раз на каждую
