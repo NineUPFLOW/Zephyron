@@ -320,7 +320,7 @@ public partial class VpnView
     {
         int routed = PoolRoutes().TryGetValue(pool.Id, out var n) ? n : 0;
 
-        var answer = MessageBox.Show(
+        var answer = ConfirmDialog.Show(
             routed > 0
                 ? $"Удалить пул «{pool.Name}»? Маршруты, ведущие в него ({routed}), пойдут в пул по умолчанию. Серверы останутся в своих подписках."
                 : $"Удалить пул «{pool.Name}»? Серверы останутся в своих подписках.",

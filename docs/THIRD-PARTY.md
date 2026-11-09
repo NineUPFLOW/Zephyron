@@ -15,6 +15,8 @@ Zephyron не работает сам по себе: он управляет д�
 | Zapret GUI (сценарии lua, списки, пресеты, каталог адресов) | MIT, © 2025–2026 censorliber; автор — loop-uh | `engines/zapret/LICENSE-ZapretGUI.txt` |
 | zapret-discord-youtube (game filter, список ipset-all) | MIT, © 2024–2026 Flowseal, © 2016–2026 bol-van | `engines/zapret/LICENSE-Flowseal.txt` |
 | tg-ws-proxy-rs (прокси вкладки «TG Proxy», с 07.10) — порт tg-ws-proxy Flowseal | MIT, © 2026 valnesfjord; MIT, © 2026 Flowseal | `engines/tg-ws-proxy/LICENSE`, `engines/tg-ws-proxy/LICENSE-Flowseal-tg-ws-proxy.txt` |
+| dnscrypt-proxy 2.1.20 (шифрованный DNS, по выбору) | ISC, © Frank Denis | `engines/dnscrypt/LICENSE` |
+| Подбор мостов Telegram, пробы DNS/QUIC/узлов, разбор подписок — логика портирована из MIT-проекта NetZapret | MIT | — |
 | WinDivert | LGPL v3 либо GPL v2 | `engines/zapret/LICENSE-WinDivert.txt` |
 | ZXing.Net (чтение QR-кодов с ключами, с 01.10) | Apache-2.0, Michael Jahn | `LICENSE-ZXing.Net.txt` |
 

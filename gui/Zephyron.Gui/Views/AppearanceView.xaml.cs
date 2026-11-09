@@ -463,7 +463,7 @@ public partial class AppearanceView : UserControl
 
         var name = CurrentTheme()?.Name ?? id;
 
-        var answer = MessageBox.Show(
+        var answer = ConfirmDialog.Show(
             Window.GetWindow(this)!,
             $"Удалить тему «{name}»?\n\nПапка themes\\{id} уйдёт в корзину Windows — оттуда её можно вернуть. Вместо неё встанет «Сигнал».",
             "Удалить тему",

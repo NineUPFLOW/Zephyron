@@ -539,7 +539,7 @@
                                         и не раздвигает ряд «Режим работы» (жалоба 28.10). Остальное —
                                         в «Весь журнал».
                                     -->
-                                    <ItemsControl x:Name="Events" Focusable="False" MaxHeight="96" ClipToBounds="True"
+                                    <ItemsControl x:Name="Events" Focusable="False" ClipToBounds="True"
                                                   VerticalAlignment="Top">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>

@@ -34,6 +34,9 @@
                             local:PageHead.Title="DNS"
                             local:PageHead.Subtitle="Через кого туннель узнаёт адреса имён. Настройки Windows мы не трогаем — этот выбор действует внутри sing-box." />
 
+            <TextBlock x:Name="NowLine" Style="{StaticResource Caption}" Margin="0,12,0,0" TextWrapping="Wrap"
+                       AutomationProperties.Name="Куда сейчас идут имена" />
+
             <Grid Margin="0,20,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -306,6 +309,51 @@
                     <TextBlock x:Name="RouterDnsStatus" Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
                                Text="Перед включением программа проверит роутер: отвечает ли он и не подменяет ли заблокированные имена." />
                 </StackPanel>
+            </Border>
+
+            <!-- Шифрованный DNS: dnscrypt-proxy на петле, туннель спрашивает его по UDP. -->
+            <Border Style="{StaticResource Card}" Margin="0,20,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Style="{StaticResource IconTile}" Margin="0,0,14,0" VerticalAlignment="Top">
+                        <TextBlock Style="{StaticResource TileGlyph}" Text="&#xE72E;" />
+                    </Border>
+
+                    <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                        <TextBlock Text="Шифрованные: DNSCrypt и ODoH" FontWeight="SemiBold" />
+                        <TextBlock x:Name="CryptStatus" Style="{StaticResource Caption}" Margin="0,5,0,8" TextWrapping="Wrap" />
+                        <ItemsControl x:Name="CryptModes">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource Choice}" BorderBrush="{Binding Edge}"
+                                            Selector.IsSelected="{Binding Chosen, Mode=OneWay}"
+                                            IsEnabled="{Binding Available}" Click="OnCryptChoose">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" MinWidth="170" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Note}" Style="{StaticResource Caption}"
+                                                       TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Latency}" Style="{StaticResource Mono}"
+                                                       VerticalAlignment="Center" MinWidth="70" TextAlignment="Right" />
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <Button Grid.Column="2" x:Name="CryptMeasure" Style="{StaticResource Ghost}" Padding="16,6"
+                            Content="Замерить" Click="OnCryptMeasure" VerticalAlignment="Top" />
+                </Grid>
             </Border>
 
             <TextBlock Text="Резолверы для туннеля" FontWeight="SemiBold" FontSize="16" Margin="2,22,0,0" />

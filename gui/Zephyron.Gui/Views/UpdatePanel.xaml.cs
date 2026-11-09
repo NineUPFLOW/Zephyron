@@ -42,6 +42,7 @@ public partial class UpdatePanel : UserControl
             _release = found;
             InstallButton.Visibility = Visibility.Visible;
             UpdateValue.Text = $"Есть новее: {found.Version}.";
+            ChecksumNote.Visibility = found.ChecksumUnavailable ? Visibility.Visible : Visibility.Collapsed;
         }
         else
         {
@@ -117,6 +118,7 @@ public partial class UpdatePanel : UserControl
                 : null;
 
             InstallButton.Visibility = _release is null ? Visibility.Collapsed : Visibility.Visible;
+            ChecksumNote.Visibility = _release is { ChecksumUnavailable: true } ? Visibility.Visible : Visibility.Collapsed;
 
             UpdateValue.Text = release is null
                 ? "Узнать не удалось: GitHub не ответил."
@@ -216,7 +218,7 @@ public partial class UpdatePanel : UserControl
 
         if (askFirst)
         {
-            var answer = MessageBox.Show(
+            var answer = ConfirmDialog.Show(
                 $"Обновить до {_release.Version}?\n\n"
                 + "Сперва скачается архив — десинк в это время работает. Потом движки "
                 + "остановятся, программа закроется, "
@@ -224,7 +226,7 @@ public partial class UpdatePanel : UserControl
                 + "Настройки, свои маршруты и подставленные адреса сохранятся.",
                 "Zephyron",
                 MessageBoxButton.YesNo,
-                MessageBoxImage.Warning,
+                MessageBoxImage.Question,
                 MessageBoxResult.No);
 
             if (answer != MessageBoxResult.Yes)

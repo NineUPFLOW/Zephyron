@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
@@ -634,6 +635,7 @@ public partial class SpeedView : UserControl
 
         HistoryRows.Children.Clear();
         HistoryEmpty.Visibility = history.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        ClearHistory.Visibility = history.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
         ShowTrend(history);
 
         for (int i = 0; i < Math.Min(HistoryShown, history.Count); i++)
@@ -658,7 +660,7 @@ public partial class SpeedView : UserControl
     }
 
     /// <summary>Строка таблицы замеров; свежая — на подложке.</summary>
-    private Border Row(SpeedEntry entry, bool latest)
+    private StackPanel Row(SpeedEntry entry, bool latest)
     {
         var grid = new Grid();
 
@@ -713,13 +715,42 @@ public partial class SpeedView : UserControl
             Child = grid,
             CornerRadius = new CornerRadius(8),
             Padding = new Thickness(10, 6, 10, 6),
-            ToolTip = Tip(entry),
+            Cursor = Cursors.Hand,
+            Focusable = true,
+            Background = Brushes.Transparent,
         };
 
         if (latest)
             row.SetResourceReference(Border.BackgroundProperty, "Raised");
 
-        return row;
+        // Подробности раскрываются по щелчку или Enter/Пробел по строке.
+        var more = new TextBlock
+        {
+            Text = Details(entry),
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
+            Margin = new Thickness(10, 2, 10, 6),
+        };
+
+        more.SetResourceReference(TextBlock.ForegroundProperty, "Muted");
+        more.FontSize = 12;
+        System.Windows.Automation.AutomationProperties.SetName(row, "Замер: подробности по щелчку");
+
+        void Toggle() => more.Visibility = more.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+        row.MouseLeftButtonUp += (_, _) => Toggle();
+        row.KeyDown += (_, e) =>
+        {
+            if (e.Key is Key.Enter or Key.Space)
+            {
+                Toggle();
+                e.Handled = true;
+            }
+        };
+
+        var host = new StackPanel();
+        host.Children.Add(row);
+        host.Children.Add(more);
+        return host;
 
         void Add(int column, string text, bool muted = false)
         {
@@ -732,7 +763,7 @@ public partial class SpeedView : UserControl
             grid.Children.Add(block);
         }
 
-        static string? Tip(SpeedEntry entry)
+        static string Details(SpeedEntry entry)
         {
             var parts = new List<string>();
 
@@ -743,7 +774,18 @@ public partial class SpeedView : UserControl
                 parts.Add($"страна выхода {country}");
 
             if (entry.Node is { Length: > 0 } node)
-                parts.Add($"узел Cloudflare {node}");
+                parts.Add($"узел замера {node}");
+
+            parts.Add(entry.Tunnel ? "путь: через туннель" : "путь: напрямую");
+
+            if (entry.JitterMs is { } jitter)
+                parts.Add($"джиттер {jitter:0.#} мс");
+
+            if (entry.LoadedPingMs is { } loaded)
+                parts.Add($"под нагрузкой {loaded:0} мс");
+
+            if (entry.Grade() is { } grade)
+                parts.Add($"класс {grade}");
 
             if (entry.Bytes > 0)
                 parts.Add($"ушло {entry.Bytes / (1024 * 1024)} МБ");
@@ -751,8 +793,30 @@ public partial class SpeedView : UserControl
             if (entry.Problem is { Length: > 0 } problem)
                 parts.Add(problem);
 
-            return parts.Count == 0 ? null : string.Join("; ", parts);
+            return string.Join(" · ", parts);
         }
+    }
+
+    /// <summary>«Очистить» историю замеров: файл удаляется, раздел перерисовывается.</summary>
+    private void OnClearHistory(object sender, RoutedEventArgs e)
+    {
+        if (!ConfirmDialog.Ask(Window.GetWindow(this), "Очистить историю", "Удалить все записанные замеры скорости? Вернуть их нельзя.",
+                "Очистить", "Отмена", danger: true, defaultNo: true))
+        {
+            return;
+        }
+
+        try
+        {
+            System.IO.File.Delete(SpeedHistory.DefaultPath);
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Не удалось очистить историю: " + ex.Message;
+            return;
+        }
+
+        ShowHistory();
     }
 
     private void OnCopy(object sender, RoutedEventArgs e)

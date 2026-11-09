@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using Zephyron.Core;
+using Zephyron.Proxy;
 using Zephyron.Supervisor;
 
 namespace Zephyron.Gui.Views;
@@ -46,6 +47,10 @@ public partial class TgProxyView : UserControl
         LinkCopy.IsEnabled = ready;
 
         ShowLook(Describe(settings));
+
+        AutoTune.IsChecked = settings.TelegramProxyAuto;
+        if (!_tuning)
+            TuneText.Text = TgProxyTune.Describe(TgProxyTune.Load());
 
         Always.IsChecked = settings.TelegramProxyAlways;
         Always.IsEnabled = settings.TelegramProxy;
@@ -317,6 +322,42 @@ public partial class TgProxyView : UserControl
             await Task.Delay(1500);
             ShowLook(Describe(AppSettings.Load(AppSettings.DefaultPath)));
         });
+    }
+
+    private bool _tuning;
+
+    private async void OnTune(object sender, RoutedEventArgs e)
+    {
+        _tuning = true;
+        TuneButton.IsEnabled = false;
+        TuneText.Text = "Проверяю прямой путь и домены Cloudflare, это до минуты…";
+
+        try
+        {
+            var tuning = await Task.Run(() => TgProxyTune.RunAsync(CancellationToken.None));
+            TgProxyTune.Save(tuning);
+            TuneText.Text = TgProxyTune.Describe(tuning);
+
+            // Прокси окна читает итог при запуске: перезапускаем, чтобы он подействовал.
+            if (AppSettings.Load(AppSettings.DefaultPath).TelegramProxyAuto)
+                SaveRoutes(s => s, "Мосты подобраны.");
+        }
+        catch (Exception ex)
+        {
+            TuneText.Text = "Подобрать не удалось: " + ex.GetBaseException().Message;
+        }
+        finally
+        {
+            _tuning = false;
+            TuneButton.IsEnabled = true;
+        }
+    }
+
+    private void OnAutoTune(object sender, RoutedEventArgs e)
+    {
+        bool on = AutoTune.IsChecked == true;
+        SaveRoutes(s => s with { TelegramProxyAuto = on },
+            on ? "Мосты подбираются перед каждым запуском прокси." : "Мосты — по ручным путям.");
     }
 
     /// <summary>Выбор показывается, а не делается — события выбора тогда не в счёт.</summary>

@@ -516,7 +516,7 @@ public partial class DesyncView : UserControl
             return;
         }
 
-        var answer = MessageBox.Show(
+        var answer = ConfirmDialog.Show(
             $"Дописать в пресет «{settings.DescribePreset()}» строку подключения модуля {module}?\n\n"
                 + "Меняется одна строка в шапке файла, остальное остаётся как есть. "
                 + "Новые рецепты появятся после следующего запуска движков.",
@@ -980,7 +980,7 @@ public partial class DesyncView : UserControl
                     && !string.Equals(Path.GetFullPath(target), Path.GetFullPath(file),
                         StringComparison.OrdinalIgnoreCase))
                 {
-                    var answer = MessageBox.Show(
+                    var answer = ConfirmDialog.Show(
                         $"Пресет «{Path.GetFileNameWithoutExtension(file)}» уже есть. Заменить?",
                         "Zephyron",
                         MessageBoxButton.YesNo,

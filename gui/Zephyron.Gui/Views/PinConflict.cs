@@ -43,7 +43,7 @@ internal static class PinConflict
 
         var shown = string.Join(", ", pinned.Take(5)) + (pinned.Count > 5 ? $" и ещё {pinned.Count - 5}" : string.Empty);
 
-        var answer = MessageBox.Show(
+        var answer = ConfirmDialog.Show(
             owner ?? Application.Current.MainWindow,
             $"В файле hosts прибиты имена: {shown}.\n\n"
             + "Пин перебивает любой маршрут: прибитое имя не получит адрес туннеля "

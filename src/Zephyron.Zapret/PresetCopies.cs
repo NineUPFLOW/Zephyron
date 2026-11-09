@@ -92,6 +92,10 @@ public static class PresetCopies
         var block = new List<string>();
         // Хвост-хеш: пустой слаг и разные имена с одинаковыми буквами не должны слиться в один файл.
         var slug = WinwsCommandLine.Sanitize(name).ToLowerInvariant();
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(name.ToLowerInvariant())))[..6].ToLowerInvariant();
+        var prefix = $"zy-own-{slug}-{hash}-";
+        var written = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         Directory.CreateDirectory(listsDirectory);
 
@@ -102,8 +106,9 @@ public static class PresetCopies
             if (profile.Steps.Count == 0 || !File.Exists(profile.HostListPath))
                 continue;
 
-            var list = $"zy-own-{slug}-{i + 1}.txt";
+            var list = $"{prefix}{i + 1}.txt";
             File.Copy(profile.HostListPath, Path.Combine(listsDirectory, list), overwrite: true);
+            written.Add(list);
 
             block.Add($"--name=Подбор: {profile.Name}");
 
@@ -134,8 +139,27 @@ public static class PresetCopies
 
         lines.InsertRange(at < 0 ? lines.Count : at, block);
         File.WriteAllLines(Path.Combine(directory, name + ".txt"), lines);
+        RemoveStaleOwnLists(listsDirectory, prefix, written);
 
         return name + ".txt";
+    }
+
+    /// <summary>
+    /// Убирает списки этого пресета от прежнего сохранения, на которые он больше не ссылается.
+    /// Трогает только файлы нашего вида <c>zy-own-…-N.txt</c> с точным префиксом пресета.
+    /// </summary>
+    internal static void RemoveStaleOwnLists(string listsDirectory, string prefix, ISet<string> keep)
+    {
+        foreach (var path in Directory.EnumerateFiles(listsDirectory, prefix + "*.txt"))
+        {
+            var file = Path.GetFileName(path);
+
+            if (keep.Contains(file) || !int.TryParse(file[prefix.Length..^4], out _))
+                continue;
+
+            try { File.Delete(path); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+        }
     }
 
     /// <summary>Переименовывает свой пресет; возвращает новое имя файла.</summary>

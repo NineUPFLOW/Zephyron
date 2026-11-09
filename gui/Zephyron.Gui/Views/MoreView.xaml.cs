@@ -208,7 +208,7 @@ public partial class MoreView : UserControl
     }
 
     private static bool Confirm(string question) =>
-        MessageBox.Show(
+        ConfirmDialog.Show(
             question,
             "Zephyron",
             MessageBoxButton.YesNo,

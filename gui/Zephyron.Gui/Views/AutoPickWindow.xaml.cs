@@ -684,7 +684,7 @@ public partial class AutoPickWindow : Window
     }
 
     private bool ConfirmUndo(int count) =>
-        MessageBox.Show(this,
+        ConfirmDialog.Show(this,
             $"Вернуть {count} маршрутов, как они были до автоподбора? Изменённые после этого не тронем.",
             "Zephyron", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
 
@@ -1700,7 +1700,7 @@ public partial class AutoPickWindow : Window
         if (!_leaving)
         {
             if (_phase == Phase.Done && Ticked > 0
-                && MessageBox.Show(this,
+                && ConfirmDialog.Show(this,
                     "Закрыть без записи? Найденное пропадёт, маршруты останутся как были.",
                     "Zephyron", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             {

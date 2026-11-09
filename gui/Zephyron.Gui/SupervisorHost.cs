@@ -70,6 +70,9 @@ internal static class SupervisorHost
         /// <summary>Поднять прокси Telegram (<see cref="TgWsProxyService"/>).</summary>
         public bool TelegramProxy { get; init; }
 
+        /// <summary>Ключ режима dnscrypt-proxy (<see cref="DnsCrypt.Key"/>); <c>null</c> — не нужен.</summary>
+        public string? DnsCrypt { get; init; }
+
         public string? LogPath { get; init; }
     }
 
@@ -111,7 +114,10 @@ internal static class SupervisorHost
         if (settings.NeedsDesync)
             arguments += $" --preset \"{settings.PresetName}\"";
 
-        if (settings.NeedsProxy && !settings.UseRouterDns && settings.DnsVia == DnsRoute.Auto)
+        if (settings.DnsCryptActive is { } crypt)
+            arguments += $" --dnscrypt {Zephyron.Core.DnsCrypt.Key(crypt)}";
+
+        if (settings.NeedsProxy && !settings.UseRouterDns && settings.DnsCryptActive is null && settings.DnsVia == DnsRoute.Auto)
             arguments += " --dns-via-auto";
 
         if (settings.VerifyTraffic)
@@ -201,6 +207,15 @@ internal static class SupervisorHost
             // под десинком. Прежде sing-box шёл первым, и первое соединение
             // WARP уходило мимо десинка и замерзало (01.10).
             AddWinws(options, services);
+
+            // dnscrypt-proxy — раньше sing-box: тот с первого запроса спросит 127.0.0.1.
+            if (!options.NoProxy && Zephyron.Core.DnsCrypt.Parse(options.DnsCrypt) is { } cryptMode)
+                services.Add(new DnsCryptService(
+                    Zephyron.Core.DnsCrypt.Executable(), cryptMode,
+                    Zephyron.Core.DnsCrypt.ShippedDirectory(), Zephyron.Core.DnsCrypt.RuntimeDirectory)
+                {
+                    OutputLogPath = Path.Combine("runtime", "dnscrypt-proxy.log"),
+                });
 
             if (!options.NoProxy && !TryAddSingBox(options, services))
                 return 2;
@@ -732,6 +747,7 @@ internal static class SupervisorHost
             Path.GetFullPath("."),
             TgWsProxyRoutes.From(settings))
         {
+            Routes = ct => TgProxyTune.RoutesAsync(AppSettings.Load(AppSettings.DefaultPath), ct),
             OutputLogPath = Path.Combine("runtime", "tg-ws-proxy.log"),
         });
     }
@@ -765,6 +781,11 @@ internal static class SupervisorHost
 
                 case TelegramProxySwitch:
                     options = options with { TelegramProxy = true };
+                    break;
+
+                case "--dnscrypt" when next is not null:
+                    options = options with { DnsCrypt = next };
+                    i++;
                     break;
 
                 case "--proxy-config" when next is not null:

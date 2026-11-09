@@ -11,6 +11,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Zephyron.Core;
+using Zephyron.Core.Rules;
 using Zephyron.Core.Updates;
 using Zephyron.Gui.Views;
 using Zephyron.Supervisor;
@@ -64,8 +65,19 @@ public partial class MainWindow : Window
         // Развёрнутое окно запоминается (окно из трея создаётся заново — читаем при создании).
         try
         {
-            if (AppSettings.Load(AppSettings.DefaultPath).WindowMaximized)
+            // Сохранённое место (config\window.json) важнее флага в настройках: оно помнит и монитор.
+            if (WindowPlacement.TryLoad(out var placedMax))
+            {
+                WindowStartupLocation = WindowStartupLocation.Manual;
+                SourceInitialized += (_, _) => WindowPlacement.Apply(this);
+
+                if (placedMax)
+                    WindowState = WindowState.Maximized;
+            }
+            else if (AppSettings.Load(AppSettings.DefaultPath).WindowMaximized)
+            {
                 WindowState = WindowState.Maximized;
+            }
         }
         catch (Exception)
         {
@@ -405,6 +417,8 @@ public partial class MainWindow : Window
     /// </remarks>
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
+        WindowPlacement.Save(this);
+
         if (!App.Exiting && !_releasing)
         {
             e.Cancel = true;
@@ -546,6 +560,13 @@ public partial class MainWindow : Window
         Motion.Page(page);
     }
 
+    /// <summary>Переходит в раздел по его имени (Tag пункта меню); неизвестное имя игнорируется.</summary>
+    public void GoTo(string name)
+    {
+        if (Items().FirstOrDefault(i => i.Tag as string == name) is { } item)
+            item.IsChecked = true;
+    }
+
     /// <summary>Раздел — на место разделов; спрятанные «Маршруты» остаются в окне.</summary>
     private void ShowPage(FrameworkElement page)
     {
@@ -642,6 +663,30 @@ public partial class MainWindow : Window
         Motion.Arrive(LogDrawer, dy: 24);
     }
 
+    /// <summary>Режим из настроек совпадает с тем, что держат живые движки (winws2 / sing-box).</summary>
+    private static bool ChosenMatchesRunning()
+    {
+        try
+        {
+            var state = SupervisorState.Load(SupervisorState.DefaultPath);
+
+            if (state is null || !state.IsSupervisorAlive())
+                return false;
+
+            var running = WorkModes.Of(new EngineChoice
+            {
+                Desync = state.Services.Any(x => x.Name == "winws2"),
+                Tunnel = state.Services.Any(x => x.Name == "sing-box"),
+            });
+
+            return running is not null && WorkModes.Of(AppSettings.Load(AppSettings.DefaultPath).Engines) == running;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     private readonly DispatcherTimer _topDot = new() { Interval = TimeSpan.FromSeconds(3) };
 
     /// <summary>
@@ -678,6 +723,10 @@ public partial class MainWindow : Window
         }
 
         _dotMode = ModeOf(key);
+
+        // Выбор вернули обратно — режим снова тот, что у работающих движков: ждать нечего.
+        if (_restartPending && ChosenMatchesRunning())
+            _restartPending = false;
 
         // Движки остановлены или поднимаются заново (трей, автоподбор, меню «Выключить») —
         // новый запуск уже берёт свежие настройки, ждать перезапуска нечего.
@@ -795,6 +844,8 @@ public partial class MainWindow : Window
         // Свёрнутое не пишем: после разворота из панели задач вернётся прежнее.
         if (WindowState == WindowState.Minimized)
             return;
+
+        WindowPlacement.Save(this);
 
         try
         {

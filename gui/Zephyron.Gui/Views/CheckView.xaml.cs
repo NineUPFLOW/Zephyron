@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using Zephyron.Core;
 using Zephyron.Core.Connections;
+using Zephyron.Core.Diagnostics;
 using Zephyron.Core.Rules;
 using Zephyron.Core.Services;
 using Zephyron.Proxy;
@@ -53,8 +54,16 @@ public sealed record CheckRow(
     Visibility FixShown = Visibility.Collapsed,
 
     /// <summary>Чем кончилась починка из этой строки; пусто — не чинили.</summary>
-    string FixNote = "")
+    string FixNote = "",
+
+    /// <summary>Рукопожатие QUIC (HTTP/3); «—» — не спрашивали.</summary>
+    string Quic = "—",
+
+    /// <summary>Чья сеть у адреса, с которым встало соединение; пусто — неизвестно.</summary>
+    string Owner = "")
 {
+    public Visibility OwnerShown => Owner.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+
     public Visibility FixNoteShown => FixNote.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
 
     /// <summary>Пока строка чинится, кнопка не нажимается второй раз.</summary>
@@ -594,7 +603,7 @@ public partial class CheckView : UserControl
                 // да и файл могли удалить. Тогда строк про секции просто не будет.
             }
 
-            var targets = Targets(zapretRoot, _target, _deep);
+            var targets = Targets(zapretRoot, _target, _deep, recentNodes: true);
 
             if (targets.Count == 0)
             {
@@ -812,9 +821,9 @@ public partial class CheckView : UserControl
 
         text.AppendLine(
             Fit("ИМЯ", 38) + Fit("TCP", 8) + Fit("TLS", 8)
-            + Fit("ПОРТ 80", 9) + Fit("ДАННЫЕ", 9) + "ВЕРДИКТ");
+            + Fit("ПОРТ 80", 9) + Fit("ДАННЫЕ", 9) + Fit("QUIC", 9) + "ВЕРДИКТ");
 
-        text.AppendLine(new string('-', 78));
+        text.AppendLine(new string('-', 87));
 
         foreach (var row in Collected)
         {
@@ -822,7 +831,8 @@ public partial class CheckView : UserControl
 
             text.AppendLine(
                 Fit(name, 38) + Fit(row.Tcp, 8) + Fit(row.Tls, 8)
-                + Fit(row.Http, 9) + Fit(row.Data, 9) + row.Verdict);
+                + Fit(row.Http, 9) + Fit(row.Data, 9) + Fit(row.Quic, 9) + row.Verdict
+                + (row.Owner.Length > 0 ? $" [сеть: {row.Owner}]" : string.Empty));
         }
 
         if (_markers.Count > 0)
@@ -973,7 +983,8 @@ public partial class CheckView : UserControl
     internal static IReadOnlyList<(string Host, string Service)> Targets(
         string? zapretRoot,
         CheckTarget? target,
-        bool deep)
+        bool deep,
+        bool recentNodes = false)
     {
         // Своё имя проверяется как есть: справочник о нём ничего не знает,
         // раскладывать его по частям не на что, а спросили именно про него.
@@ -996,6 +1007,11 @@ public partial class CheckView : UserControl
         var targets = new List<(string, string)>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        // Узлы, на которые машина недавно ходила (кэш DNS): у них свой адрес и своя судьба,
+        // зона из списка их не показывает. Только проверке окна — автоподбор меряет по спискам.
+        var recent = recentNodes ? RecentNodes.FromDnsCache() : [];
+        var zones = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var service in ServiceCatalog.All)
         {
             if (only is not null && !string.Equals(service.Name, only, StringComparison.OrdinalIgnoreCase))
@@ -1012,8 +1028,28 @@ public partial class CheckView : UserControl
 
                 int taken = 0;
 
+                // Видеопоток YouTube: настоящие узлы вместо redirector (он показывает фронтенд).
+                // Нет узлов в кэше — идёт обычный список.
+                if (recent.Count > 0 && part.List.EndsWith("googlevideo.txt", StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var node in RecentNodes.VideoNodes(recent, perPart))
+                    {
+                        if (seen.Add(node))
+                        {
+                            targets.Add((node, $"{service.Name} · {part.Name}"));
+                            taken++;
+                        }
+                    }
+
+                    if (taken > 0)
+                        continue;
+                }
+
                 foreach (var domain in HostListReader.Read(part.List, zapretRoot, out _))
                 {
+                    if (recent.Count > 0)
+                        zones.TryAdd(domain.TrimStart('*', '.'), $"{service.Name} · {part.Name}");
+
                     if (taken == perPart)
                         break;
 
@@ -1033,6 +1069,10 @@ public partial class CheckView : UserControl
                 }
             }
         }
+
+        // Остальные сервисы: по одному недавнему узлу на часть, где они нашлись.
+        if (recent.Count > 0)
+            targets.AddRange(RecentNodes.Pick(recent, zones, seen, perLabel: 1, total: only is not null ? 8 : deep ? 12 : 6));
 
         // Своё — в общей проверке, не при выборе одного сервиса. Владелец
         // 26.09: всё, что добавлено в маршруты, обязано быть в проверке;
@@ -1304,7 +1344,9 @@ public partial class CheckView : UserControl
             note,
             note.Length == 0 ? Visibility.Collapsed : Visibility.Visible,
             report.Actionable,
-            report.Actionable ? Visibility.Visible : Visibility.Collapsed);
+            report.Actionable ? Visibility.Visible : Visibility.Collapsed,
+            Quic: report.Quic is { } quic ? quic.Describe() : "—",
+            Owner: AddressOwners.Load(ZapretPaths.Discover()?.Root).Of(report.Answered) ?? string.Empty);
     }
 
     private const string QuicOff =

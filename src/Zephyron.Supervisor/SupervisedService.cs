@@ -227,6 +227,9 @@ public abstract class SupervisedService
         // аварийно, система погасит движок вместе с ним.
         Job?.Assign(Process);
 
+        // Метка запуска до вывода движка: в отчёте видно, к какому запуску относится ошибка.
+        _log?.AppendLine(RunMarker(DateTime.Now, Process.Id));
+
         // Вывод обязан вычитываться. Перенаправленный и никем не читаемый
         // конвейер заполняется и намертво блокирует дочерний процесс на записи
         // в stdout — служба при этом выглядит живой и проходит проверку порта.
@@ -451,6 +454,8 @@ public abstract class SupervisedService
     /// свойство, ради которого она велась, не вызывалось ни разу
     /// ни в консоли, ни в окне, ни в проверках.
     /// </remarks>
+    internal static string RunMarker(DateTime at, int pid) => $"==== запуск {at:yyyy-MM-dd HH:mm:ss} (PID {pid}) ====";
+
     private void RecordOutput(string line) => _log?.AppendLine(line);
 }
 
@@ -1146,12 +1151,12 @@ public sealed class SingBoxService : SupervisedService
     protected override bool TryRepair(string? fatal)
     {
         if (fatal is null
-            || System.Text.RegularExpressions.Regex.Match(fatal, @"initialize outbound\[(\d+)\]") is not { Success: true } m)
+            || System.Text.RegularExpressions.Regex.Match(fatal, @"initialize (outbound|endpoint)\[(\d+)\]") is not { Success: true } m)
             return false;
 
         try
         {
-            if (DropOutbound(File.ReadAllText(_configPath), int.Parse(m.Groups[1].Value)) is not { } repaired)
+            if (DropOutbound(File.ReadAllText(_configPath), int.Parse(m.Groups[2].Value), m.Groups[1].Value + "s") is not { } repaired)
                 return false;
 
             // Через временный файл: оборванная запись не должна оставить битый конфиг.
@@ -1172,20 +1177,22 @@ public sealed class SingBoxService : SupervisedService
     /// выбора; <c>null</c> — убрать нельзя (группа, или группа опустеет,
     /// или на него ссылается маршрут).
     /// </summary>
-    public static (string Json, string Tag)? DropOutbound(string json, int index)
+    /// <param name="section">«outbounds» или «endpoints» (WireGuard и AmneziaWG): номер из отказа — в своём списке.</param>
+    public static (string Json, string Tag)? DropOutbound(string json, int index, string section = "outbounds")
     {
         var root = System.Text.Json.Nodes.JsonNode.Parse(json)!.AsObject();
 
-        if (root["outbounds"] is not System.Text.Json.Nodes.JsonArray outbounds
+        if (root[section] is not System.Text.Json.Nodes.JsonArray outbounds
             || index < 0 || index >= outbounds.Count
             || outbounds[index] is not System.Text.Json.Nodes.JsonObject victim
             || victim["tag"]?.GetValue<string>() is not { } tag
-            || victim["outbounds"] is not null)
+            || victim["outbounds"] is not null
+            || victim["type"]?.GetValue<string>() is "direct" or "block" or "dns")
             return null;
 
         outbounds.RemoveAt(index);
 
-        foreach (var group in outbounds.OfType<System.Text.Json.Nodes.JsonObject>())
+        foreach (var group in (root["outbounds"] as System.Text.Json.Nodes.JsonArray ?? []).OfType<System.Text.Json.Nodes.JsonObject>())
         {
             if (group["outbounds"] is not System.Text.Json.Nodes.JsonArray members)
                 continue;
@@ -1764,6 +1771,12 @@ public sealed class SingBoxService : SupervisedService
 
         if (exit is not null)
             Record(exit, delay);
+
+        // Живой выход — узнаём его настоящую страну (раз в 6 ч на выход).
+        // Через вход проверки (прокси), не через Clash API — тот не прокси. В фоне: заблокированный
+        // trace не должен держать сторожа по 10 с на каждом опросе.
+        if (exit is not null && delay is not null)
+            _ = ExitCountry.MeasureAsync(exit, SingBoxOptions.DefaultHealthPort, EngineKeys.Current(_configPath), CancellationToken.None);
 
         _exitMisses = delay is null ? _exitMisses + 1 : 0;
 

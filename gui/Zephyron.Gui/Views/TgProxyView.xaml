@@ -207,6 +207,42 @@
                 </StackPanel>
             </Border>
 
+            <!-- Подбор мостов: замер прямого пути и доменов Cloudflare, лучшие встают первыми. -->
+            <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,12,0" VerticalAlignment="Center">
+                            <TextBlock Text="Мосты через Cloudflare" FontWeight="SemiBold" />
+                            <TextBlock x:Name="TuneText" Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button Grid.Column="1" x:Name="TuneButton" Style="{StaticResource Ghost}" Padding="16,6"
+                                Content="Подобрать мосты" Click="OnTune" VerticalAlignment="Center"
+                                ToolTip="Проверить прямой путь к DC2 и DC4 и домены Cloudflare, лучшие поставить первыми" />
+                    </Grid>
+
+                    <Border Style="{StaticResource RowLine}" Margin="0,14,0,14" />
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,12,0" VerticalAlignment="Center">
+                            <TextBlock Text="Подбирать мосты автоматически" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
+                                       Text="Замер идёт перед запуском прокси (не чаще раза в полчаса, не дольше 8 с), итог заменяет ручные пути." />
+                        </StackPanel>
+                        <ToggleButton Grid.Column="1" x:Name="AutoTune" Style="{StaticResource Switch}"
+                                      Click="OnAutoTune" VerticalAlignment="Center"
+                                      AutomationProperties.Name="Подбирать мосты автоматически" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
             <!-- Три плитки: в одну колонку на узком окне (OnPageSize). -->
             <UniformGrid x:Name="Tiles" Rows="1" Margin="0,14,0,0">
 

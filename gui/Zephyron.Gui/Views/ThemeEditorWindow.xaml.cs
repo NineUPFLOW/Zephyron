@@ -666,14 +666,14 @@ public partial class ThemeEditorWindow : Window
 
         if (problems.Count > 0)
         {
-            var answer = MessageBox.Show(
+            var answer = ConfirmDialog.Show(this,
                 "Тема не читается и не применится:\n\n"
                 + string.Join("\n", problems.Take(4).Select(p => "• " + p.Replace("не читается: ", string.Empty)))
                 + "\n\nСохранить её всё равно, чтобы доделать потом?"
                 + (_editingWasFine ? " Рабочая тема не пострадает: правка ляжет копией." : string.Empty),
                 "Zephyron",
                 MessageBoxButton.YesNo,
-                MessageBoxImage.Warning,
+                MessageBoxImage.Question,
                 MessageBoxResult.No);
 
             if (answer != MessageBoxResult.Yes)

@@ -68,6 +68,7 @@ public static class TgWsProxyKeeper
                 TgWsProxyRoutes.From(settings))
             {
                 OutputLogPath = Path.Combine("runtime", "tg-ws-proxy.log"),
+                Routes = ct => Zephyron.Proxy.TgProxyTune.RoutesAsync(AppSettings.Load(AppSettings.DefaultPath), ct),
             };
 
             if (service.ValidatePrerequisites() is not null)

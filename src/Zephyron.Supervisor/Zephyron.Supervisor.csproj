@@ -16,4 +16,8 @@
     <ProjectReference Include="..\Zephyron.Etw\Zephyron.Etw.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Zephyron.Core.Tests" />
+  </ItemGroup>
+
 </Project>

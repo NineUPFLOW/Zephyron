@@ -151,8 +151,8 @@ public partial class RoutesView
                 return;
             }
 
-            if (MessageBox.Show(Question(diff, incoming, RouteBundle.ListNames(dialog.FileName)), "Загрузить маршруты из файла?",
-                    MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK)
+            if (ConfirmDialog.Show(Question(diff, incoming, RouteBundle.ListNames(dialog.FileName)), "Загрузить маршруты из файла?",
+                    MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
             {
                 return;
             }

@@ -1855,7 +1855,7 @@ public partial class RoutesView : UserControl
             var sample = string.Join("\n", ours.Take(6).Select(n => "  " + n))
                 + (ours.Count > 6 ? $"\n  … и ещё {ours.Count - 6}" : string.Empty);
 
-            var answer = MessageBox.Show(
+            var answer = ConfirmDialog.Show(
                 $"Снять пины с «{label}» — {Count(ours.Count, "имя", "имени", "имён")}?\n\n{sample}\n\n"
                 + "Адрес для них потом придётся подбирать заново, и найдётся он не всегда.",
                 "Zephyron",
@@ -2594,7 +2594,7 @@ public partial class RoutesView : UserControl
 
     private void RemoveProgram(string program)
     {
-        if (MessageBox.Show(Window.GetWindow(this),
+        if (ConfirmDialog.Show(Window.GetWindow(this),
                 $"Удалить «{program}» вместе со списками доменов и адресов?",
                 "Zephyron", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
         {

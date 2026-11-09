@@ -92,6 +92,7 @@ public partial class HostsView : UserControl
         }
 
         ShowRepeats();
+        ShowForeign();
 
         try
         {
@@ -116,6 +117,55 @@ public partial class HostsView : UserControl
         ShowCounts();
         ShowSources();
         Filter();
+    }
+
+    /// <summary>Строка списка чужих записей с флажком.</summary>
+    public sealed class ForeignRow : System.ComponentModel.INotifyPropertyChanged
+    {
+        private bool _selected = true;
+
+        public ForeignRow(ForeignHostsLine line) => Line = line;
+
+        public ForeignHostsLine Line { get; }
+
+        public bool Selected
+        {
+            get => _selected;
+            set { _selected = value; PropertyChanged?.Invoke(this, new(nameof(Selected))); }
+        }
+
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    }
+
+    /// <summary>Ищет чужие записи вне потока окна: файл читается, правила разбираются.</summary>
+    private async void ShowForeign()
+    {
+        IReadOnlyList<ForeignHostsLine> found;
+
+        try { found = await Task.Run(() => HostsEditor.FindForeign()); }
+        catch (Exception) { found = []; }
+
+        ForeignList.ItemsSource = found.Select(l => new ForeignRow(l)).ToList();
+        ForeignCard.Visibility = found.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ForeignTitle.Text = $"Чужие записи в hosts: {found.Count}";
+    }
+
+    private void OnRemoveForeign(object sender, RoutedEventArgs e)
+    {
+        var picked = (ForeignList.ItemsSource as IEnumerable<ForeignRow>)?.Where(r => r.Selected).Select(r => r.Line).ToList() ?? [];
+
+        if (picked.Count == 0)
+            return;
+
+        var sample = string.Join("\n", picked.Take(5).Select(l => "  " + l.Text))
+            + (picked.Count > 5 ? $"\n  … и ещё {picked.Count - 5}" : string.Empty);
+
+        if (ConfirmDialog.Show($"Убрать из файла hosts строк: {picked.Count}?\n\n{sample}\n\nКопия файла ляжет рядом — из неё можно вернуть всё целиком.",
+                "Zephyron", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
+            return;
+
+        Edit(() => $"Убрано чужих строк: {HostsEditor.RemoveForeign(picked)}. Копия прежнего файла лежит рядом с hosts.",
+            "Не удалось убрать");
     }
 
     private static (int, string) Key(HostsLine line) => (line.Row.Line, line.Row.Name);
@@ -332,7 +382,7 @@ public partial class HostsView : UserControl
             : $"Чужих среди них {foreign.Count} ({string.Join(", ", owners)}): их ведёт не Zephyron, "
               + "и программа-хозяин может вернуть их при своей следующей правке.";
 
-        var answer = MessageBox.Show(
+        var answer = ConfirmDialog.Show(
             (lines.Count == 1
                 ? $"Удалить запись «{lines[0].Name} → {lines[0].Address}» из файла hosts?"
                 : $"Удалить из файла hosts записей: {lines.Count}?\n\n{sample}")
@@ -641,7 +691,7 @@ public partial class HostsView : UserControl
         if (_repeats is not { Removable.Count: > 0 } report)
             return;
 
-        var answer = MessageBox.Show(
+        var answer = ConfirmDialog.Show(
             $"Удалить из файла hosts {report.Removable.Count} строк-повторов?\n\n"
             + "Каждая из них повторяет запись выше с тем же адресом, так что работать "
             + "всё будет как сейчас. Отменить нажатием будет нельзя.\n\n"

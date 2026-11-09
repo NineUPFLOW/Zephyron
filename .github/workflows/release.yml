@@ -43,6 +43,9 @@ env:
   SINGBOX_URL: https://github.com/shtorm-7/sing-box-extended/releases/download/v1.14.3-extended-2.7.3/sing-box-1.14.3-extended-2.7.3-windows-amd64.zip
   SINGBOX_DIR: sing-box-1.14.3-extended-2.7.3-windows-amd64
   TGWS_URL: https://github.com/valnesfjord/tg-ws-proxy-rs/releases/download/v2.7.0/tg-ws-proxy-x86_64-pc-windows-gnu.zip
+  # dnscrypt-proxy (ISC): шифрованный DNS. Хеш — защита от подмены архива.
+  DNSCRYPT_URL: https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/2.1.20/dnscrypt-proxy-win64-2.1.20.zip
+  DNSCRYPT_SHA256: 9e498cb9bdbae57756db19ce516362ac307e9340a6996214964cfcc7c489abc3
   WINWS2_URL: https://git.zapret.moe/zapretdiscordyoutube/zapret2-fork/releases/download/v1.0.7-34-gfd8ae05-native/winws2.exe
   # Чужой сервер, а движок работает с правами администратора: файл сверяется по хешу.
   WINWS2_SHA256: b24d1e85907ac2c7bd597ed14e70919e091479500a40083a54027af7c1136dee
@@ -89,9 +92,12 @@ jobs:
           curl -fsSL -o dl/singbox.zip "$SINGBOX_URL"
           curl -fsSL -o dl/tgws.zip "$TGWS_URL"
           curl -fsSL -o dl/winws2.exe "$WINWS2_URL"
+          curl -fsSL -o dl/dnscrypt.zip "$DNSCRYPT_URL"
+          echo "$DNSCRYPT_SHA256  dl/dnscrypt.zip" | sha256sum -c -
           echo "$WINWS2_SHA256  dl/winws2.exe" | sha256sum -c -
           unzip -q dl/singbox.zip -d dl/singbox
           unzip -q dl/tgws.zip -d dl/tgws
+          unzip -q dl/dnscrypt.zip -d dl/dnscrypt
           echo "sing-box, tg-ws-proxy и winws2 на месте."
 
       - name: Собрать архив
@@ -143,6 +149,9 @@ jobs:
           mkdir -p "$STAGE/engines/sing-box" "$STAGE/engines/tg-ws-proxy"
           cp -r "$ROOT/dl/singbox/$SINGBOX_DIR/." "$STAGE/engines/sing-box/"
           cp "$ROOT/dl/tgws/tg-ws-proxy.exe" "$STAGE/engines/tg-ws-proxy/tg-ws-proxy.exe"
+          mkdir -p "$STAGE/engines/dnscrypt"
+          cp "$ROOT/dl/dnscrypt/win64/dnscrypt-proxy.exe" "$ROOT/dl/dnscrypt/win64/LICENSE" "$STAGE/engines/dnscrypt/"
+          cp "$ROOT"/config/dnscrypt/* "$STAGE/engines/dnscrypt/"
 
           mkdir -p "$Z/exe"
           cp -r "$K/exe/." "$Z/exe/"

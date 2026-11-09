@@ -213,6 +213,15 @@ public sealed class SupervisorArgumentsTests
         Assert.Equal("Universal V10", read.Preset);
     }
 
+    /// <summary>Режим DNSCrypt доезжает до супервизора ключом.</summary>
+    [Fact]
+    public void DnsCrypt_mode_survives_the_round_trip()
+    {
+        var options = RoundTrip(new AppSettings { DnsCrypt = "anonymized" });
+
+        Assert.Equal("anonymized", options.DnsCrypt);
+    }
+
     /// <summary>
     /// Конфиг движка ради DNS не собрался — надзор поднимает один десинк, как до 03.10.
     /// </summary>

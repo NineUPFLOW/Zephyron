@@ -659,6 +659,9 @@ public partial class VpnView : UserControl
             else
                 ShowFlag(country);
 
+            // Флаг в имени — подпись; если замер выхода говорит другое страну, скажем это.
+            CurrentFlag.ToolTip = ExitNote(tag, country);
+
             // Только как выход выбран: подписка, протокол и задержка — цифрами
             // ниже (макет 01.10), повторять их строкой незачем.
             //
@@ -683,6 +686,9 @@ public partial class VpnView : UserControl
             && DateTimeOffset.Now - p.At < TimeSpan.FromMinutes(1)
             ? p
             : ((string Tag, bool Ok, double? Ms, DateTimeOffset At)?)null;
+
+        if (tag is not null && ExitNote(tag, CountryTag.Split(tag).Country) is { } exit)
+            CurrentDetail.Text = (CurrentDetail.Text + " " + exit + ".").Trim();
 
         if (probe is { } checkedNow && CurrentDetail.Text.Length > 0)
             CurrentDetail.Text += $" Проверен {SecondsAgo(checkedNow.At)} назад.";
@@ -766,6 +772,20 @@ public partial class VpnView : UserControl
         CurrentFlag.SetResourceReference(Border.BackgroundProperty, "Raised");
         CurrentCountry.Text = string.Empty;
         CurrentCloud.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>«Выход: Германия» — только если замер знает страну и она не совпадает с флагом в имени.</summary>
+    private static string? ExitNote(string tag, string flagCountry)
+    {
+        if (ExitCountry.Of(tag) is not { } code || string.Equals(code, flagCountry, StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        string name;
+
+        try { name = new System.Globalization.RegionInfo(code).DisplayName; }
+        catch (ArgumentException) { name = code; }
+
+        return $"Выход: {name} (фактический, по замеру)";
     }
 
     /// <summary>Флаг картинкой, а нет картинки — буквами страны.</summary>
@@ -1311,7 +1331,7 @@ public partial class VpnView : UserControl
             var seen = Seen(server.Tag);
 
             (string, string)? why =
-                settings.ForeignExitsOnly && (server.IsSelfRegistering || SingBoxConfigCompiler.LooksDomestic(server.Tag))
+                settings.ForeignExitsOnly && (server.IsSelfRegistering || ExitCountry.IsDomestic(server.Tag))
                     ? ("вне подбора · РФ", "Отечественный выход: при «Только зарубежные» автоподбор его не берёт — через него не открыть закрытое по стране. Выбрать руками можно.")
                 : seen is { Success: false }
                     ? ("вне подбора · молчит", "Не ответил при последнем замере: автоподбор на молчащих не садится, пока они не ответят.")
@@ -2861,7 +2881,7 @@ public partial class VpnView : UserControl
 
     private void ConfirmRemoveKeys()
     {
-        var answer = MessageBox.Show(
+        var answer = ConfirmDialog.Show(
             $"Удалить все отдельные ключи ({_book.Keys.Count})? Их серверы уйдут из пула, а ключи придётся вставлять заново.",
             "Стереть ключи",
             MessageBoxButton.OKCancel,
@@ -2887,7 +2907,7 @@ public partial class VpnView : UserControl
 
     private void ConfirmRemove(string name)
     {
-        var answer = MessageBox.Show(
+        var answer = ConfirmDialog.Show(
             $"Удалить подписку «{name}»? Её серверы уйдут из пула, а ссылку придётся вставлять заново.",
             "Отключить подписку",
             MessageBoxButton.OKCancel,

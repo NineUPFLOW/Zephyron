@@ -124,6 +124,12 @@ public sealed class SingBoxOptions
     public string DnsServer { get; init; } = Zephyron.Core.AppSettings.GoogleDns;
 
     public string DnsServerType { get; init; } = "https";
+
+    /// <summary>Порт апстрима, если не стандартный: у dnscrypt-proxy на петле (<see cref="Zephyron.Core.DnsCrypt.Port"/>).</summary>
+    public int? DnsServerPort { get; init; }
+
+    /// <summary>Апстрим — dnscrypt-proxy на петле: его собственные запросы идут мимо туннеля.</summary>
+    public bool DnsCrypt { get; init; }
     public bool RouterDns { get; init; }
     public string? RouterDnsInterface { get; init; }
 
@@ -963,6 +969,10 @@ public sealed class SingBoxConfigCompiler
             remote["server_port"] = 53;
             remote["bind_interface"] = options.RouterDnsInterface;
         }
+        else if (options.DnsServerPort is { } port)
+        {
+            remote["server_port"] = port;
+        }
         if (options.DnsServerType == "https")
         {
             if (!string.IsNullOrEmpty(options.DnsServerName))
@@ -975,10 +985,11 @@ public sealed class SingBoxConfigCompiler
         // Через туннель — только если ему есть куда вести. Иначе detour
         // указывал бы на селектор без единого сервера, и разрешение имён
         // умерло бы целиком.
-        bool throughTunnel = !options.RouterDns && options.DnsThroughTunnel && haveServers;
+        // dnscrypt-proxy на петле — только напрямую: через туннель до 127.0.0.1 не добраться.
+        bool throughTunnel = !options.RouterDns && !options.DnsCrypt && options.DnsThroughTunnel && haveServers;
 
         // «Авто» — через переключатель пути DNS, который ставит надзор.
-        bool viaPath = !options.RouterDns && options.DnsViaAuto && !options.DnsThroughTunnel && haveServers;
+        bool viaPath = !options.RouterDns && !options.DnsCrypt && options.DnsViaAuto && !options.DnsThroughTunnel && haveServers;
 
         // Имена серверов подписки и панелей — мимо туннеля в обоих случаях.
         bool bootstrap = throughTunnel || viaPath;
@@ -1594,7 +1605,7 @@ public sealed class SingBoxConfigCompiler
         // loc=RU, colo=DME, warp=on). До 01.10 «только зарубежные» его
         // пропускали запасным.
         var eligible = options.ForeignExitsOnly
-            ? servers.Where(s => !LooksDomestic(tags[s]) && !s.IsSelfRegistering).ToList()
+            ? servers.Where(s => !ExitCountry.IsDomestic(tags[s]) && !s.IsSelfRegistering).ToList()
             : servers;
 
         // Но не до пустоты: подписка может состоять из домашних серверов
@@ -1899,10 +1910,9 @@ public sealed class SingBoxConfigCompiler
             case ProxyProtocol.Vless:
                 outbound["type"] = "vless";
                 outbound["uuid"] = server.Credential;
-                // sing-box знает только «xtls-rprx-vision»: xray-варианты вроде
-                // «-udp443» он отвергает фатально и роняет весь туннель, а не один сервер.
-                if (server.Flow?.StartsWith("xtls-rprx-vision", StringComparison.OrdinalIgnoreCase) == true)
-                    outbound["flow"] = "xtls-rprx-vision";
+                // sing-box знает только «xtls-rprx-vision» (VlessFlows).
+                if (VlessFlows.ForSingBox(server.Flow) is { Length: > 0 } flow)
+                    outbound["flow"] = flow;
 
                 // VLESS Encryption: без него сервер, который его требует, рвёт рукопожатие.
                 if (VlessEncryption.ForSingBox(server.Encryption) is { Length: > 0 } encryption)
@@ -2521,8 +2531,20 @@ public sealed class SingBoxConfigCompiler
             // Определение протокола по содержимому — нужно, чтобы доменные
             // правила срабатывали и на соединениях без обращения к DNS.
             new JsonObject { ["action"] = "sniff" },
-            new JsonObject { ["protocol"] = "dns", ["action"] = "hijack-dns" },
         };
+
+        // Свои запросы dnscrypt-proxy — мимо всего, раньше перехвата DNS: иначе
+        // hijack-dns вернул бы их резолверу движка, то есть ему же самому.
+        if (options.DnsCrypt)
+        {
+            rules.Add(new JsonObject
+            {
+                ["process_name"] = new JsonArray { Zephyron.Core.DnsCrypt.ProcessName + ".exe" },
+                ["outbound"] = "direct",
+            });
+        }
+
+        rules.Add(new JsonObject { ["protocol"] = "dns", ["action"] = "hijack-dns" });
 
         foreach (var node in BuildDohRejects(options))
             rules.Add(node);
@@ -2642,7 +2664,7 @@ public sealed class SingBoxConfigCompiler
             // Для этого и заведён bootstrap.
             ["default_domain_resolver"] = new JsonObject
             {
-                ["server"] = !options.RouterDns && (options.DnsThroughTunnel || options.DnsViaAuto) && haveServers ? BootstrapTag : "remote",
+                ["server"] = !options.RouterDns && !options.DnsCrypt && (options.DnsThroughTunnel || options.DnsViaAuto) && haveServers ? BootstrapTag : "remote",
 
                 // Сперва IPv4, IPv6 — запасным. Журнал владельца 25.09: сотни
                 // «dial tcp [2001:4860:…]:443: unreachable network» за 1 мс —

@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -72,6 +73,18 @@ public sealed class ResolverRow
     public Visibility IconShown => Icon is null ? Visibility.Collapsed : Visibility.Visible;
 
     public Visibility LetterShown => Icon is null ? Visibility.Visible : Visibility.Collapsed;
+}
+
+/// <summary>Режим шифрованного DNS в карточке DNSCrypt.</summary>
+public sealed class CryptRow
+{
+    public required DnsCryptMode Mode { get; init; }
+    public string Title => DnsCrypt.Describe(Mode).Title;
+    public string Note => DnsCrypt.Describe(Mode).Note;
+    public string Latency { get; set; } = "—";
+    public bool Chosen { get; set; }
+    public bool Available { get; init; }
+    public Brush Edge => (Brush)Application.Current.FindResource(Chosen ? "AccentLine" : "Border");
 }
 
 /// <summary>Строка обзора резолверов.</summary>
@@ -272,6 +285,7 @@ public partial class DnsView : UserControl
         Unloaded += (_, _) =>
         {
             _work?.Cancel();
+            _cryptWork?.Cancel();
             _logos?.Cancel();
         };
     }
@@ -283,6 +297,8 @@ public partial class DnsView : UserControl
         ShowChosen(settings);
         ShowSystem();
         ShowPinWatch(settings);
+
+        var verdicts = ResolverVerdicts.Load();
 
         // Те же провайдеры, что в обзоре, — все, кого sing-box может
         // спрашивать по DoH. Прежде список был своим, из шести, и мерился
@@ -299,19 +315,135 @@ public partial class DnsView : UserControl
                 Name = p.Name,
                 Address = p.TlsAddress ?? p.Udp[0],
                 Note = p.Note ?? string.Empty,
-                Chosen = !settings.UseRouterDns && p.Choosable && string.Equals(p.TlsAddress, settings.DnsServer, StringComparison.Ordinal),
+                Chosen = !settings.UseRouterDns && settings.DnsCryptActive is null && p.Choosable && string.Equals(p.TlsAddress, settings.DnsServer, StringComparison.Ordinal),
                 Own = p.Own,
                 Choosable = p.Choosable,
                 Udp = p.Udp.Count > 0 ? p.Udp[0] : string.Empty,
                 Site = LogoSite(p),
+                Marks = VerdictMarks(verdicts, p),
             }))
             .ToList();
+
+        ShowNow(settings);
+        ShowCrypt(settings);
 
         Status.Text = "Отклик покажет сводка выше.";
 
         ShowLast();
 
         StartLogos();
+    }
+
+    /// <summary>Пометка по запомненному вердикту обзора — пока свежий замер её не заменил.</summary>
+    private static IReadOnlyList<string> VerdictMarks(IReadOnlyDictionary<string, ResolverVerdict> verdicts, DnsProvider p) =>
+        verdicts.TryGetValue(ResolverVerdicts.Key(p), out var v)
+            ? [v.Kind switch
+            {
+                ResolverVerdictKind.Blocked => DnsMarks.Blocked,
+                ResolverVerdictKind.UdpSpoofed => DnsMarks.UdpSpoofed,
+                _ => "не тронут",
+            }]
+            : [];
+
+    /// <summary>Строка «куда сейчас идут имена».</summary>
+    private void ShowNow(AppSettings settings)
+    {
+        try
+        {
+            NowLine.Text = DnsNow.Describe(settings, SupervisorState.Load(SupervisorState.DefaultPath), null);
+        }
+        catch (Exception ex)
+        {
+            NowLine.Text = "Куда идут имена, прочитать не удалось: " + ex.GetBaseException().Message;
+        }
+    }
+
+    private CancellationTokenSource? _cryptWork;
+
+    private void ShowCrypt(AppSettings settings, IReadOnlyList<DnsCryptLatency>? latency = null)
+    {
+        bool bundled = File.Exists(DnsCrypt.Executable());
+
+        CryptModes.ItemsSource = DnsCrypt.Modes.Select(mode => new CryptRow
+        {
+            Mode = mode,
+            Available = bundled,
+            Chosen = settings.DnsCryptActive == mode,
+            Latency = latency?.FirstOrDefault(l => l.Mode == mode) is { } l
+                ? l.Ms is { } ms ? $"{ms:0} мс" : l.Failure
+                : "—",
+        }).ToList();
+
+        CryptStatus.Text = !bundled
+            ? "dnscrypt-proxy не входит в эту сборку (нет папки engines\\dnscrypt), режимы недоступны."
+            : settings.UseRouterDns && settings.DnsCrypt is { Length: > 0 }
+                ? "Включён DNS роутера: выбор режима сохранится, но подействует после его выключения."
+                : "Нажмите на режим, чтобы включить; повторное нажатие на выбранный выключает. Туннель спрашивает dnscrypt-proxy на этом компьютере.";
+        CryptMeasure.IsEnabled = bundled;
+    }
+
+    private void OnCryptChoose(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { DataContext: CryptRow row })
+            return;
+
+        try
+        {
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
+            bool off = row.Chosen;
+            var next = settings with { DnsCrypt = off ? null : DnsCrypt.Key(row.Mode) };
+            next.Save(AppSettings.DefaultPath);
+
+            ShowCrypt(next);
+            ShowChosen(next);
+            ShowNow(next);
+
+            if (Resolvers.ItemsSource is IEnumerable<ResolverRow> rows)
+            {
+                foreach (var r in rows)
+                    r.Chosen = off && !next.UseRouterDns && r.Address == next.DnsServer;
+
+                Redraw();
+            }
+
+            Status.Text = off ? "DNSCrypt выключен. Вступит в силу после следующего запуска движков."
+                : $"{row.Title}: вступит в силу после следующего запуска движков.";
+            this.Offer(off ? "DNSCrypt выключен" : $"DNS: {row.Title}");
+        }
+        catch (Exception ex)
+        {
+            CryptStatus.Text = "Выбор не записался: " + ex.GetBaseException().Message;
+        }
+    }
+
+    private async void OnCryptMeasure(object sender, RoutedEventArgs e)
+    {
+        _cryptWork?.Cancel();
+        _cryptWork = new CancellationTokenSource();
+        var token = _cryptWork.Token;
+
+        CryptMeasure.IsEnabled = false;
+        CryptStatus.Text = "Меряю три режима: временный dnscrypt-proxy поднимается до 15 секунд на режим…";
+
+        try
+        {
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
+            var result = await DnsCryptProbe.MeasureAllAsync(settings.DnsCryptActive, token);
+
+            if (token.IsCancellationRequested)
+                return;
+
+            ShowCrypt(settings, result);
+            CryptStatus.Text = "Задержка — середина трёх ответов на разные имена.";
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            CryptStatus.Text = "Замер не удался: " + ex.GetBaseException().Message;
+            CryptMeasure.IsEnabled = true;
+        }
     }
 
     private void ShowChosen(AppSettings settings)
@@ -566,7 +698,7 @@ public partial class DnsView : UserControl
 
         try
         {
-            var settings = AppSettings.Load(AppSettings.DefaultPath) with { DnsServer = address, DnsAuto = false, UseRouterDns = false };
+            var settings = AppSettings.Load(AppSettings.DefaultPath) with { DnsServer = address, DnsAuto = false, UseRouterDns = false, DnsCrypt = null };
             settings.Save(AppSettings.DefaultPath);
 
             ShowChosen(settings);

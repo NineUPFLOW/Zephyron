@@ -1,4 +1,5 @@
 using System.Globalization;
+using Zephyron.Core;
 
 namespace Zephyron.Subscriptions;
 
@@ -12,6 +13,16 @@ public static class SubscriptionParser
     /// от такого списка. Формат определяется автоматически.
     /// </summary>
     public static (IReadOnlyList<ProxyServer> Servers, IReadOnlyList<string> Errors) ParseBody(string body)
+    {
+        var (servers, errors) = ParseRaw(body);
+
+        // Хвост описания у имён из документа Xray (в ссылках его уже снял ProxyUriParser).
+        return ([.. servers.Select(s => ServerDescription.Split(s.Tag) is var (name, description) && description is not null
+            ? s with { Tag = name, Description = s.Description ?? description }
+            : s)], errors);
+    }
+
+    private static (IReadOnlyList<ProxyServer> Servers, IReadOnlyList<string> Errors) ParseRaw(string body)
     {
         var servers = new List<ProxyServer>();
         var errors = new List<string>();

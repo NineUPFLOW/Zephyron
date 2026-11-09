@@ -539,6 +539,8 @@
                         <StackPanel>
                             <DockPanel>
                                 <TextBlock Text="Недавние замеры" FontWeight="SemiBold" VerticalAlignment="Center" DockPanel.Dock="Left" />
+                                <Button x:Name="ClearHistory" Style="{StaticResource Quiet}" DockPanel.Dock="Left" Content="Очистить" Margin="10,0,0,0"
+                                        Padding="8,0" MinHeight="24" Click="OnClearHistory" AutomationProperties.Name="Очистить историю замеров" />
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                     <Button x:Name="TrendDown" Style="{StaticResource Choice}" Tag="0" Click="OnTrend" Content="Загрузка"
                                             Margin="0,0,4,0" Padding="10,0" MinHeight="24" AutomationProperties.Name="График: загрузка" />

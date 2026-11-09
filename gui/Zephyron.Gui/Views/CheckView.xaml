@@ -181,6 +181,8 @@
                                         <TextBlock Style="{StaticResource Mono}" Margin="0,0,14,0"><Run Text="TLS " Foreground="{DynamicResource Muted}" /><Run Text="{Binding Tls, Mode=OneWay}" /></TextBlock>
                                         <TextBlock Style="{StaticResource Mono}" Margin="0,0,14,0"><Run Text="Порт 80 " Foreground="{DynamicResource Muted}" /><Run Text="{Binding Http, Mode=OneWay}" /></TextBlock>
                                         <TextBlock Style="{StaticResource Mono}"><Run Text="Данные " Foreground="{DynamicResource Muted}" /><Run Text="{Binding Data, Mode=OneWay}" /></TextBlock>
+                                        <TextBlock Style="{StaticResource Mono}" Margin="14,0,0,0"><Run Text="QUIC " Foreground="{DynamicResource Muted}" /><Run Text="{Binding Quic, Mode=OneWay}" /></TextBlock>
+                                        <TextBlock Style="{StaticResource Mono}" Margin="14,0,0,0" Visibility="{Binding OwnerShown}"><Run Text="Сеть " Foreground="{DynamicResource Muted}" /><Run Text="{Binding Owner, Mode=OneWay}" /></TextBlock>
                                     </WrapPanel>
 
                                     <TextBlock Text="{Binding Why}" Style="{StaticResource Caption}"

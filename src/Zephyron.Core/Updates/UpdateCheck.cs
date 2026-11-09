@@ -17,6 +17,12 @@ public sealed record ReleaseInfo
     /// <summary>SHA-256 архива по GitHub (поле <c>digest</c> файла), строчными; нет — null.</summary>
     public string? ArchiveSha256 { get; init; }
 
+    /// <summary>
+    /// Выпуск найден по странице, а суммы на ней не нашлось: архив будет принят без сверки.
+    /// Окну сказать «контрольная сумма недоступна».
+    /// </summary>
+    public bool ChecksumUnavailable { get; init; }
+
     /// <summary>Описание изменений — то, ради чего человек и решает, обновляться ли.</summary>
     public string? Notes { get; init; }
 
@@ -81,7 +87,7 @@ public static class UpdateCheck
     /// <summary>
     /// Последний выпуск по переадресации страницы <c>releases/latest</c> — без API и его лимита.
     /// </summary>
-    /// <remarks>Ни размера, ни контрольной суммы так не узнать; архив берётся по имени, как его выкладывает сборка.</remarks>
+    /// <remarks>Размера так не узнать; сумму ищем на странице выпуска. Архив берётся по имени, как его выкладывает сборка.</remarks>
     private static async Task<ReleaseInfo?> FromPageAsync(CancellationToken cancellationToken)
     {
         try
@@ -97,17 +103,46 @@ public static class UpdateCheck
 
             var version = tag.TrimStart('v', 'V');
 
+            // Сумма архива лежит в подвале примечаний (docs/release-notes.footer.md) — берём её со страницы выпуска.
+            string? sha = null;
+
+            try
+            {
+                sha = HashFromPage(await http.GetStringAsync(
+                    $"https://github.com/{Repository}/releases/tag/{Uri.EscapeDataString(tag)}", cancellationToken), version);
+            }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            {
+            }
+
             return new ReleaseInfo
             {
                 Version = version,
                 Tag = tag,
                 ArchiveUrl = $"https://github.com/{Repository}/releases/download/{tag}/Zephyron-{version}.zip",
+                ArchiveSha256 = sha,
+                ChecksumUnavailable = sha is null,
             };
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// SHA-256 архива из подвала примечаний на странице выпуска: строка
+    /// «Zephyron-{версия}.zip   {сумма}»; не нашлась — <c>null</c>.
+    /// </summary>
+    internal static string? HashFromPage(string html, string version)
+    {
+        // Между именем и суммой — пробелы, возможно разметка или &nbsp;.
+        var m = System.Text.RegularExpressions.Regex.Match(
+            html,
+            @"Zephyron-" + System.Text.RegularExpressions.Regex.Escape(version)
+                + @"\.zip(?:\s|&nbsp;|<[^>]+>)+([0-9a-fA-F]{64})(?![0-9a-fA-F])");
+
+        return m.Success ? m.Groups[1].Value.ToLowerInvariant() : null;
     }
 
     /// <summary>Тег из адреса <c>…/releases/tag/v1.4.0</c>; не похож на версию — <c>null</c>.</summary>

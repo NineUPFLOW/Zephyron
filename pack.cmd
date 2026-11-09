@@ -184,6 +184,21 @@ echo Bundling tg-ws-proxy
 robocopy "%TGWS_DIR%." "%ENGINES%\tg-ws-proxy" /E /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
 if errorlevel 8 exit /b 1
 
+rem dnscrypt-proxy (pinned 2.1.20) for encrypted DNS, with the signed server lists.
+rem Optional: the mode is off by default and says so when the engine is missing.
+set "DNSCRYPT_DIR="
+for /f "delims=" %%F in ('dir /s /b "%ROOT%tools\dnscrypt-proxy.exe" 2^>nul') do set "DNSCRYPT_DIR=%%~dpF"
+
+if defined DNSCRYPT_DIR (
+    echo Bundling dnscrypt-proxy
+    robocopy "%DNSCRYPT_DIR%." "%ENGINES%\dnscrypt" dnscrypt-proxy.exe LICENSE /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
+    if errorlevel 8 exit /b 1
+    robocopy "%ROOT%config\dnscrypt" "%ENGINES%\dnscrypt" /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
+    if errorlevel 8 exit /b 1
+) else (
+    echo dnscrypt-proxy not found in tools\ - encrypted DNS will not start.
+)
+
 rem The Zapret GUI files come from our own copy in vendor\zapret-gui - the
 rem same as build.cmd, see the reasoning there. Taken only on the owner's word
 rem with "zy zapret-gui take"; what is left out of it and why (winws.exe,

@@ -454,6 +454,13 @@ public partial class DoctorView : UserControl
     /// </remarks>
     private static void OpenConsole(string console)
     {
+        // «page:<имя>» — раздел программы, а не внешняя программа.
+        if (console.StartsWith("page:", StringComparison.Ordinal))
+        {
+            (Application.Current?.MainWindow as MainWindow)?.GoTo(console["page:".Length..]);
+            return;
+        }
+
         try
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(console) { UseShellExecute = true })?.Dispose();

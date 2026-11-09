@@ -938,6 +938,10 @@ public static class DnsSurvey
             }
         });
 
-        return await Task.WhenAll(tasks);
+        var rows = await Task.WhenAll(tasks);
+
+        DnsTrust.Record(rows);
+
+        return rows;
     }
 }

@@ -46,4 +46,18 @@ public class DropOutboundTests
     public void LastMemberOfGroupStays() =>
         Assert.Null(SingBoxService.DropOutbound(
             """{ "outbounds": [ { "type": "urltest", "tag": "auto", "outbounds": ["a"] }, { "type": "vless", "tag": "a" } ] }""", 1));
+
+    [Fact]
+    public void BrokenEndpointIsDroppedFromItsOwnList()
+    {
+        var config = """
+            { "outbounds": [ { "type": "selector", "tag": "proxy", "outbounds": ["a", "wg"] }, { "type": "vless", "tag": "a" } ],
+              "endpoints": [ { "type": "wireguard", "tag": "wg" } ], "route": { "final": "proxy" } }
+            """;
+
+        var (json, tag) = SingBoxService.DropOutbound(config, 0, "endpoints")!.Value;
+
+        Assert.Equal("wg", tag);
+        Assert.DoesNotContain("\"wg\"", json);
+    }
 }

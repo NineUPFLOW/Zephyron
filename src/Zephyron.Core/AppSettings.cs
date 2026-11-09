@@ -249,6 +249,16 @@ public sealed record AppSettings
     public bool UseRouterDns { get; init; }
     public string RouterDnsAddress { get; init; } = "192.168.1.1";
 
+    /// <summary>
+    /// Шифрованный DNS через dnscrypt-proxy (<see cref="Zephyron.Core.DnsCrypt"/>): ключ режима;
+    /// <c>null</c> — выключено (резолвер по DoH из <see cref="DnsServer"/>). DNS роутера сильнее.
+    /// </summary>
+    public string? DnsCrypt { get; init; }
+
+    /// <summary>Режим dnscrypt-proxy, если он действует: выбран и не перебит DNS роутера.</summary>
+    [JsonIgnore]
+    public DnsCryptMode? DnsCryptActive => UseRouterDns ? null : Zephyron.Core.DnsCrypt.Parse(DnsCrypt);
+
     /// <summary>Адрес Google, который работает по DoH и там, где 8.8.8.8 закрыт.</summary>
     public const string GoogleDns = "8.8.4.4";
 
@@ -411,6 +421,13 @@ public sealed record AppSettings
     /// таймаут, а не уходило сразу в Cloudflare. Включают на вкладке «TG Proxy».
     /// </remarks>
     public bool TelegramProxyDirect { get; init; }
+
+    /// <summary>
+    /// Автонастройка прокси Telegram (<c>TgProxyTune</c>): прямой путь к DC2 и DC4
+    /// и порядок доменов Cloudflare решает замер, а не <see cref="TelegramProxyDirect"/>.
+    /// </summary>
+    /// <remarks>Выключена по умолчанию: замер идёт перед каждым запуском прокси.</remarks>
+    public bool TelegramProxyAuto { get; init; }
 
     /// <summary>Прокси Telegram ходит к DC1, DC3 и DC5 напрямую (<see cref="TgWsProxy.DirectOther"/>).</summary>
     /// <remarks>Выключено по умолчанию: адреса отвечают по TLS, а настоящие соединения через них не проверены (21.10).</remarks>
@@ -1063,6 +1080,27 @@ public sealed record AppSettings
     private static AppSettings VerifyTrafficOnce(AppSettings read) =>
         read.VerifyTrafficReset == true ? read : read with { VerifyTraffic = true, VerifyTrafficReset = true };
 
+    /// <summary>
+    /// Теги серверов в настройках — без хвоста описания (<see cref="ServerDescription"/>): записанные
+    /// прежде с хвостом не нашлись бы, и закрепление ушло бы в автоподбор. Второй раз снимать нечего.
+    /// </summary>
+    private static AppSettings WithoutServerDescriptions(AppSettings read)
+    {
+        static string? Clean(string? tag) => tag is null ? null : ServerDescription.Strip(tag);
+
+        return read with
+        {
+            PreferredServer = Clean(read.PreferredServer),
+            AutoPickExcluded = [.. read.AutoPickExcluded.Select(ServerDescription.Strip).Distinct()],
+            Pools = [.. read.Pools.Select(p => p with
+            {
+                Servers = [.. p.Servers.Select(ServerDescription.Strip).Distinct()],
+                Preferred = Clean(p.Preferred),
+                Held = Clean(p.Held),
+            })],
+        };
+    }
+
     private static AppSettings SelectiveRoutingOnce(AppSettings read) =>
         read.SelectiveRouting is null ? read with { SelectiveRouting = read.Pools.Count > 0 } : read;
 
@@ -1170,11 +1208,11 @@ public sealed record AppSettings
             // Mullvad тоже: его убрали из списка 10.10, и выбравший его
             // остался бы с DoH на адрес без имени для сертификата — туннель
             // без имён.
-            return VerifyTrafficOnce(SelectiveRoutingOnce(LiteToV12Once(PresetOnce(GameFilterOnce(WarpAsPath(read with
+            return WithoutServerDescriptions(VerifyTrafficOnce(SelectiveRoutingOnce(LiteToV12Once(PresetOnce(GameFilterOnce(WarpAsPath(read with
             {
                 Mode = read.Engines.Mode,
                 DnsServer = read.DnsServer is "8.8.8.8" or MullvadDns ? GoogleDns : read.DnsServer,
-            }))))));
+            })))))));
         }
         catch (Exception)
         {
@@ -1387,7 +1425,7 @@ public sealed record AppSettings
     /// </para>
     /// </remarks>
     [JsonIgnore]
-    public bool NeedsDnsEngine => !NeedsProxy && NeedsDesync && (UseRouterDns || DnsVia == DnsRoute.Tunnel);
+    public bool NeedsDnsEngine => !NeedsProxy && NeedsDesync && (UseRouterDns || DnsCryptActive is not null || DnsVia == DnsRoute.Tunnel);
 
     public string DescribeServer() => PreferredServer ?? "авто (по задержке)";
 

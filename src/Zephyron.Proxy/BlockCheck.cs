@@ -411,6 +411,12 @@ public sealed record TargetReport
     /// </remarks>
     public DnsSpoofResult Spoof { get; init; } = DnsSpoofResult.Unknown;
 
+    /// <summary>
+    /// Рукопожатие QUIC с тем же адресом и именем (<see cref="QuicProbe"/>); <c>null</c> — не спрашивали
+    /// (закрыт по TCP, не объявил HTTP/3, через туннель). Молчание уже учтено в <c>Data.QuicSilent</c>.
+    /// </summary>
+    public ProbeOutcome? Quic { get; init; }
+
     public IReadOnlyList<string> Addresses { get; init; } = Array.Empty<string>();
 
     /// <summary>
@@ -1189,9 +1195,18 @@ public static class BlockCheck
 
         // Открыт по TCP, но объявил HTTP/3: браузер пойдёт по QUIC, и если тот
         // молчит — страница подвисает, хотя проба по TCP её получила.
+        // Сперва по адресу (версия-пустышка), затем рукопожатие с именем: так видно и резку по SNI.
+        ProbeOutcome? quic = null;
+
         if (!viaTunnel && kind == BlockKind.None && data.Http3 && answered is not null)
         {
             bool silent = !await QuicAnswersAsync(answered, cancellationToken);
+
+            quic = silent
+                ? new ProbeOutcome { Ok = false, Detail = "QUIC молчит: адрес не отвечает на пакет QUIC" }
+                : await QuicProbe.AskAsync(answered, host, Timeout, cancellationToken);
+
+            silent |= quic is { Ok: false };
             data = data with
             {
                 QuicSilent = silent,
@@ -1233,6 +1248,7 @@ public static class BlockCheck
             EchName = echName,
             EchHelloAccepted = echAccepted,
             Cut = cut,
+            Quic = quic,
             Spoof = spoof,
 
             Addresses = shown,

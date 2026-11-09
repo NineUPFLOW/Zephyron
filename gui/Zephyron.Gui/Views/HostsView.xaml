@@ -121,6 +121,46 @@
                 </Grid>
             </Border>
 
+            <!-- Чужие строки вне нашего блока, что перебивают маршрут или не действуют (HostsEditor.FindForeign). -->
+            <Border x:Name="ForeignCard" Style="{StaticResource Card}" Margin="0,16,0,0"
+                    BorderBrush="{DynamicResource WarnLine}" Visibility="Collapsed">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock x:Name="ForeignTitle" FontWeight="SemiBold" />
+                            <TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                       Text="Строки вне блока Zephyron. Перед удалением рядом с файлом ляжет его копия." />
+                        </StackPanel>
+                        <Button Grid.Column="1" Style="{StaticResource Ghost}" Content="Убрать отмеченные"
+                                Click="OnRemoveForeign" Margin="12,0,0,0" VerticalAlignment="Center" />
+                    </Grid>
+                    <ItemsControl x:Name="ForeignList" Margin="0,8,0,0" MaxHeight="180">
+                        <ItemsControl.Template>
+                            <ControlTemplate TargetType="ItemsControl">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+                                    <ItemsPresenter />
+                                </ScrollViewer>
+                            </ControlTemplate>
+                        </ItemsControl.Template>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding Selected, Mode=TwoWay}" Margin="0,2">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Line.Text}" Style="{StaticResource Mono}"
+                                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding Line.Text}" />
+                                        <TextBlock Text="{Binding Line.Reason}" Style="{StaticResource Caption}" />
+                                    </StackPanel>
+                                </CheckBox>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
             <!-- Строка состояния: ошибка — панелью ErrorState (StatusLook); Text и Visibility пишет код. -->
             <Border x:Name="StatusBox" Margin="0,12,0,0">
                 <Grid>

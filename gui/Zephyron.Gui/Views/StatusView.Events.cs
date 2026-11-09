@@ -33,7 +33,7 @@ public partial class StatusView
     private static readonly TimeSpan EventsInterval = TimeSpan.FromSeconds(4);
 
     /// <summary>Сколько последних событий показывать.</summary>
-    private const int EventsShown = 6;
+    private const int EventsShown = 4;
 
     /// <summary>Сколько байтов с конца файла читать: с запасом на шесть длинных строк.</summary>
     private const int TailBytes = 16 * 1024;
@@ -83,7 +83,7 @@ public partial class StatusView
 
         try
         {
-            // С запасом: строки подвисаний отсеиваются, а показать надо шесть живых.
+            // С запасом: строки подвисаний отсеиваются, а показать надо четыре живых.
             var lines = await Task.Run(() => Tail(Path.Combine("runtime", "supervisor.log"), TailBytes, EventsShown * 6)
                 .Where(l => !IsStallNote(l)).TakeLast(EventsShown).ToList());
             var key = string.Join("\n", lines);

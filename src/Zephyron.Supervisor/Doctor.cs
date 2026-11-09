@@ -71,7 +71,7 @@ public static class Doctor
         sections.Add(new("Супервизор", Supervisor()));
 
         if (settings.TelegramProxy)
-            sections.Add(new("Прокси Telegram", TelegramProxy(settings)));
+            sections.Add(new("Прокси Telegram", [.. TelegramProxy(settings), .. TelegramOverload()]));
 
         return sections;
     }
@@ -118,6 +118,12 @@ public static class Doctor
 
         return text.ToString();
     }
+
+    /// <summary>Значение <see cref="DoctorCheck.Open"/>: не оснастка, а страница окна; окно переходит на неё само.</summary>
+    public const string OpenHostsPage = "page:hosts";
+
+    /// <summary>То же для страницы «TG Proxy».</summary>
+    public const string OpenTgProxyPage = "page:tgproxy";
 
     private static DoctorCheck Ok(string text) => new(text, DoctorLevel.Ok);
 
@@ -513,6 +519,8 @@ public static class Doctor
         var lines = new List<DoctorCheck>
         {
             Ok(settings.UseRouterDns ? $"DNS роутера: {settings.RouterDnsAddress}:53, UDP напрямую через LAN."
+                : settings.DnsCryptActive is { } crypt
+                    ? $"DNS движка: {DnsCrypt.Describe(crypt).Title} через dnscrypt-proxy, {DnsCrypt.Address}:{DnsCrypt.Port}."
                 : $"Апстрим туннеля: {settings.DnsServer}, путь — {DnsRoutes.Word(settings.DnsVia)}."),
         };
 
@@ -555,6 +563,9 @@ public static class Doctor
         }
 
         lines.AddRange(TunnelNames(settings));
+        lines.AddRange(ForeignHosts(settings));
+        lines.AddRange(VirtualAdapterDns());
+        lines.AddRange(InterceptedResolver(settings));
 
         var guards = SecuritySoftware.Running();
 
@@ -566,6 +577,90 @@ public static class Doctor
         }
 
         return lines;
+    }
+
+    private static IReadOnlyList<DoctorCheck> ForeignHosts(AppSettings settings)
+    {
+        try
+        {
+            var (engine, _) = RuleSetExpander.LoadFor(settings);
+            var found = HostsEditor.FindForeign(null,
+                name => engine.Evaluate(Zephyron.Core.Connections.ConnectionEvent.Describe(name)).Rule?.ToString());
+
+            return found.Count == 0
+                ? []
+                : [Warn($"В hosts вне нашего блока строк, которые мешают маршрутам или не действуют: {found.Count}. "
+                    + "Например: " + found[0].Text + " — " + found[0].Reason + ".",
+                    "Открыть hosts", OpenHostsPage)];
+        }
+        catch (Exception)
+        {
+            return [];
+        }
+    }
+
+    private static readonly string[] VirtualMarkers = ["Radmin", "Hamachi", "ZeroTier", "Tailscale", "TAP-"];
+
+    private static IReadOnlyList<DoctorCheck> VirtualAdapterDns()
+    {
+        try
+        {
+            var ups = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+                .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up
+                    && n.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
+                .Select(n => (n.Name, n.Description, (IReadOnlyList<System.Net.IPAddress>)n.GetIPProperties().DnsAddresses.ToList()));
+
+            return VirtualDnsFirst(ups) is { } warn ? [warn] : [];
+        }
+        catch (Exception)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// Адаптеры по порядку, в котором их отдаёт Windows (метрику интерфейса .NET не показывает —
+    /// порядок приближённый): если первый с DNS-серверами — виртуальный, Windows спрашивает сначала его.
+    /// </summary>
+    internal static DoctorCheck? VirtualDnsFirst(
+        IEnumerable<(string Name, string Description, IReadOnlyList<System.Net.IPAddress> Dns)> adapters)
+    {
+        // Свой туннель в счёт не идёт: его DNS — наш же.
+        var first = adapters.FirstOrDefault(a => a.Dns.Any(d => !System.Net.IPAddress.IsLoopback(d))
+            && !new[] { "sing-tun", "wintun", "zephyron" }.Any(m => a.Description.Contains(m, StringComparison.OrdinalIgnoreCase)));
+
+        if (first.Name is null
+            || !VirtualMarkers.Any(m => first.Name.Contains(m, StringComparison.OrdinalIgnoreCase)
+                || first.Description.Contains(m, StringComparison.OrdinalIgnoreCase)))
+        {
+            return null;
+        }
+
+        return Warn($"DNS виртуального адаптера «{first.Name}» Windows спрашивает первым — "
+            + "имена могут разрешаться медленнее или неверно.");
+    }
+
+    private static IReadOnlyList<DoctorCheck> InterceptedResolver(AppSettings settings)
+    {
+        if (settings.UseRouterDns || DnsTrust.IsIntercepted(settings.DnsServer) != true)
+            return [];
+
+        var better = DnsTrust.CleanAlternative();
+
+        return [Bad($"Резолвер {settings.DnsServer} подменяется у провайдера — переключите DNS на "
+            + (better ?? "другой резолвер, который на вкладке DNS отмечен чистым") + ".")];
+    }
+
+    /// <summary>≥10 ответов 503 от общих доменов Cloudflare за 10 минут — они перегружены.</summary>
+    private static IReadOnlyList<DoctorCheck> TelegramOverload()
+    {
+        int n = TgWsProxyHealth.RecentCf503(TimeSpan.FromMinutes(10));
+
+        return n < 10
+            ? []
+            : [Warn($"Общие домены Cloudflare перегружены: {n} ответов 503 за 10 минут. "
+                + "Telegram может подвисать — поднимите собственный воркер Cloudflare на вкладке «TG Proxy».",
+                "Открыть TG Proxy", OpenTgProxyPage)];
     }
 
     /// <summary>Только «Гибрид» с поднятым туннелем: иначе имя «через VPN» подставного адреса не ждёт.</summary>

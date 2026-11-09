@@ -268,6 +268,22 @@ if defined TGWS_DIR (
     echo tg-ws-proxy not found in tools\ - the TG Proxy tab will have no proxy.
 )
 
+rem dnscrypt-proxy (ISC, pinned 2.1.20) for the encrypted DNS mode: one executable from
+rem tools\, plus the signed server lists from config\dnscrypt (without a list it does
+rem not start, and GitHub does not always answer). Optional - the mode is off by default.
+set "DNSCRYPT_DIR="
+for /f "delims=" %%F in ('dir /s /b "%ROOT%tools\dnscrypt-proxy.exe" 2^>nul') do set "DNSCRYPT_DIR=%%~dpF"
+
+if defined DNSCRYPT_DIR (
+    echo Bundling dnscrypt-proxy
+    robocopy "%DNSCRYPT_DIR%." "%ENGINES%\dnscrypt" dnscrypt-proxy.exe LICENSE /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
+    if errorlevel 8 exit /b 1
+    robocopy "%ROOT%config\dnscrypt" "%ENGINES%\dnscrypt" /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
+    if errorlevel 8 exit /b 1
+) else (
+    echo dnscrypt-proxy not found in tools\ - encrypted DNS will not start.
+)
+
 rem xray is deliberately left out: it is not wired up yet, and its geoip and
 rem geosite databases alone are 27 MB of dead weight.
 

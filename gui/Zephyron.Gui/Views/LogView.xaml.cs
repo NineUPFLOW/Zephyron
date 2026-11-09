@@ -270,7 +270,7 @@ public partial class LogView : UserControl
 
     private void OnClear(object sender, RoutedEventArgs e)
     {
-        var answer = MessageBox.Show(
+        var answer = ConfirmDialog.Show(
             "Очистить журналы движков (sing-box, winws2, супервизор, tg-ws-proxy)?\n\n"
             + "Файлы останутся, пропадёт только записанное. Вернуть нельзя.",
             "Zephyron", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);

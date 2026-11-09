@@ -87,6 +87,9 @@ public sealed record PinResult
           + "Пин на этой машине не живёт, пока файл hosts не внесён в доверенные.";
 }
 
+/// <summary>Чужая строка hosts, которая мешает; <paramref name="LineNumber"/> считается с единицы.</summary>
+public sealed record ForeignHostsLine(int LineNumber, string Text, string Reason);
+
 /// <summary>
 /// Правит файл hosts: включает, выключает и прибивает записи.
 /// </summary>
@@ -1147,6 +1150,107 @@ public static class HostsEditor
                 || name.EndsWith("." + zone, StringComparison.OrdinalIgnoreCase)))
             .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    /// <summary>
+    /// Чужие строки вне нашего блока, которые мешают: пинят имя, которое
+    /// маршрутизируем мы, либо записаны задом наперёд и потому не действуют.
+    /// </summary>
+    /// <param name="routeOf">Правило, которым маршрутизируется имя, или null; по умолчанию — правила из настроек.</param>
+    public static IReadOnlyList<ForeignHostsLine> FindForeign(string? hostsPath = null, Func<string, string?>? routeOf = null)
+    {
+        string[] lines;
+        try { lines = File.ReadAllLines(hostsPath ?? HostsFile.DefaultPath); }
+        catch (Exception) { return []; }
+
+        routeOf ??= DefaultRouteOf();
+        var (bs, be) = FindBlock(lines);
+        var found = new List<ForeignHostsLine>();
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            if (i >= bs && i <= be && bs >= 0)
+                continue;
+
+            var text = lines[i].TrimStart('﻿');
+            var body = text;
+            int hash = body.IndexOf('#');
+
+            if (hash >= 0)
+                body = body[..hash];
+
+            var parts = body.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+
+            if (parts.Length < 2)
+                continue;
+
+            if (!IPAddress.TryParse(parts[0], out _))
+            {
+                if (IPAddress.TryParse(parts[1], out _))
+                    found.Add(new ForeignHostsLine(i + 1, text.Trim(), "перепутаны имя и адрес — строка не действует"));
+
+                continue;
+            }
+
+            foreach (var name in parts.Skip(1))
+            {
+                if (routeOf(name) is { } route)
+                {
+                    found.Add(new ForeignHostsLine(i + 1, text.Trim(), $"перекрывает маршрут {Readable(route)}"));
+                    break;
+                }
+            }
+        }
+
+        return found;
+    }
+
+    private static Func<string, string?> DefaultRouteOf()
+    {
+        try
+        {
+            var (engine, _) = Zephyron.Zapret.RuleSetExpander.LoadFor(Zephyron.Core.AppSettings.Load(Zephyron.Core.AppSettings.DefaultPath));
+
+            return name => engine.Evaluate(Zephyron.Core.Connections.ConnectionEvent.Describe(name)).Rule?.ToString();
+        }
+        catch (Exception)
+        {
+            // Правил нет или битые — перекрывать нечего, остаются только перепутанные строки.
+            return _ => null;
+        }
+    }
+
+    /// <summary>Удаляет строки по номерам <see cref="ForeignHostsLine.LineNumber"/> (с единицы); копия и атомарная запись как у <see cref="Remove"/>.</summary>
+    public static int RemoveForeign(IEnumerable<ForeignHostsLine> picked, string? hostsPath = null)
+    {
+        var target = hostsPath ?? HostsFile.DefaultPath;
+        var lines = File.ReadAllLines(target);
+
+        // Номер строки — из прошлого просмотра: пока человек думал над вопросом, файл
+        // мог измениться. Убираем только строку, текст которой всё ещё тот же.
+        var zero = picked
+            .Where(p => p.LineNumber >= 1 && p.LineNumber <= lines.Length && lines[p.LineNumber - 1].Trim() == p.Text)
+            .Select(p => p.LineNumber - 1)
+            .ToHashSet();
+
+        if (zero.Count == 0)
+            return 0;
+
+        Remove(zero, target);
+        return zero.Count;
+    }
+
+    /// <summary>«#0 hostlist:config/lists/telegram.txt -> proxy» → «telegram (через VPN)»: строка правила — для разбора, не человеку.</summary>
+    internal static string Readable(string route)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(route, @"^#\d+\s+\w+:(?<value>\S+)\s*->\s*(?<mode>\w+)");
+        if (!m.Success)
+            return "«" + route + "»";
+
+        var value = m.Groups["value"].Value;
+        var name = value.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) ? Path.GetFileNameWithoutExtension(value) : value.TrimStart('*', '.');
+        var mode = m.Groups["mode"].Value switch { "proxy" => "через VPN", "desync" => "десинк", "direct" => "напрямую", var other => other };
+        return $"{name} ({mode})";
     }
 
     /// <summary>Границы нашего блока; <c>(-1, -1)</c> — блока нет.</summary>

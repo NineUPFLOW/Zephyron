@@ -148,6 +148,10 @@ public static class TgWsProxy
         if (WorkerHost(routes.Worker) is { } worker)
             arguments.AddRange(["--cf-worker-domain", worker]);
 
+        // Живые домены по замеру (TgProxyTune) — первыми, перед общим списком.
+        if (routes.CfDomains is { Count: > 0 } domains)
+            arguments.AddRange(["--cf-domain", string.Join(",", domains)]);
+
         int timeout = CfTimeout(routes.CfConnectTimeout);
 
         if (timeout != DefaultCfConnectTimeout)
@@ -253,11 +257,13 @@ public static class TgWsProxy
 /// <param name="DirectMain">Прямой путь к DC2 и DC4 (<see cref="TgWsProxy.DirectMain"/>).</param>
 /// <param name="DirectOther">Прямой путь к DC1, DC3 и DC5 (<see cref="TgWsProxy.DirectOther"/>).</param>
 /// <param name="CfConnectTimeout">Сколько ждать один домен Cloudflare, секунды.</param>
+/// <param name="CfDomains">Домены Cloudflare первыми — по замеру автонастройки.</param>
 public sealed record TgWsProxyRoutes(
     bool DirectMain = false,
     bool DirectOther = false,
     int CfConnectTimeout = TgWsProxy.DefaultCfConnectTimeout,
-    string? Worker = null)
+    string? Worker = null,
+    IReadOnlyList<string>? CfDomains = null)
 {
     public static TgWsProxyRoutes From(AppSettings settings) => new(
         settings.TelegramProxyDirect,
