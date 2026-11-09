@@ -479,6 +479,10 @@ public sealed class SpeedTest
 
         try
         {
+            // Сначала встают потоки этапа: «под нагрузкой» — это когда она уже идёт,
+            // а проба на старте лишь отнимала у них соединения и время.
+            await Task.Delay(300, token);
+
             using var handler = new SocketsHttpHandler
             {
                 UseProxy = _options.Proxy is not null,
