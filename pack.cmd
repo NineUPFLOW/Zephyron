@@ -263,7 +263,7 @@ rem video background, the owner's file; HotGr and Peach Static - the owner's
 rem art (12.10, uploaded by him). Every other picture theme in a working copy
 rem is somebody else's art and stays out.
 for %%T in (aurora NyaView HotGr "Peach Static") do (
-    robocopy "%ROOT%themes\%%T" "%STAGE%\themes\%%T" theme.json background.jpg background.mp4 /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
+    robocopy "%ROOT%themes\%%~T" "%STAGE%\themes\%%~T" theme.json background.jpg background.mp4 /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
     if errorlevel 8 exit /b 1
 )
 copy /y "%ROOT%themes\README.md" "%STAGE%\themes\" >nul
