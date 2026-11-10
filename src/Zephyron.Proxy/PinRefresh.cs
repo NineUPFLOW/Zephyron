@@ -137,7 +137,7 @@ public static class PinRefresh
             var via = HostsEditor.PinsVia(hostsPath);
 
             var names = HostsEditor.PinsAll(hostsPath)
-                .Where(p => !own.Contains(p.Key) && p.Value.Count > 0)
+                .Where(p => !own.Contains(p.Key) && p.Value.Count > 0 && !p.Value.Contains(VideoNodeGuard.Refused))
                 .Select(p => p.Key)
                 .ToList();
 
@@ -264,7 +264,7 @@ public static class PinRefresh
             var own = HostsEditor.DesyncPins(path);
 
             pins = HostsEditor.PinsAll(path)
-                .Where(p => !own.Contains(p.Key) && p.Value.Count > 0)
+                .Where(p => !own.Contains(p.Key) && p.Value.Count > 0 && !p.Value.Contains(VideoNodeGuard.Refused))
                 .ToDictionary(p => p.Key, p => p.Value, StringComparer.OrdinalIgnoreCase);
 
             profiles = HostsEditor.PinsVia(path)

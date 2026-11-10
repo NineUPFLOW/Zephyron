@@ -225,6 +225,7 @@ public partial class App : Application
 
         // Новые адреса голоса Discord — в список голоса, пока он «через VPN».
         DiscordVoiceWatch.Start(Dispatcher);
+        VideoNodeWatch.Start(Dispatcher);
         RobloxServerWatch.Start();
 
         // Пины к посредникам: плановая проверка раз в 6 часов при работающих движках.

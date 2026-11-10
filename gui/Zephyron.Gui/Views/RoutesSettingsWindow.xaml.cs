@@ -145,6 +145,9 @@ public partial class RoutesSettingsWindow : Window
         Learn.IsChecked = settings.LearnDiscordVoice;
         LearnWord.Text = settings.LearnDiscordVoice ? "включено" : "не включено";
 
+        Guard.IsChecked = settings.GuardVideoNodes;
+        GuardWord.Text = settings.GuardVideoNodes ? "включено" : "не включено";
+
         LearnRoblox.IsChecked = settings.LearnRobloxServers;
         LearnRobloxWord.Text = settings.LearnRobloxServers ? "включено" : "не включено";
 
@@ -186,6 +189,15 @@ public partial class RoutesSettingsWindow : Window
         Save(s => s with { LearnDiscordVoice = on },
             on ? "Адреса голоса Discord добавляются, пока голос идёт «через VPN»."
                : "Список голоса Discord больше не пополняется автоматически.");
+    }
+
+    private void OnGuard(object sender, RoutedEventArgs e)
+    {
+        bool on = Guard.IsChecked == true;
+
+        Save(s => s with { GuardVideoNodes = on },
+            on ? "Нерабочие узлы видео YouTube отключаются, пока работают движки."
+               : "Узлы видео больше не отключаются; записи Zephyron о них снимутся в течение 20 секунд.");
     }
 
     /// <summary>Перечитать, изменить, записать — окно могло пережить чужую правку настроек.</summary>

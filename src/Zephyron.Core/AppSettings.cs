@@ -329,6 +329,9 @@ public sealed record AppSettings
     /// </remarks>
     public bool LearnDiscordVoice { get; init; } = true;
 
+    /// <summary>Отключать узлы видео YouTube, которые фильтр режет по адресу (VideoNodeGuard): плеер сразу берёт другой.</summary>
+    public bool GuardVideoNodes { get; init; } = true;
+
     /// <summary>
     /// Дописывать адреса игровых серверов Roblox из его журнала в список части
     /// «Игровые серверы (адреса)» (<see cref="Services.RobloxServerLearn"/>).

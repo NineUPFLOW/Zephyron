@@ -85,6 +85,36 @@
                     </StackPanel>
                 </Border>
 
+                <TextBlock Text="YouTube" Style="{StaticResource GroupHead}" Margin="4,22,0,7" />
+
+                <Border Style="{StaticResource SettingsGroup}">
+                    <Grid Margin="16,13">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Обходить нерабочие узлы видео" VerticalAlignment="Center" />
+
+                                <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
+                                                Content="Видео YouTube идёт с узлов googlevideo: серверов Google и кэшей Google внутри сети провайдера. Часть узлов фильтр режет по адресу, а кэш провайдера бывает сломан — десинк тут бессилен, и плеер застывает. Пока работают движки, Zephyron раз в 20 секунд проверяет узлы, к которым ходил браузер, тем же путём, что и браузер. Нерабочий узел получает в hosts запись 0.0.0.0, и плеер сразу берёт запасной — без VPN. Каждые полчаса узел проверяется снова, через 12 часов запись снимается. Браузер должен брать адреса у Windows: встроенный DNS-over-HTTPS в браузере обходит hosts." />
+                            </StackPanel>
+
+                            <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
+                                       Text="Узел, который не отдаёт видео, отключается, и плеер сразу берёт другой." />
+                        </StackPanel>
+
+                        <TextBlock Grid.Column="1" x:Name="GuardWord" Style="{StaticResource Caption}"
+                                   VerticalAlignment="Center" Margin="0,0,10,0" />
+
+                        <ToggleButton Grid.Column="2" x:Name="Guard" Style="{StaticResource Switch}"
+                                      Click="OnGuard" VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+
                 <TextBlock Text="Roblox" Style="{StaticResource GroupHead}" Margin="4,22,0,7" />
 
                 <Border Style="{StaticResource SettingsGroup}">
