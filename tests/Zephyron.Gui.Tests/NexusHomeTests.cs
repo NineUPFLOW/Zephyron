@@ -63,7 +63,7 @@ public sealed class NexusHomeTests
     }
 
     [Theory]
-    [InlineData("2026-11-10 16:43:18 Свой рецепт «pass»: C:\z\runtime\desync\pass.txt")]
+    [InlineData("2026-11-10 16:43:18 Свой рецепт «pass»: C:/z/runtime/desync/pass.txt")]
     [InlineData("2026-11-10 16:43:18 Пресет: Universal V12 Lite (412 аргументов)")]
     [InlineData("2026-11-10 16:43:18 Десинк не перехватывает трафик в туннель: подменные адреса 198.18.0.0/15")]
     [InlineData("2026-11-10 16:43:18 супервизор запущен, PID 4242")]
