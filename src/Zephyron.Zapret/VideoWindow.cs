@@ -1,37 +1,35 @@
 namespace Zephyron.Zapret;
 
 /// <summary>
-/// Узлы видео YouTube под фильтром: малое окно приёма плюс десинк googlevideo, без туннеля.
+/// Узлы видео YouTube под фильтром: малое окно приёма тем адресам, у которых ответ срезали, без туннеля.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Замер 10.11.2026 у владельца, узел 74.125.154.103 (rr2---sn-4g5ednkd): TCP проходит, но
-/// любой ответ сервера, начатый заголовком записи TLS, не доходит, а ClientHello с именем
-/// googlevideo гасится по пути. Десинк googlevideo в одиночку — 0 из 3, окно в один байт
-/// в одиночку — тоже 0. Вместе — 204 за 1,1 с: окно дробит ответ сервера, первый пакет несёт
-/// один байт, фильтр его не узнаёт (модуль <c>config/lua/video-window.lua</c>).
+/// Замер 10.11.2026 у владельца, узел 74.125.154.103: TCP проходит, но первый пакет ответа,
+/// начатый заголовком записи TLS, не доходит. Окно приёма в один байт дробит ответ, и фильтр
+/// его не узнаёт; вместе с десинком googlevideo узел ответил 204 за 1,1 с вместо тишины.
 /// </para>
 /// <para>
-/// Адреса пишет сторож узлов (<c>VideoNodeGuard</c>) в <see cref="DefaultListPath"/>, winws2
-/// перечитывает файл сам. Пустой список winws2 считает «подходит всем» (проверено тогда же),
-/// поэтому в файле всегда стоит адрес-заглушка из TEST-NET-3.
+/// Окно без масштаба держит соединение на ≈8 Мбит/с, а режет фильтр не каждое соединение,
+/// поэтому решает модуль <c>config/lua/video-window.lua</c> по адресу: срезали ответ — окно на
+/// минуту, ещё раз — на час, удачное обычное соединение сбрасывает счёт. Первая версия (1.4.5)
+/// ставила окно целым сетям по пробам сторожа и замедлила здоровые узлы и кэш провайдера.
+/// </para>
+/// <para>
+/// Два места в строке winws2: профиль SYN по сетям Google (<see cref="SynProfile"/>) — раньше
+/// своих рецептов и секций пресета, и шаг слежения в секциях googlevideo и youtube
+/// (<see cref="Watched"/>): на ClientHello winws2 ищет профиль уже по имени.
 /// </para>
 /// <para>
 /// Подтверждение рукопожатия идёт без данных, а такие пакеты winws2 по умолчанию не видит;
-/// без окна на нём сервер получает полное окно, и приём не работает. Поэтому пустые пакеты
-/// берутся в перехват, но только к сетям фронтов Google (<see cref="GoogleFrontEnds"/>):
-/// иначе через winws2 шли бы подтверждения всех загрузок машины.
+/// без окна на нём сервер получает полное окно. Поэтому пустые пакеты берутся в перехват,
+/// но только к сетям фронтов Google (<see cref="CaptureEmptyAcks"/>).
 /// </para>
 /// </remarks>
 public static class VideoWindow
 {
-    public static string DefaultListPath => Path.Combine("runtime", "video-window.txt");
-
     /// <summary>Модуль Lua в папке движка (<c>build.cmd</c> кладёт его с приставкой <c>zy-</c>).</summary>
     public const string Module = "zy-video-window.lua";
-
-    /// <summary>Заглушка: пустой список совпал бы со всеми адресами.</summary>
-    public const string Placeholder = "203.0.113.255";
 
     /// <summary>
     /// Сети фронтов Google, где живут узлы googlevideo. Их же нельзя отдавать секциям,
@@ -54,51 +52,68 @@ public static class VideoWindow
 
     private const string RawFilterKey = "--wf-raw-filter=";
 
-    /// <summary>Создаёт список с заглушкой, если его нет или в нём нет ни одного адреса.</summary>
-    public static void EnsureList(string? path = null)
+    /// <summary>Адрес в сетях фронтов Google (<see cref="GoogleFrontEnds"/>).</summary>
+    public static bool IsGoogle(System.Net.IPAddress address)
     {
-        var target = path ?? DefaultListPath;
-        var lines = File.Exists(target) ? File.ReadAllLines(target) : [];
+        if (address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
+            return false;
 
-        if (!lines.Any(l => l.Trim() == Placeholder))
+        var b = address.GetAddressBytes();
+        uint value = (uint)(b[0] << 24 | b[1] << 16 | b[2] << 8 | b[3]);
+
+        foreach (var cidr in GoogleFrontEnds)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(target))!);
-            Core.AtomicFile.WriteAllText(target, string.Join("\n", lines.Prepend(Placeholder)) + "\n");
+            var net = System.Net.IPAddress.Parse(cidr[..cidr.IndexOf('/')]).GetAddressBytes();
+            int bits = int.Parse(cidr[(cidr.IndexOf('/') + 1)..]);
+            uint first = (uint)(net[0] << 24 | net[1] << 16 | net[2] << 8 | net[3]);
+            uint mask = bits == 0 ? 0 : uint.MaxValue << (32 - bits);
+
+            if ((value & mask) == first)
+                return true;
         }
+
+        return false;
     }
 
-    /// <summary>Адреса в списке, без заглушки.</summary>
-    public static IReadOnlyList<string> Read(string? path = null)
-    {
-        var target = path ?? DefaultListPath;
-
-        return File.Exists(target)
-            ? File.ReadAllLines(target).Select(l => l.Trim()).Where(l => l.Length > 0 && l != Placeholder && !l.StartsWith('#')).ToList()
-            : [];
-    }
-
-    /// <summary>Переписывает список: заглушка и эти адреса.</summary>
-    public static void Write(IEnumerable<string> addresses, string? path = null)
-    {
-        var target = path ?? DefaultListPath;
-        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(target))!);
-        Core.AtomicFile.WriteAllText(target,
-            string.Join("\n", addresses.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).Prepend(Placeholder)) + "\n");
-    }
-
-    /// <summary>Профиль: окно, затем шаги десинка googlevideo из пресета на ClientHello.</summary>
-    public static IReadOnlyList<string> Profile(string listPath, IEnumerable<string> videoSteps) =>
+    /// <summary>Профиль SYN: сети Google, пока протокол не узнан (SYN и подтверждение рукопожатия).</summary>
+    public static IReadOnlyList<string> SynProfile() =>
     [
         "--new",
-        "--name=Zephyron: видео под фильтром",
+        "--name=Zephyron: узлы видео (SYN)",
         "--filter-tcp=443",
-        $"--ipset={listPath.Replace('\\', '/')}",
-        "--out-range=-n10",
+        "--filter-l7=unknown",
+        "--ipset-ip=" + string.Join(',', GoogleFrontEnds),
+        "--out-range=-n4",
         "--payload=all",
-        "--lua-desync=zy_video_window",
-        "--payload=tls_client_hello",
-        .. videoSteps,
+        "--lua-desync=zy_video_window:syn",
     ];
+
+    /// <summary>Секция ловит имена видео YouTube: в её списке googlevideo или youtube.</summary>
+    public static bool IsVideoSection(IReadOnlyList<string> arguments) =>
+        arguments.Any(a => a.StartsWith("--hostlist=", StringComparison.Ordinal)
+            && (a.Contains("googlevideo", StringComparison.OrdinalIgnoreCase) || a.Contains("youtube", StringComparison.OrdinalIgnoreCase)))
+        && arguments.Any(a => a.StartsWith("--filter-tcp=", StringComparison.Ordinal))
+        && !arguments.Any(a => a.StartsWith("--filter-udp=", StringComparison.Ordinal));
+
+    /// <summary>
+    /// Секция с шагом слежения первым: он видит все пакеты (<c>--payload=all</c>), а прежний
+    /// отбор нагрузки секции возвращается сразу после него.
+    /// </summary>
+    public static IReadOnlyList<string> Watched(IReadOnlyList<string> arguments)
+    {
+        int first = arguments.ToList().FindIndex(a => a.StartsWith("--lua-desync=", StringComparison.Ordinal));
+
+        if (first < 0)
+            return arguments;
+
+        var payload = arguments.Take(first).LastOrDefault(a => a.StartsWith("--payload=", StringComparison.Ordinal));
+        var result = arguments.Take(first).ToList();
+        result.Add("--payload=all");
+        result.Add("--lua-desync=zy_video_window");
+        result.Add(payload ?? "--payload=all");
+        result.AddRange(arguments.Skip(first));
+        return result;
+    }
 
     /// <summary>
     /// Секции по адресам с подделкой SYN не трогают фронты Google (см. <see cref="GoogleFrontEnds"/>).

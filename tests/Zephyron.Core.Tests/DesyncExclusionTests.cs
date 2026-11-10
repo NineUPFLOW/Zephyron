@@ -205,6 +205,19 @@ public sealed class DesyncExclusionTests : IDisposable
     /// первым.
     /// </remarks>
     [Fact]
+    public void VideoNodeRefusalKeepsDesync()
+    {
+        Write(string.Join(Environment.NewLine, "0.0.0.0 rr2---sn-aj4g55-5w.googlevideo.com", "72.56.93.144 canva.com"));
+
+        var engine = RuleSetLoader.Load("""
+            mode: selective
+            rules: []
+            """);
+
+        Assert.Equal([("canva.com", DesyncBypass.Pin)], HostsFile.DescribeDesyncExclusions(engine.RuleSet, _hosts));
+    }
+
+    [Fact]
     public void PinWinsWhenBothApply()
     {
         Write("72.56.93.144 canva.com");

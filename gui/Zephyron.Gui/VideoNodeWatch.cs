@@ -43,7 +43,7 @@ internal static class VideoNodeWatch
 
                 if (!on)
                 {
-                    if (_wasOn && VideoNodeGuard.Clear(windowList: Zapret.VideoWindow.DefaultListPath) is var cleared and > 0)
+                    if (_wasOn && VideoNodeGuard.Clear() is var cleared and > 0)
                         Journal.Write("видео YouTube", $"сторож выключен — сняты отказы узлов: {cleared}");
 
                     _wasOn = false;
@@ -55,13 +55,7 @@ internal static class VideoNodeWatch
                 if (!EngineControl.IsRunning)
                     continue;
 
-                // Список окна есть, только если движки запущены с ним (SupervisorHost) — иначе окна нет.
-                var window = System.IO.File.Exists(Zapret.VideoWindow.DefaultListPath) ? Zapret.VideoWindow.DefaultListPath : null;
-                var round = await VideoNodeGuard.RunAsync(Known, CancellationToken.None, windowList: window).ConfigureAwait(false);
-
-                if (round.Windowed.Count > 0)
-                    Journal.Write("видео YouTube", $"узлы под фильтром ожили под малым окном, видео идёт без VPN: {string.Join(", ", round.Windowed)}");
-
+                var round = await VideoNodeGuard.RunAsync(Known, CancellationToken.None).ConfigureAwait(false);
 
                 if (round.Refused.Count > 0)
                     Journal.Write("видео YouTube", $"узлы не ожили и под малым окном — отключены, плеер возьмёт другие: {string.Join(", ", round.Refused)}");

@@ -429,8 +429,15 @@ public sealed record AppSettings
     /// Автонастройка прокси Telegram (<c>TgProxyTune</c>): прямой путь к DC2 и DC4
     /// и порядок доменов Cloudflare решает замер, а не <see cref="TelegramProxyDirect"/>.
     /// </summary>
-    /// <remarks>Выключена по умолчанию: замер идёт перед каждым запуском прокси.</remarks>
-    public bool TelegramProxyAuto { get; init; }
+    /// <remarks>
+    /// Включена по умолчанию с 1.4.6: без неё прокси ходит только общим доменом Cloudflare,
+    /// а тот 10.11 отвечал 503 на DC2 через раз («TG Proxy стал плохо работать»), когда живых
+    /// мостов было 20 из 20. Замер не дольше 20 с и держится полчаса (<c>TgProxyTune</c>).
+    /// </remarks>
+    public bool TelegramProxyAuto { get; init; } = true;
+
+    /// <summary>Автоподбор мостов включён разовым переводом (10.11); <c>null</c> — ещё нет.</summary>
+    public bool? TelegramProxyAutoReset { get; init; }
 
     /// <summary>Прокси Telegram ходит к DC1, DC3 и DC5 напрямую (<see cref="TgWsProxy.DirectOther"/>).</summary>
     /// <remarks>Выключено по умолчанию: адреса отвечают по TLS, а настоящие соединения через них не проверены (21.10).</remarks>
@@ -1083,6 +1090,10 @@ public sealed record AppSettings
     private static AppSettings VerifyTrafficOnce(AppSettings read) =>
         read.VerifyTrafficReset == true ? read : read with { VerifyTraffic = true, VerifyTrafficReset = true };
 
+    /// <summary>Автоподбор мостов Telegram — раз для всех, как проверка прохода: «нет» от «не выбирал» в файле не отличить.</summary>
+    private static AppSettings TelegramProxyAutoOnce(AppSettings read) =>
+        read.TelegramProxyAutoReset == true ? read : read with { TelegramProxyAuto = true, TelegramProxyAutoReset = true };
+
     /// <summary>
     /// Теги серверов в настройках — без хвоста описания (<see cref="ServerDescription"/>): записанные
     /// прежде с хвостом не нашлись бы, и закрепление ушло бы в автоподбор. Второй раз снимать нечего.
@@ -1148,6 +1159,7 @@ public sealed record AppSettings
         TelegramProxy = true,
         GameFilterReset = true,
         VerifyTrafficReset = true,
+        TelegramProxyAutoReset = true,
         PresetV11Lite = true,
         PresetV12Lite = true,
     };
@@ -1211,11 +1223,11 @@ public sealed record AppSettings
             // Mullvad тоже: его убрали из списка 10.10, и выбравший его
             // остался бы с DoH на адрес без имени для сертификата — туннель
             // без имён.
-            return WithoutServerDescriptions(VerifyTrafficOnce(SelectiveRoutingOnce(LiteToV12Once(PresetOnce(GameFilterOnce(WarpAsPath(read with
+            return WithoutServerDescriptions(TelegramProxyAutoOnce(VerifyTrafficOnce(SelectiveRoutingOnce(LiteToV12Once(PresetOnce(GameFilterOnce(WarpAsPath(read with
             {
                 Mode = read.Engines.Mode,
                 DnsServer = read.DnsServer is "8.8.8.8" or MullvadDns ? GoogleDns : read.DnsServer,
-            })))))));
+            }))))))));
         }
         catch (Exception)
         {

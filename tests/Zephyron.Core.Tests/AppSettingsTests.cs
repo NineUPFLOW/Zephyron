@@ -34,6 +34,18 @@ public sealed class AppSettingsTests : IDisposable
     }
 
     [Fact]
+    public void Telegram_bridge_autopick_is_turned_on_once()
+    {
+        File.WriteAllText(_path, "{\"TelegramProxyAuto\": false}");
+        var first = AppSettings.Load(_path);
+        Assert.True(first.TelegramProxyAuto);
+
+        // Выключил после перевода — так и остаётся.
+        (first with { TelegramProxyAuto = false }).Save(_path);
+        Assert.False(AppSettings.Load(_path).TelegramProxyAuto);
+    }
+
+    [Fact]
     public void Broken_settings_are_backed_up_and_then_healed()
     {
         File.WriteAllText(_path, "{ не json");

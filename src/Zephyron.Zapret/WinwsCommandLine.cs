@@ -113,9 +113,9 @@ public static class WinwsCommandLine
         string? keepList = null,
         IReadOnlyList<string>? lans = null,
         bool warpApi = false,
-        string? videoWindowList = null)
+        bool videoWindow = false)
     {
-        var arguments = BuildPreset(preset, excludeList, own, keepList, warpApi, videoWindowList);
+        var arguments = BuildPreset(preset, excludeList, own, keepList, warpApi, videoWindow);
 
         PresetCapture.Apply(arguments, capture);
 
@@ -125,7 +125,7 @@ public static class WinwsCommandLine
         TunnelCapture.Apply(arguments, tunnelServers, tunnelFakeRange, udpOff, tunAddresses, lans);
 
         // Окну нужно подтверждение рукопожатия, а оно без данных (VideoWindow).
-        if (arguments.Any(a => a == "--lua-desync=zy_video_window") && !VideoWindow.CaptureEmptyAcks(arguments))
+        if (arguments.Any(a => a == "--lua-desync=zy_video_window:syn") && !VideoWindow.CaptureEmptyAcks(arguments))
             Console.WriteLine("Видео под фильтром: у пресета фильтр перехвата задан файлом, малое окно не встанет.");
 
         return arguments;
@@ -137,7 +137,7 @@ public static class WinwsCommandLine
         IReadOnlyList<OwnDesyncProfile>? own,
         string? keepList = null,
         bool warpApi = false,
-        string? videoWindowList = null)
+        bool videoWindow = false)
     {
         var arguments = new List<string>();
 
@@ -172,6 +172,16 @@ public static class WinwsCommandLine
         // никогда бы не сработал на именах, которые пресет уже забрал себе
         // под «пропустить» — а это ровно тот случай, ради которого выбор
         // рецепта и заведён.
+        // Узлы видео под фильтром (VideoWindow): SYN к сетям Google — раньше и своих рецептов,
+        // и секций пресета; ClientHello winws2 отдаёт уже по имени, и шаг слежения стоит в каждом
+        // профиле с именами видео — и в своём рецепте (отчёт с Ростелекома 10.11: рецепт
+        // «Google (сервисы)» на googlevideo забирал ClientHello у профиля окна).
+        if (videoWindow)
+        {
+            arguments.Insert(0, $"--lua-init=@lua/{VideoWindow.Module}");
+            arguments.AddRange(VideoWindow.SynProfile());
+        }
+
         foreach (var profile in own ?? [])
         {
             if (profile.Steps.Count == 0 || string.IsNullOrWhiteSpace(profile.HostListPath))
@@ -213,8 +223,8 @@ public static class WinwsCommandLine
             if (!string.IsNullOrWhiteSpace(excludeList) && !shielded)
                 arguments.Add($"--hostlist-exclude={Forward(excludeList)}");
 
-            foreach (var step in profile.Steps)
-                arguments.Add($"--lua-desync={step}");
+            var steps = profile.Steps.Select(step => $"--lua-desync={step}").ToList();
+            arguments.AddRange(videoWindow && ListsVideo(profile.HostListPath) ? VideoWindow.Watched(steps) : steps);
         }
 
         if (warpApi)
@@ -225,15 +235,6 @@ public static class WinwsCommandLine
         // TCP к тому же redirector — 0 из 25. Браузер без QUIC сразу идёт по TCP.
         if (preset.Sections.Any(s => s.RawArguments.Any(a => a.Contains("googlevideo", StringComparison.OrdinalIgnoreCase))))
             arguments.AddRange(NoYouTubeQuic);
-
-        // Узлы видео под фильтром — раньше секций пресета: профиль выбирается уже на SYN,
-        // по адресу, и секция с подделкой SYN не должна успеть забрать соединение.
-        if (videoWindowList is not null && preset.Sections.FirstOrDefault(IsVideoTcp) is { } filtered)
-        {
-            arguments.Insert(0, $"--lua-init=@lua/{VideoWindow.Module}");
-            arguments.AddRange(VideoWindow.Profile(videoWindowList,
-                filtered.RawArguments.Where(a => a.StartsWith("--lua-desync=", StringComparison.Ordinal))));
-        }
 
         foreach (var section in preset.Sections)
         {
@@ -271,7 +272,8 @@ public static class WinwsCommandLine
             if (!string.IsNullOrWhiteSpace(excludeList) && FiltersByName(section) && NeedsOwnExclude(section, shielded))
                 arguments.Add($"--hostlist-exclude={Forward(excludeList)}");
 
-            arguments.AddRange(VideoWindow.SparedFromSynData(section.RawArguments));
+            var raw = VideoWindow.SparedFromSynData(section.RawArguments);
+            arguments.AddRange(videoWindow && VideoWindow.IsVideoSection(raw) ? VideoWindow.Watched(raw) : raw);
         }
 
         // Страховка последним профилем: приветствие Chrome идёт двумя пакетами, и если имя
@@ -282,9 +284,10 @@ public static class WinwsCommandLine
             arguments.Add("--new");
             arguments.Add("--name=Zephyron: googlevideo по адресу");
             arguments.Add("--ipset=lists/ipset-googlevideo.txt");
-            arguments.AddRange(video.RawArguments.Where(a =>
+            var tail = video.RawArguments.Where(a =>
                 !a.StartsWith("--name=", StringComparison.Ordinal)
-                && !a.StartsWith("--hostlist", StringComparison.Ordinal)));
+                && !a.StartsWith("--hostlist", StringComparison.Ordinal)).ToList();
+            arguments.AddRange(videoWindow ? VideoWindow.Watched(tail) : tail);
         }
 
         return arguments;
@@ -330,6 +333,21 @@ public static class WinwsCommandLine
             OutRange,
             .. Steps(section),
         ];
+    }
+
+    /// <summary>Свой рецепт на имена видео: в его списке googlevideo.com или youtube.com.</summary>
+    private static bool ListsVideo(string? path)
+    {
+        try
+        {
+            return !string.IsNullOrWhiteSpace(path) && File.Exists(path)
+                && File.ReadLines(path).Any(l => l.Trim() is var name
+                    && (name.Equals("googlevideo.com", StringComparison.OrdinalIgnoreCase) || name.Equals("youtube.com", StringComparison.OrdinalIgnoreCase)));
+        }
+        catch (IOException)
+        {
+            return false;
+        }
     }
 
     private static bool IsVideoTcp(ZapretSection section) =>

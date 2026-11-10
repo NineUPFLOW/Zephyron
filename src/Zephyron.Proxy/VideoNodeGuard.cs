@@ -36,31 +36,15 @@ public static class VideoNodeGuard
 
     public static readonly TimeSpan MaxAge = TimeSpan.FromHours(12);
 
-    /// <summary>Сеть под окном помнится дольше: запись в списке winws2 безвредна, а новый узел той же группы идёт сразу.</summary>
-    public static readonly TimeSpan WindowMaxAge = TimeSpan.FromDays(7);
-
     /// <summary>Больше отказов в hosts не бывает: остальное решает окно или плеер сам.</summary>
     public const int MaxRefused = 32;
-
-    /// <summary>
-    /// Сеть /24 узла: группы под фильтром по 32 адреса, и соседний узел той же группы
-    /// получает окно сразу, без первого зависания. Список winws2 так и остаётся коротким.
-    /// </summary>
-    public static string Network(IPAddress address)
-    {
-        var b = address.GetAddressBytes();
-        return $"{b[0]}.{b[1]}.{b[2]}.0/24";
-    }
 
     private static readonly TimeSpan Step = TimeSpan.FromSeconds(3);
 
     public static string StatePath => Path.Combine("runtime", "video-guard.json");
 
-    /// <summary>
-    /// Имя узла, его настоящий адрес и когда меры приняты или проверены; <paramref name="Window"/> —
-    /// узел ожил под малым окном (<see cref="Zapret.VideoWindow"/>), а не отключён в hosts.
-    /// </summary>
-    public sealed record Entry(string Address, DateTimeOffset At, DateTimeOffset Checked, bool Window = false);
+    /// <summary>Имя узла, его настоящий адрес и когда отказ поставлен или проверен.</summary>
+    public sealed record Entry(string Address, DateTimeOffset At, DateTimeOffset Checked);
 
     /// <summary>Узлы видео из кэша DNS Windows с их адресами IPv4.</summary>
     public static IReadOnlyList<(string Host, IPAddress Address)> Candidates()
@@ -173,136 +157,59 @@ public static class VideoNodeGuard
 
     /// <summary>Чьи отказы пора перепроверить, а чьи снять по возрасту.</summary>
     public static (IReadOnlyList<string> Recheck, IReadOnlyList<string> Expired) Due(IReadOnlyDictionary<string, Entry> state, DateTimeOffset now) =>
-        (state.Where(p => now - p.Value.At < Age(p.Value) && now - p.Value.Checked >= Recheck).Select(p => p.Key).ToList(),
-         state.Where(p => now - p.Value.At >= Age(p.Value)).Select(p => p.Key).ToList());
+        (state.Where(p => now - p.Value.At < MaxAge && now - p.Value.Checked >= Recheck).Select(p => p.Key).ToList(),
+         state.Where(p => now - p.Value.At >= MaxAge).Select(p => p.Key).ToList());
 
-    private static TimeSpan Age(Entry entry) => entry.Window ? WindowMaxAge : MaxAge;
-
-    /// <summary>Что сделал круг сторожа: узлы под малым окном, отключённые и возвращённые.</summary>
-    public sealed record Round(IReadOnlyList<string> Refused, IReadOnlyList<string> Restored, IReadOnlyList<string> Windowed);
+    /// <summary>Что сделал круг сторожа: отключённые и возвращённые узлы.</summary>
+    public sealed record Round(IReadOnlyList<string> Refused, IReadOnlyList<string> Restored);
 
     /// <summary>
-    /// Один круг: новые узлы из кэша DNS проверяются; узел под фильтром сначала получает малое
-    /// окно (адрес — в список winws2), и только если не ожил и с ним — отказ в hosts. Старые
-    /// записи перепроверяются: отключённый узел, ожив под окном, возвращается в строй.
+    /// Один круг: новые узлы из кэша DNS проверяются тем же путём, что браузер, отказ в hosts —
+    /// только узлу, который не ответил и после этого. Старые отказы перепроверяются.
     /// </summary>
+    /// <remarks>
+    /// Малое окно узлам Google ставит winws2 сам (<see cref="Zapret.VideoWindow"/>): срезанный
+    /// ответ на первой пробе даёт адресу окно, и вторая идёт уже с ним. Поэтому две попытки
+    /// и учат winws2 заранее, и отсекают узлы, которым не помогает и окно.
+    /// </remarks>
     /// <param name="known">Адреса, проверенные в этом сеансе: живой узел не стоит мерить на каждом круге.</param>
-    /// <param name="windowList">Список адресов для малого окна; <c>null</c> — окна нет (движки запущены без него).</param>
-    public static async Task<Round> RunAsync(
-        ISet<string> known,
-        CancellationToken cancellationToken,
-        string? hostsPath = null,
-        string? statePath = null,
-        string? windowList = null)
+    public static async Task<Round> RunAsync(ISet<string> known, CancellationToken cancellationToken, string? hostsPath = null, string? statePath = null)
     {
         var now = DateTimeOffset.Now;
         var state = Load(statePath);
         var refused = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var restored = new List<string>();
-        var windowed = new List<string>();
-        var unpin = new List<string>();
-        bool windowChanged = false;
 
         // Узел, молчащий и на TCP, — тоже под фильтром (часть адресов не отвечает на SYN),
         // но только если сеть жива: иначе обрыв связи отключил бы все узлы разом.
         bool? up = null;
-
-        // Адрес — в список окна, и тот же узел спрашивается ещё раз: winws2 перечитывает
-        // список при следующем поиске профиля, проба идёт через него же.
-        async Task<bool> RevivesAsync(string host, IPAddress address)
-        {
-            if (windowList is null)
-                return false;
-
-            known.Add("window:" + address);
-
-            var listed = Zapret.VideoWindow.Read(windowList).ToHashSet(StringComparer.Ordinal);
-
-            if (listed.Add(Network(address)))
-            {
-                Zapret.VideoWindow.Write(listed, windowList);
-                windowChanged = true;
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(300), cancellationToken);
-            return await IsFilteredAsync(host, address, cancellationToken) == false;
-        }
 
         foreach (var (host, address) in Candidates())
         {
             if (state.ContainsKey(host) || !known.Add(address.ToString()))
                 continue;
 
-            // Одна быстрая попытка: плеер ждёт, а лишнее окно безвредно. Отказ в hosts —
-            // только после повторной проверки без окна ниже, в RevivesAsync она не нужна.
-            if (await IsFilteredAsync(host, address, cancellationToken, attempts: 1) is not false
+            if (await IsFilteredAsync(host, address, cancellationToken) is not false
                 && (up ??= await ReachesAsync("www.youtube.com", cancellationToken)))
             {
-                if (await RevivesAsync(host, address))
-                {
-                    windowed.Add(host);
-                    state[host] = new Entry(address.ToString(), now, now, Window: true);
-                }
-                else if (await IsFilteredAsync(host, address, cancellationToken) is not false)
-                {
-                    refused[host] = address.ToString();
-                    state[host] = new Entry(address.ToString(), now, now);
-                }
+                refused[host] = address.ToString();
+                state[host] = new Entry(address.ToString(), now, now);
             }
         }
 
-        var (due, expired) = Due(state, now);
+        var (recheck, expired) = Due(state, now);
         restored.AddRange(expired);
-
-        // Отключённый узел без попытки окна в этом сеансе (запись прежней версии или окна
-        // не было) пробуется сразу, не дожидаясь получаса.
-        var recheck = due.Concat(windowList is null ? [] : state
-                .Where(p => !p.Value.Window && !expired.Contains(p.Key) && known.Add("window:" + p.Value.Address))
-                .Select(p => p.Key))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
 
         foreach (var host in recheck)
         {
-            var entry = state[host];
-
-            if (!IPAddress.TryParse(entry.Address, out var address))
-            {
+            if (IPAddress.TryParse(state[host].Address, out var address) && await IsFilteredAsync(host, address, cancellationToken) == false)
                 restored.Add(host);
-                continue;
-            }
-
-            if (entry.Window)
-            {
-                // Под окном узел ответил — оставляем; замолчал и с ним — отказ в hosts.
-                if (await IsFilteredAsync(host, address, cancellationToken) == false)
-                {
-                    state[host] = entry with { Checked = now };
-                }
-                else
-                {
-                    refused[host] = entry.Address;
-                    state[host] = entry with { Checked = now, Window = false };
-                }
-            }
-            else if (await IsFilteredAsync(host, address, cancellationToken) == false)
-            {
-                restored.Add(host);
-            }
-            else if (await RevivesAsync(host, address))
-            {
-                unpin.Add(host);
-                windowed.Add(host);
-                state[host] = entry with { Checked = now, Window = true };
-            }
             else
-            {
-                state[host] = entry with { Checked = now };
-            }
+                state[host] = state[host] with { Checked = now };
         }
 
         // hosts — крайняя мера и не свалка: сверх MaxRefused новые отказы не пишутся.
-        int room = MaxRefused - state.Values.Count(e => !e.Window) + refused.Count;
+        int room = MaxRefused - state.Count + refused.Count;
 
         foreach (var host in refused.Keys.Skip(Math.Max(room, 0)).ToList())
         {
@@ -315,38 +222,25 @@ public static class VideoNodeGuard
             HostsEditor.Pin(
                 refused.ToDictionary(p => p.Key, _ => Refused, StringComparer.OrdinalIgnoreCase),
                 hostsPath,
-                "узлы видео YouTube под фильтром — отказ, чтобы плеер сразу взял другой",
+                "узлы видео YouTube не отвечают и под малым окном — отказ, чтобы плеер сразу взял другой",
                 refused.ToDictionary(p => p.Key, _ => Via, StringComparer.OrdinalIgnoreCase));
         }
 
-        foreach (var host in restored)
-            state.Remove(host);
-
-        if (restored.Count + unpin.Count > 0)
-            HostsEditor.Unpin([.. restored, .. unpin], hostsPath);
-
-        // Список окна — ровно адреса записей под окном: снятые и устаревшие уходят из него.
-        if (windowList is not null)
+        if (restored.Count > 0)
         {
-            var wanted = state.Values.Where(e => e.Window)
-                .Select(e => IPAddress.TryParse(e.Address, out var a) ? Network(a) : null)
-                .OfType<string>()
-                .ToHashSet(StringComparer.Ordinal);
+            HostsEditor.Unpin(restored, hostsPath);
 
-            if (!wanted.SetEquals(Zapret.VideoWindow.Read(windowList)))
-            {
-                Zapret.VideoWindow.Write(wanted, windowList);
-                windowChanged = true;
-            }
+            foreach (var host in restored)
+                state.Remove(host);
         }
 
-        if (refused.Count > 0 || restored.Count > 0 || windowed.Count > 0 || windowChanged)
+        if (refused.Count > 0 || restored.Count > 0)
+        {
             Save(state, statePath);
-
-        if (refused.Count > 0 || restored.Count > 0 || unpin.Count > 0)
             HostsEditor.FlushDns();
+        }
 
-        return new Round(refused.Keys.ToList(), restored, windowed);
+        return new Round(refused.Keys.ToList(), restored);
     }
 
     private static async Task<bool> ReachesAsync(string host, CancellationToken cancellationToken)
@@ -366,12 +260,9 @@ public static class VideoNodeGuard
     }
 
     /// <summary>Снимает все наши отказы — выключателем или при выходе из режима.</summary>
-    public static int Clear(string? hostsPath = null, string? statePath = null, string? windowList = null)
+    public static int Clear(string? hostsPath = null, string? statePath = null)
     {
         var ours = HostsEditor.PinsVia(hostsPath).Where(p => p.Value == Via).Select(p => p.Key).ToList();
-
-        if (windowList is not null && File.Exists(windowList))
-            Zapret.VideoWindow.Write([], windowList);
 
         if (ours.Count > 0)
         {

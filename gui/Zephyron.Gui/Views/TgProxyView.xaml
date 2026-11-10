@@ -234,7 +234,7 @@
                         <StackPanel Margin="0,0,12,0" VerticalAlignment="Center">
                             <TextBlock Text="Подбирать мосты автоматически" FontWeight="SemiBold" />
                             <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="Замер идёт перед запуском прокси (не чаще раза в полчаса, не дольше 8 с), итог заменяет ручные пути." />
+                                       Text="Замер идёт перед запуском прокси (не чаще раза в полчаса, не дольше 20 с), итог заменяет ручные пути." />
                         </StackPanel>
                         <ToggleButton Grid.Column="1" x:Name="AutoTune" Style="{StaticResource Switch}"
                                       Click="OnAutoTune" VerticalAlignment="Center"

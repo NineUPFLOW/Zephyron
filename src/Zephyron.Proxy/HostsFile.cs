@@ -329,6 +329,11 @@ public static class HostsFile
             if (addresses.Count == 0 || ownAddress.Contains(name))
                 continue;
 
+            // Отказ 0.0.0.0 (сторож узлов видео) — не пин на чужой узел: щит отнимал у такого
+            // узла и десинк, и малое окно, и ожить он уже не мог (10.11, rr2---sn-aj4g55-5w).
+            if (addresses.All(a => a.Equals(IPAddress.Any)))
+                continue;
+
             // Все прибитые, и под VPN тоже: адрес такого пина заведён
             // в туннель маршрутом, а winws2 видит и то, что идёт в TUN.
             Add(name, DesyncBypass.Pin);

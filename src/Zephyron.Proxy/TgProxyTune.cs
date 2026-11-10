@@ -139,9 +139,11 @@ public static class TgProxyTune
 
         try
         {
-            // Прокси ждёт этого перед стартом — дольше 8 с не держим, есть прежний итог.
+            // Прокси ждёт этого перед стартом. Было 8 с, а полный замер у владельца 10.11 шёл 9,1 с:
+            // он обрывался всякий раз, итог не сохранялся, и прокси оставался на одном общем домене
+            // с ответами 503. 20 с — один раз в полчаса, дальше берётся сохранённый итог.
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            limit.CancelAfter(TimeSpan.FromSeconds(8));
+            limit.CancelAfter(TimeSpan.FromSeconds(20));
             var fresh = await RunAsync(limit.Token);
 
             // Ни одного ответа — скорее сеть, чем Telegram: прежний итог честнее.
