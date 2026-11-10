@@ -184,6 +184,11 @@ jobs:
             cp "$f" "$Z/bin/zy-$(basename "$f")"
           done
 
+          # Свои модули Lua (zy_video_window — узлы видео под фильтром), та же приставка zy-.
+          for f in "$ROOT"/config/lua/*.lua; do
+            cp "$f" "$Z/lua/zy-$(basename "$f")"
+          done
+
           cp "$ROOT/docs/licenses/zapret-MIT.txt" "$Z/LICENSE.txt"
           cp "$ROOT/docs/licenses/zapretgui-MIT.txt" "$Z/LICENSE-ZapretGUI.txt"
           cp "$ROOT/docs/licenses/flowseal-MIT.txt" "$Z/LICENSE-Flowseal.txt"
