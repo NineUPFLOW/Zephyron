@@ -112,9 +112,10 @@ public static class WinwsCommandLine
         Core.CaptureWidth capture = Core.CaptureWidth.Preset,
         string? keepList = null,
         IReadOnlyList<string>? lans = null,
-        bool warpApi = false)
+        bool warpApi = false,
+        string? videoWindowList = null)
     {
-        var arguments = BuildPreset(preset, excludeList, own, keepList, warpApi);
+        var arguments = BuildPreset(preset, excludeList, own, keepList, warpApi, videoWindowList);
 
         PresetCapture.Apply(arguments, capture);
 
@@ -122,6 +123,10 @@ public static class WinwsCommandLine
             GameFilter.Apply(arguments);
 
         TunnelCapture.Apply(arguments, tunnelServers, tunnelFakeRange, udpOff, tunAddresses, lans);
+
+        // Окну нужно подтверждение рукопожатия, а оно без данных (VideoWindow).
+        if (arguments.Any(a => a == "--lua-desync=zy_video_window") && !VideoWindow.CaptureEmptyAcks(arguments))
+            Console.WriteLine("Видео под фильтром: у пресета фильтр перехвата задан файлом, малое окно не встанет.");
 
         return arguments;
     }
@@ -131,7 +136,8 @@ public static class WinwsCommandLine
         string? excludeList,
         IReadOnlyList<OwnDesyncProfile>? own,
         string? keepList = null,
-        bool warpApi = false)
+        bool warpApi = false,
+        string? videoWindowList = null)
     {
         var arguments = new List<string>();
 
@@ -220,6 +226,15 @@ public static class WinwsCommandLine
         if (preset.Sections.Any(s => s.RawArguments.Any(a => a.Contains("googlevideo", StringComparison.OrdinalIgnoreCase))))
             arguments.AddRange(NoYouTubeQuic);
 
+        // Узлы видео под фильтром — раньше секций пресета: профиль выбирается уже на SYN,
+        // по адресу, и секция с подделкой SYN не должна успеть забрать соединение.
+        if (videoWindowList is not null && preset.Sections.FirstOrDefault(IsVideoTcp) is { } filtered)
+        {
+            arguments.Insert(0, $"--lua-init=@lua/{VideoWindow.Module}");
+            arguments.AddRange(VideoWindow.Profile(videoWindowList,
+                filtered.RawArguments.Where(a => a.StartsWith("--lua-desync=", StringComparison.Ordinal))));
+        }
+
         foreach (var section in preset.Sections)
         {
             arguments.Add("--new");
@@ -256,7 +271,7 @@ public static class WinwsCommandLine
             if (!string.IsNullOrWhiteSpace(excludeList) && FiltersByName(section) && NeedsOwnExclude(section, shielded))
                 arguments.Add($"--hostlist-exclude={Forward(excludeList)}");
 
-            arguments.AddRange(section.RawArguments);
+            arguments.AddRange(VideoWindow.SparedFromSynData(section.RawArguments));
         }
 
         // Страховка последним профилем: приветствие Chrome идёт двумя пакетами, и если имя

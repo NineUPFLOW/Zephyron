@@ -23,10 +23,29 @@ public sealed class VideoNodeGuardTests : IDisposable
     [Theory]
     [InlineData("rr2---sn-4g5lznse.googlevideo.com", true)]
     [InlineData("RR1---SN-8PH2XAJVH-NUFS.GOOGLEVIDEO.COM", true)]
+    [InlineData("rr3---sn-aj5goc-5x.c.youtube.com", true)]
+    [InlineData("c.youtube.com", false)]
     [InlineData("redirector.googlevideo.com", false)]
     [InlineData("rr2---sn-4g5lznse.googlevideo.com.evil.net", false)]
     [InlineData("www.youtube.com", false)]
     public void KnowsVideoNodes(string host, bool expected) => Assert.Equal(expected, VideoNodeGuard.IsVideoNode(host));
+
+    [Fact]
+    public void WindowEntriesLiveAWeek()
+    {
+        var now = DateTimeOffset.Now;
+        var state = new Dictionary<string, VideoNodeGuard.Entry>
+        {
+            ["window"] = new("1.1.1.1", now.AddDays(-3), now.AddMinutes(-1), Window: true),
+            ["gone"] = new("1.1.1.2", now.AddDays(-8), now.AddMinutes(-1), Window: true),
+        };
+
+        Assert.Equal(["gone"], VideoNodeGuard.Due(state, now).Expired);
+    }
+
+    [Fact]
+    public void WindowListHoldsNetworksNotNodes() =>
+        Assert.Equal("74.125.154.0/24", VideoNodeGuard.Network(System.Net.IPAddress.Parse("74.125.154.103")));
 
     [Fact]
     public void RechecksAfterHalfHourAndDropsAfterTwelveHours()

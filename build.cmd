@@ -392,6 +392,12 @@ for %%F in ("%ROOT%config\blobs\*.bin") do (
     copy /y "%%F" "%ENGINES%\zapret\bin\zy-%%~nxF" >nul
 )
 
+rem Our own lua modules (10.11: zy_video_window for video nodes under the
+rem filter). Same zy- prefix: a module of ours must never shadow Zapret GUI's.
+for %%F in ("%ROOT%config\lua\*.lua") do (
+    copy /y "%%F" "%ENGINES%\zapret\lua\zy-%%~nxF" >nul
+)
+
 
 rem Presets are ours and come from presets\ in the repository. Nothing is taken
 rem from the Zapret installation any more: it keeps two folders and a hundred

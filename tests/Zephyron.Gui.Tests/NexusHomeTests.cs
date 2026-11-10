@@ -47,6 +47,34 @@ public sealed class NexusHomeTests
         Assert.Equal((time, source, message), StatusView.Split(line));
     }
 
+    [Theory]
+    [InlineData("2026-11-10 16:43:20 sing-box: работает, PID 18204", "Туннель (VPN):", "работает")]
+    [InlineData("2026-11-10 16:43:20 winws2: работает, PID 5464", "Десинк:", "работает")]
+    [InlineData("2026-11-10 16:43:20 супервизор остановлен", "Zephyron:", "обход выключен")]
+    [InlineData("[16:43:19] движки: запуск — кнопка «Запустить» на «Главной»", "Zephyron:", "обход включён кнопкой")]
+    [InlineData("[16:43:19] движки: остановка — обновление программы", "Zephyron:", "обход выключен (обновление программы)")]
+    [InlineData("[16:35:26] видео YouTube: узлы под фильтром ожили под малым окном, видео идёт без VPN: rr1---sn-a.googlevideo.com, rr1---sn-b.googlevideo.com",
+        "YouTube:", "починены узлы видео (2), ролики идут без VPN")]
+    [InlineData("[10:00:00] окно: уведомление после обновления до 1.4.5", "Zephyron:", "программа обновлена до 1.4.5")]
+    public void Feed_speaks_plainly(string line, string who, string what)
+    {
+        var (_, source, message) = StatusView.Split(line)!.Value;
+        Assert.Equal((who, what), StatusView.Plain(source, message));
+    }
+
+    [Theory]
+    [InlineData("2026-11-10 16:43:18 Свой рецепт «pass»: C:\z\runtime\desync\pass.txt")]
+    [InlineData("2026-11-10 16:43:18 Пресет: Universal V12 Lite (412 аргументов)")]
+    [InlineData("2026-11-10 16:43:18 Десинк не перехватывает трафик в туннель: подменные адреса 198.18.0.0/15")]
+    [InlineData("2026-11-10 16:43:18 супервизор запущен, PID 4242")]
+    [InlineData("2026-11-10 16:43:18 winws2: запуск")]
+    [InlineData("[16:43:18] пин: проверка пинов (сама): просмотрено 12, менять нечего")]
+    public void Kitchen_lines_stay_in_the_full_journal(string line)
+    {
+        var (_, source, message) = StatusView.Split(line)!.Value;
+        Assert.Null(StatusView.Plain(source, message));
+    }
+
     [Fact]
     public void Window_stall_notes_stay_out_of_the_feed()
     {
