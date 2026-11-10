@@ -75,40 +75,55 @@ public partial class StatusView
 
     private void StopEvents() => _events.Stop();
 
-    private async void OnEvents(object? sender, EventArgs e)
+    private void OnEvents(object? sender, EventArgs e)
     {
         if (_eventsBusy || !IsVisible)
             return;
 
         _eventsBusy = true;
 
-        try
-        {
-            // С запасом: служебные строки отсеиваются (Plain), а показать надо четыре живых.
-            var lines = await Task.Run(() => Tail(Path.Combine("runtime", "supervisor.log"), TailBytes, 200)
-                .Where(l => !IsStallNote(l) && Split(l) is var (_, src, msg) && Plain(src, msg) is not null)
-                .TakeLast(EventsShown).ToList());
-            var key = string.Join("\n", lines);
+        // Чтение держит раздел только слабой ссылкой: закрытый раздел не должен жить,
+        // пока в пуле дочитывается журнал (тест утечек QaSignalTests, CI 10.11).
+        var view = new WeakReference<StatusView>(this);
 
-            // Те же строки — не трогаем список: новые элементы на каждом тике
-            // перестраивали бы шаблоны впустую.
-            if (key == _eventsShown)
-                return;
+        Task.Run(ReadEvents).ContinueWith(
+            read =>
+            {
+                if (view.TryGetTarget(out var self))
+                    self.ShowEvents(read.IsCompletedSuccessfully ? read.Result : null);
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.None,
+            TaskScheduler.FromCurrentSynchronizationContext());
+    }
 
-            _eventsShown = key;
-            var rows = lines.Select(Parse).Where(r => r is not null).Reverse().ToList();
+    /// <summary>Последние живые строки ленты; служебные отсеиваются (Plain), показать надо четыре.</summary>
+    private static List<string> ReadEvents() =>
+        Tail(Path.Combine("runtime", "supervisor.log"), TailBytes, 200)
+            .Where(l => !IsStallNote(l) && Split(l) is var (_, src, msg) && Plain(src, msg) is not null)
+            .TakeLast(EventsShown)
+            .ToList();
 
-            Events.ItemsSource = rows;
-            EventsEmpty.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        }
-        catch (Exception)
-        {
-            // Журнала нет или он занят — лента остаётся прежней.
-        }
-        finally
-        {
-            _eventsBusy = false;
-        }
+    private void ShowEvents(List<string>? lines)
+    {
+        _eventsBusy = false;
+
+        // Журнала нет или он занят — лента остаётся прежней.
+        if (lines is null)
+            return;
+
+        var key = string.Join("\n", lines);
+
+        // Те же строки — не трогаем список: новые элементы на каждом тике
+        // перестраивали бы шаблоны впустую.
+        if (key == _eventsShown)
+            return;
+
+        _eventsShown = key;
+        var rows = lines.Select(Parse).Where(r => r is not null).Reverse().ToList();
+
+        Events.ItemsSource = rows;
+        EventsEmpty.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>Последние <paramref name="count"/> непустых строк файла.</summary>
