@@ -655,7 +655,9 @@ internal static class SupervisorHost
         var lans = Zephyron.Core.Rules.LocalNetworks.VirtualLans;
 
         var arguments = WinwsCommandLine.Build(preset, exclude, own, gameFilter, servers, fakeRange, udpOff, tun, settings.Capture, keep, lans,
-            warpApi: settings.WarpEnabled && !options.NoProxy, videoWindow: settings.GuardVideoNodes).ToList();
+            warpApi: settings.WarpEnabled && !options.NoProxy, videoWindow: settings.GuardVideoNodes,
+            panelHosts: Zephyron.Subscriptions.SubscriptionHosts.From(
+                [settings.SubscriptionUrl, .. SubscriptionBook.Load().Entries.Select(e => e.Url)])).ToList();
 
         // Подделки секций, выбранные в «Десинке»; образцы разрешаются от рабочей папки winws2 (корень Zapret).
         if (FakeChoice.Apply(arguments, Path.GetFileNameWithoutExtension(presetPath), settings.FakeSwaps) is > 0 and var swapped)

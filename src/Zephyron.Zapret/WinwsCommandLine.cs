@@ -113,9 +113,10 @@ public static class WinwsCommandLine
         string? keepList = null,
         IReadOnlyList<string>? lans = null,
         bool warpApi = false,
-        bool videoWindow = false)
+        bool videoWindow = false,
+        IReadOnlyList<string>? panelHosts = null)
     {
-        var arguments = BuildPreset(preset, excludeList, own, keepList, warpApi, videoWindow);
+        var arguments = BuildPreset(preset, excludeList, own, keepList, warpApi, videoWindow, panelHosts);
 
         PresetCapture.Apply(arguments, capture);
 
@@ -137,7 +138,8 @@ public static class WinwsCommandLine
         IReadOnlyList<OwnDesyncProfile>? own,
         string? keepList = null,
         bool warpApi = false,
-        bool videoWindow = false)
+        bool videoWindow = false,
+        IReadOnlyList<string>? panelHosts = null)
     {
         var arguments = new List<string>();
 
@@ -229,6 +231,12 @@ public static class WinwsCommandLine
 
         if (warpApi)
             arguments.AddRange(WarpApiProfile(preset));
+
+        // Панели подписок: многие провайдер режет по имени (13.11: gate.vpnomni.com — TLS молчит,
+        // с общим рецептом пресета — 200 за 0,3–0,5 с), а за новыми серверами идут как раз тогда,
+        // когда туннель лёг. «Напрямую» человека щит забирает раньше этого профиля.
+        if (panelHosts is { Count: > 0 })
+            arguments.AddRange(PanelProfile(preset, panelHosts));
 
         // Видео YouTube — только по TCP: его и мерят проверка с автоподбором. Замер 05.11,
         // новые соединения через десинк: QUIC к зарубежным узлам Google сбоил в 7–12 из 25,
@@ -332,6 +340,25 @@ public static class WinwsCommandLine
             $"--hostlist-domains={WarpApiHost}",
             OutRange,
             .. Steps(section),
+        ];
+    }
+
+    /// <summary>Профиль для панелей подписок: имена инлайном, рецепт — первой общей секции TLS на 443.</summary>
+    private static IReadOnlyList<string> PanelProfile(ZapretPreset preset, IReadOnlyList<string> hosts)
+    {
+        var steps = WarpApiProfile(preset).Where(a => a.StartsWith("--lua-desync=", StringComparison.Ordinal)).ToList();
+
+        if (steps.Count == 0)
+            return [];
+
+        return
+        [
+            "--new",
+            "--name=Zephyron: панели подписок",
+            "--filter-tcp=443",
+            $"--hostlist-domains={string.Join(',', hosts)}",
+            OutRange,
+            .. steps,
         ];
     }
 

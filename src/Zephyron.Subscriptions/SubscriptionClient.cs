@@ -117,6 +117,19 @@ public sealed class SubscriptionClient : IDisposable
 
                 response = await SendAsync(request, agent, cancellationToken);
 
+                // Панель с https шлёт на http того же узла (svyaz-26.ru/sub/ → http://…/sub, 13.11),
+                // а .NET с https на http не идёт и отдаёт сам ответ 307. Тот же путь — по https.
+                if (SecureRedirect(response, target) is { } secure)
+                {
+                    response.Dispose();
+                    using var again = new HttpRequestMessage(HttpMethod.Get, secure);
+
+                    if (!again.Headers.UserAgent.TryParseAdd(agent))
+                        again.Headers.TryAddWithoutValidation("User-Agent", agent);
+
+                    response = await SendAsync(again, agent, cancellationToken);
+                }
+
                 // Отказ «такого нет» или «не для тебя» — пробуем другое имя;
                 // сбой самой панели (5xx) другим именем не лечится.
                 if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized)
@@ -159,6 +172,23 @@ public sealed class SubscriptionClient : IDisposable
         {
             response?.Dispose();
         }
+    }
+
+    /// <summary>
+    /// Переадресация с https на http того же узла — тот же адрес по https; иначе <c>null</c>.
+    /// </summary>
+    /// <remarks>Ссылка подписки равносильна паролю: по http её не отдаём.</remarks>
+    internal static Uri? SecureRedirect(HttpResponseMessage response, Uri from)
+    {
+        if ((int)response.StatusCode is < 300 or >= 400 || response.Headers.Location is not { } location || from.Scheme != Uri.UriSchemeHttps)
+            return null;
+
+        var next = location.IsAbsoluteUri ? location : new Uri(from, location);
+
+        if (next.Scheme != Uri.UriSchemeHttp || !next.Host.Equals(from.Host, StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        return new UriBuilder(next) { Scheme = Uri.UriSchemeHttps, Port = -1 }.Uri;
     }
 
     /// <summary>

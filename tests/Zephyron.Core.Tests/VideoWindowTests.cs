@@ -131,3 +131,21 @@ public sealed class VideoWindowCommandLineTests
         Assert.DoesNotContain("--wf-tcp-empty=1", arguments);
     }
 }
+
+/// <summary>Панели подписок получают десинк по имени.</summary>
+public sealed class PanelProfileTests
+{
+    [Fact]
+    public void PanelsGetTheirOwnProfile()
+    {
+        var preset = new PresetReader().Load(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "presets", "Universal V12 Lite.txt"));
+        var arguments = WinwsCommandLine.Build(preset, panelHosts: ["gate.vpnomni.com", "svyaz-26.ru"]).ToList();
+
+        int at = arguments.IndexOf("--name=Zephyron: панели подписок");
+
+        Assert.True(at >= 0);
+        Assert.Contains("--hostlist-domains=gate.vpnomni.com,svyaz-26.ru", arguments);
+        Assert.StartsWith("--lua-desync=", arguments[arguments.FindIndex(at, a => a.StartsWith("--lua-desync=", StringComparison.Ordinal))]);
+        Assert.DoesNotContain("--name=Zephyron: панели подписок", WinwsCommandLine.Build(preset));
+    }
+}
