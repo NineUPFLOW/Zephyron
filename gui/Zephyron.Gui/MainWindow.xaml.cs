@@ -285,6 +285,18 @@ public partial class MainWindow : Window
 
         _updateOffered = true;
 
+        // Автообновление (владелец 14.11): найденное при запуске ставится само, тем же путём,
+        // что кнопка «Обновить» в окне.
+        if (settings.AutoInstallUpdates)
+        {
+            Journal.Write("обновление", $"автообновление: ставлю {release!.Version}");
+            Open("status");
+            Dispatcher.BeginInvoke(new Action(() =>
+                (Section.Content as StatusView)?.Updates.Install(askFirst: false)),
+                DispatcherPriority.Loaded);
+            return;
+        }
+
         // Следующим ходом очереди: из IsVisibleChanged модальное окно
         // поднимать рано — главное ещё не дорисовано.
         Dispatcher.BeginInvoke(new Action(() => ShowUpdateWindow(release!)), DispatcherPriority.ApplicationIdle);

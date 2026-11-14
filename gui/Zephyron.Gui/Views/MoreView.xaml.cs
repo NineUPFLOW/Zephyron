@@ -243,6 +243,30 @@ public partial class MoreView : UserControl
     {
         UpdatesSwitch.IsChecked = settings.CheckForUpdates;
         UpdatesWord.Text = settings.CheckForUpdates ? "включено" : "не включено";
+        AutoUpdateSwitch.IsChecked = settings.AutoInstallUpdates;
+        AutoUpdateWord.Text = settings.AutoInstallUpdates ? "включено" : "не включено";
+    }
+
+    private void OnAutoUpdateSwitch(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var next = AppSettings.Load(AppSettings.DefaultPath) with { AutoInstallUpdates = AutoUpdateSwitch.IsChecked == true };
+
+            next.Save(AppSettings.DefaultPath);
+            ShowUpdates(next);
+
+            Status.Text = next.AutoInstallUpdates
+                ? (next.CheckForUpdates
+                    ? "Сохранено: найденное при запуске обновление поставится само."
+                    : "Сохранено, но поиск обновлений при запуске выключен — включите его выше.")
+                : "Сохранено: обновление будет предлагаться окном, как раньше.";
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
+            ShowUpdates(AppSettings.Load(AppSettings.DefaultPath));
+        }
     }
 
     private void OnUpdatesSwitch(object sender, RoutedEventArgs e)

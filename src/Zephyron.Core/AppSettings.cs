@@ -329,6 +329,16 @@ public sealed record AppSettings
     /// </remarks>
     public bool LearnDiscordVoice { get; init; } = true;
 
+    /// <summary>
+    /// Ставить найденное при запуске обновление само, без окна «Доступно обновление».
+    /// </summary>
+    /// <remarks>
+    /// Владелец 14.11: автообновление по умолчанию. В старых файлах поля нет — читается выключенным,
+    /// прежних пользователей не трогаем; новым его включает мастер первого запуска. «Пропустить
+    /// версию» сильнее: пропущенная не ставится.
+    /// </remarks>
+    public bool AutoInstallUpdates { get; init; }
+
     /// <summary>Отключать узлы видео YouTube, которые фильтр режет по адресу (VideoNodeGuard): плеер сразу берёт другой.</summary>
     public bool GuardVideoNodes { get; init; } = true;
 

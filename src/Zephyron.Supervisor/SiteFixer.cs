@@ -130,6 +130,32 @@ public static class SiteFixer
             return new(host, steps, null, false, wall);
         }
 
+        // 1а. Мёртвый пин в hosts: пока он стоит, ни рецепт, ни VPN до имени не доходят
+        // (пин сильнее маршрута, щит выводит прибитое имя из-под десинка). Снять и мерить заново.
+        if (DeadPin(host) is { } dead)
+        {
+            if (Unpin(host) is { } failed)
+            {
+                return new(host, steps, null, false,
+                    $"{host} прибит в hosts к {dead.Address}, а тот сайт не открывает. Пока стоит пин, ни десинк, "
+                    + $"ни VPN до имени не доходят. Снять пин не вышло ({failed}): снимите его на вкладке "
+                    + "«Файл hosts» и повторите подбор.");
+            }
+
+            steps.Add(new("пин в hosts", true, $"снят: {dead.Address} не открывал {host}"));
+
+            progress?.Report($"Снял пин, проверяю {host} заново…");
+            now = await BlockCheck.CheckAsync(host, null, cancellationToken, throughTunnel: route == RoutingMode.Proxy);
+            steps.Add(new($"как есть без пина ({Word(route)})", now.Kind == BlockKind.None, now.Describe()));
+
+            if (now.Kind == BlockKind.None)
+            {
+                return new(host, steps, null, false,
+                    $"Снял мёртвый пин {host} → {dead.Address} в hosts — без него {host} открывается "
+                    + $"({Word(route)}). Маршрут не менял.");
+            }
+        }
+
         // 2. Напрямую — через щит, если сейчас его трогает десинк.
         if (route == RoutingMode.Desync && settings.NeedsDesync)
         {
@@ -302,4 +328,65 @@ public static class SiteFixer
         RoutingMode.Desync => "десинк",
         _ => "напрямую",
     };
+
+    /// <summary>
+    /// Пин имени в hosts мимо десинка — подбор снимает его, если имя не открылось.
+    /// </summary>
+    /// <returns>Строка hosts; <c>null</c> — пина нет, это пин сервиса под десинк или отказ сторожа.</returns>
+    /// <remarks>
+    /// Пин сервиса (<see cref="HostsEditor.DesyncMark"/>) идёт под десинк — его рецепты как раз
+    /// и пробуют. Отказ 0.0.0.0 сторожа узлов видео — не пин на адрес, его снимает сторож.
+    /// </remarks>
+    internal static HostsEntry? DeadPin(string host, string? path = null)
+    {
+        try
+        {
+            var pin = HostsEditor.Parse(path).FirstOrDefault(e => e.Enabled
+                && e.Names.Any(n => string.Equals(n, host, StringComparison.OrdinalIgnoreCase)));
+
+            return pin is null
+                || pin.Note?.Contains(HostsEditor.DesyncMark, StringComparison.OrdinalIgnoreCase) == true
+                || pin.Address == VideoNodeGuard.Refused
+                ? null
+                : pin;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Снимает пин имени и его пары с www — свой блок и чужие строки; не вышло — почему.</summary>
+    internal static string? Unpin(string host, string? path = null)
+    {
+        var bare = host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? host[4..] : host;
+        var names = new HashSet<string>([bare, "www." + bare], StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            HostsEditor.Unpin(names, path);
+
+            // Чужие строки (Zapret GUI и прочие) — по номерам: наш блок их не держит.
+            var foreign = HostsEditor.Parse(path)
+                .Where(e => e.Enabled)
+                .SelectMany(e => e.Names.Where(names.Contains).Select(n => (e.Line, n)))
+                .ToList();
+
+            if (foreign.Count > 0)
+                HostsEditor.RemoveNames(foreign, path);
+
+            if (path is null)
+                HostsEditor.FlushDns();
+
+            return DeadPin(host, path) is null ? null : "строка осталась в hosts";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return "нужны права администратора";
+        }
+        catch (IOException ex)
+        {
+            return ex.Message;
+        }
+    }
 }

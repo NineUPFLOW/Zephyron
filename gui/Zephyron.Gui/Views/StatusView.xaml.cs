@@ -1832,21 +1832,9 @@ public partial class StatusView : UserControl
             }
             else
             {
-                var (ok, output) = AutostartTask.Install(new AutostartOptions
-                {
-                    TaskName = AutostartTask.DefaultTaskName,
-                    ExecutablePath = exe,
-
-                    // Задача поднимает интерфейс в трей, а движки он заводит
-                    // сам — теми же ключами, что и кнопка «Запустить». Прежде
-                    // задача поднимала один супервизор, и при входе не было
-                    // ни значка, ни способа остановить обход, кроме как
-                    // открыть программу заново.
-                    Arguments = TrayIcon.Switch,
-                    WorkingDirectory = Path.GetFullPath("."),
-                    // SID, а не имя: см. AutostartTask.CurrentUserId.
-                    UserId = AutostartTask.CurrentUserId(),
-                });
+                // Тот же код, что у мастера первого запуска: задача поднимает окно в трей,
+                // а движки оно заводит само.
+                var (ok, output) = Autostart.TurnOn();
 
                 if (!ok)
                     ShowProblem("Автозапуск не создался: " + output);

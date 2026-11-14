@@ -1089,7 +1089,16 @@ public partial class OnboardingView : UserControl
             if (settings.OnboardingDone)
                 return false;
 
-            (settings with { OnboardingDone = true }).Save(AppSettings.DefaultPath);
+            // Новый человек (владелец 14.11): автозапуск и автообновление — включены. Прежде о них
+            // не знали: после перезагрузки обход не поднимался, пока программу не откроют руками.
+            (settings with { OnboardingDone = true, AutoInstallUpdates = true }).Save(AppSettings.DefaultPath);
+
+            _ = Task.Run(() =>
+            {
+                var (ok, output) = Autostart.TurnOn();
+                Journal.Write("окно", ok ? "автозапуск включён после мастера первого запуска" : "автозапуск не включился: " + output);
+            });
+
             return true;
         }
         catch (Exception)
