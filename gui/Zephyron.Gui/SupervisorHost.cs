@@ -288,6 +288,10 @@ internal static class SupervisorHost
                 OnEvent = log is null ? Console.WriteLine : null,
             };
 
+            // Отпечаток настроек, с которыми движки поднимаются (в любом режиме): по нему
+            // окно решает, ждать ли перезапуска после правок (EngineInputs).
+            EngineInputs.Record();
+
             Console.WriteLine(
                 $"Служб под присмотром: {services.Count} " +
                 $"({string.Join(", ", services.Select(s => s.Name))})");

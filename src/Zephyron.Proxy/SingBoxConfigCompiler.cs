@@ -1696,6 +1696,11 @@ public sealed class SingBoxConfigCompiler
             ["tag"] = options.SelectorTag,
             ["outbounds"] = selectorMembers,
             ["default"] = pinned ?? LatencyTag,
+
+            // Смена сервера на ходу (LiveExit) рвёт уже открытые соединения: без этого
+            // вкладки, Telegram и игры оставались на прежнем сервере, и смена выглядела
+            // несработавшей (владелец 14.11: «моментальная смена сервера не работала»).
+            ["interrupt_exist_connections"] = true,
         });
 
         // Выход локального прокси: те же серверы, но без direct. Надзор переносит
@@ -1712,6 +1717,7 @@ public sealed class SingBoxConfigCompiler
                 ["tag"] = LocalProxyInbound.ExitTag,
                 ["outbounds"] = exitMembers,
                 ["default"] = pinned ?? LatencyTag,
+                ["interrupt_exist_connections"] = true,
             });
         }
 
@@ -2444,6 +2450,7 @@ public sealed class SingBoxConfigCompiler
             ["tag"] = ServerPools.SelectorTag(pool.Id),
             ["outbounds"] = selector,
             ["default"] = pinned ?? ServerPools.LatencyTag(pool.Id),
+            ["interrupt_exist_connections"] = true,
         });
     }
 

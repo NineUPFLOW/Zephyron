@@ -675,29 +675,6 @@ public partial class MainWindow : Window
         Motion.Arrive(LogDrawer, dy: 24);
     }
 
-    /// <summary>Режим из настроек совпадает с тем, что держат живые движки (winws2 / sing-box).</summary>
-    private static bool ChosenMatchesRunning()
-    {
-        try
-        {
-            var state = SupervisorState.Load(SupervisorState.DefaultPath);
-
-            if (state is null || !state.IsSupervisorAlive())
-                return false;
-
-            var running = WorkModes.Of(new EngineChoice
-            {
-                Desync = state.Services.Any(x => x.Name == "winws2"),
-                Tunnel = state.Services.Any(x => x.Name == "sing-box"),
-            });
-
-            return running is not null && WorkModes.Of(AppSettings.Load(AppSettings.DefaultPath).Engines) == running;
-        }
-        catch (Exception)
-        {
-            return false;
-        }
-    }
 
     private readonly DispatcherTimer _topDot = new() { Interval = TimeSpan.FromSeconds(3) };
 
@@ -736,9 +713,16 @@ public partial class MainWindow : Window
 
         _dotMode = ModeOf(key);
 
-        // Выбор вернули обратно — режим снова тот, что у работающих движков: ждать нечего.
-        if (_restartPending && ChosenMatchesRunning())
+        // Настройки вернули к тем, с которыми подняты движки, — ждать нечего. Прежде здесь
+        // сверялся только режим, и после смены маршрута или DNS метка гасла сама (EngineInputs).
+        if (_restartPending && !EngineInputs.Differs())
+        {
             _restartPending = false;
+
+            // Висящее предложение перезапуска больше не о чем — убираем и его.
+            if (Toast.Visibility == Visibility.Visible && ToastAct.Visibility == Visibility.Visible && ToastAct.IsEnabled)
+                HideToast();
+        }
 
         // Движки остановлены или поднимаются заново (трей, автоподбор, меню «Выключить») —
         // новый запуск уже берёт свежие настройки, ждать перезапуска нечего.
@@ -1064,6 +1048,10 @@ public partial class MainWindow : Window
         var state = SupervisorState.Load(SupervisorState.DefaultPath);
 
         if (state is null || !state.IsSupervisorAlive())
+            return;
+
+        // Изменение вернуло настройки к тем, с которыми движки подняты, — ждать нечего (EngineInputs).
+        if (!EngineInputs.Differs())
             return;
 
         ToastTitle.Text = what;

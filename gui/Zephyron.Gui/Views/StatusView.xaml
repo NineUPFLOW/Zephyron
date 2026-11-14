@@ -880,6 +880,9 @@
                             <Button Style="{StaticResource Quiet}" Padding="9,5" FontSize="11.5" Click="OnTelegram"
                                     local:ButtonGlyph.Lead="&#xE724;" Content="Telegram"
                                     ToolTip="Новости в Telegram: что вышло и зачем обновляться, в паре строк" />
+                            <Button Style="{StaticResource Quiet}" Padding="9,5" FontSize="11.5" Click="OnSupport"
+                                    local:ButtonGlyph.Lead="&#xEB51;" Content="Поддержать"
+                                    ToolTip="Поддержать разработку: Tribute или tips.tips" />
                         </StackPanel>
                     </Grid>
                 </Border>
