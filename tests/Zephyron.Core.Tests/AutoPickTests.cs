@@ -33,6 +33,16 @@ public sealed class AutoPickTests : IDisposable
     }
 
     [Fact]
+    public void Country_closed_page_sends_direct_route_to_vpn()
+    {
+        // Gemini напрямую отдаёт целую страницу: Measure метит такую пробу заглушкой.
+        var row = Row(RoutingMode.Direct, null,
+            Try(AutoPickWay.Direct, true) with { Stub = true, Status = 200 }, Try(AutoPickWay.Vpn, true));
+
+        Assert.Equal(AutoPickWay.Vpn, AutoPick.Choose(row)?.Way);
+    }
+
+    [Fact]
     public void Working_current_route_stays()
     {
         var row = Row(RoutingMode.Proxy, null,

@@ -772,9 +772,16 @@ public static class AutoPick
 
             clock.Stop();
 
+            // Gemini и подобные отдают из России целую страницу, а отказ — уже на запрос
+            // к модели (владелец 14.11: подбор слал Gemini напрямую, а там заглушка).
+            // Прямые пробы идут на настоящий адрес из DoH, не на пин, — значит, из России.
+            bool closed = works && !flow.Stub && CountryClosed.Covers(row.Host);
+
             row.Add(new AutoPickTry(way, recipe, title, null, works, clock.Elapsed,
-                partly ?? RecipeTrial.Verdict(flow, clock.Elapsed), flow.Status, flow.Status is null ? null : flow.CertValid,
-                flow.Stub));
+                partly ?? (closed ? "страница открылась, но сервис закрыт для России — без VPN или посредника не работает"
+                    : RecipeTrial.Verdict(flow, clock.Elapsed)),
+                flow.Status, flow.Status is null ? null : flow.CertValid,
+                flow.Stub || closed));
 
             progress?.Report(row);
             return works;
