@@ -1769,6 +1769,20 @@ public static class AutoPick
                 reverted = true;
                 toPin.Clear();
             }
+            else
+            {
+                // Особый маршрут: по файлу маршрутов видно, на каком пине держится имя,
+                // и чужой набор маршрутов ставит его сам (SpecialRoute).
+                foreach (var pinned in kept.Where(e => e.Pins is not null && e.Wrote is { Off: false }))
+                {
+                    var wrote = pinned.Wrote!;
+                    file.SetSpecial(wrote.Match, wrote.Value, wrote.Mode,
+                        wrote.Mode == RoutingMode.Desync ? SpecialRoute.ServicePin : SpecialRoute.RelayPin,
+                        pin: "автоподбор", pinHosts: pinned.Pins);
+                }
+
+                file.Save();
+            }
         }
 
         try

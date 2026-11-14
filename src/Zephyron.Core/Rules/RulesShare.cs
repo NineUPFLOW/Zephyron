@@ -58,7 +58,18 @@ public static class RulesShare
                 Server = r.Mode == RoutingMode.Proxy ? r.Server : null,
                 Enabled = r.Enabled,
                 Off = r.Off,
+                Special = r.Special,
+                Pin = r.Pin,
+                PinHosts = r.PinHosts,
             })
+            .ToList();
+
+    /// <summary>Пины из особых маршрутов набора: имя → адрес и под десинком ли (пин сервиса).</summary>
+    public static IReadOnlyList<(string Name, string Address, bool Desync, string? Pin)> Pins(IEnumerable<UserRuleEntry> rules) =>
+        rules.Where(r => r.Enabled && !r.Off && r.Special is SpecialRoute.ServicePin or SpecialRoute.RelayPin && r.PinHosts is { Count: > 0 })
+            .SelectMany(r => r.PinHosts!.Select(p => (p.Key, p.Value, r.Special == SpecialRoute.ServicePin, r.Pin)))
+            .Where(p => System.Net.IPAddress.TryParse(p.Value, out _))
+            .DistinctBy(p => p.Key, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
     // Чужой файл не должен вести список за пределы каталога установки.
@@ -137,7 +148,9 @@ public static class RulesShare
 
     /// <summary>Правило коротко, для перечня в вопросе: «discord → десинк».</summary>
     public static string Describe(UserRuleEntry entry) =>
-        $"{NameOf(entry)} → {entry.DescribeMode()}" + (entry.Enabled ? string.Empty : " (запись отключена)");
+        $"{NameOf(entry)} → {entry.DescribeMode()}"
+        + (entry.Special is { } special ? $", {SpecialRoute.Describe(special, entry.Pin)}" : string.Empty)
+        + (entry.Enabled ? string.Empty : " (запись отключена)");
 
     /// <summary>Смена коротко: «discord: десинк → VPN».</summary>
     public static string Describe(UserRuleEntry before, UserRuleEntry after)

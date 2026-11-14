@@ -125,6 +125,9 @@ public static class SupportReport
             // из вложения, которое человек догадался прислать сам.
             if (Read(HostsFile.DefaultPath) is { } hosts)
                 parts.Add(("hosts.txt", HostsExcerpt(hosts)));
+
+            // Особые маршруты против hosts: на каком пине держится маршрут и стоит ли он.
+            parts.Add(("special-routes.txt", Section(() => SpecialRoutes())));
         }
 
         // Сторож серверов и недавние выходы: что отвечало и когда — для жалоб
@@ -464,6 +467,36 @@ public static class SupportReport
     /// <summary>
     /// Строки hosts с адресами и границы нашего блока — без пояснений Microsoft.
     /// </summary>
+    /// <summary>Особые маршруты и их пины — сверенные с нынешним hosts.</summary>
+    internal static string SpecialRoutes(string? rulesPath = null, string? hostsPath = null)
+    {
+        var marked = Core.Rules.UserRulesFile.Load(rulesPath ?? Core.Rules.UserRulesFile.DefaultPath).Entries
+            .Where(e => e.Special is not null)
+            .ToList();
+
+        if (marked.Count == 0)
+            return "Особых маршрутов нет.";
+
+        var pinned = HostsFile.Read(hostsPath);
+        var text = new StringBuilder();
+
+        foreach (var entry in marked)
+        {
+            text.AppendLine(Core.Rules.RulesShare.Describe(entry));
+
+            foreach (var (name, address) in entry.PinHosts ?? new Dictionary<string, string>())
+            {
+                var state = !pinned.TryGetValue(name, out var list) ? "НЕТ в hosts"
+                    : list.Any(a => a.ToString() == address) ? "стоит"
+                    : $"в hosts другой адрес: {string.Join(", ", list)}";
+
+                text.AppendLine($"  {name} → {address}: {state}");
+            }
+        }
+
+        return text.ToString();
+    }
+
     public static string HostsExcerpt(string hosts)
     {
         var lines = hosts.Replace("\r", string.Empty).Split('\n');

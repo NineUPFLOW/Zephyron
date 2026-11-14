@@ -242,6 +242,11 @@ public static class RuleSetLoader
                 Server = string.IsNullOrWhiteSpace(raw.Server) ? null : raw.Server.Trim(),
                 Recipe = string.IsNullOrWhiteSpace(raw.Recipe) ? null : raw.Recipe.Trim(),
                 Enabled = raw.Enabled ?? true,
+                Special = SpecialRoute.Parse(raw.Special),
+                Pin = string.IsNullOrWhiteSpace(raw.Pin) ? null : raw.Pin.Trim(),
+                PinHosts = raw.PinHosts is { Count: > 0 } hosts
+                    ? new Dictionary<string, string>(hosts, StringComparer.OrdinalIgnoreCase)
+                    : null,
                 Ordinal = i,
             });
         }
@@ -384,6 +389,13 @@ public static class RuleSetLoader
 
         /// <summary>Выключенное правило хранится, но не применяется.</summary>
         public bool? Enabled { get; set; }
+
+        /// <summary>Особый маршрут (<see cref="SpecialRoute"/>); незнакомое слово — обычный маршрут.</summary>
+        public string? Special { get; set; }
+
+        public string? Pin { get; set; }
+
+        public Dictionary<string, string>? PinHosts { get; set; }
     }
 
     private sealed class DefaultDto

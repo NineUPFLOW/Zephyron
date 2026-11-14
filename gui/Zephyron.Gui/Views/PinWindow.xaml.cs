@@ -579,6 +579,11 @@ public partial class PinWindow : Window
         // прибитого адреса и уводит соединение мимо него.
         var file = UserRulesFile.Load();
         file.Set(_target.Match, _target.Value, RoutingMode.Direct);
+
+        // Особый маршрут «пин посредника»: в файле маршрутов видно, к кому прибито,
+        // и загрузка набора маршрутов ставит пин сама (SpecialRoute).
+        file.SetSpecial(_target.Match, _target.Value, RoutingMode.Direct, SpecialRoute.RelayPin,
+            pin: via?.Values.FirstOrDefault() ?? source, pinHosts: answers);
         file.Save();
         _ = HostsEditor.FlushDnsAsync();
 
@@ -888,6 +893,15 @@ public partial class PinWindow : Window
 
             var result = HostsEditor.Unpin(ours);
             _ = HostsEditor.FlushDnsAsync();
+
+            // Пина больше нет — и пометки особого маршрута тоже: путь стал обычным «напрямую».
+            var file = UserRulesFile.Load();
+
+            if (file.Entries.FirstOrDefault(e => e.Match == _target.Match && e.Matches(_target.Value)) is { Special: not null } marked)
+            {
+                file.SetSpecial(marked.Match, marked.Value, marked.Mode, special: null);
+                file.Save();
+            }
 
             Changed = true;
             ShowPins();

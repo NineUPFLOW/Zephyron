@@ -58,6 +58,15 @@ public sealed class RoutingRule
     /// </remarks>
     public bool Enabled { get; init; } = true;
 
+    /// <summary>Особый маршрут: на чём он держится (<see cref="SpecialRoute"/>); <c>null</c> — обычный.</summary>
+    public string? Special { get; init; }
+
+    /// <summary>Решение пина или ключ посредника особого маршрута.</summary>
+    public string? Pin { get; init; }
+
+    /// <summary>Какие имена к каким адресам прибиты в hosts этим маршрутом.</summary>
+    public IReadOnlyDictionary<string, string>? PinHosts { get; init; }
+
     /// <summary>
     /// Часть выключена: не действует ни это правило, ни базовое на тот же список.
     /// </summary>

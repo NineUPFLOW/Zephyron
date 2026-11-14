@@ -174,7 +174,31 @@ public partial class RoutesView
             file.ReplaceAll(incoming);
             file.Save();
 
+            // Особые маршруты набора несут свои пины — ставим их в hosts, иначе маршрут
+            // «пин посредника» без пина шёл бы напрямую в никуда (SpecialRoute).
+            int pinned = 0;
+            var pins = RulesShare.Pins(incoming);
+
+            try
+            {
+                foreach (var group in pins.GroupBy(p => p.Desync))
+                {
+                    var result = HostsEditor.Pin(
+                        group.ToDictionary(p => p.Name, p => p.Address, StringComparer.OrdinalIgnoreCase),
+                        note: group.Key ? $"набор маршрутов {HostsEditor.DesyncMark}" : "набор маршрутов");
+                    pinned += result.Reverted is null ? group.Count() : 0;
+                }
+
+                if (pinned > 0)
+                    _ = HostsEditor.FlushDnsAsync();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Status.Text = "Маршруты загружены, но пины в hosts не встали: " + ex.GetBaseException().Message;
+            }
+
             Status.Text = $"Загружено: {incoming.Count} маршрутов. Применится при следующем запуске движков."
+                + (pinned > 0 ? $" Пинов в hosts поставлено: {pinned}." : string.Empty)
                 + (created + kept > 0 ? $" Списков заведено: {created}" + (kept > 0 ? $", оставлено ваших с тем же названием: {kept}." : ".") : string.Empty)
                 + (backup is null ? string.Empty : $" Прежние — в {backup}.");
 
@@ -198,6 +222,9 @@ public partial class RoutesView
         Listed(text, "Будет добавлено", diff.Added.Select(RulesShare.Describe).ToList());
         Listed(text, "Исчезнет", diff.Removed.Select(RulesShare.Describe).ToList());
         Listed(text, "Будет изменено", diff.Changed.Select(c => RulesShare.Describe(c.Before, c.After)).ToList());
+
+        if (RulesShare.Pins(incoming) is { Count: > 0 } pins)
+            text.AppendLine($"Пинов в hosts поставится: {pins.Count} (особые маршруты набора).");
 
         int fresh = bundled.Count(n => !OwnLists.Exists(n));
 

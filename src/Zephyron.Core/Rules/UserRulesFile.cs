@@ -55,6 +55,9 @@ public sealed class UserRulesFile
                     Server = r.Mode == RoutingMode.Proxy ? r.Server : null,
                     Enabled = r.Enabled,
                     Off = r.Off,
+                    Special = r.Special,
+                    Pin = r.Pin,
+                    PinHosts = r.PinHosts,
                 })
                 .ToList();
 
@@ -152,6 +155,13 @@ public sealed class UserRulesFile
 
         if (index >= 0)
         {
+            // Пометка особого маршрута живёт, пока режим тот же (смена рецепта у пина
+            // сервиса её не снимает); другой режим — уже другой путь, пометка снимается.
+            var old = _entries[index];
+
+            if (entry.Special is null && old.Special is not null && !old.Off && !entry.Off && old.Mode == entry.Mode)
+                entry = entry with { Special = old.Special, Pin = old.Pin, PinHosts = old.PinHosts };
+
             _entries[index] = entry;
             return;
         }
@@ -160,6 +170,31 @@ public sealed class UserRulesFile
 
         if (wider >= 0)
             _entries.Insert(wider, entry);
+        else
+            _entries.Add(entry);
+    }
+
+    /// <summary>
+    /// Помечает запись особым маршрутом; записи нет — заводит её с этим режимом.
+    /// </summary>
+    /// <param name="special">Вид (<see cref="SpecialRoute"/>); <c>null</c> — снять пометку.</param>
+    public void SetSpecial(MatchKind match, string value, RoutingMode mode, string? special, string? pin = null,
+        IReadOnlyDictionary<string, string>? pinHosts = null)
+    {
+        int index = _entries.FindIndex(e => e.Match == match && e.Matches(value.Trim()));
+        var entry = index >= 0 && _entries[index].Mode == mode && !_entries[index].Off
+            ? _entries[index]
+            : new UserRuleEntry { Match = match, Value = value.Trim(), Mode = mode, Enabled = true };
+
+        entry = entry with
+        {
+            Special = special,
+            Pin = special is null ? null : pin,
+            PinHosts = special is null || pinHosts is not { Count: > 0 } ? null : pinHosts,
+        };
+
+        if (index >= 0)
+            _entries[index] = entry;
         else
             _entries.Add(entry);
     }
@@ -283,6 +318,22 @@ public sealed class UserRulesFile
                 if (!string.IsNullOrWhiteSpace(entry.Recipe))
                     builder.AppendLine($"    recipe: {Quote(entry.Recipe)}");
 
+                if (!entry.Off && entry.Special is { } special)
+                {
+                    builder.AppendLine($"    special: {special}");
+
+                    if (!string.IsNullOrWhiteSpace(entry.Pin))
+                        builder.AppendLine($"    pin: {Quote(entry.Pin)}");
+
+                    if (entry.PinHosts is { Count: > 0 } hosts)
+                    {
+                        builder.AppendLine("    pin_hosts:");
+
+                        foreach (var (name, address) in hosts.OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase))
+                            builder.AppendLine($"      {Quote(name)}: {Quote(address)}");
+                    }
+                }
+
                 if (!entry.Enabled)
                     builder.AppendLine("    enabled: false");
             }
@@ -378,6 +429,15 @@ public sealed record UserRuleEntry
 
     /// <summary>Часть выключена целиком (<see cref="RoutingRule.Off"/>); <see cref="Mode"/> тогда не значит ничего.</summary>
     public bool Off { get; init; }
+
+    /// <summary>Особый маршрут (<see cref="SpecialRoute"/>): пин сервиса, пин посредника или TG Proxy.</summary>
+    public string? Special { get; init; }
+
+    /// <summary>Решение пина или ключ посредника.</summary>
+    public string? Pin { get; init; }
+
+    /// <summary>Имя → адрес, прибитые в hosts этим маршрутом.</summary>
+    public IReadOnlyDictionary<string, string>? PinHosts { get; init; }
 
     public bool Matches(string value) =>
         string.Equals(Value, value, StringComparison.OrdinalIgnoreCase);
