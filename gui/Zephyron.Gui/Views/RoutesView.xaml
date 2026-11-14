@@ -281,19 +281,22 @@
                                         <TextBlock x:Name="CountAll" Margin="6,0,0,0" FontWeight="SemiBold" />
                                     </StackPanel>
                                 </RadioButton>
-                                <RadioButton Style="{StaticResource RouteFilter}" GroupName="RouteFilter" Tag="2" Click="OnRouteFilter" Margin="3,0,0,0">
+                                <RadioButton Style="{StaticResource RouteFilter}" GroupName="RouteFilter" Tag="2" Click="OnRouteFilter" Margin="3,0,0,0"
+                                             ToolTip="Через VPN: трафик идёт через сервер подписки или WARP, сайт видит зарубежный адрес. Нужно там, где сервис закрыт по стране (ChatGPT, Gemini, Claude).">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="Через VPN" />
                                         <TextBlock x:Name="CountVpn" Margin="6,0,0,0" FontWeight="SemiBold" />
                                     </StackPanel>
                                 </RadioButton>
-                                <RadioButton Style="{StaticResource RouteFilter}" GroupName="RouteFilter" Tag="1" Click="OnRouteFilter" Margin="3,0,0,0">
+                                <RadioButton Style="{StaticResource RouteFilter}" GroupName="RouteFilter" Tag="1" Click="OnRouteFilter" Margin="3,0,0,0"
+                                             ToolTip="Десинк: трафик идёт с вашего адреса, Zephyron лишь маскирует начало соединения от фильтра провайдера. Помогает там, где сайт режет провайдер (YouTube, Discord).">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="Десинк" />
                                         <TextBlock x:Name="CountDesync" Margin="6,0,0,0" FontWeight="SemiBold" />
                                     </StackPanel>
                                 </RadioButton>
-                                <RadioButton Style="{StaticResource RouteFilter}" GroupName="RouteFilter" Tag="0" Click="OnRouteFilter" Margin="3,0,0,0">
+                                <RadioButton Style="{StaticResource RouteFilter}" GroupName="RouteFilter" Tag="0" Click="OnRouteFilter" Margin="3,0,0,0"
+                                             ToolTip="Напрямую: Zephyron этот трафик не трогает — ни десинка, ни туннеля, и по именам, и по адресам. Для того, что и так работает, и для игр, которым обход мешает.">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="Напрямую" />
                                         <TextBlock x:Name="CountDirect" Margin="6,0,0,0" FontWeight="SemiBold" />

@@ -3,3 +3,8 @@
 # origin.com жив: клиент EA App до сих пор ходит на него за учётной записью.
 ea.com
 origin.com
+
+# Apex Legends (Respawn): сайт игры и Respawn — тем же путём, что вход EA.
+# Служебные имена Apex (apexstatic.cdn.origin.com и др.) уже покрыты origin.com.
+apexlegends.com
+respawn.com

@@ -165,6 +165,11 @@ public static class TunnelReach
             using var request = new HttpRequestMessage(HttpMethod.Get, $"https://{host}/");
             request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
 
+            // Те же заголовки, что у пробы проверки блокировок: защита сайта (CloudFront)
+            // отказывала запросу без Accept как роботу, и 403 через туннель читался
+            // как «тот же отказ, что напрямую» — VPN не предлагался.
+            request.Headers.Add("Accept", "*/*");
+
             using var response = await http.SendAsync(
                 request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 

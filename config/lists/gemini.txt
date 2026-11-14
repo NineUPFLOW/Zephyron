@@ -28,3 +28,18 @@ notebooklm-pa.googleapis.com
 notebooklm.googleapis.com
 cloudaicompanion.googleapis.com
 cloudcode-pa.googleapis.com
+
+# 14.11: имена из каталога Zapret (посредник Gemini у Comss DNS), которых здесь не было.
+# Без них загрузка файлов и служебные запросы Gemini шли мимо туннеля с российского
+# адреса и получали отказ по стране, пока сам чат шёл через VPN.
+content-push.googleapis.com
+assistant-s3-pa.googleapis.com
+geller-pa.googleapis.com
+people-pa.clients6.google.com
+aicode.googleapis.com
+daily-cloudcode-pa.googleapis.com
+notebook-pa.googleapis.com
+labs.google.com
+opal.google.com
+jules.google
+generativeai.google

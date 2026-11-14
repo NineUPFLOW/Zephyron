@@ -656,6 +656,7 @@ internal static class SupervisorHost
 
         var arguments = WinwsCommandLine.Build(preset, exclude, own, gameFilter, servers, fakeRange, udpOff, tun, settings.Capture, keep, lans,
             warpApi: settings.WarpEnabled && !options.NoProxy, videoWindow: settings.GuardVideoNodes,
+            directList: File.Exists(DirectAddresses.DefaultPath) ? Path.GetFullPath(DirectAddresses.DefaultPath) : null,
             panelHosts: Zephyron.Subscriptions.SubscriptionHosts.From(
                 [settings.SubscriptionUrl, .. SubscriptionBook.Load().Entries.Select(e => e.Url)])).ToList();
 

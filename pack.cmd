@@ -73,6 +73,12 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+rem System.Net.Quic looks for msquic.dll next to the exe, not where the single
+rem file extracts its libraries: without it the QUIC probe never runs.
+set "MSQUIC="
+for /f "delims=" %%F in ('dir /s /b /o:n "%USERPROFILE%\.nuget\packages\microsoft.netcore.app.runtime.win-x64\msquic.dll" 2^>nul') do set "MSQUIC=%%F"
+if defined MSQUIC copy /y "%MSQUIC%" "%STAGE%\" >nul
+
 rem Debug symbols are of no use to anyone downloading this, and they clutter
 rem a folder whose whole point is being obvious.
 del /q "%STAGE%\*.pdb" >nul 2>&1

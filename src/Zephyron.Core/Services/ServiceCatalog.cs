@@ -842,6 +842,24 @@ public static class ServiceCatalog
             ],
         },
 
+        // Aion 2 (жалоба 13.11): с Universal не войти, Discord и YouTube при этом нужны.
+        // Вход NCSOFT из России открыт — «напрямую» базовым правилом; серверы матча по имени
+        // не узнать, их адреса человек ставит «напрямую» в «Программах».
+        new ServiceDefinition
+        {
+            Name = "Aion 2",
+            Parts =
+            [
+                new ServicePart
+                {
+                    Name = "Вход и лаунчер",
+                    List = "config/lists/aion2.txt",
+                    Probe = "plaync.com",
+                    Note = "аккаунт NCSOFT, лаунчер PURPLE, магазин; «напрямую» — мимо десинка и туннеля",
+                },
+            ],
+        },
+
         new ServiceDefinition
         {
             Name = "Игры",

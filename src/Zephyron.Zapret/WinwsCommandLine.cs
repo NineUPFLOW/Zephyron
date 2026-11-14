@@ -114,9 +114,10 @@ public static class WinwsCommandLine
         IReadOnlyList<string>? lans = null,
         bool warpApi = false,
         bool videoWindow = false,
-        IReadOnlyList<string>? panelHosts = null)
+        IReadOnlyList<string>? panelHosts = null,
+        string? directList = null)
     {
-        var arguments = BuildPreset(preset, excludeList, own, keepList, warpApi, videoWindow, panelHosts);
+        var arguments = BuildPreset(preset, excludeList, own, keepList, warpApi, videoWindow, panelHosts, directList);
 
         PresetCapture.Apply(arguments, capture);
 
@@ -124,6 +125,11 @@ public static class WinwsCommandLine
             GameFilter.Apply(arguments);
 
         TunnelCapture.Apply(arguments, tunnelServers, tunnelFakeRange, udpOff, tunAddresses, lans);
+
+        // Строка запуска Windows — не длиннее 32 767 символов (14.11: переполнение молча
+        // не давало winws2 подняться). Необязательное — исключения «напрямую» — уходит первым.
+        if (Length(arguments) > SafeLength && arguments.RemoveAll(a => directList is not null && a == DirectAddresses.Exclude(directList)) > 0)
+            Console.WriteLine("Строка winws2 близка к пределу Windows: сети «напрямую» из секций по адресам не исключены.");
 
         // Окну нужно подтверждение рукопожатия, а оно без данных (VideoWindow).
         if (arguments.Any(a => a == "--lua-desync=zy_video_window:syn") && !VideoWindow.CaptureEmptyAcks(arguments))
@@ -139,7 +145,8 @@ public static class WinwsCommandLine
         string? keepList = null,
         bool warpApi = false,
         bool videoWindow = false,
-        IReadOnlyList<string>? panelHosts = null)
+        IReadOnlyList<string>? panelHosts = null,
+        string? directList = null)
     {
         var arguments = new List<string>();
 
@@ -191,6 +198,7 @@ public static class WinwsCommandLine
 
             arguments.Add("--new");
             arguments.Add($"--name=Zephyron: {profile.Name}");
+
 
             // Порты те же, что у подменяемой секции. Зашитое 80,443 стоило
             // дорого: у Discord секция объявлена на восьми портах, и пять
@@ -248,6 +256,12 @@ public static class WinwsCommandLine
         {
             arguments.Add("--new");
 
+            // Сети «напрямую» человека — секциям без имён: они имени не спрашивают (DirectAddresses).
+            // Секции по именам закрывает щит; ключ в каждой из ~80 секций переполнял строку
+            // запуска сверх предела Windows в 32 767 символов (14.11: winws2 не поднимался).
+            if (directList is not null && !FiltersByName(section))
+                arguments.Add(DirectAddresses.Exclude(directList));
+
             // Исключение повторяется в каждой секции намеренно: winws2
             // разбирает --hostlist-exclude в пределах профиля, и один ключ
             // в начале накрыл бы только первый из полутора десятков.
@@ -300,6 +314,13 @@ public static class WinwsCommandLine
 
         return arguments;
     }
+
+    /// <summary>Запас до предела строки запуска Windows (32 767): путь к exe и кавычки.</summary>
+    public const int SafeLength = 31_000;
+
+    /// <summary>Длина строки запуска: аргументы через пробел, с кавычками там, где есть пробел.</summary>
+    public static int Length(IEnumerable<string> arguments) =>
+        arguments.Sum(a => a.Length + 1 + (a.Contains(' ') ? 2 : 0));
 
     private const string WarpApiHost = "api.cloudflareclient.com";
 

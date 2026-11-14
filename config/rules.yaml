@@ -137,6 +137,12 @@ rules:
     value: config/lists/riot-network.txt
     mode: direct
 
+  # Aion 2 (жалоба 13.11): вход NCSOFT открыт и без обхода, а рецепты пресета
+  # его ломали — по умолчанию напрямую.
+  - match: hostlist
+    value: config/lists/aion2.txt
+    mode: direct
+
   # SeriesGraph — не заблокирован, а рецепт пресета рвал загрузку страницы
   # (замер 27.09: 24 КБ пришли, соединение не закрылось и за 20 с). Десинк
   # с рецептом pass — имя winws2 пропускает, секции по адресам остаются:

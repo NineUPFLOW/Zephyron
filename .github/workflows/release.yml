@@ -84,6 +84,11 @@ jobs:
             -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true \
             -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -p:DebugSymbols=false \
             -o stage/Zephyron --nologo -v quiet
+          # System.Net.Quic ищет msquic.dll рядом с exe, а не там, куда одиночный файл
+          # распаковывает библиотеки: без него проба QUIC в выпуске не работает ни у кого.
+          MSQUIC=$(find ~/.nuget/packages/microsoft.netcore.app.runtime.win-x64 -name msquic.dll -path '*win-x64/native/*' | sort -V | tail -1)
+          test -n "$MSQUIC"
+          cp "$MSQUIC" stage/Zephyron/
 
       - name: Скачать движки
         run: |

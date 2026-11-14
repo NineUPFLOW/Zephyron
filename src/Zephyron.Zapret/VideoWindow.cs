@@ -115,17 +115,39 @@ public static class VideoWindow
         return result;
     }
 
+    /// <summary>Порты HTTPS Discord и запасные HTTPS Cloudflare: ради них секции с подделкой SYN и стоят.</summary>
+    public const string SynDataPorts = "80,443,1080,2053,2083,2087,2096,8443";
+
     /// <summary>
-    /// Секции по адресам с подделкой SYN не трогают фронты Google (см. <see cref="GoogleFrontEnds"/>).
+    /// Секции по адресам с подделкой SYN: не трогают фронты Google и не выходят за порты HTTPS.
     /// </summary>
+    /// <remarks>
+    /// «discord.com (IP fallback)» стоит на портах 80 и 443–65535 по <c>ipset-discord</c>, а в нём
+    /// AWS, Google Cloud и Cloudflare целиком — там же серверы игр. Подделка SYN на их портах
+    /// (жалобы 13.11: Heroes of Newerth не подключается и на «напрямую», Aion 2 не входит
+    /// с Universal) ломала соединения, которым десинк вовсе не нужен. Для Discord и сайтов
+    /// Cloudflare секция нужна на HTTPS и его запасных портах — их и оставляем.
+    /// </remarks>
     public static IReadOnlyList<string> SparedFromSynData(IReadOnlyList<string> sectionArguments)
     {
         bool byAddress = sectionArguments.Any(a => a.StartsWith("--ipset=", StringComparison.Ordinal));
         bool synData = sectionArguments.Any(a => a.StartsWith("--lua-desync=syndata", StringComparison.Ordinal));
 
-        return byAddress && synData
-            ? [.. sectionArguments, "--ipset-exclude-ip=" + string.Join(',', GoogleFrontEnds)]
-            : sectionArguments;
+        if (!byAddress || !synData)
+            return sectionArguments;
+
+        var result = sectionArguments
+            .Select(a => a.StartsWith("--filter-tcp=", StringComparison.Ordinal) && WideRange(a["--filter-tcp=".Length..])
+                ? "--filter-tcp=" + SynDataPorts
+                : a)
+            .ToList();
+
+        result.Add("--ipset-exclude-ip=" + string.Join(',', GoogleFrontEnds));
+        return result;
+
+        // Диапазон, уходящий за 8443, — «все порты» по сути.
+        static bool WideRange(string ports) =>
+            ports.Split(',').Any(p => p.Contains('-') && int.TryParse(p[(p.IndexOf('-') + 1)..], out var last) && last > 8443);
     }
 
     /// <summary>
