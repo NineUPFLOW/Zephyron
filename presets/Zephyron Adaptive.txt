@@ -404,16 +404,6 @@
 
 --new
 
-# x.com и t.co переехали на Cloudflare 162.159.140.x, которого в ipset-twitter нет:
-# их приветствие забирала «Russia blacklist TCP 443». Секция по именам — тем же рецептом.
---name=Twitter/X (по имени)
---filter-tcp=80,443
---hostlist=lists/zy-twitter.txt
---out-range=-d8
---lua-desync=multisplit:pos=1:seqovl=568:seqovl_pattern=tls_4pda
-
---new
-
 # По адресам — прежний рецепт: секция берёт и чужие сайты на тех же адресах Cloudflare,
 # и рецепт 4pda здесь закрывал их (firstlook.gg — 0 из 3, 15.11).
 --name=Twitter/X

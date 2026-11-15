@@ -1,4 +1,4 @@
-# SimpleX Chat (для пресета «Ростелеком»).
+# SimpleX Chat (для пресета Zephyron Strict).
 simplex.chat
 simplex.im
 simplexonflux.com

@@ -69,6 +69,8 @@ public sealed class NexusHomeTests
     [InlineData("2026-11-10 16:43:18 супервизор запущен, PID 4242")]
     [InlineData("2026-11-10 16:43:18 winws2: запуск")]
     [InlineData("[16:43:18] пин: проверка пинов (сама): просмотрено 12, менять нечего")]
+    [InlineData("[16:43:18] замер: забыто проверок серверов старше 7 дн.: 5")]
+    [InlineData("2026-11-16 00:10:00 YouTube: способ обхода 1 из 6.")]
     public void Kitchen_lines_stay_in_the_full_journal(string line)
     {
         var (_, source, message) = StatusView.Split(line)!.Value;

@@ -1,4 +1,4 @@
-# Signal (для пресета «Ростелеком»).
+# Signal (для пресета Zephyron Strict).
 signal.org
 signal.me
 signal.art

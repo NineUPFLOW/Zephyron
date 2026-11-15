@@ -247,6 +247,7 @@ public sealed class SignaturesTests
         Assert.StartsWith("steamcommunity.com — 14", text);
         Assert.Contains(Signatures.Freeze.Meaning, text);
         Assert.Contains("Что делать: " + Signatures.Freeze.Remedy, text);
-        Assert.Contains("Почерк известен: " + Signatures.Freeze.Origin, text);
+        // Откуда почерк известен — наша заметка, в окно и отчёт не идёт (16.11).
+        Assert.DoesNotContain(Signatures.Freeze.Origin, text);
     }
 }

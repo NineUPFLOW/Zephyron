@@ -1,6 +1,7 @@
-# Preset: Ростелеком
-# BuiltinVersion: 2.44
-# Description: 
+# Preset: Zephyron Strict
+# BuiltinVersion: 1.0
+# IconColor: #f0a35e
+# Description: Для провайдеров, которые режут строже обычного (например, Ростелеком). Включите, если с Zephyron Adaptive YouTube или сайты не открываются.
 
 --lua-init=@lua/zapret-lib.lua
 --lua-init=@lua/zapret-antidpi.lua

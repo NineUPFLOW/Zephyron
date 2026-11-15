@@ -183,6 +183,12 @@ public partial class StatusView
         if (who == "пин" && message.Contains("менять нечего", StringComparison.Ordinal))
             return null;
 
+        // Уборка старых замеров и номер способа YouTube при каждом запуске — кухня, не событие
+        // (16.11 владелец: «если это мусор, то не стоит его показывать»). Смену способа сторож пишет сам.
+        if ((who == "замер" && message.StartsWith("забыто", StringComparison.Ordinal))
+            || (who == "YouTube" && message.StartsWith("способ обхода", StringComparison.Ordinal)))
+            return null;
+
         var name = who switch
         {
             "winws2" => "Десинк",

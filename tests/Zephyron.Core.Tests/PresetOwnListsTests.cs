@@ -50,7 +50,7 @@ public sealed class PresetOwnListsTests
     /// Списки и образцы Zapret GUI, названные пресетом, лежат в vendor\zapret-gui.
     /// </summary>
     /// <remarks>
-    /// Пресет «Ростелеком» (15.11) ссылался на signal, matrix и simplex, которых
+    /// Пресет Zephyron Strict (бывший «Ростелеком», 15.11) ссылался на signal, matrix и simplex, которых
     /// в Zapret GUI нет: winws2 с несуществующим списком не поднимается вовсе.
     /// </remarks>
     [Fact]

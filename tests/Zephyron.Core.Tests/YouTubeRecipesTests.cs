@@ -78,6 +78,7 @@ public sealed class YouTubeRecipesTests : IDisposable
     [Theory]
     [InlineData("Zephyron Adaptive", true)]
     [InlineData("Universal V12 Lite", false)]
+    [InlineData("Zephyron Strict", false)]
     [InlineData(null, false)]
     public void OnlyOurPresetChangesRecipes(string? name, bool expected) =>
         Assert.Equal(expected, YouTubeRecipes.Applies(name));

@@ -1,4 +1,4 @@
-# Matrix и Element (для пресета «Ростелеком»).
+# Matrix и Element (для пресета Zephyron Strict).
 matrix.org
 matrix.to
 element.io

@@ -280,11 +280,17 @@ public partial class CheckView : UserControl
     private static string? _verdict;
 
     /// <summary>«Только проблемы»: прячет строки, по которым делать нечего.</summary>
-    private static bool _onlyProblems;
+    /// <remarks>
+    /// Включено сразу (16.11): из 170 имён проблемных обычно с десяток, и сотня зелёных
+    /// карточек их прятала. Выбранный вердикт («доступен») показывается целиком.
+    /// </remarks>
+    private static bool _onlyProblems = true;
 
     private static bool Shown(CheckRow row) =>
-        (_verdict is null || row.Verdict == _verdict)
-        && (!_onlyProblems || row.Actionable || row.BypassShown == Visibility.Visible);
+        _verdict is not null
+            ? row.Verdict == _verdict
+            // Проверка одного сайта или сервиса: человек спросил про него — ответ показываем целиком.
+            : !_onlyProblems || _target is not null || row.Actionable || row.BypassShown == Visibility.Visible;
 
     private void OnRowsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) => ShowSummary();
 
@@ -519,10 +525,10 @@ public partial class CheckView : UserControl
 
         if (running)
         {
-            SetupTitle.Text = "Движки работают — видно сеть уже с десинком";
-            SetupBody.Text = "Чтобы увидеть, что закрыто на самом деле, выключите их на "
-                + "«Главной» и повторите. Доступное сейчас может быть доступно как раз "
-                + "благодаря обходу.";
+            // 16.11: жёлтая плашка «Движки работают» читалась как неполадка, а проверка с обходом — обычный случай.
+            SetupTitle.Text = "Проверка идёт через обход";
+            SetupBody.Text = "Видно, как сайты открываются у вас сейчас. Чтобы узнать, что провайдер "
+                + "закрывает без обхода, выключите его на «Главной» и проверьте снова.";
         }
 
         return running;
@@ -731,16 +737,37 @@ public partial class CheckView : UserControl
             var changes = BlockCheckHistory.Compare(was, Collected.Select(r => (r.Host, r.Verdict)));
 
             string when = last.LastWriteTime.ToString("dd.MM HH:mm");
-            string body = changes.Count == 0
-                ? "Ни одно имя, проверенное оба раза, вердикта не сменило."
-                : string.Join("\n", changes.Select(c => $"{c.Host}: было «{c.Was}», стало «{c.Now}»"));
+            var (opened, closed) = BlockCheckHistory.Flips(changes);
 
-            // Движки в прошлый раз стояли иначе — разница может быть от обхода, а не от сети.
-            if (engines is { } before && before != enginesRunning)
-                body += before ? "\nВ прошлый раз движки работали, сейчас — нет." : "\nВ прошлый раз движки были остановлены, сейчас работают.";
+            // Движки в прошлый раз стояли иначе — разница от обхода, а не от сети: списком её не показываем.
+            bool otherEngines = engines is { } before && before != enginesRunning;
 
-            var row = new SectionRow($"С прошлой проверки ({when}): изменилось {changes.Count}", body,
-                (Brush)FindResource(changes.Count == 0 ? "Muted" : "Accent"));
+            string title, body;
+
+            if (otherEngines)
+            {
+                title = $"С прошлой проверки ({when})";
+                body = engines == true
+                    ? "В прошлый раз обход работал, сейчас выключен — сравнивать нечего."
+                    : "В прошлый раз обход был выключен, сейчас работает — сравнивать нечего.";
+            }
+            else if (opened.Count + closed.Count == 0)
+            {
+                title = $"С прошлой проверки ({when}): без перемен";
+                body = "Что открывалось, то и открывается.";
+            }
+            else
+            {
+                title = $"С прошлой проверки ({when})";
+                body = string.Join("\n", new[]
+                {
+                    opened.Count > 0 ? $"Открылись ({opened.Count}): {BlockCheckHistory.Names(opened)}" : null,
+                    closed.Count > 0 ? $"Перестали открываться ({closed.Count}): {BlockCheckHistory.Names(closed)}" : null,
+                }.OfType<string>());
+            }
+
+            var row = new SectionRow(title, body,
+                (Brush)FindResource(closed.Count > 0 && !otherEngines ? "Accent" : "Muted"));
 
             // В тот же список, что держит Summarise: его дозаписи (туннель и пр.) приходят
             // позже и ставят этот список заново — копия потеряла бы строку.
@@ -1010,7 +1037,10 @@ public partial class CheckView : UserControl
 
         // Узлы, на которые машина недавно ходила (кэш DNS): у них свой адрес и своя судьба,
         // зона из списка их не показывает. Только проверке окна — автоподбор меряет по спискам.
-        var recent = recentNodes ? RecentNodes.FromDnsCache() : [];
+        // Без узлов, которые сторож видео сам закрыл в hosts (0.0.0.0): это не поломка, а
+        // наш отказ от молчащего кэша провайдера — 16.11 такой узел стоял в проверке «проблемой».
+        var refused = VideoNodeGuard.Load();
+        var recent = recentNodes ? RecentNodes.FromDnsCache().Where(n => !refused.ContainsKey(n)).ToList() : [];
         var zones = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var service in ServiceCatalog.All)
@@ -1324,7 +1354,13 @@ public partial class CheckView : UserControl
 
         // Молчащий QUIC маршрутом не чинится (SiteFixer скажет «открывается как есть») —
         // поэтому сразу как: выключить HTTP/3 в браузере, и браузер пойдёт по TCP.
-        if (report.Data.QuicSilent == true)
+        //
+        // При работающем обходе молчащий QUIC — наш же пресет: он гасит QUIC YouTube и
+        // соседей, браузер сразу идёт по TCP, видео играет (16.11, 4K и 8K). Совет
+        // «выключите QUIC» тогда ложный и пугает у открывшегося сайта.
+        bool quicNote = report.Data.QuicSilent == true && !EngineControl.IsRunning;
+
+        if (quicNote)
             note = QuicOff;
 
         return new CheckRow(
@@ -1341,7 +1377,7 @@ public partial class CheckView : UserControl
             report.Describe(),
             (Brush)FindResource(key),
             why ?? string.Empty,
-            (report.Actionable || report.Data.QuicSilent == true) && why is not null ? Visibility.Visible : Visibility.Collapsed,
+            (report.Actionable || quicNote) && why is not null ? Visibility.Visible : Visibility.Collapsed,
             note,
             note.Length == 0 ? Visibility.Collapsed : Visibility.Visible,
             report.Actionable,

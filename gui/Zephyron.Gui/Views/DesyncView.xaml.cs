@@ -116,7 +116,6 @@ public sealed record PresetRow(string Name, string Version, string Fake) : INoti
 
     public Visibility ApplyShown => Chosen ? Visibility.Collapsed : Visibility.Visible;
 
-    public Visibility VersionShown => Version.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
 
     public Visibility FakeShown => Fake.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
 }
@@ -219,7 +218,7 @@ public partial class DesyncView : UserControl
             _rows = rows;
             Redraw();
 
-            Status.Text = $"Пресетов: {rows.Count}, из них наших {rows.Count(r => r.Official)}. "
+            Status.Text = $"Пресетов: {rows.Count}. "
                 + "Выбор вступит в силу при следующем запуске движков.";
 
             StartCounting(rows);
@@ -629,7 +628,10 @@ public partial class DesyncView : UserControl
         CaptureBox.SelectedIndex = Array.IndexOf(CaptureOrder, settings.Capture);
         _fillingCapture = false;
 
-        CaptureHint.Text = DescribeCapture(settings);
+        var (hint, details) = DescribeCapture(settings);
+        CaptureHint.Text = hint;
+        CaptureHint.Visibility = hint.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        CaptureHint.ToolTip = details.Length > 0 ? details : null;
     }
 
     /// <summary>
@@ -640,13 +642,19 @@ public partial class DesyncView : UserControl
     /// а снаружи это неотличимо от неработающего рецепта. Сказать об этом
     /// должно окно, до запуска, а не человек через вечер разбора.
     /// </remarks>
-    private static string DescribeCapture(AppSettings settings)
+    // 16.11: строка портов и перечень секций с диапазонами занимали пол-экрана и
+    // человеку ничего не говорили. «Как в пресете» — так задумал автор пресета,
+    // говорить не о чем; при сужении — одна строка, перечень во всплывающей подсказке.
+    internal static (string Hint, string Details) DescribeCapture(AppSettings settings)
     {
         if (settings.PresetName is not { } name)
-            return "Пресет не выбран, десинк не запущен.";
+            return ("Пресет не выбран, десинк не запущен.", string.Empty);
 
         if (ZapretPaths.FindPreset(name) is not { } path)
-            return $"Пресет «{name}» не найден в папке пресетов — что выйдет с перехватом, сказать нечем.";
+            return ($"Пресет «{name}» не найден в папке пресетов.", string.Empty);
+
+        if (settings.Capture == CaptureWidth.Preset)
+            return (string.Empty, string.Empty);
 
         ZapretPreset preset;
 
@@ -656,21 +664,20 @@ public partial class DesyncView : UserControl
         }
         catch (Exception)
         {
-            return string.Empty;
+            return (string.Empty, string.Empty);
         }
 
         if (PresetCapture.Effective(preset, settings.Capture) is not { } ports)
-            return $"У пресета «{preset.Name}» полный фильтр перехвата (--wf-raw) — уровень к нему не применяется.";
-
-        var text = $"Сейчас: TCP {ports.Tcp}, UDP {ports.Udp}"
-            + (settings.GameFilter ? $"; game filter добавит {GameFilter.Ports}." : ".");
+            return (string.Empty, string.Empty);
 
         var lost = PresetCapture.Unreached(preset, settings.Capture);
+        var details = $"Перехват: TCP {ports.Tcp}, UDP {ports.Udp}"
+            + (settings.GameFilter ? $"; game filter добавит {GameFilter.Ports}." : ".")
+            + (lost.Count > 0 ? "\n\nНе получат трафик:\n" + string.Join("\n", lost) : string.Empty);
 
-        if (lost.Count > 0)
-            text += $"\nСекции «{preset.Name}», которые не получат трафик на этих портах: {string.Join("; ", lost)}.";
-
-        return text;
+        return (lost.Count > 0
+            ? $"При таком перехвате {lost.Count} {Ending(lost.Count, "часть", "части", "частей")} пресета не получат трафик — наведите, чтобы увидеть какие."
+            : string.Empty, details);
     }
 
     /// <summary>

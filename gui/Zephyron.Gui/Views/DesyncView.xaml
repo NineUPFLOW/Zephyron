@@ -40,15 +40,6 @@
                     <TextBlock Grid.Column="0" Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"
                                TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="0,0,10,0" />
 
-                    <Border Grid.Column="1" Background="{DynamicResource Raised}" CornerRadius="{StaticResource RMd}"
-                            BorderBrush="{DynamicResource Border}" BorderThickness="{StaticResource Stroke}"
-                            Padding="8,2" VerticalAlignment="Center"
-                            ToolTip="Для какой версии Zapret GUI собран пресет"
-                            Visibility="{Binding VersionShown}">
-                        <TextBlock Text="{Binding Version}" Style="{StaticResource Mono}"
-                                   Foreground="{DynamicResource Muted}" FontSize="11.5" />
-                    </Border>
-
                     <Button Grid.Column="3" Style="{StaticResource IconGhost}" Content="&#xE712;"
                             Margin="6,0,0,0" VerticalAlignment="Center"
                             ToolTip="Ещё: открыть в редакторе, показать файл"
@@ -476,7 +467,7 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="4,0,16,0">
-                        <TextBlock x:Name="MineHeader" Text="Пресет Zephyron" FontWeight="SemiBold" FontSize="18" />
+                        <TextBlock x:Name="MineHeader" Text="Пресеты Zephyron" FontWeight="SemiBold" FontSize="18" />
                         <TextBlock x:Name="MineNote" Style="{StaticResource Caption}" Margin="0,4,0,0"
                                    TextWrapping="Wrap"
                                    Text="Подстраивается под провайдера и обновляется вместе с программой." />

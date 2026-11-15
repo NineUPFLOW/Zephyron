@@ -13,3 +13,20 @@ public sealed class CacheNodeNameTests
     public void OnlyTheNodeIsKept(string answer, string expected) =>
         Assert.Equal(expected, SupportReport.CacheNodeName(answer));
 }
+
+/// <summary>Свой видеосервер YouTube по ответу report_mapping.</summary>
+public sealed class GoogleVideoNodeTests
+{
+    [Fact]
+    public void ClusterBecomesVideoServer() =>
+        Assert.Equal("rr1---sn-h0jelne7.googlevideo.com",
+            Zephyron.Core.Diagnostics.GoogleVideoNode.FromCluster(
+                Zephyron.Core.Diagnostics.GoogleVideoNode.Cluster("1.2.3.4 => muc12s10 (1.2.3.0/24)")));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("не ответил")]
+    public void JunkGivesNothing(string? cluster) =>
+        Assert.Null(Zephyron.Core.Diagnostics.GoogleVideoNode.FromCluster(cluster));
+}

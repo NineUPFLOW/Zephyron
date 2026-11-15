@@ -209,7 +209,7 @@
                 <TextBlock Text="Пины напрямую" Style="{StaticResource GroupHead}" Margin="4,22,0,7" />
 
                 <TextBlock Style="{StaticResource Caption}" Margin="4,0,0,9" TextWrapping="Wrap"
-                           Text="Имя прибивается в hosts к адресу самого сервиса, а десинк продолжает работать: провайдер режет это имя и там. Взято из каталога Zapret GUI, раздел «Напрямую»." />
+                           Text="Имя прибивается в hosts к адресу самого сервиса, а десинк продолжает работать: провайдер режет это имя и там." />
 
                 <Border Style="{StaticResource SettingsGroup}">
                     <ItemsControl x:Name="Solutions">

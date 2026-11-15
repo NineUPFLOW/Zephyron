@@ -105,6 +105,53 @@ public partial class LogView : UserControl
         "не удалось", "не отвечает", "недоступ",
     ];
 
+    /// <summary>
+    /// Журнал без шума: служебные строки туннеля убраны, а одинаковые подряд
+    /// (до чисел, адресов и номеров) свёрнуты в одну с числом повторов.
+    /// </summary>
+    /// <remarks>
+    /// 16.11 у владельца в журнале туннеля стояли сотни ERROR: Telegram сам перебирает
+    /// свои адреса напрямую (300 «i/o timeout»), а закрытые браузером соединения дают
+    /// «endpoint not connected». Ни то ни другое не сбой — человек же видел стену ошибок.
+    /// </remarks>
+    internal static (List<string> Lines, int Hidden) Tidy(IEnumerable<string> lines)
+    {
+        var shown = new List<string>();
+        int hidden = 0, repeats = 0;
+        string? lastKey = null;
+
+        foreach (var line in lines)
+        {
+            if (NoiseWords.Any(word => line.Contains(word, StringComparison.OrdinalIgnoreCase)))
+            {
+                hidden++;
+                continue;
+            }
+
+            var key = Regex.Replace(line, @"[0-9a-fA-F:.\[\]]{4,}|\d+", "#");
+
+            if (key == lastKey)
+            {
+                repeats++;
+                hidden++;
+                shown[^1] = line + $"   (×{repeats + 1} подряд)";
+                continue;
+            }
+
+            lastKey = key;
+            repeats = 0;
+            shown.Add(line);
+        }
+
+        return (shown, hidden);
+    }
+
+    private static readonly string[] NoiseWords =
+    [
+        // Соединение закрыла сама программа (браузер ушёл со страницы) — не сбой.
+        "endpoint not connected", "operation was canceled", "use of closed network connection",
+    ];
+
     /// <param name="follow">Перечитывание по таймеру: без лишней работы, когда ничего не изменилось, и без рывка к концу, если человек читает выше.</param>
     internal void Reload(bool follow = false)
     {
@@ -128,7 +175,7 @@ public partial class LogView : UserControl
             if (_errorsOnly)
                 lines = lines.Where(IsTrouble);
 
-            var shown = lines.ToList();
+            var (shown, hidden) = Tidy(lines);
             var text = string.Join('\n', shown);
 
             if (follow && text == Text.Text)
@@ -141,7 +188,8 @@ public partial class LogView : UserControl
 
             var size = new FileInfo(path).Length / 1024.0;
             Status.Text = $"{path} — {size:N0} КБ, показаны последние {shown.Count} строк"
-                + (_errorsOnly ? " с ошибками." : ".");
+                + (_errorsOnly ? " с ошибками" : string.Empty)
+                + (hidden > 0 ? $"; повторов и служебного шума скрыто: {hidden}." : ".");
 
             // Вниз, к свежему: журнал читают ради последнего, а не первого.
             if (atEnd)

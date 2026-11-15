@@ -27,7 +27,12 @@ public sealed class YouTubeWatchTests
         var recent = new Queue<DateTime>(Enumerable.Range(1, YouTubeRecipes.Recipes.Count).Select(i => Now.AddMinutes(-i * 4)));
 
         Assert.False(YouTubeWatch.Due(2, Now, Now.AddMinutes(-4), recent));
+        Assert.True(YouTubeWatch.Exhausted(2, Now, Now.AddMinutes(-4), recent));
     }
+
+    [Fact]
+    public void NotExhaustedWhileRecipesRemain() =>
+        Assert.False(YouTubeWatch.Exhausted(2, Now, Now.AddMinutes(-4), new Queue<DateTime>([Now.AddMinutes(-4)])));
 
     [Fact]
     public void OldSwitchesAreForgotten()

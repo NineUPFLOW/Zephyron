@@ -539,8 +539,17 @@ public static class SupportReport
 
     private static string YouTubeNow()
     {
+        // К какому кэшу Google отправляет провайдер: «rostelecom-svo13» — свой узел провайдера,
+        // код аэропорта (FRA, AMS, ARN, HEL) — заграничный, видео идёт издалека (ggc-russia, 10.2026).
+        var node = GoogleCacheNode();
+
+        // И сам видеосервер этого узла: redirector отвечает и тогда, когда видео режут.
+        string[] hosts = Zephyron.Core.Diagnostics.GoogleVideoNode.FromCluster(node) is { } video
+            ? [.. YouTubeHosts, video]
+            : YouTubeHosts;
+
         using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(25));
-        var probes = YouTubeHosts.Select(h => BlockCheck.CheckAsync(h, "YouTube", cancel.Token)).ToArray();
+        var probes = hosts.Select(h => BlockCheck.CheckAsync(h, "YouTube", cancel.Token)).ToArray();
 
         try
         {
@@ -552,17 +561,14 @@ public static class SupportReport
         }
 
         var text = new StringBuilder("YouTube через нынешний путь (движки работают): TLS, данные, вердикт.\n\n");
-
-        // К какому кэшу Google отправляет провайдер: «rostelecom-svo13» — свой узел провайдера,
-        // код аэропорта (FRA, AMS, ARN, HEL) — заграничный, видео идёт издалека (ggc-russia, 10.2026).
-        text.AppendLine("Узел кэша Google (redirector report_mapping): " + GoogleCacheNode());
+        text.AppendLine("Узел кэша Google (redirector report_mapping): " + node);
         text.AppendLine();
 
-        for (int i = 0; i < YouTubeHosts.Length; i++)
+        for (int i = 0; i < hosts.Length; i++)
         {
             text.AppendLine(probes[i].IsCompletedSuccessfully
-                ? $"{YouTubeHosts[i],-28} TLS {probes[i].Result.DescribeTls(),-8} данные {probes[i].Result.DescribeData(),-10} {probes[i].Result.Describe()}"
-                : $"{YouTubeHosts[i],-28} проба не завершилась: {probes[i].Exception?.GetBaseException().Message ?? "время вышло"}");
+                ? $"{hosts[i],-28} TLS {probes[i].Result.DescribeTls(),-8} данные {probes[i].Result.DescribeData(),-10} {probes[i].Result.Describe()}"
+                : $"{hosts[i],-28} проба не завершилась: {probes[i].Exception?.GetBaseException().Message ?? "время вышло"}");
         }
 
         return text.ToString();
@@ -573,7 +579,7 @@ public static class SupportReport
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
-            var answer = http.GetStringAsync("https://redirector.googlevideo.com/report_mapping?di=no").GetAwaiter().GetResult();
+            var answer = http.GetStringAsync(Zephyron.Core.Diagnostics.GoogleVideoNode.MappingUrl).GetAwaiter().GetResult();
             return CacheNodeName(answer);
         }
         catch (Exception ex)

@@ -59,4 +59,27 @@ public static class BlockCheckHistory
         now.Where(n => was.TryGetValue(Key(n.Host), out var before) && before != n.Verdict)
             .Select(n => new VerdictChange(n.Host, was[Key(n.Host)], n.Verdict))
             .ToList();
+
+    /// <summary>
+    /// Что открылось и что перестало: смена одного «доступен» на другой (уточнилась
+    /// сеть, поменялась причина отказа) человеку не интересна и в счёт не идёт.
+    /// </summary>
+    /// <remarks>16.11 владелец: список «было … стало …» по каждому имени — огромный и нечитаемый.</remarks>
+    public static (IReadOnlyList<string> Opened, IReadOnlyList<string> Closed) Flips(IEnumerable<VerdictChange> changes)
+    {
+        var list = changes.ToList();
+        return (
+            list.Where(c => !IsOpen(c.Was) && IsOpen(c.Now)).Select(c => c.Host).ToList(),
+            list.Where(c => IsOpen(c.Was) && !IsOpen(c.Now)).Select(c => c.Host).ToList());
+    }
+
+    /// <summary>Вердикт «открывается»: «доступен», но не «недоступен».</summary>
+    public static bool IsOpen(string verdict) =>
+        System.Text.RegularExpressions.Regex.IsMatch(verdict, @"(?<![а-яё])доступен", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    /// <summary>Имена через запятую, не больше <paramref name="max"/>; остальные — числом.</summary>
+    public static string Names(IReadOnlyList<string> hosts, int max = 6) =>
+        hosts.Count <= max
+            ? string.Join(", ", hosts)
+            : string.Join(", ", hosts.Take(max)) + $" и ещё {hosts.Count - max}";
 }

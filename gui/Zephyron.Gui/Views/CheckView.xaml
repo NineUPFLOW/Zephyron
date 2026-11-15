@@ -49,9 +49,9 @@
                     какая она есть.
                 -->
                 <Border x:Name="SetupCard" Style="{StaticResource Card}" Margin="0,20,0,0"
-                        Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}" Visibility="Collapsed">
+                        Visibility="Collapsed">
                     <StackPanel>
-                        <TextBlock x:Name="SetupTitle" FontWeight="SemiBold" Foreground="{DynamicResource Warn}" />
+                        <TextBlock x:Name="SetupTitle" FontWeight="SemiBold" />
                         <TextBlock x:Name="SetupBody" Style="{StaticResource Caption}"
                                    TextWrapping="Wrap" Margin="0,6,0,0" />
                     </StackPanel>

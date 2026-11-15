@@ -29,6 +29,19 @@ internal sealed record BuildOutcome(bool Ok, string Message, string? Warning = n
 /// </remarks>
 internal static class TunnelConfig
 {
+    /// <summary>Наш пресет по умолчанию — запас для рецептов, названных по секциям другого пресета.</summary>
+    private static readonly Lazy<ZapretPreset?> DefaultPreset = new(() =>
+    {
+        try
+        {
+            return ZapretPaths.FindPreset(AppSettings.DefaultPresetName) is { } path ? new PresetReader().Load(path) : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    });
+
     public static async Task<BuildOutcome> BuildAsync(
         AppSettings settings,
         CancellationToken cancellationToken)
@@ -540,6 +553,12 @@ internal static class TunnelConfig
                     // профиль не создавался, а в маршрутах стояло
                     // «десинк: tls-multisplit-sni — нет в пресете».
                     var recipe = RecipeResolver.Find(preset, group.Key, providers);
+
+                    // Рецепт выбран по имени секции другого пресета («Google (сервисы)»
+                    // из Universal), а пресет сменили: берём его шаги из нашего пресета
+                    // по умолчанию, а не оставляем имена без десинка (16.11).
+                    if (!recipe.Found && DefaultPreset.Value is { } fallback)
+                        recipe = RecipeResolver.Find(fallback, group.Key, providers);
 
                     var domains = (IReadOnlyList<string>)group
                         .SelectMany(Names)

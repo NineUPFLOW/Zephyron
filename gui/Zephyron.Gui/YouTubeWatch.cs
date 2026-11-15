@@ -1,4 +1,5 @@
 using Zephyron.Core;
+using Zephyron.Core.Diagnostics;
 using Zephyron.Core.Rules;
 using Zephyron.Proxy;
 using Zephyron.Zapret;
@@ -29,6 +30,7 @@ internal static class YouTubeWatch
     private static readonly string[] Probes = ["www.youtube.com", "i.ytimg.com", "redirector.googlevideo.com"];
 
     private static bool _started;
+    private static string? _videoNode;
     private static int _streak;
     private static bool _switched;
     private static DateTime _lastSwitch = DateTime.MinValue;
@@ -84,7 +86,12 @@ internal static class YouTubeWatch
             return;
         }
 
-        var results = await Task.WhenAll(Probes.Select(h => BlockCheck.CheckAsync(h, "YouTube", cancel.Token))).ConfigureAwait(false);
+        // Свой видеосервер человека — один раз за сторожа: узел меняется редко, а redirector
+        // отвечает и тогда, когда режут само видео.
+        _videoNode ??= await GoogleVideoNode.FindAsync(cancel.Token).ConfigureAwait(false);
+        string[] probes = _videoNode is { } node ? [.. Probes, node] : Probes;
+
+        var results = await Task.WhenAll(probes.Select(h => BlockCheck.CheckAsync(h, "YouTube", cancel.Token))).ConfigureAwait(false);
 
         // Страница открылась, а видео нет — для человека YouTube тоже не работает.
         if (results.All(r => r.Kind == BlockKind.None))
@@ -100,7 +107,12 @@ internal static class YouTubeWatch
         _streak++;
 
         if (!Due(_streak, DateTime.UtcNow, _lastSwitch, Switches))
+        {
+            if (Exhausted(_streak, DateTime.UtcNow, _lastSwitch, Switches) && ZapretPaths.FindPreset(YouTubeRecipes.FallbackPreset) is not null)
+                await ToStrongAsync(settings, results).ConfigureAwait(false);
+
             return;
+        }
 
         int now = YouTubeRecipes.Read();
         int next = YouTubeRecipes.Next(now);
@@ -124,6 +136,27 @@ internal static class YouTubeWatch
             switches.Dequeue();
 
         return streak >= 2 && now - lastSwitch >= Gap && switches.Count < YouTubeRecipes.Recipes.Count;
+    }
+
+    /// <summary>
+    /// Круг рецептов пройден, ни один не помог: провайдер строже, чем рассчитан Adaptive.
+    /// </summary>
+    internal static bool Exhausted(int streak, DateTime now, DateTime lastSwitch, Queue<DateTime> switches) =>
+        streak >= 2 && now - lastSwitch >= Gap && switches.Count >= YouTubeRecipes.Recipes.Count;
+
+    /// <summary>
+    /// Один раз за сторожа — на Zephyron Strict. Дальше сторож молчит (Applies у Strict ложно),
+    /// так что качелей между пресетами нет; вернуть Adaptive можно на «Десинке».
+    /// </summary>
+    private static async Task ToStrongAsync(AppSettings settings, TargetReport[] results)
+    {
+        (settings with { PresetName = YouTubeRecipes.FallbackPreset }).Save(AppSettings.DefaultPath);
+        _streak = 0;
+
+        Journal.Write("YouTube", $"Ни один способ обхода в Zephyron Adaptive не открыл YouTube ({string.Join("; ", results.Select(r => r.Describe()))}) — "
+            + $"включаю пресет {YouTubeRecipes.FallbackPreset} для строгих провайдеров. Вернуть прежний можно на вкладке «Десинк».");
+
+        await EngineControl.RestartAsync("YouTube: пресет для строгих провайдеров", CancellationToken.None).ConfigureAwait(false);
     }
 
     /// <summary>Свой маршрут YouTube — через VPN: тогда способ десинка ни при чём.</summary>

@@ -29,6 +29,9 @@ public static class YouTubeRecipes
     /// <summary>Секция видеосерверов: страница открылась, а видео стоит — режут её, и рецепт меняется вместе.</summary>
     public const string VideoSectionName = "googlevideo.com (CDN сервера)";
 
+    /// <summary>Куда уйти, когда в Adaptive не помог ни один рецепт: пресет для строгих провайдеров.</summary>
+    public const string FallbackPreset = "Zephyron Strict";
+
     public static string StatePath => Path.Combine("runtime", "youtube-recipe.txt");
 
     public static readonly IReadOnlyList<string> Recipes =
@@ -43,9 +46,9 @@ public static class YouTubeRecipes
         "hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2",
     ];
 
-    /// <summary>Наш ли пресет: смена рецепта — только в нём, Universal остаются как есть.</summary>
+    /// <summary>Смена рецепта — только в Zephyron Adaptive: в Strict и Universal рецепты авторов, их не трогаем.</summary>
     public static bool Applies(string? presetName) =>
-        presetName is not null && presetName.StartsWith("Zephyron", StringComparison.OrdinalIgnoreCase);
+        string.Equals(presetName, AppSettings.DefaultPresetName, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Номер выбранного рецепта; нет файла или мусор — первый.</summary>
     public static int Read(string? path = null)

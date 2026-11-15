@@ -494,7 +494,7 @@ public sealed class QaSignalTests
         { "Не удалось очистить: x", true, "TunnelSettingsWindow.xaml.cs:247" },
 
         // Не ошибки: информация, ход работы, успех.
-        { "Пресетов: 4, из них наших 2.", false, "DesyncView.xaml.cs:218" },
+        { "Пресетов: 4.", false, "DesyncView.xaml.cs:218" },
         { "Выбран «p». Применится при следующем запуске движков.", false, "DesyncView.xaml.cs:975" },
         { "Открыт p.bat. Правка подействует после перезапуска движков.", false, "DesyncView.xaml.cs:722" },
         { "Пресет не выбран — открывать нечего.", false, "DesyncView.xaml.cs:796" },

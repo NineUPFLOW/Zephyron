@@ -615,7 +615,8 @@ public sealed class SingBoxConfigCompiler
 
         var root = new JsonObject
         {
-            ["log"] = new JsonObject { ["level"] = options.LogLevel },
+            // Время в каждой строке: без него в журнале не понять, когда ошибка случилась.
+            ["log"] = new JsonObject { ["level"] = options.LogLevel, ["timestamp"] = true },
             ["certificate"] = Certificates(),
             ["dns"] = BuildDns(options, tags.Count > 0, ruleSet),
             ["inbounds"] = BuildInbounds(options, CollectProxyAddresses(ruleSet), localProxy),

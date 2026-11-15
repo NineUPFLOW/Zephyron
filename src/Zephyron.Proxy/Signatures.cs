@@ -50,7 +50,7 @@ public sealed record SignatureFinding
     public string Describe(int shown = 8) =>
         string.Join("\n", Lines.Take(shown))
         + (Lines.Count > shown ? $"\n… и ещё {Lines.Count - shown}" : string.Empty)
-        + $"\n\n{Signature.Meaning}\n\nЧто делать: {Signature.Remedy}\n\nПочерк известен: {Signature.Origin}";
+        + $"\n\n{Signature.Meaning}\n\nЧто делать: {Signature.Remedy}";
 }
 
 /// <summary>
