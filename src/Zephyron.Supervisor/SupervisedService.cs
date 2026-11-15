@@ -1158,6 +1158,8 @@ public sealed class SingBoxService : SupervisedService
 
     // Десять секунд: спокойно ушедший адаптер wintun убирает за пару секунд.
     // Движку ради DNS адаптер не нужен, а zephyron0 рядом может быть живым туннелем.
+    private bool _phantomsCleared;
+
     protected override async Task BeforeStartAsync(CancellationToken cancellationToken)
     {
         if (!_dnsOnly && await GhostTunnel.ClearAsync(TimeSpan.FromSeconds(10), cancellationToken) is { } what)
@@ -1171,6 +1173,18 @@ public sealed class SingBoxService : SupervisedService
     /// </summary>
     protected override bool TryRepair(string? fatal)
     {
+        // Адаптер не создался — сначала убрать призраки чужих туннелей, один раз за запуск.
+        if (!_dnsOnly && !_phantomsCleared && GhostTunnel.IsTunFailure(fatal))
+        {
+            _phantomsCleared = true;
+            int removed = GhostTunnel.RemovePhantoms();
+            Note(removed > 0
+                ? $"адаптер туннеля не создался — убраны старые адаптеры других VPN-клиентов: {removed}, запускаю снова"
+                : "адаптер туннеля не создался, старых адаптеров других VPN-клиентов не нашлось");
+
+            return removed > 0;
+        }
+
         if (fatal is null
             || System.Text.RegularExpressions.Regex.Match(fatal, @"initialize (outbound|endpoint)\[(\d+)\]") is not { Success: true } m)
             return false;

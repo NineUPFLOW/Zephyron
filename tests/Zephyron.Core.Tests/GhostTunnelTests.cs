@@ -26,4 +26,13 @@ public sealed class GhostTunnelTests
     [Fact]
     public void ARealAdapterWithOurNameIsNotOurs() =>
         Assert.False(GhostTunnel.IsOurs("zephyron0", "Intel(R) Ethernet", [Ours]));
+
+    [Theory]
+    [InlineData("start inbound/tun[tun-in]: configure tun interface: set ipv4 address: The object already exists.", true)]
+    [InlineData("create wintun adapter: Cannot create a file when that file already exists.", true)]
+    [InlineData("initialize outbound[3]: unknown flow", false)]
+    [InlineData("dial tcp 1.2.3.4:443: file already exists", false)]
+    [InlineData(null, false)]
+    public void TunFailureIsRecognised(string? fatal, bool expected) =>
+        Assert.Equal(expected, GhostTunnel.IsTunFailure(fatal));
 }
