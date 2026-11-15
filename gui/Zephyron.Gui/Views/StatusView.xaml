@@ -699,7 +699,7 @@
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="Запуск при входе" FontWeight="SemiBold" FontSize="13.5" VerticalAlignment="Center" />
                                         <ContentControl Style="{StaticResource Info}" Margin="2,0,0,0"
-                                                        Content="Это задача планировщика, а не служба: права администратора она получает сразу, и запрос UAC при входе не появляется. Запускается та же программа с теми же ключами, что и кнопка «Включить», иначе при входе поднялось бы не то, что вы проверяли." />
+                                                        Content="Программа сама включится при входе в Windows — так же, как кнопкой «Включить», и без запроса прав." />
                                     </StackPanel>
 
                                     <!--

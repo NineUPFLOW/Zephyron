@@ -112,7 +112,7 @@
                 <StackPanel>
                     <TextBlock Text="Когда он пригодится" FontWeight="SemiBold" FontSize="15" />
                     <TextBlock Style="{StaticResource Caption}" Margin="0,5,0,0" TextWrapping="Wrap"
-                               Text="Когда Telegram не идёт через VPN: адреса Telegram закрыты, а через прокси он работает целиком, с фото и видео. Работает прокси только вместе с десинком — без него соединения самого прокси режет DPI, и Telegram не подключится. Если маршрут Telegram — «через VPN» и туннель включён, Telegram и так идёт через него — прокси не нужен." />
+                               Text="Когда Telegram не идёт через VPN: адреса Telegram закрыты, а через прокси он работает целиком, с фото и видео. Нужен включённый десинк: без него провайдер блокирует и сам прокси. Если Telegram уже идёт через VPN, прокси не нужен." />
                     <TextBlock Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap"
                                Text="Только Telegram Desktop на этом компьютере — телефон через него не подключить. Прокси: tg-ws-proxy-rs (valnesfjord) — порт программы tg-ws-proxy (Flowseal), обе под MIT. Журнал — runtime\tg-ws-proxy.log." />
                 </StackPanel>
@@ -158,7 +158,7 @@
                             <TextBlock x:Name="StateText" Style="{StaticResource Caption}" FontSize="13.5" Margin="0,7,0,0" TextWrapping="Wrap" />
                             <TextBlock x:Name="ViaTunnelNote" Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
                                        Visibility="Collapsed"
-                                       Text="Маршрут Telegram — «через VPN», а режим с туннелем: Telegram идёт через туннель, прокси не нужен." />
+                                       Text="Telegram уже идёт через VPN — прокси не нужен." />
                             <!-- Предупреждение: панель WarnSoft с ромбом «частично»; Visibility пишет код у DesyncWarning. -->
                             <Border Margin="0,8,0,0" Padding="12,8" CornerRadius="{StaticResource RMd}"
                                     Background="{DynamicResource WarnSoft}" BorderBrush="{DynamicResource WarnLine}"
@@ -173,7 +173,7 @@
                                              VerticalAlignment="Top" />
                                     <TextBlock x:Name="DesyncWarning" Grid.Column="1" TextWrapping="Wrap" FontSize="12.5"
                                                Visibility="Collapsed"
-                                               Text="Без десинка прокси не работает: его соединения к Telegram и к доменам за Cloudflare режет DPI. Включите десинк: режим «Десинк» или «Гибрид» на «Главной», либо вкладка «Десинк»." />
+                                               Text="Без десинка провайдер блокирует соединения прокси. Включите десинк: режим «Десинк» или «Гибрид» на «Главной», либо вкладка «Десинк»." />
                                 </Grid>
                             </Border>
                         </StackPanel>
@@ -195,7 +195,7 @@
                         <StackPanel Grid.Column="0" Margin="0,0,12,0" VerticalAlignment="Center">
                             <TextBlock Text="Держать включённым без движков" FontWeight="SemiBold" />
                             <TextBlock x:Name="AlwaysText" Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
-                                       Text="Прокси работает, пока открыта программа — и в трее, — даже когда движки остановлены. Без десинка его соединения у части провайдеров режет DPI." />
+                                       Text="Прокси работает, пока открыта программа — и в трее, — даже когда движки остановлены. Без десинка у части провайдеров прокси блокируется." />
                         </StackPanel>
 
                         <TextBlock Grid.Column="1" x:Name="AlwaysWord" Style="{StaticResource Caption}"

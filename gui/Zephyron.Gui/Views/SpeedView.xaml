@@ -66,7 +66,7 @@
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock FontFamily="{StaticResource IconFont}" Text="&#xE774;" FontSize="13"
                                                VerticalAlignment="Center" Margin="0,0,8,0" />
-                                    <TextBlock Text="Через туннель" VerticalAlignment="Center" />
+                                    <TextBlock Text="Через VPN" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
                             <Button x:Name="Direct" AutomationProperties.Name="Мерить напрямую" Style="{StaticResource Segment}" Click="OnDirect" Margin="4,0,0,0">
@@ -509,7 +509,7 @@
                             </Border>
                             <Border Grid.Column="2" Padding="12" CornerRadius="{StaticResource RMd}" Background="{DynamicResource Wash}">
                                 <StackPanel>
-                                    <TextBlock Text="Через туннель" Style="{StaticResource GroupHead}" />
+                                    <TextBlock Text="Через VPN" Style="{StaticResource GroupHead}" />
                                     <TextBlock x:Name="CmpTunnel" Margin="0,6,0,0" FontSize="12.5" LineHeight="20" LineStackingStrategy="BlockLineHeight" TextWrapping="Wrap" />
                                 </StackPanel>
                             </Border>

@@ -182,7 +182,7 @@
                             </StackPanel>
 
                             <Button Grid.Column="3" Style="{StaticResource IconGhost}" Content="&#xE712;" VerticalAlignment="Center"
-                                    ToolTip="Дополнительно: закрепить, скопировать ссылку, изменить, удалить"
+                                    ToolTip="Ещё: закрепить, скопировать ссылку, изменить, удалить"
                                     AutomationProperties.Name="Ещё: действия с подпиской"
                                     Tag="{Binding Name}" Click="OnMore" />
                         </Grid>
@@ -246,7 +246,7 @@
                                               ToolTipService.ShowOnDisabled="True"
                                               Click="OnPoolAuto" />
                                 <Button Style="{StaticResource IconGhost}" Content="&#xE712;" VerticalAlignment="Center"
-                                        ToolTip="Дополнительно: переименовать, удалить" AutomationProperties.Name="Ещё: действия с пулом"
+                                        ToolTip="Ещё: переименовать, удалить" AutomationProperties.Name="Ещё: действия с пулом"
                                         Click="OnPoolMore" />
                             </StackPanel>
                         </Grid>
@@ -402,7 +402,7 @@
                                 о котором никто не знал (владелец 12.10).
                             -->
                             <Button Grid.Column="8" Style="{StaticResource IconGhost}" Content="&#xE712;"
-                                    ToolTip="Дополнительно: автоподбор, замер, адрес" AutomationProperties.Name="Ещё: действия с сервером"
+                                    ToolTip="Ещё: автоподбор, замер, адрес" AutomationProperties.Name="Ещё: действия с сервером"
                                     VerticalAlignment="Center"
                                     Tag="{Binding Tag}" Click="OnServerMenu" />
                         </Grid>

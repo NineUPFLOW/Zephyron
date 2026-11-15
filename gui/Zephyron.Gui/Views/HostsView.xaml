@@ -88,7 +88,7 @@
                     <StackPanel Grid.Column="1">
                         <TextBlock x:Name="ReplacedTitle" FontWeight="SemiBold" Foreground="{DynamicResource Text}" />
                         <TextBlock Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,6,0,0"
-                                   Text="Изменённый hosts он считает признаком заражения и вернул файл к своему умолчанию — вместе со всеми пинами. Пин на этой машине не живёт, пока файл не внесён в доверенные в настройках защитника." />
+                                   Text="Защитник сбросил файл hosts вместе с пинами. Чтобы пины держались, разрешите изменения hosts в настройках защитника." />
                     </StackPanel>
                 </Grid>
             </Border>
