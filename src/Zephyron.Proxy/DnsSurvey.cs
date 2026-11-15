@@ -154,7 +154,7 @@ public static class DnsSurvey
             Group: DnsGroup.Open),
 
         // Добавлены 15.11 по просьбе владельца; DoH проверен из его сети: doh.pub 0,6 с, Wikimedia 0,7 с.
-        // DNS4EU и LibreDNS оттуда не ответили — не берём.
+        // DNS4EU и LibreDNS оттуда не ответили, dnsforge в обзоре программы не прошёл по DoH — не берём.
         new("DNSPod (Tencent)", ["119.29.29.29", "182.254.116.116"], "1.12.12.12", "doh.pub",
             Note: "китайский, без фильтрации",
             Group: DnsGroup.Open),
@@ -163,9 +163,6 @@ public static class DnsSurvey
             Group: DnsGroup.Open),
 
         // Эти по HTTP/1.1 отвечают 505 и работают только по HTTP/2 — как и спрашивают обзор и sing-box.
-        new("dnsforge", ["176.9.93.198", "176.9.1.117"], "176.9.93.198", "dnsforge.de",
-            Note: "немецкий, отсекает рекламу",
-            Group: DnsGroup.Filtering),
         new("Digitale Gesellschaft", ["185.95.218.42", "185.95.218.43"], "185.95.218.42", "dns.digitale-gesellschaft.ch",
             Note: "швейцарский, без фильтрации",
             Group: DnsGroup.Open),
