@@ -616,4 +616,17 @@ public class BlockCheckTests
         Assert.Equal(BlockKind.None, BlockCheck.WithSpoof(BlockKind.None, Ok(), DnsSpoofResult.Clean).Kind);
         Assert.Equal(BlockKind.TlsDpi, BlockCheck.WithSpoof(BlockKind.TlsDpi, Ok(), foreign).Kind);
     }
+
+    [Fact]
+    public void DecryptFailureFarPastFreezeIsWindowsNotNetwork()
+    {
+        var schannel = new System.Security.Authentication.AuthenticationException("x",
+            new System.ComponentModel.Win32Exception(unchecked((int)0x80090330)));
+        var text = new IOException("Указанные данные не могут быть расшифрованы.");
+
+        Assert.True(BlockCheck.KeyUpdateGlitch(schannel, 103_469));
+        Assert.True(BlockCheck.KeyUpdateGlitch(text, 103_469));
+        Assert.False(BlockCheck.KeyUpdateGlitch(text, 26_011));
+        Assert.False(BlockCheck.KeyUpdateGlitch(new IOException("connection reset"), 103_469));
+    }
 }

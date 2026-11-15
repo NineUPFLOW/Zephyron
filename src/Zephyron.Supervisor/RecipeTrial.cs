@@ -340,12 +340,13 @@ public static class RecipeTrial
     /// Сколько данных считать доказательством, что рецепт работает.
     /// </summary>
     /// <remarks>
-    /// Шестнадцать килобайт — выше всех порогов, на которых у нас рвались
-    /// потоки: steamcommunity.com умирал на 14 381 Б, skinsrestorer.net
-    /// на 13 505, Steam на 16 384. Меньший порог такие обрывы пропустил бы,
-    /// а больший стоил бы времени на каждом из восьми рецептов.
+    /// Выше всех порогов, на которых у нас рвались потоки: steamcommunity.com
+    /// умирал на 14 381 Б, skinsrestorer.net на 13 505, Steam на 16 384, а
+    /// заморозка по объёму — на 26 011 и 27 380 Б. При 16 КБ подбор её не видел:
+    /// 15.11 seriesgraph.com и wpstream.net засчитаны рабочими, а проверка
+    /// блокировок тут же показала поток, вставший на 26 011 Б.
     /// </remarks>
-    private const int Enough = 16 * 1024;
+    private const int Enough = 32 * 1024;
 
     /// <summary>Сколько ждать продолжения, прежде чем счесть поток убитым.</summary>
     private static readonly TimeSpan Silence = TimeSpan.FromSeconds(2);

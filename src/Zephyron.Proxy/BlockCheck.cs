@@ -2384,6 +2384,11 @@ public static class BlockCheck
                 {
                     read = await ssl.ReadAsync(buffer, silence.Token);
                 }
+                catch (Exception ex) when (KeyUpdateGlitch(ex, total))
+                {
+                    // Страница уже пришла далеко за порогом заморозки: дальше — сбой Windows, не сети.
+                    break;
+                }
                 catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
                 {
                     // Тишина при живом соединении — то самое, что ищем.
@@ -2693,6 +2698,34 @@ public static class BlockCheck
     /// и больше заморозку показала бы сама. Порог по полученному целиком,
     /// с заголовками: ТСПУ считает байты соединения, а не тела.
     /// </remarks>
+    /// <summary>
+    /// «Указанные данные не могут быть расшифрованы» после 64 КБ — сбой schannel, а не обрыв.
+    /// </summary>
+    /// <remarks>
+    /// 15.11 instagram.com через туннель: проба трижды «оборвано на ~103 000 Б» и вердикт
+    /// «туннель не доставил», а curl тем же путём брал все 390 КБ за секунду. Сервер Meta
+    /// посреди ответа обновляет ключ TLS 1.3, и SslStream на Windows на этом спотыкается.
+    /// Заморозка провайдера рвёт на 14–28 КБ, поэтому дальше 64 КБ это не она.
+    /// </remarks>
+    internal static bool KeyUpdateGlitch(Exception ex, int total)
+    {
+        if (total < 64 * 1024)
+            return false;
+
+        for (var e = ex; e is not null; e = e.InnerException)
+        {
+            // SEC_E_DECRYPT_FAILURE; текст — запасной признак, если код завернули иначе.
+            if (e is System.ComponentModel.Win32Exception { NativeErrorCode: unchecked((int)0x80090330) }
+                || e.Message.Contains("could not be decrypted", StringComparison.OrdinalIgnoreCase)
+                || e.Message.Contains("не могут быть расшифрованы", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     internal static bool NeedsAsset(int? status, bool refused, bool challenged, string? moved, int total) =>
         status is 200 && !refused && !challenged && moved is null && total < Signatures.FreezeTo;
 
