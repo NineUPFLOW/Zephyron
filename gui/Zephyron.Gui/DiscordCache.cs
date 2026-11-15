@@ -29,8 +29,7 @@ internal static class DiscordCache
 
         return await Task.Run(() =>
         {
-            if (close)
-                Close();
+            bool wasRunning = close && Close();
 
             int removed = 0, locked = 0;
 
@@ -69,11 +68,12 @@ internal static class DiscordCache
                 ? "Кеша Discord не нашлось, чистить нечего."
                 : $"Кеш Discord очищен: файлов удалено {removed}"
                     + (locked > 0 ? $", занятых осталось {locked}" : string.Empty)
-                    + ". Запустите Discord снова.";
+                    + (wasRunning ? ". Запустите Discord снова." : ".");
         });
     }
 
-    private static void Close()
+    /// <returns>Был ли Discord запущен.</returns>
+    private static bool Close()
     {
         var running = ProcessNames.SelectMany(Process.GetProcessesByName).ToList();
 
@@ -107,5 +107,7 @@ internal static class DiscordCache
                 process.Dispose();
             }
         }
+
+        return running.Count > 0;
     }
 }

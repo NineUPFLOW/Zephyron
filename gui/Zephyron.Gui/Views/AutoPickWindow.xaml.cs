@@ -162,9 +162,13 @@ public sealed class AutoPickItem : INotifyPropertyChanged
             if (tries.Count == 0)
                 return Finished ? "—" : "ждёт";
 
-            return tries.Where(t => t.Works).OrderBy(t => t.Way).FirstOrDefault() is { } ok
-                ? $"открывается {ok.Took.TotalSeconds:0.0} с"
-                : "не открывается";
+            // Заглушка по стране (Gemini напрямую) — не «открывается»: сайт ответил, но работать не будет.
+            return tries.Where(t => t.Works).OrderByDescending(t => t.Level).ThenBy(t => t.Way).FirstOrDefault() switch
+            {
+                null => "не открывается",
+                { Stub: true } => "только заглушка по стране",
+                var ok => $"открывается {ok.Took.TotalSeconds:0.0} с",
+            };
         }
     }
 
@@ -173,6 +177,7 @@ public sealed class AutoPickItem : INotifyPropertyChanged
         // Служебное имя — не страница: «не открывается» там не провал.
         "не открывается" => Row is not null && AutoPick.NotASite(Row) is not null ? "Muted" : "Danger",
         var v when v.StartsWith("открывается", StringComparison.Ordinal) => "Success",
+        "только заглушка по стране" => "Warn",
         _ => "Muted",
     });
 

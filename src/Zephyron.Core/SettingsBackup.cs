@@ -42,6 +42,8 @@ public static class SettingsBackup
 
     private static readonly byte[] Magic = "ZYB1"u8.ToArray();
 
+    // Только то, что человек меняет сам: заводские файлы (pin-solutions.yaml, списки)
+    // из старой копии откатили бы обновление программы.
     private static readonly string[] Fixed =
     [
         "config/zephyron.json",
@@ -52,7 +54,6 @@ public static class SettingsBackup
         "config/dns.user.json",
         "config/addresses.yaml",
         "config/catalog.yaml",
-        "config/pin-solutions.yaml",
         "runtime/desync-own.json",
         "runtime/desync-ipset-off.txt",
         "runtime/desync-udp-off.txt",
