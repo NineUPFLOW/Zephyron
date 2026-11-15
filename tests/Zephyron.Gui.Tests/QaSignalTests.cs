@@ -307,11 +307,18 @@ public sealed class QaSignalTests
 
             try
             {
-                for (int i = 0; i < 6; i++)
+                // Вид может держать начатая операция (пинг «Главной» ждёт до 1,5 с, а в CI
+                // ICMP закрыт): это не утечка, пока она отпускает его сама. Ждём до 5 с.
+                var deadline = DateTime.UtcNow.AddSeconds(5);
+
+                for (int i = 0; i < 6 || DateTime.UtcNow < deadline && (vpn.Any(r => r.IsAlive) || status.Any(r => r.IsAlive)); i++)
                 {
                     GC.Collect(2, GCCollectionMode.Forced, blocking: true);
                     GC.WaitForPendingFinalizers();
                     Pump();
+
+                    if (i >= 6)
+                        Thread.Sleep(100);
                 }
 
                 Assert.True(vpn.Count(r => r.IsAlive) == 0, $"VpnView удержано: {vpn.Count(r => r.IsAlive)} из {vpn.Count}");
