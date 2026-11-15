@@ -552,7 +552,8 @@ public static class AutoPick
         IProgress<AutoPickRow>? progress,
         CancellationToken cancellationToken,
         bool allowExit = false,
-        ProxyServer? warp = null)
+        ProxyServer? warp = null,
+        IProgress<string>? stages = null)
     {
         // Без разрешения выход не пробуется вовсе: подбор не должен гнать сайты за границу сам.
         // WARP — только для тех, у кого нет подписки (владелец 08.11): есть VPN — меряем его.
@@ -712,7 +713,7 @@ public static class AutoPick
         // чужой адрес, и все пробы мерили бы его, а не путь до имени.
         using var dohClient = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
 
-        await Stage("dns", timings, () => Each(rows.Where(r => r.Skip is null), async row =>
+        await Stage("dns", timings, stages, () => Each(rows.Where(r => r.Skip is null), async row =>
         {
             var address = await RecipeTrial.AddressForAsync(row.Host, cancellationToken);
 
@@ -799,13 +800,13 @@ public static class AutoPick
         }
 
         // a) Напрямую: движков нет, мерим голую сеть.
-        await Stage("direct", timings, () =>
+        await Stage("direct", timings, stages, () =>
             Each(live, row => Measure(row, AutoPickWay.Direct, null, null), cancellationToken));
 
         // b) Пресет целиком, одним winws2, — как он работал бы в жизни.
         if (canDesync)
         {
-            await Stage("preset", timings, async () =>
+            await Stage("preset", timings, stages, async () =>
             {
                 try
                 {
@@ -896,7 +897,7 @@ public static class AutoPick
                 .ToList();
 
             if (suspects.Count > 0)
-                await Stage("not-site", timings, () => MeasureVpn(vpnServers[0], suspects));
+                await Stage("not-site", timings, stages, () => MeasureVpn(vpnServers[0], suspects));
         }
 
         // Понадобятся и перепроверке: она поднимает те же рецепты заново.
@@ -906,7 +907,7 @@ public static class AutoPick
         // c) Каждый рецепт отдельным winws2 — для имён, которые ещё не открылись.
         if (canDesync)
         {
-            await Stage("recipes", timings, async () =>
+            await Stage("recipes", timings, stages, async () =>
             {
                 // Не сайт — рецептам мерить нечего. Ответил хоть отказом — тоже: рецепт
                 // чинит только прохождение DPI, а отказ по стране меняет лишь VPN.
@@ -984,7 +985,7 @@ public static class AutoPick
         // c2) Пин в hosts: имя прибивается к посреднику или настоящему адресу. Дешевле
         // VPN, а не наоборот — потому стоит перед ним; нужен тем, у кого ни один из
         // способов выше страницы не открыл.
-        await Stage("pin", timings, async () =>
+        await Stage("pin", timings, stages, async () =>
         {
             // Не для тех, кто сейчас в VPN. Пин покрывает одно-два имени, а маршрут
             // сервиса — весь список: снять с него VPN ради пина значило бы оставить
@@ -1021,7 +1022,7 @@ public static class AutoPick
         // отказом — заглушка страны), и тем, что идут в туннель сейчас.
         if (singBox is not null)
         {
-            await Stage("vpn", timings, async () =>
+            await Stage("vpn", timings, stages, async () =>
             {
                 var left = live
                     .Where(r => NotASite(r) is null && !r.Tries.Any(t => t.Way == AutoPickWay.Vpn))
@@ -1049,7 +1050,7 @@ public static class AutoPick
         // e) Перепроверка: прежде чем менять маршрут, мерим ещё раз и нынешний
         // способ, и выбранный. Не устоял выбранный — берём следующий и мерим его;
         // три круга хватает, дальше пусть остаётся как есть.
-        await Stage("confirm", timings, async () =>
+        await Stage("confirm", timings, stages, async () =>
         {
             for (int round = 0; round < 3; round++)
             {
@@ -1133,7 +1134,7 @@ public static class AutoPick
         // f) Три подтверждения: победитель обязан открыться три раза подряд. Срыв
         // отклоняет кандидата (в пробы ложится неудача, и Choose берёт следующего);
         // не подтверждённое за круги не пишем. Мерится только победитель.
-        await Stage("triple", timings, async () =>
+        await Stage("triple", timings, stages, async () =>
         {
             var confirmed = new Dictionary<AutoPickRow, AutoPickChoice>();
 
@@ -1349,9 +1350,10 @@ public static class AutoPick
         row.Pins = pins;
     }
 
-    private static async Task Stage(string name, Dictionary<string, TimeSpan> timings, Func<Task> work)
+    private static async Task Stage(string name, Dictionary<string, TimeSpan> timings, IProgress<string>? stages, Func<Task> work)
     {
         var clock = Stopwatch.StartNew();
+        stages?.Report(name);
 
         try
         {

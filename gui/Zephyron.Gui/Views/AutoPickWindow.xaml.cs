@@ -352,6 +352,21 @@ public partial class AutoPickWindow : Window
     private bool _leaving;
     private readonly HashSet<string> _addressed = new(StringComparer.Ordinal);
     private int _stage;
+
+    /// <summary>Идёт перепроверка найденного: новых проб нет, и строка прежде застывала на «vpn».</summary>
+    private string? _check;
+
+    private void OnStage(string name)
+    {
+        _check = name switch
+        {
+            "confirm" => "перепроверяю, что найдено",
+            "triple" => "подтверждаю найденное трижды",
+            _ => null,
+        };
+
+        SayProgress();
+    }
     private int _ticks;
     private string _filter = "all";
 
@@ -548,7 +563,9 @@ public partial class AutoPickWindow : Window
         }
 
         string count = _stage == 0 ? $"Готово {WayCount(AutoPickWay.Direct)} из {live}" : $"Проб: {WayCount((AutoPickWay)_stage)}";
-        string text = $"Проверяю: {StageNames[_stage].ToLowerInvariant()}. {count}, прошло {_clock.Elapsed:mm\\:ss}.";
+        string text = _check is not null
+            ? $"Почти готово: {_check}. Прошло {_clock.Elapsed:mm\\:ss}."
+            : $"Проверяю: {StageNames[_stage].ToLowerInvariant()}. {count}, прошло {_clock.Elapsed:mm\\:ss}.";
 
         if (_warnings.Count > 0)
             text += " " + string.Join(" ", _warnings);
@@ -1106,7 +1123,9 @@ public partial class AutoPickWindow : Window
             // В пуле: синхронные куски прогона (запуск и гашение winws2 на каждый
             // рецепт) иначе держали окно по ~1,8 с на рецепт.
             var progress = _progress;
-            var report = await Task.Run(() => AutoPick.RunAsync(targets, servers, progress, token, allowExit, fallback), token);
+            _check = null;
+            var stages = new Progress<string>(OnStage);
+            var report = await Task.Run(() => AutoPick.RunAsync(targets, servers, progress, token, allowExit, fallback, stages), token);
 
             Finish(report);
         }
