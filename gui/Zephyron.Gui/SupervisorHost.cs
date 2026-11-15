@@ -616,6 +616,14 @@ internal static class SupervisorHost
         foreach (var name in sectionsOff)
             Console.WriteLine($"Секция «{name}» не запущена: её список адресов выключен в «Маршрутах».");
 
+        // Наш пресет: способ для YouTube — тот, что сторож YouTube нашёл рабочим.
+        if (YouTubeRecipes.Applies(preset.Name))
+        {
+            int recipe = YouTubeRecipes.Read();
+            preset = YouTubeRecipes.Apply(preset, recipe);
+            Console.WriteLine($"YouTube: способ обхода {recipe + 1} из {YouTubeRecipes.Recipes.Count}.");
+        }
+
         // Список исключений пишется при сборке конфига; если его нет —
         // исключать нечего, и командная строка остаётся нетронутой.
         var exclude = File.Exists(WinwsCommandLine.DefaultExcludeListPath)

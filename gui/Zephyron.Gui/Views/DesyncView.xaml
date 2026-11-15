@@ -476,13 +476,10 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="4,0,16,0">
-                        <TextBlock x:Name="OwnHeader" FontWeight="SemiBold" FontSize="18">
-                            <Run Text="Пресеты Zephyron" />
-                            <Run Text="  автор RixyPow" FontSize="12" FontWeight="Normal" Foreground="{DynamicResource Faint}" />
-                        </TextBlock>
-                        <TextBlock x:Name="OwnNote" Style="{StaticResource Caption}" Margin="0,4,0,0"
+                        <TextBlock x:Name="MineHeader" Text="Пресет Zephyron" FontWeight="SemiBold" FontSize="18" />
+                        <TextBlock x:Name="MineNote" Style="{StaticResource Caption}" Margin="0,4,0,0"
                                    TextWrapping="Wrap"
-                                   Text="Их ведём мы: собраны по замерам и обновляются вместе с программой. Новые вверху." />
+                                   Text="Подстраивается под провайдера и обновляется вместе с программой." />
                     </StackPanel>
 
                     <!--
@@ -497,6 +494,23 @@
                                    HorizontalAlignment="Left" Margin="13,0,0,0" IsHitTestVisible="False" />
                     </Grid>
                 </Grid>
+
+                <!-- Наш пресет — отдельно от Universal: у тех свой автор (владелец 15.11). -->
+                <ItemsControl x:Name="MineList" ItemTemplate="{StaticResource PresetItem}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <gui:MasonryPanel ColumnWidth="420" Gap="12" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+
+                <TextBlock x:Name="OwnHeader" FontWeight="SemiBold" FontSize="18" Margin="4,24,0,4">
+                    <Run Text="Пресеты Universal" />
+                    <Run Text="  автор RixyPow" FontSize="12" FontWeight="Normal" Foreground="{DynamicResource Faint}" />
+                </TextBlock>
+                <TextBlock x:Name="OwnNote" Style="{StaticResource Caption}" Margin="4,0,0,10"
+                           TextWrapping="Wrap"
+                           Text="Собраны по замерам и обновляются вместе с программой. Новые вверху." />
 
                 <ItemsControl x:Name="Own" ItemTemplate="{StaticResource PresetItem}">
                     <ItemsControl.ItemsPanel>

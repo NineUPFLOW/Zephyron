@@ -159,10 +159,10 @@ public sealed class AppSettingsTests : IDisposable
     /// с 19.10 — V12 Lite); выключенный десинк так и остаётся.
     /// </summary>
     [Theory]
-    [InlineData("""{ "PresetName": "Universal V10" }""", AppSettings.DefaultPresetName)]
-    [InlineData("""{ "PresetName": "Default v1 (game filter)" }""", AppSettings.DefaultPresetName)]
-    [InlineData("""{ "PresetName": null }""", null)]
-    [InlineData("""{ "PresetV11Lite": true, "PresetName": "Universal V10" }""", "Universal V10")]
+    [InlineData("""{ "PresetAdaptive": true, "PresetName": "Universal V10" }""", AppSettings.DefaultPresetName)]
+    [InlineData("""{ "PresetAdaptive": true, "PresetName": "Default v1 (game filter)" }""", AppSettings.DefaultPresetName)]
+    [InlineData("""{ "PresetAdaptive": true, "PresetName": null }""", null)]
+    [InlineData("""{ "PresetAdaptive": true, "PresetV11Lite": true, "PresetName": "Universal V10" }""", "Universal V10")]
     public void PresetIsMovedToV11LiteOnce(string json, string? expected)
     {
         File.WriteAllText(_path, json);
@@ -177,12 +177,12 @@ public sealed class AppSettingsTests : IDisposable
     /// С V11 Lite на V12 Lite переводят один раз (19.10); прочие пресеты и выключенный десинк не трогают.
     /// </summary>
     [Theory]
-    [InlineData("""{ "PresetV11Lite": true, "PresetName": "Universal V11 Lite" }""", "Universal V12 Lite")]
-    [InlineData("""{ "PresetV11Lite": true, "PresetName": "universal v11 lite" }""", "Universal V12 Lite")]
-    [InlineData("""{ "PresetV11Lite": true, "PresetName": "Universal V11" }""", "Universal V11")]
-    [InlineData("""{ "PresetV11Lite": true, "PresetName": "white sni (circular)" }""", "white sni (circular)")]
-    [InlineData("""{ "PresetV11Lite": true, "PresetName": null }""", null)]
-    [InlineData("""{ "PresetV11Lite": true, "PresetV12Lite": true, "PresetName": "Universal V11 Lite" }""", "Universal V11 Lite")]
+    [InlineData("""{ "PresetAdaptive": true, "PresetV11Lite": true, "PresetName": "Universal V11 Lite" }""", "Universal V12 Lite")]
+    [InlineData("""{ "PresetAdaptive": true, "PresetV11Lite": true, "PresetName": "universal v11 lite" }""", "Universal V12 Lite")]
+    [InlineData("""{ "PresetAdaptive": true, "PresetV11Lite": true, "PresetName": "Universal V11" }""", "Universal V11")]
+    [InlineData("""{ "PresetAdaptive": true, "PresetV11Lite": true, "PresetName": "white sni (circular)" }""", "white sni (circular)")]
+    [InlineData("""{ "PresetAdaptive": true, "PresetV11Lite": true, "PresetName": null }""", null)]
+    [InlineData("""{ "PresetAdaptive": true, "PresetV11Lite": true, "PresetV12Lite": true, "PresetName": "Universal V11 Lite" }""", "Universal V11 Lite")]
     public void V11LiteIsMovedToV12LiteOnce(string json, string? expected)
     {
         File.WriteAllText(_path, json);
@@ -193,11 +193,31 @@ public sealed class AppSettingsTests : IDisposable
         Assert.True(read.PresetV12Lite);
     }
 
+    /// <summary>
+    /// Всех переводят на Zephyron Adaptive один раз (15.11); выключенный десинк так и остаётся,
+    /// а выбранное после перевода не трогается.
+    /// </summary>
+    [Theory]
+    [InlineData("""{ "PresetV11Lite": true, "PresetV12Lite": true, "PresetName": "Universal V12 Lite" }""", "Zephyron Adaptive")]
+    [InlineData("""{ "PresetV11Lite": true, "PresetV12Lite": true, "PresetName": "white sni (circular)" }""", "Zephyron Adaptive")]
+    [InlineData("""{ "PresetV11Lite": true, "PresetV12Lite": true, "PresetName": null }""", null)]
+    [InlineData("""{ "PresetAdaptive": true, "PresetV11Lite": true, "PresetV12Lite": true, "PresetName": "Universal V12 Lite" }""", "Universal V12 Lite")]
+    public void EveryoneIsMovedToAdaptiveOnce(string json, string? expected)
+    {
+        File.WriteAllText(_path, json);
+
+        var read = AppSettings.Load(_path);
+
+        Assert.Equal(expected, read.PresetName);
+        Assert.True(read.PresetAdaptive);
+        Assert.Equal("Zephyron Adaptive", AppSettings.DefaultPresetName);
+    }
+
     /// <summary>Вернувшийся на V11 Lite после перевода на нём и остаётся.</summary>
     [Fact]
     public void V11LiteChosenAfterTheMoveStays()
     {
-        File.WriteAllText(_path, """{ "PresetV11Lite": true, "PresetName": "Universal V11 Lite" }""");
+        File.WriteAllText(_path, """{ "PresetAdaptive": true, "PresetV11Lite": true, "PresetName": "Universal V11 Lite" }""");
 
         (AppSettings.Load(_path) with { PresetName = "Universal V11 Lite" }).Save(_path);
 

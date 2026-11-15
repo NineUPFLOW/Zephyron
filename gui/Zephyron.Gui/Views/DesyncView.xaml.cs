@@ -106,7 +106,8 @@ public sealed record PresetRow(string Name, string Version, string Fake) : INoti
     /// пресет к чужим. Universal ведём мы — это и есть признак.
     /// </remarks>
     public bool Official =>
-        Name.StartsWith("Universal", StringComparison.OrdinalIgnoreCase) && Version.Length > 0;
+        (Name.StartsWith("Universal", StringComparison.OrdinalIgnoreCase) || Name.StartsWith("Zephyron", StringComparison.OrdinalIgnoreCase))
+        && Version.Length > 0;
 
     public Brush Edge =>
         (Brush)Application.Current.FindResource(Chosen ? "AccentLine" : "Border");
@@ -397,8 +398,14 @@ public partial class DesyncView : UserControl
         bool Fits(PresetRow row) =>
             !searching || row.Name.Contains(needle, StringComparison.OrdinalIgnoreCase);
 
-        var ours = _rows.Where(row => row.Official && Fits(row)).ToList();
+        bool Mine(PresetRow row) => row.Name.StartsWith("Zephyron", StringComparison.OrdinalIgnoreCase);
+
+        var mine = _rows.Where(row => row.Official && Mine(row) && Fits(row)).ToList();
+        var ours = _rows.Where(row => row.Official && !Mine(row) && Fits(row)).ToList();
         var theirs = _rows.Where(row => !row.Official && Fits(row)).ToList();
+
+        MineList.ItemsSource = null;
+        MineList.ItemsSource = mine;
 
         Own.ItemsSource = null;
         Own.ItemsSource = ours;
@@ -406,11 +413,12 @@ public partial class DesyncView : UserControl
         Others.ItemsSource = null;
         Others.ItemsSource = theirs;
 
-        Show(OwnHeader, OwnNote, searching || ours.Count > 0);
+        Show(MineHeader, MineNote, searching || mine.Count > 0);
+        Show(OwnHeader, OwnNote, ours.Count > 0);
         Show(OthersHeader, OthersNote, theirs.Count > 0);
 
         NothingFound.Text = $"Пресетов с «{needle}» в имени нет.";
-        NothingFound.Visibility = searching && ours.Count == 0 && theirs.Count == 0
+        NothingFound.Visibility = searching && mine.Count == 0 && ours.Count == 0 && theirs.Count == 0
             ? Visibility.Visible
             : Visibility.Collapsed;
     }

@@ -1,0 +1,6 @@
+# Matrix и Element (для пресета «Ростелеком»).
+matrix.org
+matrix.to
+element.io
+riot.im
+vector.im

@@ -174,12 +174,20 @@ public sealed record AppSettings
     /// намеренно — в них работа человека, — поэтому у тех, кто уже запускался,
     /// останется прежний выбор, и меняется он в меню. Исключения — разовые
     /// переводы по слову владельца: всех на V11 Lite (<see cref="PresetOnce"/>,
-    /// 03.10) и с V11 Lite на V12 Lite (<see cref="LiteToV12Once"/>, 19.10).
+    /// 03.10), с V11 Lite на V12 Lite (<see cref="LiteToV12Once"/>, 19.10)
+    /// и с V12 Lite на Zephyron Adaptive (<see cref="AdaptiveOnce"/>, 15.11).
+    /// </para>
+    /// <para>
+    /// Был V12 Lite, стал Zephyron Adaptive (владелец, 15.11): тот же пресет,
+    /// но YouTube сам меняет рецепт, когда провайдер начинает резать прежний
+    /// (circular, как в z2k и Zapret GUI 2.44), а QUIC YouTube, не прошедший
+    /// с подделкой, глушится — браузер уходит на TCP. Провайдеры меняют правила
+    /// для YouTube по нескольку раз за день, а один рецепт этого не переживает.
     /// </para>
     /// </remarks>
     public string? PresetName { get; init; } = DefaultPresetName;
 
-    public const string DefaultPresetName = "Universal V12 Lite";
+    public const string DefaultPresetName = "Zephyron Adaptive";
 
     /// <summary>Тег сервера либо <c>null</c> для автоподбора по задержке.</summary>
     public string? PreferredServer { get; init; }
@@ -1075,6 +1083,25 @@ public sealed record AppSettings
     /// на нём и остаётся.
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// Переведён ли V12 Lite на Zephyron Adaptive разовым переводом (15.11); <c>null</c> — настройки старше.
+    /// </summary>
+    public bool? PresetAdaptive { get; init; }
+
+    /// <summary>
+    /// Разовый перевод всех на Zephyron Adaptive (владелец, 15.11: «по умолчанию должен
+    /// быть у всех»). Выключенный десинк остаётся выключенным; вернувшийся после
+    /// перевода на свой пресет на нём и остаётся.
+    /// </summary>
+    private static AppSettings AdaptiveOnce(AppSettings read) =>
+        read.PresetAdaptive == true
+            ? read
+            : read with
+            {
+                PresetName = read.PresetName is null ? null : DefaultPresetName,
+                PresetAdaptive = true,
+            };
+
     private static AppSettings LiteToV12Once(AppSettings read) =>
         read.PresetV12Lite == true
             ? read
@@ -1172,6 +1199,7 @@ public sealed record AppSettings
         TelegramProxyAutoReset = true,
         PresetV11Lite = true,
         PresetV12Lite = true,
+        PresetAdaptive = true,
     };
 
     /// <summary>Есть ли выход кроме WARP: подписка или отдельные ключи.</summary>
@@ -1233,11 +1261,11 @@ public sealed record AppSettings
             // Mullvad тоже: его убрали из списка 10.10, и выбравший его
             // остался бы с DoH на адрес без имени для сертификата — туннель
             // без имён.
-            return WithoutServerDescriptions(TelegramProxyAutoOnce(VerifyTrafficOnce(SelectiveRoutingOnce(LiteToV12Once(PresetOnce(GameFilterOnce(WarpAsPath(read with
+            return WithoutServerDescriptions(TelegramProxyAutoOnce(VerifyTrafficOnce(SelectiveRoutingOnce(AdaptiveOnce(LiteToV12Once(PresetOnce(GameFilterOnce(WarpAsPath(read with
             {
                 Mode = read.Engines.Mode,
                 DnsServer = read.DnsServer is "8.8.8.8" or MullvadDns ? GoogleDns : read.DnsServer,
-            }))))))));
+            })))))))));
         }
         catch (Exception)
         {

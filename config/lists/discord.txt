@@ -27,6 +27,14 @@ discordsays.com
 discordactivities.com
 discord-activities.com
 discord-attachments-uploads-prd.storage.googleapis.com
+# 15.11, из list-general Flowseal (MIT): прочие официальные зоны Discord.
+discord.app
+discord.design
+discord.store
+discord.status
+discordmerch.com
+discordpartygames.com
+discordsez.com
 
 # Капча Discord — hCaptcha, и она обязана идти тем же путём, что Discord.
 # Жалоба 30.09: Discord целиком через VPN, а при получении Orbs за видео

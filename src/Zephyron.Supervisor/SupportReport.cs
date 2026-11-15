@@ -553,6 +553,11 @@ public static class SupportReport
 
         var text = new StringBuilder("YouTube через нынешний путь (движки работают): TLS, данные, вердикт.\n\n");
 
+        // К какому кэшу Google отправляет провайдер: «rostelecom-svo13» — свой узел провайдера,
+        // код аэропорта (FRA, AMS, ARN, HEL) — заграничный, видео идёт издалека (ggc-russia, 10.2026).
+        text.AppendLine("Узел кэша Google (redirector report_mapping): " + GoogleCacheNode());
+        text.AppendLine();
+
         for (int i = 0; i < YouTubeHosts.Length; i++)
         {
             text.AppendLine(probes[i].IsCompletedSuccessfully
@@ -561,6 +566,33 @@ public static class SupportReport
         }
 
         return text.ToString();
+    }
+
+    private static string GoogleCacheNode()
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+            var answer = http.GetStringAsync("https://redirector.googlevideo.com/report_mapping?di=no").GetAwaiter().GetResult();
+            return CacheNodeName(answer);
+        }
+        catch (Exception ex)
+        {
+            return "не ответил: " + ex.GetBaseException().Message;
+        }
+    }
+
+    /// <summary>
+    /// Имя узла из ответа report_mapping. Ответ начинается с адреса человека и его
+    /// подсети («95.25.96.158 => vimpelcom-stw3 (95.25.96.0/22)») — в отчёт, который
+    /// пересылают, идёт только узел.
+    /// </summary>
+    internal static string CacheNodeName(string answer)
+    {
+        var line = answer.Split('\n')[0];
+        int arrow = line.IndexOf("=>", StringComparison.Ordinal);
+        var node = (arrow >= 0 ? line[(arrow + 2)..] : line).Split('(')[0].Trim();
+        return node.Length > 0 ? node : "пустой ответ";
     }
 
     private static FileInfo? LatestAutoPick(string folder)

@@ -8,6 +8,17 @@ loop-uh, лицензия MIT. Часть лежит здесь без изме�
 Universal V8–V12, V11 Lite и V12 Lite собраны уже в этом проекте из тех же секций. Разбор —
 в [docs/THIRD-PARTY.md](../docs/THIRD-PARTY.md).
 
+Zephyron Adaptive (с 15.11) — наш пресет и умолчание у всех: Universal V12 Lite,
+где рецепт секции «youtube.com (интерфейс)» подставляет программа: YouTube перестал
+открываться — берётся следующий из YouTubeRecipes (рецепт V12 Lite, рецепты Zapret
+GUI 2.44, рецепт general Flowseal, MIT) и обход перезапускается. `circular` в секции
+по именам сбивал соседние сайты, поэтому смена — в программе. QUIC YouTube глушится,
+браузер уходит на TCP. X/Twitter по имени — рецепт tls_4pda. Секции YouTube и
+Discord читают и наши списки (`zy-youtube.txt`, `zy-discord.txt`).
+
+«Ростелеком» (с 15.11) — пресет Zapret GUI 2.44 как есть. Списки signal.txt,
+matrix.txt и simplex.txt, на которые он ссылается, в Zapret GUI не лежат — они наши.
+
 Universal V12 и V12 Lite (с 19.10) — V11 и V11 Lite с секцией «Hetzner TCP»
 над IP fallback: сетям Hetzner — наложение приветствия 4pda.to, рецепт
 Flowseal (у него — для list-general и ipset-all). Секция и список

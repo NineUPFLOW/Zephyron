@@ -512,7 +512,8 @@ public partial class CheckView : UserControl
     private bool ShowSetup(bool? measured = null)
     {
         var state = SupervisorState.Load(SupervisorState.DefaultPath);
-        bool running = measured ?? (state is not null && state.IsSupervisorAlive());
+        // Свежезапущенный супервизор состояние пишет не сразу: процесс — тоже признак (15.11 отчёт с обходом вышел «остановлены»).
+        bool running = measured ?? (EngineControl.IsRunning || (state is not null && state.IsSupervisorAlive()));
 
         SetupCard.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
 

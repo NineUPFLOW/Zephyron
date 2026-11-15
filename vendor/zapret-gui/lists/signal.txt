@@ -1,0 +1,8 @@
+# Signal (для пресета «Ростелеком»).
+signal.org
+signal.me
+signal.art
+signal.group
+signal.link
+signal.tube
+whispersystems.org

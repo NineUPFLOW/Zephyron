@@ -25,3 +25,9 @@ youtube-ui.l.google.com
 yt-video-upload.l.google.com
 wide-youtube.l.google.com
 ytimg.l.google.com
+# 15.11, из списка YouTube z2k (MIT): прочие зоны самого YouTube.
+youtubegaming.com
+youtubeeducation.com
+withyoutube.com
+youtubefanfest.com
+youtubemobilesupport.com

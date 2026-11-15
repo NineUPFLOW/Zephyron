@@ -46,6 +46,35 @@ public sealed class PresetOwnListsTests
         Assert.True(missing.Count == 0, "Нет исходника в config\\lists: " + string.Join(", ", missing.Distinct()));
     }
 
+    /// <summary>
+    /// Списки и образцы Zapret GUI, названные пресетом, лежат в vendor\zapret-gui.
+    /// </summary>
+    /// <remarks>
+    /// Пресет «Ростелеком» (15.11) ссылался на signal, matrix и simplex, которых
+    /// в Zapret GUI нет: winws2 с несуществующим списком не поднимается вовсе.
+    /// </remarks>
+    [Fact]
+    public void EveryVendorFileAPresetNamesShips()
+    {
+        if (Repository() is not { } root)
+            return;
+
+        var vendor = Path.Combine(root, "vendor", "zapret-gui");
+        var named = new Regex(@"(?<![\w/])(?:@)?(?<path>(?:lists|bin|lua|windivert\.filter)/(?!zy-)[^\s""]+\.(?:txt|bin|lua))", RegexOptions.Compiled);
+        var missing = new List<string>();
+
+        foreach (var file in Directory.GetFiles(Path.Combine(root, "presets"), "*.txt"))
+        {
+            foreach (Match match in named.Matches(File.ReadAllText(file)))
+            {
+                if (!File.Exists(Path.Combine(vendor, match.Groups["path"].Value)))
+                    missing.Add($"{Path.GetFileName(file)}: {match.Groups["path"].Value}");
+            }
+        }
+
+        Assert.True(missing.Count == 0, "Нет в vendor\\zapret-gui: " + string.Join(", ", missing.Distinct()));
+    }
+
     /// <summary>Основной пресет лежит в presets\ — иначе первый запуск идёт без десинка.</summary>
     [Fact]
     public void TheDefaultPresetShips()
