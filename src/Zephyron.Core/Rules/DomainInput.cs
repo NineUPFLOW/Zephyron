@@ -41,6 +41,11 @@ public static class DomainInput
         if (raw.Length == 0 || !raw.Contains('.') || raw.EndsWith('.') || raw.Any(char.IsWhiteSpace))
             return null;
 
+        // Последняя часть из цифр — адрес или его обрывок («144.76», ссылка на IP), а не имя:
+        // правило «*.144.76.194.29» не совпадало ни с чем (владелец 15.11).
+        if (raw[(raw.LastIndexOf('.') + 1)..].All(char.IsDigit))
+            return null;
+
         return raw;
     }
 }

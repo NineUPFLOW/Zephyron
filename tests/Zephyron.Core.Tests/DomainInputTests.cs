@@ -25,6 +25,9 @@ public sealed class DomainInputTests
     [InlineData("youtube")]
     [InlineData("my site.com")]
     [InlineData("example.")]
+    [InlineData("144.76")]
+    [InlineData("*.144.76.194.29")]
+    [InlineData("https://144.76.194.29/page")]
     [InlineData(null)]
     public void ASearchIsNotAName(string? text) =>
         Assert.Null(DomainInput.Normalize(text));
