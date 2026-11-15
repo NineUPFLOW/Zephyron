@@ -162,8 +162,19 @@ public static class SupportReport
         AddFile(parts, "desync-exclude.txt", At(root, Path.Combine("runtime", "desync-exclude.txt")));
         AddFile(parts, "desync-keep.txt", At(root, Path.Combine("runtime", "desync-keep.txt")));
 
+        // Сводка ошибок по всем поколениям журналов: выдержка выше теряет середину,
+        // а сырые 90 таймаутов без пояснения разбирать вручную (владелец 15.11).
+        parts.Insert(1, ("errors.txt", Section(() => ErrorDigest(
+            new[] { "sing-box.log", "tg-ws-proxy.log", "winws2.log", "supervisor.log" }
+                .Select(log => (log, (Read(At(root, Path.Combine("runtime", log + ".1"))) ?? string.Empty)
+                    + "\n" + (Read(At(root, Path.Combine("runtime", log))) ?? string.Empty)))))));
+
         // Что автоподбор записал в маршруты и hosts — без него не понять, откуда правило или пин.
         AddFile(parts, "autopick-journal.json", At(root, AutoPickJournal.DefaultPath));
+
+        // И почему: итог последнего прогона с пробами по каждому имени.
+        if (LatestAutoPick(At(root, DefaultDirectory)) is { } autopick)
+            AddFile(parts, "autopick-last.txt", autopick.FullName);
 
         // Сбои окна (App.Show): исключение со стеком — в остальных журналах их нет.
         AddFile(parts, "gui.log", At(root, Path.Combine("logs", "gui.log")));
@@ -517,6 +528,174 @@ public static class SupportReport
     }
 
     /// <summary>Самый свежий отчёт проверки блокировок; <c>null</c> — проверок не было.</summary>
+    private static FileInfo? LatestAutoPick(string folder)
+    {
+        try
+        {
+            return Directory.Exists(folder)
+                ? new DirectoryInfo(folder).GetFiles("autopick-*.txt").OrderByDescending(f => f.LastWriteTimeUtc).FirstOrDefault()
+                : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private static readonly Regex Noise = new(
+        @"^\S+\s+(?=\S*(ERROR|WARN|FATAL))|\[\d+\s[\d.]+[mµ]?s\]|\b\d{4}-\d\d-\d\dT\S+|\[\d{4}\]|\[\d\d:\d\d:\d\d\]|\d{4}-\d\d-\d\d \d\d:\d\d:\d\d",
+        RegexOptions.Compiled);
+
+    private static readonly Regex Endpoint = new(@"\[?[0-9a-f:.]*[0-9a-f]\]?:\d{2,5}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static readonly Regex Digits = new(@"\d+", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Ошибки и предупреждения журналов, сведённые по виду: сколько, когда последняя,
+    /// куда чаще всего и что это значит простыми словами.
+    /// </summary>
+    internal static string ErrorDigest(IEnumerable<(string Source, string Text)> logs)
+    {
+        var text = new StringBuilder();
+        text.AppendLine("Ошибки и предупреждения журналов по видам (все поколения журнала, не выдержка).");
+        text.AppendLine("«пример» — последняя такая запись; «куда» — самые частые адреса и имена; «когда» — первая и последняя, если журнал пишет дату.");
+
+        foreach (var (source, raw) in logs)
+        {
+            var groups = new Dictionary<string, Group>();
+
+            foreach (var line in raw.Split('\n'))
+            {
+                var clean = Spaces.Replace(Ansi.Replace(line, string.Empty).Replace("\0", string.Empty), " ").Trim();
+
+                if (clean.Length == 0 || !IsProblem(clean))
+                    continue;
+
+                var body = Noise.Replace(clean, string.Empty).Trim();
+                var key = Digits.Replace(Host.Replace(Endpoint.Replace(body, "АДРЕС"), "ИМЯ"), "N");
+
+                // Куда: внешний адрес или имя; свои (TUN, петля, подменные) ничего не говорят.
+                var where = Endpoint.Matches(body).Select(m => m.Value.Trim('[', ']')).FirstOrDefault(v => !IsLocal(v))
+                    ?? (Host.Match(body) is { Success: true } h ? h.Value : null);
+
+                if (!groups.TryGetValue(key, out var group))
+                    groups[key] = group = new Group();
+
+                group.Count++;
+                group.Last = clean;
+
+                if (Stamp.Match(clean) is { Success: true } stamp)
+                {
+                    group.First ??= stamp.Value;
+                    group.LastStamp = stamp.Value;
+                }
+
+                if (where is not null)
+                    group.Where[where] = group.Where.GetValueOrDefault(where) + 1;
+            }
+
+            text.AppendLine().AppendLine($"== {source}: {(groups.Count == 0 ? "ошибок нет" : $"видов {groups.Count}, записей {groups.Values.Sum(v => v.Count)}")}");
+
+            foreach (var group in groups.Values.OrderByDescending(g => g.Count).Take(15))
+            {
+                text.AppendLine().AppendLine($"[{group.Count}] {Explain(source, group.Last)}");
+
+                if (group.First is not null)
+                    text.AppendLine($"  когда: {group.First} … {group.LastStamp}");
+
+                text.AppendLine("  пример: " + (group.Last.Length > 260 ? group.Last[..260] + "…" : group.Last));
+
+                if (group.Where.Count > 0)
+                    text.AppendLine("  куда: " + string.Join(", ", group.Where.OrderByDescending(w => w.Value).Take(5).Select(w => $"{w.Key} ×{w.Value}")));
+            }
+        }
+
+        return text.ToString();
+    }
+
+    private sealed class Group
+    {
+        public int Count;
+        public string Last = string.Empty;
+        public string? First;
+        public string? LastStamp;
+        public readonly Dictionary<string, int> Where = new(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static readonly Regex Spaces = new(@"\s{2,}", RegexOptions.Compiled);
+
+    private static readonly Regex Host = new(@"\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static readonly Regex Stamp = new(@"\d{4}-\d\d-\d\d[T ]\d\d:\d\d(:\d\d)?", RegexOptions.Compiled);
+
+    private static bool IsLocal(string endpoint) =>
+        endpoint.StartsWith("127.", StringComparison.Ordinal) || endpoint.StartsWith("172.19.", StringComparison.Ordinal)
+        || endpoint.StartsWith("198.18.", StringComparison.Ordinal) || endpoint.StartsWith("198.19.", StringComparison.Ordinal)
+        || endpoint.StartsWith("fdfe:", StringComparison.OrdinalIgnoreCase) || endpoint.StartsWith("fc00:", StringComparison.OrdinalIgnoreCase)
+        || endpoint.StartsWith("::1", StringComparison.Ordinal);
+
+    private static bool IsProblem(string line) =>
+        line.Contains("ERROR", StringComparison.Ordinal) || line.Contains("FATAL", StringComparison.Ordinal)
+        || line.Contains(" WARN ", StringComparison.Ordinal) || line.StartsWith("WARN", StringComparison.Ordinal)
+        || line.Contains("ошибк", StringComparison.OrdinalIgnoreCase) || line.Contains("не удалось", StringComparison.OrdinalIgnoreCase)
+        || line.Contains("упал", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Что значит запись — по известным признакам; неизвестное так и названо.</summary>
+    internal static string Explain(string source, string line)
+    {
+        bool Has(string word) => line.Contains(word, StringComparison.OrdinalIgnoreCase);
+        bool telegram = Has("149.154.") || Has("91.108.") || Has("91.105.") || Has("95.161.") || Has("185.76.151.");
+
+        if (Has("i/o timeout") && Has("outbound/direct"))
+            return telegram
+                ? "Прямое соединение с сервером Telegram не дождалось ответа: так tg-ws-proxy пробует прямой путь, провайдер его режет, прокси идёт через мосты. Не сбой."
+                : "Прямое соединение не дождалось ответа: адрес режет провайдер или он не отвечает. Если это нужный сайт — ему путь «десинк» или «через VPN».";
+
+        if (Has("i/o timeout"))
+            return "Соединение через туннель не дождалось ответа: сервер VPN или сайт не ответил вовремя. Много таких подряд — плохой сервер выхода.";
+
+        if (Has("endpoint not connected") || Has("connection reset") || Has("broken pipe") || Has("use of closed") || Has("forcibly closed"))
+            return "Соединение закрыла одна из сторон (закрыли вкладку, сервер оборвал). Обычное дело, не сбой.";
+
+        if (Has("tls handshake eof") || Has("handshake") && source.StartsWith("tg-ws", StringComparison.Ordinal))
+            return "Прямой путь tg-ws-proxy к Telegram срезан на рукопожатии — прокси уходит на мосты Cloudflare. Не сбой, если мосты отвечают.";
+
+        if (Has("CF WS") && Has("timed out"))
+            return "Мост Cloudflare к Telegram не ответил вовремя — прокси пробует следующий. Сбой, только если не отвечают все (тогда «Подобрать мосты» в TG Proxy).";
+
+        if (Has("not in --dc-ip"))
+            return "Telegram попросил служебный сервер (обычно медиа или тестовый), для которого у прокси нет прямого адреса — идёт через мосты. Сбой, только если не грузятся фото и видео.";
+
+        if (Has("all configured domains"))
+            return "Ни один мост Cloudflare не открылся для этого сервера Telegram — вот это сбой: «Подобрать мосты» в TG Proxy или свой воркер.";
+
+        if (Has("pre-connect"))
+            return "Прокси не смог заранее открыть запасное соединение — откроет при первом запросе. Не сбой.";
+
+        if (Has("11001") || Has("11004") || Has("хост неизвестен") || Has("данные запрошенного типа"))
+            return "Имя моста не разрешилось через DNS: мост закрыт или DNS не ответил. Прокси берёт следующий; сбой, только если так со всеми.";
+
+        if (Has("10065") || Has("недоступного хоста"))
+            return "Адрес был недоступен в этот момент (нет сети или маршрута): обычно после сна или смены сети.";
+
+        if (Has("HTTP 503") || Has("HTTP 502") || Has("HTTP 52"))
+            return "Мост или сервер ответил ошибкой на своей стороне — берётся следующий. Сбой, только если так отвечают все.";
+
+        if (Has("certificate") || Has("x509"))
+            return "Сертификат сервера не принят: у сервера подписки он просрочен или чужой, либо соединение подменяют.";
+
+        if (Has("no route") || Has("unreachable") || Has("network is down"))
+            return "Сети не было в этот момент (сон, смена Wi-Fi, отключение кабеля).";
+
+        if (Has("lookup") || Has("dns") || Has("no such host"))
+            return "Имя не разрешилось: DNS не ответил или имени нет.";
+
+        if (Has("refused"))
+            return "Сервер отказал в соединении на этом порту: сервис там не работает.";
+
+        return "Без готового пояснения — смотреть пример и сам журнал рядом.";
+    }
+
     private static FileInfo? LatestBlockcheck(string folder)
     {
         try

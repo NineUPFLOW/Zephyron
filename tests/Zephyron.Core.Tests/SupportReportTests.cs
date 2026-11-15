@@ -404,4 +404,23 @@ public sealed class SupportReportTests : IDisposable
 
         return all.ToString();
     }
+
+    [Fact]
+    public void ErrorDigestGroupsAndExplains()
+    {
+        var singBox = string.Join("\n",
+            "\u001b[31mERROR\u001b[0m[0215] [2690648 5.0s] connection: open connection to 149.154.167.220:443 using outbound/direct[direct]: dial tcp 149.154.167.220:443: i/o timeout",
+            "ERROR[0216] [1111 5.0s] connection: open connection to 149.154.167.220:443 using outbound/direct[direct]: dial tcp 149.154.167.220:443: i/o timeout",
+            "ERROR[0300] [2222 1m2s] connection: connection download closed: close tcp 10.0.0.1:5000->1.2.3.4:443: endpoint not connected",
+            "INFO[0301] all good");
+
+        var text = SupportReport.ErrorDigest([("sing-box.log", singBox), ("winws2.log", "started\n")]);
+
+        Assert.Contains("[2] Прямое соединение с сервером Telegram", text);
+        Assert.Contains("149.154.167.220:443 ×2", text);
+        Assert.Contains("[1] Соединение закрыла одна из сторон", text);
+        Assert.Contains("== winws2.log: ошибок нет", text);
+        Assert.DoesNotContain("all good", text);
+        Assert.DoesNotContain("\u001b", text);
+    }
 }
