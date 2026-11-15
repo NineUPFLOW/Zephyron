@@ -38,6 +38,11 @@ public sealed class DnsSurveyTests
 
         Assert.Same(fast, picked);
         Assert.Null(DnsSurvey.Fastest([Row(silent, null), Row(middleman, 5)]));
+
+        // Подменяемый провайдером не берётся, пока есть чистый; одни подменяемые — быстрейший.
+        var intercepted = Row(fast, 30) with { Intercepted = true };
+        Assert.Same(slow, DnsSurvey.Fastest([intercepted, Row(slow, 80)]));
+        Assert.Same(fast, DnsSurvey.Fastest([intercepted]));
     }
 
     /// <summary>Ответ с одной A и сжатым именем, как отдаёт любой резолвер.</summary>

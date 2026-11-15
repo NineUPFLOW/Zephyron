@@ -903,12 +903,16 @@ public static class DnsSurvey
     /// посредники вроде XBOX DNS отдают адреса своих прокси, и быстрота их
     /// ответа — не достоинство.
     /// </remarks>
-    public static DnsProvider? Fastest(IEnumerable<DnsSurveyRow> rows) =>
-        rows
-            .Where(r => r.Provider.Choosable && r.DohMs is not null)
-            .OrderBy(r => r.DohMs)
-            .Select(r => r.Provider)
-            .FirstOrDefault();
+    /// <remarks>
+    /// Подменяемый провайдером резолвер не берётся, даже если он быстрейший: 15.11 автовыбор
+    /// поставил 1.1.1.1, и «Диагностика» тут же назвала это ошибкой. Чистых нет — берём быстрейший.
+    /// </remarks>
+    public static DnsProvider? Fastest(IEnumerable<DnsSurveyRow> rows)
+    {
+        var usable = rows.Where(r => r.Provider.Choosable && r.DohMs is not null).OrderBy(r => r.DohMs).ToList();
+
+        return (usable.FirstOrDefault(r => !DnsTrust.IsBad(r)) ?? usable.FirstOrDefault())?.Provider;
+    }
 
     /// <summary>Обзор всех провайдеров, по нескольку разом.</summary>
     public static async Task<IReadOnlyList<DnsSurveyRow>> SurveyAllAsync(
