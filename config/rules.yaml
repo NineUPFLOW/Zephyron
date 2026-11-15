@@ -179,8 +179,10 @@ rules:
   # rutracker.org отсюда убран 08.11: автоподбор открыл его десинком пресета
   # трижды подряд — туннель только если иначе никак (владелец 08.11).
 
-  - match: domain
-    value: "*.linkedin.com"
+  # Списком сервиса, а не *.linkedin.com: свой путь LinkedIn в «Маршрутах» пишется
+  # на тот же список и заменяет это правило, а не спорит с ним (владелец 15.11).
+  - match: hostlist
+    value: config/lists/linkedin.txt
     mode: proxy
 
   - match: domain
