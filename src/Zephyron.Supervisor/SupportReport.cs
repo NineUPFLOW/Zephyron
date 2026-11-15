@@ -117,6 +117,11 @@ public static class SupportReport
             // Права не проверяются: отчёт собирает и zy без администратора.
             parts.Add(("doctor.txt", Section(() => Doctor.Describe(Doctor.Run(settings, elevation: false)))));
 
+            // YouTube тем путём, каким он идёт сейчас. Отчёт 15.11: проверка блокировок была
+            // снята с выключенными движками, и что ломается при включённом обходе, видно не было.
+            if (state is not null && state.IsSupervisorAlive())
+                parts.Add(("youtube-now.txt", Section(YouTubeNow)));
+
             // Голос Discord: что сторож дописал бы — тот же текст, что zy voice.
             parts.Add(("voice.txt", Section(() => Core.Services.DiscordVoiceLearn.Report(root: root).Text)));
 
@@ -528,6 +533,36 @@ public static class SupportReport
     }
 
     /// <summary>Самый свежий отчёт проверки блокировок; <c>null</c> — проверок не было.</summary>
+    /// <summary>Страница, миниатюры, аватары, API и раздатчик видео — всё, без чего YouTube «без интернета».</summary>
+    internal static readonly string[] YouTubeHosts =
+        ["www.youtube.com", "i.ytimg.com", "yt3.ggpht.com", "youtubei.googleapis.com", "redirector.googlevideo.com"];
+
+    private static string YouTubeNow()
+    {
+        using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(25));
+        var probes = YouTubeHosts.Select(h => BlockCheck.CheckAsync(h, "YouTube", cancel.Token)).ToArray();
+
+        try
+        {
+            Task.WaitAll(probes);
+        }
+        catch (Exception)
+        {
+            // Упавшая проба — тоже ответ: пишем, что успели.
+        }
+
+        var text = new StringBuilder("YouTube через нынешний путь (движки работают): TLS, данные, вердикт.\n\n");
+
+        for (int i = 0; i < YouTubeHosts.Length; i++)
+        {
+            text.AppendLine(probes[i].IsCompletedSuccessfully
+                ? $"{YouTubeHosts[i],-28} TLS {probes[i].Result.DescribeTls(),-8} данные {probes[i].Result.DescribeData(),-10} {probes[i].Result.Describe()}"
+                : $"{YouTubeHosts[i],-28} проба не завершилась: {probes[i].Exception?.GetBaseException().Message ?? "время вышло"}");
+        }
+
+        return text.ToString();
+    }
+
     private static FileInfo? LatestAutoPick(string folder)
     {
         try
@@ -665,6 +700,17 @@ public static class SupportReport
 
         if (Has("not in --dc-ip"))
             return "Telegram попросил служебный сервер (обычно медиа или тестовый), для которого у прокси нет прямого адреса — идёт через мосты. Сбой, только если не грузятся фото и видео.";
+
+        if (Has("context deadline exceeded") && Has("outbound"))
+            return telegram
+                ? "Telegram шёл через VPN, а сервер выхода не успел соединиться. Много таких — сервер плох: смените его или отдайте Telegram прокси (TG Proxy)."
+                : "Сервер VPN не успел соединиться. Много таких подряд — сервер выхода плохой или его рвёт десинк; смените сервер.";
+
+        if (Has("unexpected HTTP response status: 52") || Has("unexpected HTTP response status: 50"))
+            return "Сервер VPN за Cloudflare не достучался до себя (ошибка 5xx на его стороне) — этот сервер подписки лежит, выберите другой.";
+
+        if (Has("PROTOCOL_ERROR") || Has("stream error"))
+            return "Поток через сервер VPN оборвался посреди передачи (HTTP/2, gRPC). Изредка — норма, часто — сервер нестабилен.";
 
         if (Has("all configured domains"))
             return "Ни один мост Cloudflare не открылся для этого сервера Telegram — вот это сбой: «Подобрать мосты» в TG Proxy или свой воркер.";

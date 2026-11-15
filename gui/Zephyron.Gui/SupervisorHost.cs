@@ -640,7 +640,11 @@ internal static class SupervisorHost
         IReadOnlyList<System.Net.IPAddress> servers = options.NoProxy
             ? []
             : TunnelEndpoints.Read(options.ProxyConfig,
-                ServerPools.CaptureFirst(Warp.PreferredExit(settings), settings.EnginePools));
+                [.. ServerPools.CaptureFirst(Warp.PreferredExit(settings), settings.EnginePools),
+                    // Дальше — быстрейшие по замерам: автовыбор берёт быстрейший, и он должен
+                    // попасть в 40 защищённых. Отчёт 15.11: из 361 сервера защищены первые 40
+                    // по подписке, а выбран был японский из середины — и туннель сыпал 525 и таймаутами.
+                    .. ServerHealthCache.Load().Latencies().OrderBy(p => p.Value).Select(p => p.Key)]);
 
         // И соединения, которые уходят в туннель по подменным адресам.
         var fakeRange = options.NoProxy ? null : TunnelEndpoints.FakeRange(options.ProxyConfig);

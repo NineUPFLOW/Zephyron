@@ -423,4 +423,11 @@ public sealed class SupportReportTests : IDisposable
         Assert.DoesNotContain("all good", text);
         Assert.DoesNotContain("\u001b", text);
     }
+
+    [Theory]
+    [InlineData("connection: open connection to 149.154.167.220:443 using outbound/selector[auto]: context deadline exceeded", "Telegram шёл через VPN")]
+    [InlineData("connection: open connection to x2.c.lencr.org:80 using outbound/selector[auto]: unexpected HTTP response status: 525", "за Cloudflare")]
+    [InlineData("connection download closed: stream error: stream ID 19; PROTOCOL_ERROR; received from peer", "оборвался посреди передачи")]
+    public void TunnelServerErrorsAreExplained(string line, string expected) =>
+        Assert.Contains(expected, SupportReport.Explain("sing-box.log", line));
 }
