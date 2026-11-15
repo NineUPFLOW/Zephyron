@@ -543,7 +543,7 @@ public static class SupportReport
     }
 
     private static readonly Regex Noise = new(
-        @"^\S+\s+(?=\S*(ERROR|WARN|FATAL))|\[\d+\s[\d.]+[mµ]?s\]|\b\d{4}-\d\d-\d\dT\S+|\[\d{4}\]|\[\d\d:\d\d:\d\d\]|\d{4}-\d\d-\d\d \d\d:\d\d:\d\d",
+        @"^\S+\s+(?=\S*(ERROR|WARN|FATAL))|\[\d+\s[\d.hmsµ]+\]|\b\d{4}-\d\d-\d\dT\S+|\[\d{4}\]|\[\d\d:\d\d:\d\d\]|\d{4}-\d\d-\d\d \d\d:\d\d:\d\d",
         RegexOptions.Compiled);
 
     private static readonly Regex Endpoint = new(@"\[?[0-9a-f:.]*[0-9a-f]\]?:\d{2,5}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
