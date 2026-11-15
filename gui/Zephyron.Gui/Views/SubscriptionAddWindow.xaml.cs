@@ -44,7 +44,10 @@ public partial class SubscriptionAddWindow : Window
 
     /// <param name="taken">Имена подписок: двух одинаковых не различить в меню и в метках пула.</param>
     /// <param name="pasteOnOpen">Ctrl+V на вкладке: сразу взять из буфера.</param>
-    public SubscriptionAddWindow(IReadOnlyCollection<string> taken, bool pasteOnOpen = false)
+    /// <param name="preloadFile">Файл, брошенный на вкладку: читается как «из файла».</param>
+    /// <param name="preloadText">Текст, брошенный на вкладку: как из буфера.</param>
+    public SubscriptionAddWindow(IReadOnlyCollection<string> taken, bool pasteOnOpen = false,
+        string? preloadFile = null, string? preloadText = null)
     {
         InitializeComponent();
 
@@ -52,7 +55,11 @@ public partial class SubscriptionAddWindow : Window
 
         Loaded += (_, _) =>
         {
-            if (pasteOnOpen)
+            if (preloadFile is not null)
+                FromFile(preloadFile);
+            else if (preloadText is not null)
+                Fill(preloadText, name: null, where: "Из брошенного текста");
+            else if (pasteOnOpen)
                 FromClipboard();
             else
                 UrlBox.Focus();

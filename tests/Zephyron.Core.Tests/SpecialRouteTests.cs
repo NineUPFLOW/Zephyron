@@ -67,7 +67,11 @@ public sealed class SpecialRouteTests : IDisposable
         {
             new UserRuleEntry { Match = MatchKind.HostList, Value = "config/lists/instagram.txt", Mode = RoutingMode.Direct, Special = SpecialRoute.RelayPin, PinHosts = InstagramPins },
             new UserRuleEntry { Match = MatchKind.HostList, Value = "config/lists/x.txt", Mode = RoutingMode.Desync, Special = SpecialRoute.ServicePin,
-                PinHosts = new Dictionary<string, string> { ["x.com"] = "104.244.42.1", ["bad.example"] = "не адрес" } },
+                PinHosts = new Dictionary<string, string>
+                {
+                    ["x.com"] = "104.244.42.1", ["bad.example"] = "не адрес",
+                    ["a.com\n1.2.3.4 bank.ru"] = "1.2.3.4", ["b.com #x"] = "1.2.3.4",
+                } },
         };
 
         var pins = RulesShare.Pins(entries);

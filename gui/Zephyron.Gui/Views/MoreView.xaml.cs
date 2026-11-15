@@ -207,6 +207,148 @@ public partial class MoreView : UserControl
         return state is not null && state.IsSupervisorAlive();
     }
 
+    /// <summary>Копия настроек под паролем: ключи подписок внутри, поэтому открытой не бывает.</summary>
+    private async void OnBackupSave(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Куда сохранить копию настроек",
+            FileName = "zephyron-backup" + SettingsBackup.Extension,
+            Filter = "Копия настроек Zephyron (*.zybackup)|*.zybackup",
+        };
+
+        if (dialog.ShowDialog() != true)
+            return;
+
+        var cloud = CloudFolder.Of(Path.GetDirectoryName(Path.GetFullPath(dialog.FileName)) ?? dialog.FileName);
+
+        if (cloud is not null && !ConfirmDialog.Ask(Window.GetWindow(this), "Папка синхронизации",
+                $"Папка принадлежит {cloud}: файл уйдёт в облако. В копии ключи подписок и серверов; она зашифрована паролем, но потеряете пароль — не откроете, а слабый пароль можно подобрать. Сохранить сюда?",
+                "Сохранить", "Отмена", defaultNo: true))
+        {
+            return;
+        }
+
+        var password = PasswordDialog.Ask(Window.GetWindow(this), "Пароль копии",
+            $"Без него копию не открыть, восстановить пароль нельзя. Не короче {SettingsBackup.MinPassword} знаков.",
+            confirm: true, SettingsBackup.MinPassword);
+
+        if (password is null)
+            return;
+
+        BackupSave.IsEnabled = BackupLoad.IsEnabled = false;
+        Status.Text = "Шифрую копию…";
+
+        try
+        {
+            await Task.Run(() => SettingsBackup.Export(dialog.FileName, password));
+            Status.Text = $"Копия сохранена: {dialog.FileName}.";
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Сохранить копию не удалось: " + ex.GetBaseException().Message;
+        }
+        finally
+        {
+            BackupSave.IsEnabled = BackupLoad.IsEnabled = true;
+        }
+    }
+
+    private async void OnBackupLoad(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Откуда восстановить настройки",
+            Filter = "Копия настроек Zephyron (*.zybackup)|*.zybackup|Все файлы|*.*",
+        };
+
+        if (dialog.ShowDialog() != true)
+            return;
+
+        var running = EnginesRunning();
+
+        if (!ConfirmDialog.Ask(Window.GetWindow(this), "Восстановить настройки?",
+                "Текущие настройки, маршруты, подписки и свои списки будут заменены содержимым копии. Прежние файлы сохранятся в runtime/backups. Пины особых маршрутов из копии встанут в hosts."
+                + (running ? " Движки будут остановлены." : string.Empty),
+                "Восстановить", "Отмена", danger: true, defaultNo: true))
+        {
+            return;
+        }
+
+        var password = PasswordDialog.Ask(Window.GetWindow(this), "Пароль копии", "Тот, что вводили при сохранении.",
+            confirm: false, SettingsBackup.MinPassword);
+
+        if (password is null)
+            return;
+
+        BackupSave.IsEnabled = BackupLoad.IsEnabled = false;
+        Status.Text = "Открываю копию…";
+        bool stopped = false;
+
+        try
+        {
+            // Сначала пароль и целость: неверный пароль не должен гасить движки.
+            var opened = await Task.Run(() => SettingsBackup.Read(dialog.FileName, password));
+
+            if (running)
+            {
+                await EngineControl.StopAsync("восстановление копии настроек", CancellationToken.None);
+                stopped = true;
+            }
+
+            var restored = await Task.Run(() => SettingsBackup.Apply(opened));
+
+            // Пины особых маршрутов — в hosts, как при загрузке набора маршрутов.
+            int pinned = 0;
+            string? pinProblem = null;
+
+            try
+            {
+                foreach (var group in RulesShare.Pins(UserRulesFile.Load().Entries).GroupBy(p => p.Desync))
+                {
+                    var result = Zephyron.Proxy.HostsEditor.Pin(
+                        group.ToDictionary(p => p.Name, p => p.Address, StringComparer.OrdinalIgnoreCase),
+                        note: group.Key ? $"копия настроек {Zephyron.Proxy.HostsEditor.DesyncMark}" : "копия настроек");
+                    pinned += result.Reverted is null ? group.Count() : 0;
+                }
+
+                if (pinned > 0)
+                    _ = Zephyron.Proxy.HostsEditor.FlushDnsAsync();
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                pinProblem = ex.GetBaseException().Message;
+            }
+
+            Journal.Write("настройки", $"восстановлено из копии: {restored.Files.Count} файлов, прежние — в {restored.BackupDir}"
+                + (pinProblem is null ? string.Empty : "; пины в hosts не встали: " + pinProblem));
+
+            // Движки — уже по восстановленным настройкам; окно читает их заново
+            // только при запуске, поэтому программа перезапускается сама.
+            if (running)
+                await EngineControl.StartAsync("восстановление копии настроек", CancellationToken.None);
+
+            App.Relaunch();
+        }
+        catch (SettingsBackup.BadBackupException ex)
+        {
+            Status.Text = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Восстановить не удалось: " + ex.GetBaseException().Message
+                + (stopped ? " Часть файлов могла замениться, прежние — в runtime/backups. Движки запускаю снова." : string.Empty);
+
+            // Остановили ради записи — не оставляем человека без обхода.
+            if (stopped)
+                await EngineControl.StartAsync("восстановление копии не удалось", CancellationToken.None);
+        }
+        finally
+        {
+            BackupSave.IsEnabled = BackupLoad.IsEnabled = true;
+        }
+    }
+
     private static bool Confirm(string question) =>
         ConfirmDialog.Show(
             question,

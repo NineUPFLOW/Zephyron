@@ -178,5 +178,10 @@ internal static class SingleInstance
         }
 
         _mutex?.Dispose();
+
+        // Второй вызов (перезапуск, затем OnExit) не должен трогать освобождённое.
+        _watch = _leaveWatch = null;
+        _wake = _leave = null;
+        _mutex = null;
     }
 }

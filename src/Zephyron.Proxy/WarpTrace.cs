@@ -5,7 +5,8 @@ namespace Zephyron.Proxy;
 /// <summary>Что Cloudflare увидел по ту сторону туннеля.</summary>
 /// <param name="Country">Страна выхода, двумя буквами (<c>loc</c>); <c>null</c> — не назвал.</param>
 /// <param name="WarpOn">Соединение пришло через WARP (<c>warp=on</c>).</param>
-public sealed record WarpExit(string? Country, bool WarpOn);
+/// <param name="Colo">Дата-центр Cloudflare (<c>colo</c>: ARN, DME…); <c>null</c> — не назвал.</param>
+public sealed record WarpExit(string? Country, bool WarpOn, string? Colo = null);
 
 /// <summary>Итог сверки выхода с ожидаемой страной.</summary>
 public enum WarpExitVerdict
@@ -52,10 +53,10 @@ public static class WarpTrace
 
     public static WarpExit Parse(string text)
     {
-        var (_, country, _) = SpeedTest.ParseTrace(text);
+        var (_, country, colo) = SpeedTest.ParseTrace(text);
         bool warp = text.Split('\n', StringSplitOptions.TrimEntries).Contains("warp=on", StringComparer.Ordinal);
 
-        return new WarpExit(country?.ToUpperInvariant(), warp);
+        return new WarpExit(country?.ToUpperInvariant(), warp, colo?.ToUpperInvariant());
     }
 
     /// <param name="seen">Что вернула проверка; <c>null</c> — ответа не было.</param>

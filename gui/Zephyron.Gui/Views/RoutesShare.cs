@@ -212,6 +212,89 @@ public partial class RoutesView
         }
     }
 
+    private void OnTxtMenu(object sender, RoutedEventArgs e)
+    {
+        var import = new System.Windows.Controls.MenuItem { Header = "Импорт из .txt…" };
+        var export = new System.Windows.Controls.MenuItem { Header = "Экспорт в .txt…" };
+        import.Click += (_, _) => ImportTxt();
+        export.Click += (_, _) => ExportTxt();
+
+        var menu = new System.Windows.Controls.ContextMenu
+        {
+            PlacementTarget = (UIElement)sender,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+        };
+        menu.Items.Add(import);
+        menu.Items.Add(export);
+        menu.IsOpen = true;
+    }
+
+    private void ImportTxt()
+    {
+        var dialog = new OpenFileDialog { Title = "Список доменов", Filter = "Текст (*.txt)|*.txt|Все файлы|*.*" };
+
+        if (dialog.ShowDialog() != true)
+            return;
+
+        try
+        {
+            // Список — килобайты; больше — не тот файл, и читать его в память незачем.
+            if (new FileInfo(dialog.FileName).Length > 1_000_000)
+            {
+                Status.Text = "Файл слишком большой для списка.";
+                return;
+            }
+
+            AddList(File.ReadAllText(dialog.FileName));
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Не удалось прочитать файл: " + ex.GetBaseException().Message;
+        }
+    }
+
+    private void ExportTxt()
+    {
+        try
+        {
+            var lines = TxtLines(UserRulesFile.Load().Entries);
+
+            if (lines.Count == 0)
+            {
+                Status.Text = "Своих доменов и адресов нет, выгружать нечего.";
+                return;
+            }
+
+            var dialog = new SaveFileDialog
+            {
+                Title = "Куда сохранить список",
+                FileName = "zephyron-domains.txt",
+                Filter = "Текст (*.txt)|*.txt|Все файлы|*.*",
+            };
+
+            if (dialog.ShowDialog() != true)
+                return;
+
+            // Без BOM: списки читают и сторонние утилиты.
+            Zephyron.Core.AtomicFile.WriteAllText(dialog.FileName,
+                string.Join(Environment.NewLine, lines) + Environment.NewLine,
+                new System.Text.UTF8Encoding(false));
+
+            Status.Text = $"Сохранено: {lines.Count} строк в {dialog.FileName}.";
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Сохранить не удалось: " + ex.GetBaseException().Message;
+        }
+    }
+
+    /// <summary>Домены и адреса своих правил по одному, без повторов.</summary>
+    internal static IReadOnlyList<string> TxtLines(IEnumerable<UserRuleEntry> rules) =>
+        [.. rules.Where(r => r.Match is MatchKind.Domain or MatchKind.Ip)
+            .Select(r => r.Value.Trim())
+            .Where(v => v.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
+
     /// <summary>Вопрос перед заменой: сколько и что именно.</summary>
     private static string Question(RulesDiff diff, IReadOnlyList<UserRuleEntry> incoming, IReadOnlyList<string> bundled)
     {

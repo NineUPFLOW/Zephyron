@@ -6,7 +6,8 @@
              xmlns:views="clr-namespace:Zephyron.Gui.Views"
              Background="{DynamicResource Chrome}"
              Focusable="True" FocusVisualStyle="{x:Null}"
-             PreviewKeyDown="OnPreviewKeyDown">
+             PreviewKeyDown="OnPreviewKeyDown"
+             AllowDrop="True" DragOver="OnDragOver" Drop="OnDrop">
 
     <!--
         Вся вкладка — один список, который рисует только видимые строки

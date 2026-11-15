@@ -182,6 +182,32 @@ public partial class RoutesSettingsWindow : Window
                : "Перезапуск Discord больше не предлагается.");
     }
 
+    private async void OnClearDiscord(object sender, RoutedEventArgs e)
+    {
+        if (!ConfirmDialog.Ask(this, "Очистить кеш Discord?",
+                "Discord будет закрыт (если не закроется сам за 5 с — принудительно), а его кеш (Cache, Code Cache, GPUCache) удалён. Вход в аккаунт и настройки не затрагиваются.",
+                "Очистить", "Отмена"))
+        {
+            return;
+        }
+
+        ClearDiscord.IsEnabled = false;
+        Status.Text = "Закрываю Discord и чищу кеш…";
+
+        try
+        {
+            Status.Text = await DiscordCache.ClearAsync();
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Очистить не удалось: " + ex.GetBaseException().Message;
+        }
+        finally
+        {
+            ClearDiscord.IsEnabled = true;
+        }
+    }
+
     private void OnLearn(object sender, RoutedEventArgs e)
     {
         bool on = Learn.IsChecked == true;

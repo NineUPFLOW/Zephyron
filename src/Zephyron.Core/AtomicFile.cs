@@ -24,6 +24,22 @@ public static class AtomicFile
         }
     }
 
+    public static void WriteAllBytes(string path, byte[] contents)
+    {
+        var temp = TempPath(path);
+
+        try
+        {
+            File.WriteAllBytes(temp, contents);
+            File.Move(temp, path, overwrite: true);
+        }
+        catch
+        {
+            TryDelete(temp);
+            throw;
+        }
+    }
+
     public static async Task WriteAllTextAsync(string path, string contents, Encoding? encoding = null, CancellationToken cancellationToken = default)
     {
         var temp = TempPath(path);

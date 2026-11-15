@@ -101,6 +101,12 @@
                                     Click="OnOpen" Margin="0,0,8,8" />
                             <Button Style="{StaticResource Ghost}" Content="Пресеты" Tag="presets"
                                     Click="OnOpen" Margin="0,0,8,8" />
+                            <Button x:Name="BackupSave" Style="{StaticResource Ghost}" Content="Сохранить копию…"
+                                    Click="OnBackupSave" Margin="0,0,8,8"
+                                    ToolTip="Настройки, маршруты, подписки и свои списки в один файл .zybackup под паролем." />
+                            <Button x:Name="BackupLoad" Style="{StaticResource Ghost}" Content="Восстановить из копии…"
+                                    Click="OnBackupLoad" Margin="0,0,8,8"
+                                    ToolTip="Заменяет текущие настройки содержимым копии; прежние сохраняются в runtime\backups." />
                         </WrapPanel>
 
                         <TextBlock x:Name="RootValue" Style="{StaticResource Mono}"

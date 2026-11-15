@@ -158,6 +158,11 @@ public abstract class SupervisedService
     {
     }
 
+    /// <summary>Компьютер проснулся: забыть накопленные за сон неудачи проверок, движки не трогать.</summary>
+    public virtual void OnResume()
+    {
+    }
+
     /// <summary>
     /// Движок поднялся и отвечает — можно сказать ему то, чего он не помнит
     /// или помнит неверно.
@@ -1049,6 +1054,22 @@ public sealed class SingBoxService : SupervisedService
         if (!Zephyron.Proxy.HostsEditor.FlushDns())
             Note("кэш DNS Windows не сброшен — до десяти минут после перезапуска "
                 + "имена в VPN могут вести по старым подменным адресам.");
+    }
+
+    /// <remarks>
+    /// После сна провалы проверок — это сон, а не отказ сети: счёт неудач и
+    /// «молчание» обнуляются, и следующая проверка глубокая. Включённый обход
+    /// не трогаем: он реально стоит в движке, снимет его удачная проверка.
+    /// Зовётся из того же цикла, что и проверки, — гонки нет.
+    /// </remarks>
+    public override void OnResume()
+    {
+        _checkCounter = 0;
+        _exitMisses = 0;
+        _lastTrafficOk = true;
+
+        if (!_bypass.Engaged)
+            _bypass.Forget();
     }
 
     protected override void ForgetRunState()

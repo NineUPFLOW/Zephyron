@@ -82,6 +82,26 @@
                             <ToggleButton Grid.Column="2" x:Name="Learn" Style="{StaticResource Switch}"
                                           Click="OnLearn" VerticalAlignment="Center" />
                         </Grid>
+
+                        <Border Style="{StaticResource RowLine}" />
+
+                        <Grid Margin="16,13">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+                                <TextBlock Text="Кеш Discord" VerticalAlignment="Center" />
+
+                                <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0" TextWrapping="Wrap"
+                                           Text="Поможет, если после смены маршрута или десинка Discord держится за старые соединения или не подключается. Discord закроется; вход в аккаунт и настройки не затрагиваются." />
+                            </StackPanel>
+
+                            <Button Grid.Column="1" x:Name="ClearDiscord" Style="{StaticResource Ghost}"
+                                    Content="Очистить кеш Discord" Click="OnClearDiscord" VerticalAlignment="Center"
+                                    ToolTip="Закрывает Discord и удаляет только папки Cache, Code Cache и GPUCache." />
+                        </Grid>
                     </StackPanel>
                 </Border>
 

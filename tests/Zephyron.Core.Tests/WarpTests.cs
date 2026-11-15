@@ -491,7 +491,8 @@ public partial class WarpTests
         var ee = WarpTrace.Parse("fl=1\nip=203.0.113.7\nloc=ee\ncolo=TLL\nwarp=on\n");
         var plain = WarpTrace.Parse("loc=EE\nwarp=off\n");
 
-        Assert.Equal(new WarpExit("EE", true), ee);
+        Assert.Equal(new WarpExit("EE", true, "TLL"), ee);
+        Assert.Null(plain.Colo);
         Assert.Equal(WarpExitVerdict.Match, WarpTrace.Judge(ee, "EE"));
         Assert.Equal(WarpExitVerdict.Match, WarpTrace.Judge(ee, null));
         Assert.Equal(WarpExitVerdict.Mismatch, WarpTrace.Judge(ee, "DE"));

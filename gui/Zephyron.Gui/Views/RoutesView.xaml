@@ -712,6 +712,10 @@
                         <Button x:Name="ImportButton" Style="{StaticResource Ghost}"
                                 Content="Загрузить из файла" Click="OnLoadRoutes" Padding="12,7"
                                 ToolTip="Читает маршруты из файла, показывает, что изменится, и спрашивает перед записью." />
+
+                        <Button Style="{StaticResource Ghost}" Content="Списки .txt…" Click="OnTxtMenu"
+                                Margin="8,0,0,0" Padding="12,7"
+                                ToolTip="Свои домены текстом: загрузить список из .txt или выгрузить ваши домены и адреса в .txt." />
                     </StackPanel>
                 </Grid>
 

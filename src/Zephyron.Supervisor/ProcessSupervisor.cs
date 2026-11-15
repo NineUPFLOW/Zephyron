@@ -136,6 +136,11 @@ public sealed class ProcessSupervisor
         return found;
     }
 
+    /// <summary>Между витками прошло заметно больше интервала — машина спала.</summary>
+    /// <remarks>Запас 30 с на задержку таймера под нагрузкой.</remarks>
+    internal static bool AfterSleep(long previousTicks, long nowTicks, TimeSpan interval) =>
+        nowTicks - previousTicks > (interval + TimeSpan.FromSeconds(30)).TotalMilliseconds;
+
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         Log($"супервизор запущен, PID {Environment.ProcessId}");
@@ -159,7 +164,21 @@ public sealed class ProcessSupervisor
 
             while (!cancellationToken.IsCancellationRequested)
             {
+                // Меряется только пауза: долгая проверка службы сном не считается.
+                var previous = Environment.TickCount64;
                 await Task.Delay(_options.CheckInterval, cancellationToken);
+
+                // TickCount64 идёт и во сне, таймер Task.Delay — нет: разрыв выдаёт сон.
+                var now = Environment.TickCount64;
+
+                if (AfterSleep(previous, now, _options.CheckInterval))
+                {
+                    Log($"возобновление после сна ({(now - previous) / 1000} с)");
+
+                    foreach (var service in _services)
+                        service.OnResume();
+                }
+
                 await CheckAllAsync(cancellationToken);
                 SaveState();
             }

@@ -2109,6 +2109,10 @@ public partial class VpnView : UserControl
         }
     }
 
+    /// <summary>« · дата-центр ARN», если Cloudflare его назвал.</summary>
+    private static string Colo(WarpExit? seen) =>
+        seen?.Colo is { Length: > 0 } colo ? $" · дата-центр {colo}" : string.Empty;
+
     /// <summary>
     /// Спрашивает у Cloudflare, откуда виден выход, и говорит это словами в карточке.
     /// </summary>
@@ -2172,10 +2176,10 @@ public partial class VpnView : UserControl
         WarpExitLine.Text = verdict switch
         {
             WarpExitVerdict.Match when seen?.Country is { } code && expected is not null =>
-                $"Выход подтверждён: {CountryName(code)}.",
+                $"Выход подтверждён: {CountryName(code)}{Colo(seen)}.",
             WarpExitVerdict.Match =>
                 seen?.Country is { } code2
-                    ? $"WARP работает, выход: {CountryName(code2)}." + (settings.WarpCountryTag is null ? string.Empty
+                    ? $"WARP работает, выход: {CountryName(code2)}{Colo(seen)}." + (settings.WarpCountryTag is null ? string.Empty
                         : " Страну сервера по названию определить не удалось, поэтому сверять нечего.")
                     : "WARP работает.",
             WarpExitVerdict.Mismatch =>
@@ -2385,10 +2389,12 @@ public partial class VpnView : UserControl
     }
 
     /// <param name="pasteOnOpen">Ctrl+V на вкладке: окно сразу берёт из буфера.</param>
-    private void OpenAdd(bool pasteOnOpen)
+    /// <param name="file">Файл, брошенный на вкладку.</param>
+    /// <param name="text">Текст, брошенный на вкладку.</param>
+    private void OpenAdd(bool pasteOnOpen, string? file = null, string? text = null)
     {
         var taken = _book.Entries.Select(entry => entry.Name).ToList();
-        var window = new SubscriptionAddWindow(taken, pasteOnOpen) { Owner = Window.GetWindow(this) };
+        var window = new SubscriptionAddWindow(taken, pasteOnOpen, file, text) { Owner = Window.GetWindow(this) };
 
         if (window.ShowDialog() != true || window.Request is not { } request)
             return;
@@ -2621,6 +2627,42 @@ public partial class VpnView : UserControl
         var pad = (Thickness)FindResource("PagePad");
         double side = Math.Max(0, (e.NewSize.Width - pad.Left - pad.Right - (double)FindResource("ContentMax")) / 2);
         Page.Padding = new Thickness(pad.Left + side, pad.Top, pad.Right + side, pad.Bottom);
+    }
+
+    private static readonly string[] DroppableFiles = [".conf", ".txt", ".png", ".jpg", ".jpeg"];
+
+    /// <summary>Что принесли: первый подходящий файл либо текст.</summary>
+    private static (string? File, string? Text) Dropped(DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop) && e.Data.GetData(DataFormats.FileDrop) is string[] files)
+        {
+            var file = files.FirstOrDefault(f => System.IO.File.Exists(f)
+                && DroppableFiles.Contains(System.IO.Path.GetExtension(f), StringComparer.OrdinalIgnoreCase));
+
+            return (file, null);
+        }
+
+        return e.Data.GetDataPresent(DataFormats.UnicodeText) && e.Data.GetData(DataFormats.UnicodeText) is string { Length: > 0 } text
+            ? (null, text)
+            : (null, null);
+    }
+
+    private void OnDragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = Dropped(e) is (not null, _) or (_, not null) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnDrop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+
+        if (Dropped(e) is (null, null))
+            return;
+
+        var (file, text) = Dropped(e);
+        // Окно — после выхода из перетаскивания: иначе Проводник ждёт, пока его закроют.
+        Dispatcher.BeginInvoke(() => OpenAdd(pasteOnOpen: false, file, text));
     }
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)

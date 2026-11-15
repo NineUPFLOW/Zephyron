@@ -442,6 +442,20 @@ public partial class App : Application
 
     private TrayIcon? _tray;
 
+    /// <summary>Перезапуск окна (движки — отдельный процесс, их это не трогает).</summary>
+    /// <remarks>Место единственного экземпляра освобождается до запуска нового, иначе тот лишь покажет старое окно.</remarks>
+    internal static void Relaunch()
+    {
+        Exiting = true;
+        SingleInstance.Release();
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath!)
+        {
+            UseShellExecute = false,
+            WorkingDirectory = Environment.CurrentDirectory,
+        });
+        Current.Shutdown(0);
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         // Замер при запуске мог ещё идти — его пробник не должен пережить окно.

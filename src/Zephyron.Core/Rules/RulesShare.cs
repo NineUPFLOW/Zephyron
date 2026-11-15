@@ -68,7 +68,8 @@ public static class RulesShare
     public static IReadOnlyList<(string Name, string Address, bool Desync, string? Pin)> Pins(IEnumerable<UserRuleEntry> rules) =>
         rules.Where(r => r.Enabled && !r.Off && r.Special is SpecialRoute.ServicePin or SpecialRoute.RelayPin && r.PinHosts is { Count: > 0 })
             .SelectMany(r => r.PinHosts!.Select(p => (p.Key, p.Value, r.Special == SpecialRoute.ServicePin, r.Pin)))
-            .Where(p => System.Net.IPAddress.TryParse(p.Value, out _))
+            // Чужой файл пишет в hosts: только настоящее имя, без пробелов, «#» и переводов строки.
+            .Where(p => Uri.CheckHostName(p.Key) == UriHostNameType.Dns && System.Net.IPAddress.TryParse(p.Value, out _))
             .DistinctBy(p => p.Key, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
