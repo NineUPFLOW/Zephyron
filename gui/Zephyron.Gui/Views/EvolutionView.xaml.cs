@@ -16,6 +16,18 @@ public sealed record ProbeRowUi(string Host, string Status, Brush StatusColor, s
 
 public sealed record EvolutionLogEntry(string Time, string Message, Brush Color);
 
+public sealed record FitnessHistoryPoint(
+    int Generation,
+    double Fitness,
+    int Passed,
+    int Total)
+{
+    public string GenText => $"G{Generation}";
+    public string FitnessText => $"{Fitness:P0}";
+    public int FitnessPercent => Math.Clamp((int)(Fitness * 100), 0, 100);
+    public string TooltipText => $"Поколение {Generation}: фитнес {Fitness:P0}, открыто {Passed}/{Total} хостов";
+}
+
 public sealed record PresetDiffUiModel(
     string SectionName,
     string OldSteps,
@@ -123,6 +135,7 @@ public partial class EvolutionView : UserControl
     private readonly ObservableCollection<ProbeRowUi> _probeRows = [];
     private readonly ObservableCollection<EvolutionLogEntry> _logEntries = [];
     private readonly ObservableCollection<PresetDiffUiModel> _diffEntries = [];
+    private readonly ObservableCollection<FitnessHistoryPoint> _fitnessHistory = [];
 
     private CancellationTokenSource? _cts;
     private CancellationTokenSource? _benchmarkCts;
@@ -142,6 +155,7 @@ public partial class EvolutionView : UserControl
         ProbeResultsList.ItemsSource = _probeRows;
         EvolutionLogList.ItemsSource = _logEntries;
         DiffEntriesList.ItemsSource = _diffEntries;
+        FitnessHistoryList.ItemsSource = _fitnessHistory;
 
         _settings = EvolutionSettings.Load();
         InitializeDomainGroups();
@@ -669,6 +683,8 @@ public partial class EvolutionView : UserControl
         StopEvolutionButton.IsEnabled = true;
         BenchmarkAllButton.IsEnabled = false;
         ExportCard.Visibility = Visibility.Collapsed;
+        _fitnessHistory.Clear();
+        FitnessHistoryCard.Visibility = Visibility.Collapsed;
         _initialBaseFitness = 0.0;
         _lastLoggedGen = -1;
 
@@ -834,6 +850,18 @@ public partial class EvolutionView : UserControl
                 _lastLoggedGen = prog.Generation;
                 AppendLog($"Поколение {prog.Generation}: открыто {prog.BestPassed}/{prog.BestTotal} хостов, фитнес {prog.BestFitness:P0}, пинг {prog.BestLatencyMs}мс",
                     prog.BestPassed == prog.BestTotal ? Brushes.LimeGreen : Brushes.LightGray);
+
+                if (!_fitnessHistory.Any(p => p.Generation == prog.Generation))
+                {
+                    _fitnessHistory.Add(new FitnessHistoryPoint(
+                        prog.Generation,
+                        prog.BestFitness,
+                        prog.BestPassed,
+                        prog.BestTotal
+                    ));
+                    FitnessHistoryCard.Visibility = Visibility.Visible;
+                    HistoryPointsSummary.Text = $"Оптимум: {prog.BestFitness:P0} ({prog.BestPassed}/{prog.BestTotal} хостов)";
+                }
             }
 
             // Обновляем детальные строки сетевых проб
@@ -980,6 +1008,50 @@ public partial class EvolutionView : UserControl
         finally
         {
             ABTestButton.IsEnabled = true;
+        }
+    }
+
+    private void OnSearchPresetTextChanged(object sender, TextChangedEventArgs e)
+    {
+        var query = SearchPresetBox.Text?.Trim() ?? "";
+        SearchPresetPlaceholder.Visibility = string.IsNullOrEmpty(query) ? Visibility.Visible : Visibility.Collapsed;
+
+        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(_benchmarkItems);
+        if (view is null)
+            return;
+
+        if (string.IsNullOrEmpty(query))
+        {
+            view.Filter = null;
+        }
+        else
+        {
+            view.Filter = item =>
+            {
+                if (item is PresetBenchmarkItem p)
+                {
+                    return p.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
+                        || p.EvolvedBadge.Contains(query, StringComparison.OrdinalIgnoreCase);
+                }
+                return false;
+            };
+        }
+    }
+
+    private void OnCopyPresetContent(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(_lastExportedFile) && File.Exists(_lastExportedFile))
+        {
+            try
+            {
+                var content = File.ReadAllText(_lastExportedFile);
+                Clipboard.SetText(content);
+                AppendLog("📋 Содержимое пресета скопировано в буфер обмена!", Brushes.LimeGreen);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Не удалось скопировать: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
     }
 

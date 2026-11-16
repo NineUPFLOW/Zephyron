@@ -122,6 +122,19 @@
                         </StackPanel>
                     </Grid>
 
+                    <!-- Поиск и фильтрация по списку пресетов -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="280" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="SearchPresetBox" Height="28" Padding="6,2" VerticalContentAlignment="Center"
+                                 Background="{DynamicResource Surface}" Foreground="{DynamicResource Text}"
+                                 BorderBrush="{DynamicResource Border}" TextChanged="OnSearchPresetTextChanged" />
+                        <TextBlock x:Name="SearchPresetPlaceholder" Text="🔍 Фильтр по названию или Gen..." Style="{StaticResource Caption}"
+                                   VerticalAlignment="Center" Margin="10,0,0,0" IsHitTestVisible="False" Foreground="{DynamicResource Muted}" />
+                    </Grid>
+
                     <!-- Список отсортированных пресетов -->
                     <ItemsControl x:Name="BenchmarkResultsList" Margin="0,6,0,12">
                         <ItemsControl.ItemTemplate>
@@ -347,6 +360,41 @@
                         </Border>
                     </Grid>
 
+                    <!-- График динамики поколений -->
+                    <Border x:Name="FitnessHistoryCard" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}"
+                            BorderThickness="1" CornerRadius="{StaticResource RSm}" Padding="12,8" Margin="0,0,0,16" Visibility="Collapsed">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,6">
+                                <TextBlock Text="📈 Динамика приспособленности по поколениям" Style="{StaticResource Caption}" FontWeight="SemiBold" />
+                                <TextBlock x:Name="HistoryPointsSummary" HorizontalAlignment="Right" Style="{StaticResource Caption}" Foreground="{DynamicResource Accent}" />
+                            </Grid>
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                <ItemsControl x:Name="FitnessHistoryList">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{DynamicResource Wash}" CornerRadius="{StaticResource RSm}"
+                                                    Padding="6,4" Margin="0,0,6,0" VerticalAlignment="Bottom" ToolTip="{Binding TooltipText}">
+                                                <StackPanel HorizontalAlignment="Center" Width="38">
+                                                    <TextBlock Text="{Binding FitnessText}" FontSize="10" FontWeight="Bold"
+                                                               Foreground="{DynamicResource Accent}" HorizontalAlignment="Center" />
+                                                    <ProgressBar Orientation="Vertical" Height="40" Width="14" Minimum="0" Maximum="100"
+                                                                 Value="{Binding FitnessPercent}" Margin="0,3,0,3" HorizontalAlignment="Center" />
+                                                    <TextBlock Text="{Binding GenText}" FontSize="9" Foreground="{DynamicResource Muted}"
+                                                               HorizontalAlignment="Center" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </StackPanel>
+                    </Border>
+
                     <!-- Две колонки: Результаты проб сайтов + Живой журнал эволюции -->
                     <Grid Margin="0,0,0,16">
                         <Grid.ColumnDefinitions>
@@ -458,6 +506,8 @@
                                     <Button x:Name="ABTestButton" Style="{StaticResource Quiet}" Padding="12,8" Margin="0,0,6,0"
                                             Content="⚔️ A/B Тест" Click="OnRunABTest"
                                             ToolTip="Сравнить базовый и эволюционировавший пресеты в реальном бою" />
+                                    <Button Style="{StaticResource Ghost}" Padding="10,8" Margin="0,0,6,0" Content="📋 Скопировать" Click="OnCopyPresetContent"
+                                            ToolTip="Скопировать содержимое пресета в буфер обмена" />
                                     <Button Style="{StaticResource Ghost}" Padding="10,8" Content="Папка" Click="OnOpenFolder" />
                                 </StackPanel>
                             </Grid>
