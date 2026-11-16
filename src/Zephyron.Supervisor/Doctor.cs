@@ -757,6 +757,18 @@ public static class Doctor
             lines.Add(Warn("Хранилище сертификатов не читается: " + ex.GetBaseException().Message));
         }
 
+        // Перехват HTTPS антивирусом: обход тогда видит не браузер, а его соединения.
+        using (var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(6)))
+        {
+            var caught = TlsInterception.CheckAsync(cancel.Token).GetAwaiter().GetResult();
+
+            lines.Add(caught is null
+                ? Ok("Защищённые соединения никто не вскрывает: сертификат Google приходит от Google.")
+                : Warn($"{caught.Product ?? "Какая-то программа"} вскрывает защищённые соединения (сертификат Google подписан «{caught.Issuer}»). "
+                    + "Из-за этого обход и туннель могут не работать: сайты открывает уже она, а не браузер. "
+                    + $"Выключить: {caught.Advice}."));
+        }
+
         return lines;
     }
 
