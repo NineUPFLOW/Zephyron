@@ -20,4 +20,5 @@ public sealed record EvolutionProgress
     public DpiProfile? DetectedDpiProfile { get; init; }
     public IReadOnlyList<PresetDiffEntry>? DiffEntries { get; init; }
     public Zapret.Evolution.PresetIndividual? WinnerIndividual { get; init; }
+    public string? LiveOutcomeDetail { get; init; }
 }

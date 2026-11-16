@@ -1,5 +1,6 @@
 using Xunit;
 using Xunit.Abstractions;
+using Zephyron.Supervisor;
 using Zephyron.Supervisor.Evolution;
 using Zephyron.Zapret;
 using Zephyron.Zapret.Evolution;
@@ -281,5 +282,17 @@ public sealed class GeneticEvolutionLiveCheckTests
         Assert.Equal(0x12, bytes[5]);
         Assert.Equal(0xA4, bytes[6]);
         Assert.Equal(0x42, bytes[7]); // Magic Cookie
+    }
+
+    [Fact]
+    public async Task RecipeTrial_ResolvesHostAddressesViaDohAndFallback()
+    {
+        var address = await RecipeTrial.AddressForAsync("www.youtube.com", CancellationToken.None);
+        Assert.NotNull(address);
+        Assert.Equal(System.Net.Sockets.AddressFamily.InterNetwork, address.AddressFamily);
+
+        var discordAddr = await RecipeTrial.AddressForAsync("discord.com", CancellationToken.None);
+        Assert.NotNull(discordAddr);
+        Assert.Equal(System.Net.Sockets.AddressFamily.InterNetwork, discordAddr.AddressFamily);
     }
 }

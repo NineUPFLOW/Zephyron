@@ -50,8 +50,7 @@ public static class DiscordVoiceProbe
 
             try
             {
-                var addresses = await Dns.GetHostAddressesAsync(host, ct);
-                var targetIp = addresses.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork);
+                var targetIp = await RecipeTrial.AddressForAsync(host, ct);
                 if (targetIp is null)
                     continue;
 

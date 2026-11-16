@@ -69,13 +69,119 @@ public class TargetDomainGroup : INotifyPropertyChanged
 public class PresetBenchmarkItem : INotifyPropertyChanged
 {
     private bool _isSelected;
+    private int _passedHosts;
+    private int _totalHosts;
+    private long _latencyMs;
+    private double _fitnessScore;
+    private int _rank;
+    private bool _isEvaluating;
+    private List<HostProbeChip> _hostChips = [];
+
     public ZapretPreset Preset { get; init; } = default!;
     public string Name => Preset.Name;
-    public int PassedHosts { get; set; }
-    public int TotalHosts { get; set; }
-    public long LatencyMs { get; set; }
-    public double FitnessScore { get; set; }
-    public int Rank { get; set; }
+
+    public bool IsEvaluating
+    {
+        get => _isEvaluating;
+        set
+        {
+            if (_isEvaluating != value)
+            {
+                _isEvaluating = value;
+                OnPropertyChanged(nameof(IsEvaluating));
+                OnPropertyChanged(nameof(ScoreBadge));
+                OnPropertyChanged(nameof(ScoreBrush));
+                OnPropertyChanged(nameof(ScoreBackground));
+                OnPropertyChanged(nameof(RankText));
+                OnPropertyChanged(nameof(LatencyBadge));
+            }
+        }
+    }
+
+    public int PassedHosts
+    {
+        get => _passedHosts;
+        set
+        {
+            if (_passedHosts != value)
+            {
+                _passedHosts = value;
+                OnPropertyChanged(nameof(PassedHosts));
+                OnPropertyChanged(nameof(ScoreBadge));
+                OnPropertyChanged(nameof(ScoreBrush));
+                OnPropertyChanged(nameof(ScoreBackground));
+            }
+        }
+    }
+
+    public int TotalHosts
+    {
+        get => _totalHosts;
+        set
+        {
+            if (_totalHosts != value)
+            {
+                _totalHosts = value;
+                OnPropertyChanged(nameof(TotalHosts));
+                OnPropertyChanged(nameof(ScoreBadge));
+                OnPropertyChanged(nameof(ScoreBrush));
+                OnPropertyChanged(nameof(ScoreBackground));
+                OnPropertyChanged(nameof(RankText));
+            }
+        }
+    }
+
+    public long LatencyMs
+    {
+        get => _latencyMs;
+        set
+        {
+            if (_latencyMs != value)
+            {
+                _latencyMs = value;
+                OnPropertyChanged(nameof(LatencyMs));
+                OnPropertyChanged(nameof(LatencyBadge));
+            }
+        }
+    }
+
+    public double FitnessScore
+    {
+        get => _fitnessScore;
+        set
+        {
+            if (Math.Abs(_fitnessScore - value) > 0.0001)
+            {
+                _fitnessScore = value;
+                OnPropertyChanged(nameof(FitnessScore));
+                OnPropertyChanged(nameof(RankText));
+            }
+        }
+    }
+
+    public int Rank
+    {
+        get => _rank;
+        set
+        {
+            if (_rank != value)
+            {
+                _rank = value;
+                OnPropertyChanged(nameof(Rank));
+                OnPropertyChanged(nameof(RankText));
+            }
+        }
+    }
+
+    public List<HostProbeChip> HostChips
+    {
+        get => _hostChips;
+        set
+        {
+            _hostChips = value;
+            OnPropertyChanged(nameof(HostChips));
+        }
+    }
 
     public bool IsEvolved =>
         Name.StartsWith("Evolved ", StringComparison.OrdinalIgnoreCase)
@@ -95,19 +201,33 @@ public class PresetBenchmarkItem : INotifyPropertyChanged
 
     public Visibility EvolvedBadgeVisibility => IsEvolved ? Visibility.Visible : Visibility.Collapsed;
 
-    public string RankText => $"Ранг #{Rank} · фитнес {FitnessScore:P0}";
-    public string ScoreBadge => $"{PassedHosts}/{TotalHosts} хостов";
-    public string LatencyBadge => LatencyMs > 0 ? $"{LatencyMs} мс" : "—";
+    public string RankText => _isEvaluating
+        ? "⏳ Выполняется замер..."
+        : (_totalHosts == 0 ? "В очереди на проверку" : $"Ранг #{Rank} · фитнес {FitnessScore:P0}");
 
-    public Brush ScoreBrush => PassedHosts == TotalHosts
-        ? Brushes.LimeGreen
-        : (PassedHosts > 0 ? Brushes.Orange : Brushes.OrangeRed);
+    public string ScoreBadge => _isEvaluating
+        ? "⚡ Проверка..."
+        : (_totalHosts == 0 ? "Ожидает" : $"{PassedHosts}/{TotalHosts} хостов");
 
-    public Brush ScoreBackground => PassedHosts == TotalHosts
-        ? new SolidColorBrush(Color.FromArgb(0x22, 0x35, 0xE6, 0xA0))
-        : (PassedHosts > 0 ? new SolidColorBrush(Color.FromArgb(0x22, 0xF5, 0xB1, 0x4A)) : new SolidColorBrush(Color.FromArgb(0x22, 0xFF, 0x6B, 0x6B)));
+    public string LatencyBadge => _isEvaluating
+        ? "замер..."
+        : (LatencyMs > 0 ? $"{LatencyMs} мс" : "—");
 
-    public List<HostProbeChip> HostChips { get; set; } = [];
+    public Brush ScoreBrush => _isEvaluating
+        ? Brushes.DeepSkyBlue
+        : (_totalHosts == 0
+            ? Brushes.Gray
+            : (PassedHosts == TotalHosts
+                ? Brushes.LimeGreen
+                : (PassedHosts > 0 ? Brushes.Orange : Brushes.OrangeRed)));
+
+    public Brush ScoreBackground => _isEvaluating
+        ? new SolidColorBrush(Color.FromArgb(0x22, 0x00, 0xB0, 0xFF))
+        : (_totalHosts == 0
+            ? new SolidColorBrush(Color.FromArgb(0x15, 0x88, 0x88, 0x88))
+            : (PassedHosts == TotalHosts
+                ? new SolidColorBrush(Color.FromArgb(0x22, 0x35, 0xE6, 0xA0))
+                : (PassedHosts > 0 ? new SolidColorBrush(Color.FromArgb(0x22, 0xF5, 0xB1, 0x4A)) : new SolidColorBrush(Color.FromArgb(0x22, 0xFF, 0x6B, 0x6B)))));
 
     public bool IsSelected
     {
@@ -117,7 +237,7 @@ public class PresetBenchmarkItem : INotifyPropertyChanged
             if (_isSelected != value)
             {
                 _isSelected = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+                OnPropertyChanged(nameof(IsSelected));
                 SelectedChanged?.Invoke();
             }
         }
@@ -125,6 +245,9 @@ public class PresetBenchmarkItem : INotifyPropertyChanged
 
     public Action? SelectedChanged { get; set; }
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    protected void OnPropertyChanged(string name) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
 public partial class EvolutionView : UserControl
@@ -513,7 +636,20 @@ public partial class EvolutionView : UserControl
             ProbeRetries = 1
         };
 
-        var evaluatedList = new List<PresetBenchmarkItem>();
+        // Предварительно отображаем все найденные пресеты в таблице со статусом «Ожидает»
+        var existingSelected = _benchmarkItems.Where(x => x.IsSelected).Select(x => x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _benchmarkItems.Clear();
+        for (int i = 0; i < presets.Count; i++)
+        {
+            var p = presets[i];
+            _benchmarkItems.Add(new PresetBenchmarkItem
+            {
+                Preset = p,
+                Rank = i + 1,
+                IsSelected = existingSelected.Contains(p.Name),
+                SelectedChanged = UpdateSelectedCount
+            });
+        }
 
         try
         {
@@ -529,8 +665,11 @@ public partial class EvolutionView : UserControl
                 ct.ThrowIfCancellationRequested();
 
                 var preset = presets[i];
+                var uiItem = _benchmarkItems[i];
+                uiItem.IsEvaluating = true;
+
                 BenchmarkStatusText.Text = $"Тестирование {i + 1}/{presets.Count}: «{preset.Name}»...";
-                BenchmarkProgressBar.Value = (i + 1) * 100.0 / presets.Count;
+                BenchmarkProgressBar.Value = (i * 100.0) / presets.Count;
 
                 var individual = PresetIndividual.FromPreset(preset, 0);
                 var evalResult = await probe.EvaluateAsync(individual, preset, benchmarkSettings, ct);
@@ -541,20 +680,33 @@ public partial class EvolutionView : UserControl
                     chips.Add(new HostProbeChip(host, outcome.Success, outcome.LatencyMs));
                 }
 
-                evaluatedList.Add(new PresetBenchmarkItem
-                {
-                    Preset = preset,
-                    PassedHosts = evalResult.Passed,
-                    TotalHosts = evalResult.Total,
-                    LatencyMs = evalResult.AvgLatencyMs,
-                    FitnessScore = evalResult.Score,
-                    HostChips = chips,
-                    SelectedChanged = UpdateSelectedCount
-                });
+                uiItem.PassedHosts = evalResult.Passed;
+                uiItem.TotalHosts = evalResult.Total;
+                uiItem.LatencyMs = evalResult.AvgLatencyMs;
+                uiItem.FitnessScore = evalResult.Score;
+                uiItem.HostChips = chips;
+                uiItem.IsEvaluating = false;
+
+                BenchmarkProgressBar.Value = (i + 1) * 100.0 / presets.Count;
+
+                // Live-логирование каждого протестированного пресета в живой журнал
+                var passedSummary = evalResult.HostResults
+                    .Where(kv => kv.Value.Success)
+                    .Select(kv => $"{kv.Key} ✔ ({kv.Value.LatencyMs}мс)");
+                var failedSummary = evalResult.HostResults
+                    .Where(kv => !kv.Value.Success)
+                    .Select(kv => $"{kv.Key} ✖ ({kv.Value.Detail})");
+
+                var hostBreakdown = string.Join(", ", passedSummary.Concat(failedSummary));
+                var logBrush = evalResult.Passed == evalResult.Total
+                    ? Brushes.LimeGreen
+                    : (evalResult.Passed > 0 ? Brushes.LightSkyBlue : Brushes.OrangeRed);
+
+                AppendLog($"[{i + 1}/{presets.Count}] «{preset.Name}»: открыто {evalResult.Passed}/{evalResult.Total} хостов, пинг {evalResult.AvgLatencyMs}мс, фитнес {evalResult.Score:P0} [{hostBreakdown}]", logBrush);
             }
 
             // Сортировка: сначала наибольший пробив хостов, затем максимальный фитнес, затем минимальный пинг
-            var sorted = evaluatedList
+            var sorted = _benchmarkItems
                 .OrderByDescending(x => x.PassedHosts)
                 .ThenByDescending(x => x.FitnessScore)
                 .ThenBy(x => x.LatencyMs)
@@ -571,7 +723,7 @@ public partial class EvolutionView : UserControl
             var leader = sorted.FirstOrDefault();
             if (leader != null)
             {
-                AppendLog($"🏆 Бенчмарк завершён! Лидер: «{leader.Name}» ({leader.PassedHosts}/{leader.TotalHosts} хостов, пинг {leader.LatencyMs}мс)", Brushes.LimeGreen);
+                AppendLog($"🏆 Бенчмарк завершён! Лидер: «{leader.Name}» ({leader.PassedHosts}/{leader.TotalHosts} хостов, пинг {leader.LatencyMs}мс, фитнес {leader.FitnessScore:P0})", Brushes.LimeGreen);
             }
 
             BenchmarkStatusText.Text = $"Бенчмарк завершён. Найдено {sorted.Count} пресетов, топ-3 отмечены.";
@@ -588,6 +740,9 @@ public partial class EvolutionView : UserControl
         }
         finally
         {
+            foreach (var item in _benchmarkItems)
+                item.IsEvaluating = false;
+
             if (wasRunning)
             {
                 _ = EngineControl.StartAsync("бенчмарк", CancellationToken.None);
@@ -842,6 +997,14 @@ public partial class EvolutionView : UserControl
             if (prog.WinnerIndividual is not null)
             {
                 _lastWinner = prog.WinnerIndividual;
+            }
+
+            if (!string.IsNullOrEmpty(prog.LiveOutcomeDetail))
+            {
+                var brush = prog.BestPassed == prog.BestTotal
+                    ? Brushes.LimeGreen
+                    : (prog.BestPassed > 0 ? Brushes.LightSkyBlue : Brushes.Orange);
+                AppendLog(prog.LiveOutcomeDetail, brush);
             }
 
             // Логируем смену поколений

@@ -160,6 +160,7 @@ public sealed class EvolutionEngine
                 Phase = $"Поколение {gen + 1}/{maxGen}: Оценка фитнеса особей...",
             });
 
+            int evaluatedCount = 0;
             // Параллельная оценка особей текущего поколения через семафор
             var tasks = population.Select(async ind =>
             {
@@ -175,6 +176,22 @@ public sealed class EvolutionEngine
                     ind.ProbesTotal = result.Total;
                     ind.AvgLatencyMs = result.AvgLatencyMs;
                     ind.LastHostOutcomes = result.HostResults.ToDictionary(k => k.Key, v => v.Value.Success);
+
+                    int count = Interlocked.Increment(ref evaluatedCount);
+                    var passSummary = string.Join(", ", result.HostResults.Select(h => $"{h.Key}: {(h.Value.Success ? "✔" : "✖")}"));
+
+                    progress.Report(new EvolutionProgress
+                    {
+                        Generation = gen + 1,
+                        MaxGenerations = maxGen,
+                        BestFitness = bestOverall.HasValidFitness ? Math.Max(bestOverall.FitnessScore, ind.FitnessScore) : ind.FitnessScore,
+                        BestPassed = bestOverall.HasValidFitness ? Math.Max(bestOverall.ProbesPassed, ind.ProbesPassed) : ind.ProbesPassed,
+                        BestTotal = result.Total,
+                        BestLatencyMs = bestOverall.HasValidFitness ? bestOverall.AvgLatencyMs : ind.AvgLatencyMs,
+                        BestHostResults = ind.LastHostOutcomes,
+                        Phase = $"Поколение {gen + 1}/{maxGen}: особь {count}/{population.Count} (пробито {result.Passed}/{result.Total} хостов, {ind.AvgLatencyMs}мс)",
+                        LiveOutcomeDetail = $"[Пок. {gen + 1} | Особь {count}/{population.Count}] Пробито {result.Passed}/{result.Total} хостов ({passSummary}), пинг {result.AvgLatencyMs}мс, фитнес {result.Score:P0}"
+                    });
                 }
                 finally
                 {
