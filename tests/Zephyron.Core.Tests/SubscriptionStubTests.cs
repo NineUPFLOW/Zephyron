@@ -44,7 +44,7 @@ public sealed class SubscriptionStubTests
     [Fact]
     public void ZeroAddressesAndPortOneArePlaceholders()
     {
-        // Xonar 16.11: ссылками «Основной» на 0.0.0.0:443 и «Во время ограничений» на 0.0.0.0:1.
+        // 16.11: ссылками «Основной» на 0.0.0.0:443 и «Во время ограничений» на 0.0.0.0:1.
         var info = Info(Server("0.0.0.0", "tls"), Server("0.0.0.0", "none", port: 1), Server("84.38.181.190", "tls"), Server("::", "tls"));
 
         Assert.Equal(3, SubscriptionClient.Placeholders(info));
