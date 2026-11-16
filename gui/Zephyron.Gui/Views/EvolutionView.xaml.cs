@@ -24,7 +24,7 @@ public sealed record FitnessHistoryPoint(
 {
     public string GenText => $"G{Generation}";
     public string FitnessText => $"{Fitness:P0}";
-    public int FitnessPercent => Math.Clamp((int)(Fitness * 100), 0, 100);
+    public int FitnessPercent { get; set; } = Math.Clamp((int)(Fitness * 100), 0, 100);
     public string TooltipText => $"Поколение {Generation}: фитнес {Fitness:P0}, открыто {Passed}/{Total} хостов";
 }
 

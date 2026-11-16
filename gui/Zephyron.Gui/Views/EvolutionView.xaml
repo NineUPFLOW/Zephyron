@@ -383,7 +383,7 @@
                                                     <TextBlock Text="{Binding FitnessText}" FontSize="10" FontWeight="Bold"
                                                                Foreground="{DynamicResource Accent}" HorizontalAlignment="Center" />
                                                     <ProgressBar Orientation="Vertical" Height="40" Width="14" Minimum="0" Maximum="100"
-                                                                 Value="{Binding FitnessPercent}" Margin="0,3,0,3" HorizontalAlignment="Center" />
+                                                                 Value="{Binding FitnessPercent, Mode=OneWay}" Margin="0,3,0,3" HorizontalAlignment="Center" />
                                                     <TextBlock Text="{Binding GenText}" FontSize="9" Foreground="{DynamicResource Muted}"
                                                                HorizontalAlignment="Center" />
                                                 </StackPanel>
