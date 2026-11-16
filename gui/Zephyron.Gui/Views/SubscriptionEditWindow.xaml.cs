@@ -58,7 +58,7 @@ public partial class SubscriptionEditWindow : Window
             if (!Uri.TryCreate(raw, UriKind.Absolute, out var parsed)
                 || SubscriptionClient.Unwrap(parsed) is not { Scheme: "http" or "https" } unwrapped)
             {
-                Say("Это не похоже на ссылку подписки: нужна http, https либо обёртка happ, clash или sn.");
+                Say("Это не похоже на ссылку подписки: нужна ссылка вида https://… или кнопка «Открыть в Happ / Clash» (happ://add/…, clash://…).");
                 return;
             }
 

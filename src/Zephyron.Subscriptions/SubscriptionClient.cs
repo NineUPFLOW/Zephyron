@@ -152,6 +152,25 @@ public sealed class SubscriptionClient : IDisposable
                     continue;
                 }
 
+                // Ответ с заглушками 0.0.0.0 среди настоящих: так панель отдаёт ссылками профили,
+                // которые описываются только JSON Xray (балансир, запасные серверы) — «смотрите
+                // в Happ». 16.11 (Xonar): ссылками 6 настоящих из 8, под Happ JSON — все 8.
+                // Переспрашиваем другим именем и берём ответ, где настоящих больше.
+                if (Placeholders(info) > 0 && i < agents.Length - 1)
+                {
+                    if (stub is not { } kept || Real(info) > Real(kept.Info))
+                        stub = (info, LastBody ?? string.Empty, agent);
+
+                    continue;
+                }
+
+                if (stub is { } earlier && Real(earlier.Info) > Real(info))
+                {
+                    AgentMemory.Set(target, earlier.Agent == _userAgents[0] ? null : earlier.Agent, _memory);
+                    LastBody = earlier.Body;
+                    return earlier.Info;
+                }
+
                 // Сработало не имя по умолчанию — запомнить; сработало оно —
                 // забыть: панель могла снова начать отвечать обоим.
                 AgentMemory.Set(target, agent == _userAgents[0] ? null : agent, _memory);
@@ -205,6 +224,16 @@ public sealed class SubscriptionClient : IDisposable
         info.Servers.Count > 1
         && info.Servers.Select(s => $"{s.Host}:{s.Port}").Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1
         && info.Servers.All(s => string.IsNullOrEmpty(s.Security) || string.Equals(s.Security, "none", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Сколько в ответе заглушек: адрес 0.0.0.0 (или ::) либо порт 0–1.</summary>
+    internal static int Placeholders(SubscriptionInfo info) => info.Servers.Count(IsPlaceholder);
+
+    private static int Real(SubscriptionInfo info) => info.Servers.Count - Placeholders(info);
+
+    internal static bool IsPlaceholder(ProxyServer server) =>
+        server.Port <= 1
+        || (System.Net.IPAddress.TryParse(server.Host, out var ip)
+            && (ip.Equals(System.Net.IPAddress.Any) || ip.Equals(System.Net.IPAddress.IPv6Any)));
 
     /// <summary>Тело последнего удачного ответа — для запаса пула (<see cref="SubscriptionPool"/>).</summary>
     /// <remarks>Пароль, как и ссылка: не печатается и не пишется в журнал.</remarks>

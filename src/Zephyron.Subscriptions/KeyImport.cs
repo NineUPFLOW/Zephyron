@@ -65,6 +65,15 @@ public static class KeyImport
                 : new([], null, "файл WireGuard не разбирается: " + error);
         }
 
+        // Запертая ссылка Happ: продавец шифрует её, чтобы подписку открывал только Happ.
+        // Расшифровка — обход его защиты, её нет; человеку — куда идти за обычной ссылкой.
+        if (text.TrimStart().StartsWith("happ://crypt", StringComparison.OrdinalIgnoreCase))
+        {
+            return new([], null,
+                "это зашифрованная ссылка Happ — её открывает только Happ. Попросите у продавца обычную ссылку "
+                + "подписки (https://…) или ключи vless:// — обычно она есть в личном кабинете или в боте («для других приложений»)");
+        }
+
         var keys = KeyRing.Split(text);
 
         if (keys.Count > 0)

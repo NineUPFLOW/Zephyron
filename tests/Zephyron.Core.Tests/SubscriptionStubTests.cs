@@ -40,4 +40,28 @@ public sealed class SubscriptionStubTests
         // Подписка из одного сервера.
         Assert.False(SubscriptionClient.LooksLikeStub(Info(Server("one.example", "none"))));
     }
+
+    [Fact]
+    public void ZeroAddressesAndPortOneArePlaceholders()
+    {
+        // Xonar 16.11: ссылками «Основной» на 0.0.0.0:443 и «Во время ограничений» на 0.0.0.0:1.
+        var info = Info(Server("0.0.0.0", "tls"), Server("0.0.0.0", "none", port: 1), Server("84.38.181.190", "tls"), Server("::", "tls"));
+
+        Assert.Equal(3, SubscriptionClient.Placeholders(info));
+        Assert.False(SubscriptionClient.IsPlaceholder(Server("breaker.sbs", "tls")));
+    }
+}
+
+/// <summary>Запертая ссылка Happ — понятный ответ вместо «ни ключей, ни ссылки».</summary>
+public sealed class HappCryptTests
+{
+    [Fact]
+    public void EncryptedHappLinkTellsWhereToGetAPlainOne()
+    {
+        var found = KeyImport.FromText("happ://crypt4/EkAoNMIK2fEKCL5CB8mISVXnyAko353DBLun6jv6xCGKn1I6");
+
+        Assert.Empty(found.Keys);
+        Assert.Null(found.SubscriptionUrl);
+        Assert.StartsWith("это зашифрованная ссылка Happ", found.Problem);
+    }
 }

@@ -986,8 +986,7 @@ public partial class OnboardingView : UserControl
 
         if (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps)
         {
-            VpnStatus.Text = "Это не адрес подписки: нужен http или https "
-                + "либо обёртка happ, clash или sn.";
+            VpnStatus.Text = "Это не похоже на ссылку подписки: нужна ссылка вида https://… или кнопка «Открыть в Happ / Clash» (happ://add/…, clash://…).";
 
             return;
         }

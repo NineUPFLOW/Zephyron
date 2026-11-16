@@ -340,7 +340,9 @@ public partial class SubscriptionAddWindow : Window
 
         if (found.SubscriptionUrl is not { } url)
         {
-            Say("Это не похоже на ссылку подписки: нужна http, https либо обёртка happ, clash или sn.");
+            Say(found.Problem is { } problem && problem.StartsWith("это зашифрованная ссылка Happ", StringComparison.Ordinal)
+                ? char.ToUpper(problem[0]) + problem[1..] + "."
+                : "Это не похоже на ссылку подписки: нужна ссылка вида https://… или кнопка «Открыть в Happ / Clash» (happ://add/…, clash://…).");
             return;
         }
 
