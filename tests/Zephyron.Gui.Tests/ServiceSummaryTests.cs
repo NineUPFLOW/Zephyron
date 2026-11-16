@@ -40,7 +40,7 @@ public sealed class ServiceSummaryTests
             Part(1, "десинк: hostfakesplit_multi"),
             Part(1, "десинк: hostfakesplit_multi"),
             Part(1, "десинк: send + syndata"),
-            Part(1, "десинк: по имени секции нет, по адресам — может сработать"),
+            Part(1, "десинк: общий, по адресам сайта"),
             Part(1, "десинк"),
         ]);
 

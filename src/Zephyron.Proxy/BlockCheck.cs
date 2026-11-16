@@ -1182,7 +1182,11 @@ public static class BlockCheck
 
         // Системное приветствие прошло — а браузерное, длинное, пройдёт ли?
         // Только у Cloudflare: там его и резали.
+        // Сначала — длинное приветствие с самим именем: его десинк обходит, как обходит
+        // браузеру. 16.11 x.com в браузере открывался, а проверка по чужому имени
+        // (example.com, десинк его не трогает) писала «режут длинное приветствие».
         if (kind == BlockKind.None && !viaTunnel && CloudflareNet.Contains(answered)
+            && !Got(await BrowserHello.AskAsync(answered!, host, Timeout, cancellationToken))
             && await LongHelloCutAsync(answered!, cancellationToken) is { } longCut)
         {
             kind = BlockKind.LongHello;

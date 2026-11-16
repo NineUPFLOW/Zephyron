@@ -177,7 +177,7 @@ public partial class StatusView
             return null;
 
         // «запуск» каждого движка тут же сменяется «работает» — второе и показываем.
-        if (who is "winws2" or "sing-box" or "tg-ws-proxy" or "dnscrypt-proxy" && message == "запуск")
+        if (who is "winws2" or "sing-box" or "tg-ws-proxy" or "dnscrypt-proxy" or "dnscrypt" && message == "запуск")
             return null;
 
         if (who == "пин" && message.Contains("менять нечего", StringComparison.Ordinal))
@@ -194,7 +194,7 @@ public partial class StatusView
             "winws2" => "Десинк",
             "sing-box" => "Туннель (VPN)",
             "tg-ws-proxy" => "Прокси Telegram",
-            "dnscrypt-proxy" => "Шифрованный DNS",
+            "dnscrypt-proxy" or "dnscrypt" => "Шифрованный DNS",
             "надзор" or "движки" or "запуск" => "Zephyron",
             "видео YouTube" => "YouTube",
             "подписка" => "Подписка",
