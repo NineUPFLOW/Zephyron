@@ -401,4 +401,13 @@ public sealed class GeneticEvolutionTests
         Assert.Equal(Zephyron.Supervisor.Evolution.DiffChangeKind.Pruned, entry.Kind); // Contains :tcp_md5 removed
         Assert.Contains("Genomic Pruning", entry.Explanation);
     }
+
+    [Fact]
+    public void EnvironmentConflictChecker_ReturnsValidReport()
+    {
+        var report = Zephyron.Supervisor.Evolution.EnvironmentConflictChecker.Check();
+        Assert.NotNull(report);
+        Assert.NotNull(report.Conflicts);
+        Assert.NotNull(report.Recommendations);
+    }
 }

@@ -483,6 +483,15 @@ public partial class EvolutionView : UserControl
 
         AppendLog($"⚡ Запуск бенчмарка: проверка {presets.Count} пресетов на {targetHosts.Count} доменах...", Brushes.DeepSkyBlue);
 
+        var conflictReport = EnvironmentConflictChecker.Check();
+        if (conflictReport.HasConflicts)
+        {
+            foreach (var conflict in conflictReport.Conflicts)
+            {
+                AppendLog($"⚠ Внимание: {conflict}", Brushes.Orange);
+            }
+        }
+
         var benchmarkSettings = new EvolutionSettings
         {
             TargetHosts = targetHosts,
@@ -679,6 +688,15 @@ public partial class EvolutionView : UserControl
         foreach (var p in selectedPresets.Take(3))
         {
             AppendLog($"  • Родительский донор: «{p.Name}»", Brushes.DeepSkyBlue);
+        }
+
+        var envConflict = EnvironmentConflictChecker.Check();
+        if (envConflict.HasConflicts)
+        {
+            foreach (var conflict in envConflict.Conflicts)
+            {
+                AppendLog($"⚠ Внимание: {conflict}", Brushes.Orange);
+            }
         }
 
         try
