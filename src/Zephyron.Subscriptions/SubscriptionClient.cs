@@ -115,7 +115,18 @@ public sealed class SubscriptionClient : IDisposable
                 if (!request.Headers.UserAgent.TryParseAdd(agent))
                     request.Headers.TryAddWithoutValidation("User-Agent", agent);
 
-                response = await SendAsync(request, agent, cancellationToken);
+                try
+                {
+                    response = await SendAsync(request, agent, cancellationToken);
+                }
+                catch (Exception ex) when (stub is not null && !cancellationToken.IsCancellationRequested
+                    && ex is HttpRequestException or TaskCanceledException)
+                {
+                    // Переспрос не прошёл — первый ответ уже есть, его и отдаём (16.11: подписка
+                    // с разделителем 0.0.0.0 терялась целиком, когда второй запрос не доходил).
+                    response = null;
+                    break;
+                }
 
                 // Панель с https шлёт на http того же узла (svyaz-26.ru/sub/ → http://…/sub, 13.11),
                 // а .NET с https на http не идёт и отдаёт сам ответ 307. Тот же путь — по https.
@@ -134,6 +145,9 @@ public sealed class SubscriptionClient : IDisposable
                 // сбой самой панели (5xx) другим именем не лечится.
                 if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized)
                     continue;
+
+                if (!response.IsSuccessStatusCode && stub is not null)
+                    break;
 
                 response.EnsureSuccessStatusCode();
 

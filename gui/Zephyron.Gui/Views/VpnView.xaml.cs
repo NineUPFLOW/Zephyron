@@ -1334,9 +1334,9 @@ public partial class VpnView : UserControl
                 settings.ForeignExitsOnly && (server.IsSelfRegistering || ExitCountry.IsDomestic(server.Tag))
                     ? ("вне подбора · РФ", "Отечественный выход: при «Только зарубежные» автоподбор его не берёт — через него не открыть закрытое по стране. Выбрать руками можно.")
                 : seen is { Success: false }
-                    ? ("вне подбора · молчит", "Не ответил при последнем замере: автоподбор на молчащих не садится, пока они не ответят.")
+                    ? ("вне подбора · не отвечает", "Не ответил при последнем замере: автоподбор на молчащих не садится, пока они не ответят.")
                 : settings.StableFirst && seen is { Success: true, Flaky: true }
-                    ? ("вне подбора · мигает", "Отвечает через раз: при «Сначала стабильные» автоподбор его не берёт, даже если задержка ниже — соединения через него рвались бы.")
+                    ? ("вне подбора · нестабилен", "Отвечает через раз: при «Сначала стабильные» автоподбор его не берёт, даже если задержка ниже — соединения через него рвались бы.")
                 : null;
 
             if (why is { } reason)
@@ -1769,12 +1769,12 @@ public partial class VpnView : UserControl
 
     private string Latency(string tag) => Seen(tag) switch
     {
-        { Flaky: true, LatencyMs: { } flaky } => $"{flaky:0} мс · через раз",
-        { Flaky: true } => "с перебоями",
+        { Flaky: true, LatencyMs: { } flaky } => $"{flaky:0} мс · нестабилен",
+        { Flaky: true } => "нестабилен",
         { Success: true, LatencyMs: { } ms } => $"{ms:0} мс",
         { Success: true } => "откликается",
-        { Success: false, Reliability: >= 80 } => "последняя не удалась",
-        { Success: false } => "не откликается",
+        { Success: false, Reliability: >= 80 } => "был сбой",
+        { Success: false } => "не отвечает",
         _ => "не замерялся",
     };
 

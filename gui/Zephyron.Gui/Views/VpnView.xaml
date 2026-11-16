@@ -304,16 +304,15 @@
                             </Grid>
 
                             <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
+                                <!--
+                                    Перенос, а не сетка: пометки («Идёт сейчас», «копия», «вне подбора · …»)
+                                    при длинном имени уходят на следующую строку, а не срезаются (16.11).
+                                -->
+                                <WrapPanel>
+                                    <TextBlock Text="{Binding Name}" FontSize="14.5" FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="0,0,0,2" />
 
-                                    <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="14.5" FontWeight="SemiBold"
-                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,2">
                                         <!-- Через этот сервер трафик идёт прямо сейчас — по движку, не по настройке. -->
                                         <Border CornerRadius="{StaticResource RMd}" Padding="8,1" Margin="10,0,0,0" VerticalAlignment="Center"
                                                 Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentLine}"
@@ -338,7 +337,7 @@
                                             <TextBlock Text="{Binding SkipLabel}" FontSize="12" Foreground="{DynamicResource Muted}" />
                                         </Border>
                                     </StackPanel>
-                                </Grid>
+                                </WrapPanel>
 
                                 <TextBlock Text="{Binding Description}" Style="{StaticResource Caption}"
                                            Margin="0,3,0,0" TextTrimming="CharacterEllipsis"
@@ -351,7 +350,7 @@
 
                             <TextBlock Grid.Column="3" Text="{Binding Latency}" Width="104"
                                        FontSize="15" FontWeight="SemiBold" TextAlignment="Right"
-                                       TextTrimming="CharacterEllipsis"
+                                       TextWrapping="Wrap"
                                        VerticalAlignment="Center" Margin="0,0,16,0"
                                        Foreground="{Binding Color}" ToolTip="{Binding Latency}" />
 
