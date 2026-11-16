@@ -638,7 +638,7 @@ public sealed record TargetReport
         BlockKind.GeoBlock => "только VPN — десинк не поможет",
         BlockKind.Forbidden => "открыть в браузере: открывается — ничего не нужно, отказ и там — VPN",
         BlockKind.BotWall => "откройте в браузере: откроется — ничего не нужно, нет — решайте по картине там",
-        BlockKind.LongHello => "десинк или другой адрес Cloudflare в hosts (8.47.69.x, 8.6.112.x не резали), иначе VPN",
+        BlockKind.LongHello => "другой рецепт десинка (для YouTube сторож сменит его сам), а у сайтов на Cloudflare — другой адрес в hosts (8.47.69.x, 8.6.112.x не резали); иначе VPN",
         BlockKind.BrokenCname => "подставить адрес",
         // Браузеру этот сайт открывается: у него приветствие TLS другое
         // по составу — с GREASE, с расширениями, которых SChannel не шлёт
@@ -1189,6 +1189,16 @@ public static class BlockCheck
             tls = tls with { Detail = Join(tls.Detail, longCut) };
         }
 
+        // YouTube — тем приветствием, каким пойдёт Chrome: с постквантовым ключом и этим
+        // именем. 16.11 у пользователя проба видела YouTube «доступен», а браузер — нет:
+        // короткое приветствие проходило, а браузерное длинное у провайдера могут резать.
+        if (kind == BlockKind.None && !viaTunnel && answered is not null && IsYouTube(host)
+            && !Got(await BrowserHello.AskAsync(answered, host, Timeout, cancellationToken)))
+        {
+            kind = BlockKind.LongHello;
+            tls = tls with { Detail = Join(tls.Detail, "браузерное приветствие с постквантовым ключом не прошло, короткое прошло") };
+        }
+
         // К TLS, а не к данным: «почему» у DPI по TLS читается из стадии TLS (Why).
         if (cut is { } by)
             tls = tls with { Detail = (tls.Detail is { Length: > 0 } said ? said + "; " : string.Empty) + CutText(by) };
@@ -1270,6 +1280,12 @@ public static class BlockCheck
             : (kind, data);
 
     private static bool Got(HelloResult answer) => answer.Answer is HelloAnswer.Accepted or HelloAnswer.Refused;
+
+    /// <summary>Имя YouTube: страница, превью, аватары, видеосерверы.</summary>
+    internal static bool IsYouTube(string host) =>
+        new[] { "youtube.com", "youtu.be", "ytimg.com", "ggpht.com", "googlevideo.com" }
+            .Any(zone => host.Equals(zone, StringComparison.OrdinalIgnoreCase)
+                || host.EndsWith("." + zone, StringComparison.OrdinalIgnoreCase));
 
     private const string ShortPassed =
         "с example.com приветствие без постквантового ключа, одним пакетом, принято, "
