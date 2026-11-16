@@ -246,15 +246,43 @@ public static class BrowserSetup
             : [];
     }
 
+    /// <summary>
+    /// Открыт ли браузер. Работающий только в фоне — без единого окна — закрывается сам:
+    /// терять в нём нечего, а человеку его не закрыть.
+    /// </summary>
+    /// <remarks>
+    /// 16.11: Edge после закрытия окна оставался в фоне («Ускорение запуска»), и кнопка
+    /// «Исправить» раз за разом просила его закрыть.
+    /// </remarks>
     private static bool IsRunning(string process)
     {
         var all = Process.GetProcessesByName(process);
-        bool any = all.Length > 0;
 
-        foreach (var p in all)
-            p.Dispose();
+        try
+        {
+            if (all.Any(p => p.MainWindowHandle != IntPtr.Zero))
+                return true;
 
-        return any;
+            foreach (var p in all)
+            {
+                try
+                {
+                    p.Kill();
+                    p.WaitForExit(5000);
+                }
+                catch (Exception)
+                {
+                    // Уже вышел или не наш — проверим ниже, жив ли кто.
+                }
+            }
+
+            return Process.GetProcessesByName(process).Any(p => !p.HasExited);
+        }
+        finally
+        {
+            foreach (var p in all)
+                p.Dispose();
+        }
     }
 
     private static void Backup(string path)
