@@ -47,7 +47,7 @@ public sealed class BrowserSetupTests
     {
         var state = """{"browser":{"enabled_labs_experiments":["some-flag@1","enable-quic@1"]},"dns_over_https":{"mode":"secure","templates":"https://x/dns"}}""";
 
-        Assert.Equal(3, BrowserSetup.ChromiumIssues("Chrome", state, NoPolicy).Count());
+        Assert.Equal(2, BrowserSetup.ChromiumIssues("Chrome", state, NoPolicy).Count());
 
         var fixedState = BrowserSetup.FixChromium(state);
 

@@ -262,20 +262,35 @@ public partial class DoctorView : UserControl
             null => null,
         });
 
-    /// <summary>Правит настройки закрытых браузеров и проверяет заново.</summary>
-    private void FixBrowsers()
+    /// <summary>Закрывает браузеры, правит их и открывает заново; потом проверяет ещё раз.</summary>
+    private async void FixBrowsers()
     {
+        var open = Zephyron.Core.Diagnostics.BrowserSetup.OpenToFix();
+
+        if (open.Count > 0 && ConfirmDialog.Show(
+                Window.GetWindow(this),
+                $"Закрою {string.Join(", ", open)}, поправлю настройки и открою снова с теми же вкладками.\n\n"
+                + "Если на какой-то странице не сохранено (письмо, форма) — сохраните сначала.",
+                "Исправить браузеры",
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Question,
+                MessageBoxResult.OK) != MessageBoxResult.OK)
+        {
+            return;
+        }
+
+        Status.Visibility = Visibility.Visible;
+        Status.Text = "Исправляю браузеры…";
+
         try
         {
-            var (done, running) = Zephyron.Core.Diagnostics.BrowserSetup.Fix();
+            var (done, stuck) = await Task.Run(Zephyron.Core.Diagnostics.BrowserSetup.Fix);
 
-            Status.Visibility = Visibility.Visible;
-            Status.Text = (done.Count > 0 ? $"Исправлено: {string.Join(", ", done)}. Откройте браузер заново. " : string.Empty)
-                + (running.Count > 0 ? $"Закройте {string.Join(", ", running)} и нажмите «Исправить» ещё раз — открытый браузер перепишет настройки при выходе." : string.Empty);
+            Status.Text = (done.Count > 0 ? $"Исправлено: {string.Join(", ", done)}. " : string.Empty)
+                + (stuck.Count > 0 ? $"Не закрылся: {string.Join(", ", stuck)} — закройте его сами и нажмите ещё раз." : string.Empty);
         }
         catch (Exception ex)
         {
-            Status.Visibility = Visibility.Visible;
             Status.Text = "Настройки браузеров не поправились: " + ex.GetBaseException().Message;
         }
 

@@ -711,7 +711,7 @@ public static class Doctor
             var issues = BrowserSetup.Scan();
 
             if (issues.Count == 0)
-                lines.Add(Ok("Браузеры настроены так, что обходу ничего не мешает: свой DNS, QUIC, ECH и старый TLS выключены."));
+                lines.Add(Ok("Браузеры настроены так, что обходу ничего не мешает: свой DNS и QUIC выключены, TLS 1.3 включён."));
 
             // Одна кнопка на все строки: правка идёт по всем закрытым браузерам разом.
             foreach (var issue in issues)
