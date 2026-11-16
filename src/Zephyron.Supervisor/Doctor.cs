@@ -708,20 +708,17 @@ public static class Doctor
 
         try
         {
-            var bypass = BrowserDns.Scan();
+            var issues = BrowserSetup.Scan();
 
-            if (bypass.Count == 0)
+            if (issues.Count == 0)
+                lines.Add(Ok("Браузеры настроены так, что обходу ничего не мешает: свой DNS, QUIC, ECH и старый TLS выключены."));
+
+            // Одна кнопка на все строки: правка идёт по всем закрытым браузерам разом.
+            foreach (var issue in issues)
             {
-                lines.Add(Ok("Браузеры спрашивают имена у системы — пины и маршруты на них действуют."));
-            }
-
-            foreach (var b in bypass)
-            {
-                var provider = string.IsNullOrEmpty(b.Provider) ? "" : $" ({b.Provider})";
-
-                lines.Add(Warn($"{b.Browser} резолвит имена сам, через свой DNS{provider}. "
-                    + "Такой браузер обходит и файл hosts, и туннель: пины на него не действуют, "
-                    + "а «через VPN» для него не срабатывает. Выключить: " + b.Setting + "."));
+                lines.Add(issue.Fixable
+                    ? Warn($"{issue.Browser}: {issue.What}.", "Исправить", "fix:browsers")
+                    : Warn($"{issue.Browser}: {issue.What}. Поменять может только тот, кто это настроил (администратор или вы в настройках браузера)."));
             }
         }
         catch (Exception ex)

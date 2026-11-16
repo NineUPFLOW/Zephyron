@@ -211,6 +211,13 @@ public partial class DoctorView : UserControl
         Status.Visibility = bad > 0 ? Visibility.Visible : Visibility.Collapsed;
         Status.Text = Doctor.Verdict(sections);
 
+        if (_fixNote is { } note)
+        {
+            Status.Visibility = Visibility.Visible;
+            Status.Text = note;
+            _fixNote = null;
+        }
+
         AllFilter.Content = $"Все ({all.Count})";
         ProblemFilter.Content = $"Только замечания ({bad + warn})";
         DetailsCount.Text = $"{all.Count} проверок · поломок {bad} · оговорок {warn}";
@@ -242,13 +249,43 @@ public partial class DoctorView : UserControl
         }
     }
 
-    private static DoctorLine Line(DoctorCheck check, string section) => new(
+    private DoctorLine Line(DoctorCheck check, string section) => new(
         check.Text,
         KindOf(check.Level),
         check.Level,
         section,
         check.ActionLabel,
-        check.Open is { } console ? () => OpenConsole(console) : null);
+        check.Open switch
+        {
+            "fix:browsers" => FixBrowsers,
+            { } console => () => OpenConsole(console),
+            null => null,
+        });
+
+    /// <summary>Правит настройки закрытых браузеров и проверяет заново.</summary>
+    private void FixBrowsers()
+    {
+        try
+        {
+            var (done, running) = Zephyron.Core.Diagnostics.BrowserSetup.Fix();
+
+            Status.Visibility = Visibility.Visible;
+            Status.Text = (done.Count > 0 ? $"Исправлено: {string.Join(", ", done)}. Откройте браузер заново. " : string.Empty)
+                + (running.Count > 0 ? $"Закройте {string.Join(", ", running)} и нажмите «Исправить» ещё раз — открытый браузер перепишет настройки при выходе." : string.Empty);
+        }
+        catch (Exception ex)
+        {
+            Status.Visibility = Visibility.Visible;
+            Status.Text = "Настройки браузеров не поправились: " + ex.GetBaseException().Message;
+        }
+
+        // Проверка идёт заново в фоне, и её итог перепишет строку состояния — ответ кнопки сохраняем.
+        _fixNote = Status.Text;
+        Run();
+    }
+
+    /// <summary>Что сказала кнопка «Исправить» — показать поверх итога следующей проверки.</summary>
+    private string? _fixNote;
 
     /// <summary>Знак раздела — по его имени из <see cref="Doctor.Run"/>.</summary>
     private static string GlyphOf(string title) => title switch
