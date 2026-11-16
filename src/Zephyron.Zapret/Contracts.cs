@@ -198,6 +198,21 @@ public sealed record ZapretPaths
     /// </remarks>
     private static IEnumerable<string> BundledRoots()
     {
-        yield return Path.Combine(AppContext.BaseDirectory, BundleDirectory, "zapret");
+        var beside = Path.Combine(AppContext.BaseDirectory, BundleDirectory, "zapret");
+        yield return beside;
+
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            var besideDist = Path.Combine(directory.FullName, "dist", "Zephyron", BundleDirectory, "zapret");
+            if (Directory.Exists(besideDist))
+                yield return besideDist;
+
+            var besideBuild = Path.Combine(directory.FullName, "build", BundleDirectory, "zapret");
+            if (Directory.Exists(besideBuild))
+                yield return besideBuild;
+
+            directory = directory.Parent;
+        }
     }
 }

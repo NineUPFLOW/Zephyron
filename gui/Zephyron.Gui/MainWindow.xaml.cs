@@ -563,6 +563,7 @@ public partial class MainWindow : Window
             "hosts" => new HostsView(),
             "watch" => new WatchView(),
             "doctor" => new DoctorView(),
+            "evolution" => new EvolutionView(),
             "look" => new AppearanceView(),
             "more" => new MoreView(),
             _ => new StatusView(),
