@@ -326,4 +326,79 @@ public sealed class GeneticEvolutionTests
         Assert.Contains("--lua-desync=fake:blob=tls_max:repeats=3", rebuilt);
         Assert.Contains("--lua-desync=multidisorder:pos=1,host+2:seqovl=1", rebuilt);
     }
+
+    [Fact]
+    public void Mutate_WithTargetSection_OnlyMutatesTargetedSection()
+    {
+        var rng = new Random(42);
+        var geneYt = new PresetGene { OutRange = "-d8", TcpPorts = "80,443", DesyncSteps = ["multisplit:pos=1"] };
+        var geneDc = new PresetGene { OutRange = "-d8", TcpPorts = "443-65535", DesyncSteps = ["fake:blob=tls_discord"] };
+
+        var parent = new PresetIndividual
+        {
+            GenerationNumber = 1,
+            Genes = new Dictionary<string, PresetGene>
+            {
+                ["youtube"] = geneYt,
+                ["discord"] = geneDc
+            }
+        };
+
+        var pool = new GenePool
+        {
+            OutRanges = ["-d10", "-d12"],
+            KnownRecipeSteps = [["multisplit:pos=sniext+1:seqovl=652"]]
+        };
+
+        var mutated = GeneticOperators.Mutate(parent, pool, 2, rng, rate: 1.0, targetSection: "youtube");
+
+        // Discord должен остаться абсолютно нетронутым (замороженным)
+        Assert.Equal(geneDc.OutRange, mutated.Genes["discord"].OutRange);
+        Assert.Equal(geneDc.DesyncSteps, mutated.Genes["discord"].DesyncSteps);
+
+        // YouTube должен мутировать
+        Assert.True(mutated.Genes.ContainsKey("youtube"));
+    }
+
+    [Fact]
+    public void PresetDiffInspector_DetectsOptimizedAndPrunedChanges()
+    {
+        var section1 = new ZapretSection
+        {
+            Name = "youtube",
+            HostListPaths = [],
+            InlineDomains = ["googlevideo.com"],
+            IpSetPaths = [],
+            DesyncRecipes = ["multisplit:pos=1:tcp_md5"],
+            IsPassThrough = false,
+            RawArguments = ["--name=youtube", "--filter-tcp=80,443", "--lua-desync=multisplit:pos=1:tcp_md5"]
+        };
+
+        var preset = new ZapretPreset
+        {
+            Name = "TestPreset",
+            FilePath = "test.txt",
+            GlobalArguments = [],
+            Sections = [section1]
+        };
+
+        var winner = new PresetIndividual
+        {
+            GenerationNumber = 5,
+            Genes = new Dictionary<string, PresetGene>
+            {
+                ["youtube"] = new PresetGene
+                {
+                    DesyncSteps = ["multisplit:pos=sniext+1:seqovl=652"]
+                }
+            }
+        };
+
+        var entries = Zephyron.Supervisor.Evolution.PresetDiffInspector.Inspect(preset, winner);
+        Assert.Single(entries);
+        var entry = entries[0];
+        Assert.Equal("youtube", entry.SectionName);
+        Assert.Equal(Zephyron.Supervisor.Evolution.DiffChangeKind.Pruned, entry.Kind); // Contains :tcp_md5 removed
+        Assert.Contains("Genomic Pruning", entry.Explanation);
+    }
 }

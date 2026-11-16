@@ -16,6 +16,15 @@ public sealed record ProbeRowUi(string Host, string Status, Brush StatusColor, s
 
 public sealed record EvolutionLogEntry(string Time, string Message, Brush Color);
 
+public sealed record PresetDiffUiModel(
+    string SectionName,
+    string OldSteps,
+    string NewSteps,
+    string Explanation,
+    string StatusBadge,
+    Brush BadgeBrush,
+    Brush BadgeBackground);
+
 public sealed record HostProbeChip(string Host, bool Success, long LatencyMs)
 {
     public string DisplayText => Success ? $"{Host}: {LatencyMs}мс ✔" : $"{Host}: ✖";
@@ -113,10 +122,14 @@ public partial class EvolutionView : UserControl
     private readonly ObservableCollection<PresetBenchmarkItem> _benchmarkItems = [];
     private readonly ObservableCollection<ProbeRowUi> _probeRows = [];
     private readonly ObservableCollection<EvolutionLogEntry> _logEntries = [];
+    private readonly ObservableCollection<PresetDiffUiModel> _diffEntries = [];
 
     private CancellationTokenSource? _cts;
     private CancellationTokenSource? _benchmarkCts;
     private string? _lastExportedFile;
+    private PresetIndividual? _lastWinner;
+    private ZapretPreset? _lastBasePreset;
+    private string? _previousPresetName;
     private double _initialBaseFitness = 0.0;
     private int _lastLoggedGen = -1;
 
@@ -128,6 +141,7 @@ public partial class EvolutionView : UserControl
         BenchmarkResultsList.ItemsSource = _benchmarkItems;
         ProbeResultsList.ItemsSource = _probeRows;
         EvolutionLogList.ItemsSource = _logEntries;
+        DiffEntriesList.ItemsSource = _diffEntries;
 
         _settings = EvolutionSettings.Load();
         InitializeDomainGroups();
@@ -570,8 +584,39 @@ public partial class EvolutionView : UserControl
         StopBenchmarkButton.IsEnabled = false;
     }
 
+    private void OnTargetSectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (TargetSectionCombo?.SelectedItem is ComboBoxItem item && item.Tag is string tag)
+        {
+            _settings.TargetSectionKey = tag.Equals("all", StringComparison.OrdinalIgnoreCase) ? null : tag;
+            if (TargetSectionHint is not null)
+            {
+                TargetSectionHint.Text = tag switch
+                {
+                    "youtube" => "Фокус только на YouTube/googlevideo (остальные секции защищены).",
+                    "discord" => "Фокус только на Discord голосовых шлюзах и каналах.",
+                    "general" => "Фокус только на общих веб-блокировках.",
+                    _ => "Будут оптимизированы все секции пресета."
+                };
+            }
+        }
+    }
+
+    private async void OnStartMicroEvolution(object sender, RoutedEventArgs e)
+    {
+        _settings.FastSprintMode = true;
+        if (string.IsNullOrWhiteSpace(_settings.TargetSectionKey))
+        {
+            _settings.TargetSectionKey = "youtube";
+            if (TargetSectionCombo is not null)
+                TargetSectionCombo.SelectedIndex = 1;
+        }
+        await ExecuteEvolutionAsync(resume: false);
+    }
+
     private async void OnStartEvolution(object sender, RoutedEventArgs e)
     {
+        _settings.FastSprintMode = false;
         await ExecuteEvolutionAsync(resume: false);
     }
 
@@ -598,6 +643,7 @@ public partial class EvolutionView : UserControl
         }
 
         var selectedPresets = selectedItems.Select(x => x.Preset).ToList();
+        _lastBasePreset = selectedPresets[0];
 
         SyncUiToSettings();
 
@@ -650,10 +696,12 @@ public partial class EvolutionView : UserControl
                 : await engine.RunAsync(selectedPresets, zapretRoot, _settings, outputDir, progress, ct);
 
             _lastExportedFile = result.ExportPath;
+            _lastWinner = result.Winner;
             var evolvedStem = Path.GetFileNameWithoutExtension(result.ExportPath);
             ExportPathText.Text = $"Файл: {Path.GetFileName(result.ExportPath)}";
             ApplyButton.IsEnabled = true;
             ApplyButton.Content = "🚀 Применить пресет";
+            ABTestResultCard.Visibility = Visibility.Collapsed;
             ExportCard.Visibility = Visibility.Visible;
             PhaseText.Text = "🎉 Эволюция успешно завершена!";
 
@@ -720,6 +768,48 @@ public partial class EvolutionView : UserControl
                 SynergyReportText.Visibility = Visibility.Collapsed;
             }
 
+            if (prog.DetectedDpiProfile is not null)
+            {
+                DpiProfileText.Text = $"DPI: {prog.DetectedDpiProfile.IspFilterType}";
+                DpiProfileBadge.Visibility = Visibility.Visible;
+            }
+
+            if (prog.DiffEntries is not null && prog.DiffEntries.Count > 0)
+            {
+                _diffEntries.Clear();
+                foreach (var d in prog.DiffEntries)
+                {
+                    var brush = d.Kind switch
+                    {
+                        DiffChangeKind.Optimized => Brushes.LimeGreen,
+                        DiffChangeKind.Pruned => Brushes.DodgerBlue,
+                        DiffChangeKind.FineTuned => Brushes.Orange,
+                        _ => Brushes.Gray
+                    };
+                    var bg = d.Kind switch
+                    {
+                        DiffChangeKind.Optimized => new SolidColorBrush(Color.FromArgb(0x22, 0x35, 0xE6, 0xA0)),
+                        DiffChangeKind.Pruned => new SolidColorBrush(Color.FromArgb(0x22, 0x21, 0x96, 0xF3)),
+                        DiffChangeKind.FineTuned => new SolidColorBrush(Color.FromArgb(0x22, 0xFF, 0x98, 0x00)),
+                        _ => new SolidColorBrush(Color.FromArgb(0x22, 0x9E, 0x9E, 0x9E))
+                    };
+                    _diffEntries.Add(new PresetDiffUiModel(
+                        d.SectionName,
+                        d.OldSteps,
+                        d.NewSteps,
+                        d.Explanation,
+                        d.StatusBadge,
+                        brush,
+                        bg
+                    ));
+                }
+            }
+
+            if (prog.WinnerIndividual is not null)
+            {
+                _lastWinner = prog.WinnerIndividual;
+            }
+
             // Логируем смену поколений
             if (prog.Generation != _lastLoggedGen && prog.Generation > 0)
             {
@@ -758,6 +848,14 @@ public partial class EvolutionView : UserControl
 
             var presetStem = Path.GetFileNameWithoutExtension(_lastExportedFile);
             var settings = AppSettings.Load(AppSettings.DefaultPath);
+
+            _previousPresetName = settings.PresetName;
+            if (!string.IsNullOrEmpty(_previousPresetName))
+            {
+                RollbackButton.Content = $"↩️ Откатить на «{_previousPresetName}»";
+                RollbackButton.Visibility = Visibility.Visible;
+            }
+
             settings = settings with { PresetName = presetStem };
             settings.Save();
 
@@ -781,6 +879,89 @@ public partial class EvolutionView : UserControl
             ApplyButton.IsEnabled = true;
             ApplyButton.Content = "🚀 Применить пресет";
             MessageBox.Show($"Ошибка применения пресета: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async void OnRollbackPreset(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_previousPresetName))
+            return;
+
+        try
+        {
+            RollbackButton.IsEnabled = false;
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
+            settings = settings with { PresetName = _previousPresetName };
+            settings.Save();
+
+            AppendLog($"↩️ Выполняется откат к предыдущему стабильному пресету «{_previousPresetName}»...", Brushes.Gold);
+            var result = await EngineControl.RestartAsync("эволюция: откат", CancellationToken.None);
+
+            RollbackButton.Visibility = Visibility.Collapsed;
+            PhaseText.Text = result.Ok
+                ? $"Выполнен откат к пресету «{_previousPresetName}»!"
+                : $"Откат выполнен, но перезапуск сообщил: {result.Message}";
+
+            AppendLog(result.Ok
+                ? $"✔ Стабильный пресет «{_previousPresetName}» восстановлен!"
+                : $"⚠ Сообщение отката: {result.Message}",
+                result.Ok ? Brushes.LimeGreen : Brushes.Orange);
+        }
+        catch (Exception ex)
+        {
+            RollbackButton.IsEnabled = true;
+            MessageBox.Show($"Ошибка отката пресета: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async void OnRunABTest(object sender, RoutedEventArgs e)
+    {
+        if (_lastWinner is null || _lastBasePreset is null)
+        {
+            MessageBox.Show("Нет данных для A/B тестирования. Запустите эволюцию пресета.", "A/B Тест", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            ABTestButton.IsEnabled = false;
+            ABStatusText.Text = "Запуск прямого A/B тестирования в бою...";
+            ABTestResultCard.Visibility = Visibility.Visible;
+
+            var zapretPaths = ZapretPaths.Discover();
+            if (zapretPaths?.Root is null)
+                return;
+
+            var probe = new FitnessProbe(zapretPaths.Root, zapretPaths.ExecutablePath);
+            var abProbe = new ABComparisonProbe(probe);
+
+            AppendLog($"⚔️ Запуск прямого A/B тестирования: «{_lastBasePreset.Name}» против «Evolved (Gen {_lastWinner.GenerationNumber})»...", Brushes.Cyan);
+
+            var abResult = await abProbe.CompareAsync(_lastBasePreset, _lastWinner, _settings, CancellationToken.None);
+
+            ABBaseTitleText.Text = $"Базовый: {_lastBasePreset.Name}";
+            ABBaseHostsText.Text = $"Доступность: {abResult.BasePassedHosts}/{abResult.TotalHosts} хостов";
+            ABBaseLatencyText.Text = $"Пинг: {abResult.BaseAvgLatencyMs} мс";
+            ABBaseThroughputText.Text = $"L7 Throughput: {abResult.BaseThroughputKBps:F0} КБ/с";
+
+            ABEvolvedTitleText.Text = $"🧬 {abResult.EvolvedName}";
+            ABEvolvedHostsText.Text = $"Доступность: {abResult.EvolvedPassedHosts}/{abResult.TotalHosts} хостов";
+            ABEvolvedLatencyText.Text = $"Пинг: {abResult.EvolvedAvgLatencyMs} мс";
+            ABEvolvedThroughputText.Text = $"L7 Throughput: {abResult.EvolvedThroughputKBps:F0} КБ/с";
+
+            ABVerdictText.Text = abResult.Verdict;
+            ABStatusText.Text = "Тест завершён ✔";
+
+            AppendLog($"⚔️ Вердикт A/B: {abResult.Verdict}", abResult.EvolvedIsSuperior ? Brushes.LimeGreen : Brushes.Orange);
+        }
+        catch (Exception ex)
+        {
+            ABStatusText.Text = $"Ошибка: {ex.Message}";
+            AppendLog($"Ошибка A/B теста: {ex.Message}", Brushes.OrangeRed);
+        }
+        finally
+        {
+            ABTestButton.IsEnabled = true;
         }
     }
 

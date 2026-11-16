@@ -57,6 +57,24 @@ public sealed class EvolutionEngine
             return await FinalizeWinnerAsync(winnerInd, primaryPreset, settings, pool, outputDirectory, progress, rng, ct);
         }
 
+        // Экспресс-определение сигнатуры DPI ТСПУ (DPI Fingerprinting)
+        var sampleResults = new Dictionary<string, bool>();
+        if (primaryPreset.Sections.Any(s => s.Name.Contains("youtube", StringComparison.OrdinalIgnoreCase)))
+            sampleResults["www.youtube.com"] = false;
+        if (primaryPreset.Sections.Any(s => s.Name.Contains("discord", StringComparison.OrdinalIgnoreCase)))
+            sampleResults["discord.com"] = false;
+
+        var dpiProfile = DpiFingerprinter.DetectProfile(sampleResults);
+        int targetMaxGen = settings.FastSprintMode ? Math.Min(settings.MaxGenerations, 4) : settings.MaxGenerations;
+
+        progress.Report(new EvolutionProgress
+        {
+            Generation = 0,
+            MaxGenerations = targetMaxGen,
+            Phase = $"DPI Fingerprint: {dpiProfile.IspFilterType}. Засевание генофонда...",
+            DetectedDpiProfile = dpiProfile
+        });
+
         // Поколение 0: Засевание из ВСЕХ отобранных пресетов-родителей
         var population = new List<PresetIndividual>();
         foreach (var p in seedPresets)
@@ -69,10 +87,11 @@ public sealed class EvolutionEngine
 
         // Дополняем популяцию до PopulationSize через кроссовер и мутации отобранных родителей
         int parentIdx = 0;
-        while (population.Count < settings.PopulationSize)
+        int targetPopSize = settings.FastSprintMode ? Math.Min(settings.PopulationSize, 10) : settings.PopulationSize;
+        while (population.Count < targetPopSize)
         {
             var parent = population[parentIdx % seedPresets.Count];
-            var mutated = GeneticOperators.Mutate(parent, pool, 0, rng, 0.25);
+            var mutated = GeneticOperators.Mutate(parent, pool, 0, rng, 0.25, settings.TargetSectionKey);
             population.Add(mutated);
             parentIdx++;
         }
@@ -231,13 +250,13 @@ public sealed class EvolutionEngine
                 var p1 = GeneticOperators.TournamentSelect(population, rng, settings.TournamentSize);
                 var p2 = GeneticOperators.TournamentSelect(population, rng, settings.TournamentSize);
 
-                var (child1, child2) = GeneticOperators.Crossover(p1, p2, gen + 1, rng, settings.CrossoverRate);
+                var (child1, child2) = GeneticOperators.Crossover(p1, p2, gen + 1, rng, settings.CrossoverRate, settings.TargetSectionKey);
 
-                nextGeneration.Add(GeneticOperators.Mutate(child1, pool, gen + 1, rng, currentMutationRate));
+                nextGeneration.Add(GeneticOperators.Mutate(child1, pool, gen + 1, rng, currentMutationRate, settings.TargetSectionKey));
 
                 if (nextGeneration.Count < settings.PopulationSize)
                 {
-                    nextGeneration.Add(GeneticOperators.Mutate(child2, pool, gen + 1, rng, currentMutationRate));
+                    nextGeneration.Add(GeneticOperators.Mutate(child2, pool, gen + 1, rng, currentMutationRate, settings.TargetSectionKey));
                 }
             }
 
@@ -322,7 +341,10 @@ public sealed class EvolutionEngine
         // 3. Геномная редукция (Pruning) — удаление дублирующихся шагов и избыточных мутаций
         winner = GenomicPruner.Prune(winner);
 
-        // 4. Экспортируем финального победителя
+        // 4. Построение отчёта об изменениях («Было / Стало»)
+        var diffEntries = PresetDiffInspector.Inspect(basePreset, winner);
+
+        // 5. Экспортируем финального победителя
         var exportPath = _exporter.Export(winner, basePreset, outputDirectory);
 
         progress.Report(new EvolutionProgress
@@ -338,7 +360,9 @@ public sealed class EvolutionEngine
             Phase = "Эволюция завершена!",
             IsComplete = true,
             WinnerExportPath = exportPath,
-            SynergyReport = synergyReport
+            SynergyReport = synergyReport,
+            DiffEntries = diffEntries,
+            WinnerIndividual = winner
         });
 
         return (winner, exportPath);

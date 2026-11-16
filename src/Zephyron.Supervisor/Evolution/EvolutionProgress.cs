@@ -17,4 +17,7 @@ public sealed record EvolutionProgress
     public bool IsComplete { get; init; }
     public string? WinnerExportPath { get; init; }
     public string? SynergyReport { get; init; }
+    public DpiProfile? DetectedDpiProfile { get; init; }
+    public IReadOnlyList<PresetDiffEntry>? DiffEntries { get; init; }
+    public Zapret.Evolution.PresetIndividual? WinnerIndividual { get; init; }
 }

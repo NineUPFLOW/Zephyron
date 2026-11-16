@@ -49,13 +49,15 @@ public static class GeneticOperators
 
     /// <summary>
     /// Кроссовер (скрещивание) двух особей с получением двух потомков.
+    /// При указании targetSection скрещиваются только гены выбранной секции.
     /// </summary>
     public static (PresetIndividual Child1, PresetIndividual Child2) Crossover(
         PresetIndividual parent1,
         PresetIndividual parent2,
         int generation,
         Random rng,
-        double rate = DefaultCrossoverRate)
+        double rate = DefaultCrossoverRate,
+        string? targetSection = null)
     {
         if (rng.NextDouble() > rate)
         {
@@ -76,6 +78,8 @@ public static class GeneticOperators
             );
         }
 
+        bool isTargeted = !string.IsNullOrWhiteSpace(targetSection) && !targetSection.Equals("all", StringComparison.OrdinalIgnoreCase);
+
         var keys = parent1.Genes.Keys.Union(parent2.Genes.Keys).ToList();
         var child1Genes = new Dictionary<string, PresetGene>(StringComparer.OrdinalIgnoreCase);
         var child2Genes = new Dictionary<string, PresetGene>(StringComparer.OrdinalIgnoreCase);
@@ -84,6 +88,22 @@ public static class GeneticOperators
         {
             parent1.Genes.TryGetValue(key, out var g1);
             parent2.Genes.TryGetValue(key, out var g2);
+
+            // Если включена целевая микро-эволюция и секция не относится к целевой — замораживаем
+            if (isTargeted && !key.Contains(targetSection!, StringComparison.OrdinalIgnoreCase))
+            {
+                if (g1 is not null)
+                {
+                    child1Genes[key] = g1;
+                    child2Genes[key] = g1;
+                }
+                else if (g2 is not null)
+                {
+                    child1Genes[key] = g2;
+                    child2Genes[key] = g2;
+                }
+                continue;
+            }
 
             if (g1 is not null && g2 is not null)
             {
@@ -122,26 +142,33 @@ public static class GeneticOperators
     }
 
     /// <summary>
-    /// Мутация особи: каждый ген секции мутирует с заданной вероятностью.
-    /// </summary>
-    /// <summary>
     /// Мутация особи с защитой работающих секций: работающие рецепты сохраняются и лишь калибруются,
     /// а неработающие подвергаются направленной мутации.
+    /// При указании targetSection мутирует только указанная секция, остальные замораживаются.
     /// </summary>
     public static PresetIndividual Mutate(
         PresetIndividual individual,
         GenePool pool,
         int generation,
         Random rng,
-        double rate = DefaultMutationRate)
+        double rate = DefaultMutationRate,
+        string? targetSection = null)
     {
         var mutatedGenes = new Dictionary<string, PresetGene>(StringComparer.OrdinalIgnoreCase);
+        bool isTargeted = !string.IsNullOrWhiteSpace(targetSection) && !targetSection.Equals("all", StringComparison.OrdinalIgnoreCase);
 
         foreach (var (name, gene) in individual.Genes)
         {
+            // Если включена микро-эволюция конкретной секции, все остальные секции полностью замораживаются
+            if (isTargeted && !name.Contains(targetSection!, StringComparison.OrdinalIgnoreCase))
+            {
+                mutatedGenes[name] = gene;
+                continue;
+            }
+
             bool working = IsSectionWorking(name, individual.LastHostOutcomes);
 
-            if (working)
+            if (working && !isTargeted)
             {
                 // Защита от деградации: работающую стратегию не ломаем, лишь слегка калибруем пинг
                 mutatedGenes[name] = rng.NextDouble() < 0.15
@@ -150,8 +177,9 @@ public static class GeneticOperators
             }
             else
             {
-                // Неработающая секция: активный эволюционный поиск решения
-                mutatedGenes[name] = rng.NextDouble() < rate
+                // Неработающая или целевая секция: активный эволюционный поиск решения
+                double effectiveRate = isTargeted ? Math.Max(rate, 0.35) : rate;
+                mutatedGenes[name] = rng.NextDouble() < effectiveRate
                     ? gene.Mutate(pool, rng, name)
                     : gene;
             }

@@ -63,6 +63,15 @@ public sealed class EvolutionSettings
     /// <summary>Включить комплексную верификацию работы сервисов в связке.</summary>
     public bool EnableSynergyVerification { get; set; } = true;
 
+    /// <summary>
+    /// Имя целевой секции для микро-эволюции (null или "all" — полная эволюция всех секций).
+    /// Например: "youtube", "discord", "general".
+    /// </summary>
+    public string? TargetSectionKey { get; set; }
+
+    /// <summary>Режим экспресс-спринта для быстрой целевой микро-эволюции (3-5 поколений).</summary>
+    public bool FastSprintMode { get; set; }
+
     /// <summary>Целевые хосты для сетевых проб.</summary>
     public List<string> TargetHosts { get; set; } =
     [
