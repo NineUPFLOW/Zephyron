@@ -358,11 +358,28 @@ public sealed class EvolutionEngine
         // 3. Геномная редукция (Pruning) — удаление дублирующихся шагов и избыточных мутаций
         winner = GenomicPruner.Prune(winner);
 
-        // 4. Построение отчёта об изменениях («Было / Стало»)
+        // 4. Финализирующий аудит и сертификация качества пресета
+        progress.Report(new EvolutionProgress
+        {
+            Generation = settings.MaxGenerations,
+            MaxGenerations = settings.MaxGenerations,
+            BestFitness = winner.FitnessScore,
+            BestPassed = winner.ProbesPassed,
+            BestTotal = winner.ProbesTotal,
+            BestLatencyMs = winner.AvgLatencyMs,
+            BestHostResults = winner.LastHostOutcomes,
+            BestPresetName = basePreset.Name,
+            Phase = "Сертификация качества: стресс-тест в 3 раундах и проверка winws2 --dry-run..."
+        });
+
+        var certifier = new PresetQualityCertifier(_probe, _probe.ZapretRoot, _probe.WinwsPath);
+        var certificate = await certifier.CertifyAsync(winner, basePreset, settings, ct);
+
+        // 5. Построение отчёта об изменениях («Было / Стало»)
         var diffEntries = PresetDiffInspector.Inspect(basePreset, winner);
 
-        // 5. Экспортируем финального победителя
-        var exportPath = _exporter.Export(winner, basePreset, outputDirectory);
+        // 6. Экспортируем финального победителя с сертификатом качества
+        var exportPath = _exporter.Export(winner, basePreset, outputDirectory, certificate);
 
         progress.Report(new EvolutionProgress
         {
@@ -379,7 +396,8 @@ public sealed class EvolutionEngine
             WinnerExportPath = exportPath,
             SynergyReport = synergyReport,
             DiffEntries = diffEntries,
-            WinnerIndividual = winner
+            WinnerIndividual = winner,
+            Certificate = certificate
         });
 
         return (winner, exportPath);

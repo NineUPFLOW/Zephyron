@@ -18,7 +18,8 @@ public sealed class PresetExporter
     public string Export(
         PresetIndividual winner,
         ZapretPreset template,
-        string outputDirectory)
+        string outputDirectory,
+        PresetQualityCertificate? certificate = null)
     {
         if (!Directory.Exists(outputDirectory))
             Directory.CreateDirectory(outputDirectory);
@@ -52,6 +53,15 @@ public sealed class PresetExporter
         sb.AppendLine($"# BuiltinVersion: evolved-gen-{totalGen}");
         sb.AppendLine($"# EvolvedAt: {DateTimeOffset.Now:yyyy-MM-dd HH:mm}");
         sb.AppendLine($"# FitnessScore: {winner.FitnessScore:P0}");
+        if (certificate is not null)
+        {
+            sb.AppendLine($"# QualityScore: {certificate.QualityScore}%");
+            sb.AppendLine($"# QualityVerdict: {certificate.Verdict}");
+            if (certificate.StreamingSpeedKBps > 0)
+                sb.AppendLine($"# StreamingSpeed: {certificate.StreamingSpeedKBps:F0} KB/s");
+            if (certificate.QualityBadges.Count > 0)
+                sb.AppendLine($"# QualityBadges: {string.Join(", ", certificate.QualityBadges)}");
+        }
         sb.AppendLine($"# IconColor: #4CAF50");
         sb.AppendLine($"# Description: Адаптированный пресет на основе {baseName}. Поколение {totalGen}. Успешность проб: {winner.ProbesPassed}/{winner.ProbesTotal}, средняя задержка: {winner.AvgLatencyMs} мс.");
         sb.AppendLine();

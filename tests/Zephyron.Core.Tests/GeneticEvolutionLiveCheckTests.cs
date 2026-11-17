@@ -295,4 +295,156 @@ public sealed class GeneticEvolutionLiveCheckTests
         Assert.NotNull(discordAddr);
         Assert.Equal(System.Net.Sockets.AddressFamily.InterNetwork, discordAddr.AddressFamily);
     }
+
+    [Fact]
+    public void PresetIndividual_RebuildSectionArguments_PreservesUdpExclusivity()
+    {
+        var basePreset = new ZapretPreset
+        {
+            Name = "Test Discord Voice Preset",
+            FilePath = "test.cmd",
+            GlobalArguments = [],
+            Sections =
+            [
+                new ZapretSection
+                {
+                    Name = "Discord Voice Section",
+                    HostListPaths = [],
+                    InlineDomains = [],
+                    IpSetPaths = [],
+                    DesyncRecipes = ["fake"],
+                    IsPassThrough = false,
+                    RawArguments = ["--filter-udp=50000-65535", "--lua-desync=fake"]
+                }
+            ]
+        };
+
+        var individual = PresetIndividual.FromPreset(basePreset, 1);
+        var rebuilt = individual.ToPreset(basePreset);
+
+        Assert.Single(rebuilt.Sections);
+        var sec = rebuilt.Sections[0];
+
+        // Проверяем, что в аргументы НЕ подмешался --filter-tcp, а сохранен чисто UDP
+        Assert.DoesNotContain(sec.RawArguments, a => a.StartsWith("--filter-tcp", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(sec.RawArguments, a => a.StartsWith("--filter-udp=50000-65535", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void PresetExporter_EmbedsQualityCertificate_InHeader()
+    {
+        var exporter = new PresetExporter();
+        var tempDir = Path.Combine(Path.GetTempPath(), "ZephyronTestCert_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            var basePreset = new ZapretPreset
+            {
+                Name = "Base Testing Preset",
+                FilePath = "base.cmd",
+                GlobalArguments = [],
+                Sections =
+                [
+                    new ZapretSection
+                    {
+                        Name = "Test",
+                        HostListPaths = [],
+                        InlineDomains = [],
+                        IpSetPaths = [],
+                        DesyncRecipes = ["fake"],
+                        IsPassThrough = false,
+                        RawArguments = ["--filter-tcp=80,443", "--lua-desync=fake"]
+                    }
+                ]
+            };
+
+            var individual = PresetIndividual.FromPreset(basePreset, 5);
+            individual.FitnessScore = 0.98;
+
+            var cert = new PresetQualityCertificate
+            {
+                QualityScore = 98,
+                SyntaxValid = true,
+                PassedRounds = 3,
+                TotalRounds = 3,
+                StreamingSpeedKBps = 14500,
+                DiscordVoicePassed = true,
+                Verdict = "Превосходная стабильность и скорость потока",
+                QualityBadges = ["✨ 98% Качество", "⚡ 14.5 МБ/с", "🎮 Discord Voice OK", "🛡️ Синтаксис проверен"]
+            };
+
+            var outPath = exporter.Export(individual, basePreset, tempDir, certificate: cert);
+            Assert.True(File.Exists(outPath));
+
+            var content = File.ReadAllText(outPath);
+            Assert.Contains("# QualityScore: 98%", content);
+            Assert.Contains("# QualityVerdict: Превосходная стабильность и скорость потока", content);
+            Assert.Contains("# StreamingSpeed: 14500 KB/s", content);
+            Assert.Contains("# QualityBadges: ✨ 98% Качество, ⚡ 14.5 МБ/с, 🎮 Discord Voice OK, 🛡️ Синтаксис проверен", content);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task PresetQualityCertifier_ValidatesSyntax_WithDryRun()
+    {
+        var zapretPaths = ZapretPaths.Discover();
+        if (zapretPaths?.Root is null || zapretPaths.ExecutablePath is null || !File.Exists(zapretPaths.ExecutablePath))
+            return;
+
+        var probe = new FitnessProbe(zapretPaths.Root, zapretPaths.ExecutablePath);
+        var certifier = new PresetQualityCertifier(probe, zapretPaths.Root, zapretPaths.ExecutablePath);
+
+        var validPreset = new ZapretPreset
+        {
+            Name = "Valid Test",
+            FilePath = "test.cmd",
+            GlobalArguments = ["--wf-tcp-out=80,443"],
+            Sections =
+            [
+                new ZapretSection
+                {
+                    Name = "TCP",
+                    HostListPaths = [],
+                    InlineDomains = [],
+                    IpSetPaths = [],
+                    DesyncRecipes = ["pass"],
+                    IsPassThrough = false,
+                    RawArguments = ["--filter-tcp=80,443", "--lua-desync=pass"]
+                }
+            ]
+        };
+
+        var (valid, detail) = await certifier.ValidateSyntaxAsync(validPreset, CancellationToken.None);
+        Assert.True(valid, $"Valid preset syntax check failed: {detail}");
+
+        var invalidPreset = new ZapretPreset
+        {
+            Name = "Invalid Test",
+            FilePath = "test.cmd",
+            GlobalArguments = ["--wf-tcp-out=80,443"],
+            Sections =
+            [
+                new ZapretSection
+                {
+                    Name = "Bad",
+                    HostListPaths = [],
+                    InlineDomains = [],
+                    IpSetPaths = [],
+                    DesyncRecipes = [],
+                    IsPassThrough = false,
+                    RawArguments = ["--unknown-invalid-argument-xyz=123"]
+                }
+            ]
+        };
+
+        var (invalidValid, invalidDetail) = await certifier.ValidateSyntaxAsync(invalidPreset, CancellationToken.None);
+        Assert.False(invalidValid, "Invalid preset must fail dry-run validation");
+        Assert.Contains("winws2", invalidDetail, StringComparison.OrdinalIgnoreCase);
+    }
 }

@@ -245,6 +245,8 @@
                                     <CheckBox x:Name="IslandCheck" Margin="0,2,0,6" Content="Островная модель (параллельные субпопуляции)" />
                                     <CheckBox x:Name="MemeticCheck" IsChecked="True" Margin="0,0,0,6" Content="Меметическая доводка (Hill-Climbing)" />
                                     <CheckBox x:Name="SynergyCheck" IsChecked="True" Margin="0,0,0,6" Content="Проверка синергии в связке (YouTube + Discord + Web)" />
+                                    <CheckBox x:Name="ZeroDowntimeCheck" IsChecked="True" Margin="0,0,0,6" Content="Zero-Downtime: не отключать интернет во время тестов"
+                                              ToolTip="Использует изолирующий фильтр WinDivert высокого приоритета. Основной обход и интернет не прерываются во время оценки." />
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -500,6 +502,9 @@
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                     <Button x:Name="ApplyButton" Style="{StaticResource Primary}" Padding="14,8"
                                             Content="🚀 Применить пресет" Margin="0,0,6,0" Click="OnApplyPreset" />
+                                    <Button x:Name="TrialButton" Style="{StaticResource Ghost}" Padding="12,8" Margin="0,0,6,0"
+                                            Content="🧪 Тест в бою (30 сек)" Click="OnTrialPreset"
+                                            ToolTip="Временно активировать пресет на 30 секунд для проверки в браузере без риска" />
                                     <Button x:Name="RollbackButton" Style="{StaticResource Ghost}" Padding="12,8" Margin="0,0,6,0"
                                             Content="↩️ Откатить" Visibility="Collapsed" Click="OnRollbackPreset"
                                             ToolTip="Вернуть предыдущий стабильный пресет" />
@@ -511,6 +516,64 @@
                                     <Button Style="{StaticResource Ghost}" Padding="10,8" Content="Папка" Click="OnOpenFolder" />
                                 </StackPanel>
                             </Grid>
+
+                            <!-- Сертификат качества пресета -->
+                            <Border x:Name="QualityCertCard" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}"
+                                    BorderThickness="1" CornerRadius="{StaticResource RSm}" Padding="12" Margin="0,0,0,12" Visibility="Collapsed">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Grid.Column="0" Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentLine}"
+                                            BorderThickness="1" CornerRadius="{StaticResource RSm}" Padding="12,8" Margin="0,0,14,0" VerticalAlignment="Center">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock x:Name="QualityCertScoreText" Text="98%" FontWeight="Bold" FontSize="20" Foreground="{DynamicResource Accent}" HorizontalAlignment="Center" />
+                                            <TextBlock Text="индекс качества" FontSize="9" Foreground="{DynamicResource Muted}" HorizontalAlignment="Center" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock x:Name="QualityCertVerdictText" FontWeight="SemiBold" Text="Превосходное качество" FontSize="13" TextWrapping="Wrap" />
+                                        <ItemsControl x:Name="QualityBadgesList" Margin="0,6,0,0">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{DynamicResource Wash}" BorderBrush="{DynamicResource Border}"
+                                                            BorderThickness="1" CornerRadius="{StaticResource RSm}" Padding="6,2" Margin="0,0,6,4">
+                                                        <TextBlock Text="{Binding}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" />
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Панель активного пробного запуска (30 сек) -->
+                            <Border x:Name="TrialRunCard" Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentLine}"
+                                    BorderThickness="1" CornerRadius="{StaticResource RSm}" Padding="12" Margin="0,0,0,12" Visibility="Collapsed">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="🧪 Идёт пробный запуск в вашей системе!" FontWeight="Bold" Foreground="{DynamicResource Accent}" />
+                                        <TextBlock x:Name="TrialCountdownText" Text="Откройте YouTube и Discord в браузере. До автовозврата: 30 сек..." Style="{StaticResource Caption}" Margin="0,2,0,0" />
+                                        <ProgressBar x:Name="TrialProgressBar" Height="4" Margin="0,6,0,0" Minimum="0" Maximum="30" Value="30" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
+                                        <Button Style="{StaticResource Primary}" Padding="12,6" Margin="0,0,6,0" Content="✅ Оставить навсегда" Click="OnConfirmTrialKeep" />
+                                        <Button Style="{StaticResource Quiet}" Padding="12,6" Content="⏹ Вернуть как было" Click="OnCancelTrialRevert" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
 
                             <!-- Результаты A/B Тестирования («Было / Стало» в бою) -->
                             <Border x:Name="ABTestResultCard" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Border}"

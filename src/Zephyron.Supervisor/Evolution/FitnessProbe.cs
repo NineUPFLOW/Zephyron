@@ -13,6 +13,9 @@ public sealed class FitnessProbe
     private readonly string _zapretRoot;
     private readonly string _winwsPath;
 
+    public string ZapretRoot => _zapretRoot;
+    public string WinwsPath => _winwsPath;
+
     public FitnessProbe(string zapretRoot, string? winwsPath = null)
     {
         _zapretRoot = zapretRoot;
@@ -79,6 +82,10 @@ public sealed class FitnessProbe
         if (!arguments.Any(a => a.StartsWith("--wf-priority", StringComparison.OrdinalIgnoreCase)))
         {
             arguments.Insert(0, "--wf-priority=1000");
+        }
+        if (!arguments.Any(a => a.StartsWith("--wf-dup-check", StringComparison.OrdinalIgnoreCase)))
+        {
+            arguments.Insert(0, "--wf-dup-check=0");
         }
 
         var outcomes = new Dictionary<string, ProbeOutcome>(StringComparer.OrdinalIgnoreCase);

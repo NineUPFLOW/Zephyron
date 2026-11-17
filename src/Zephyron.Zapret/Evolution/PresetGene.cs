@@ -5,8 +5,8 @@ namespace Zephyron.Zapret.Evolution;
 /// </summary>
 public sealed record PresetGene
 {
-    /// <summary>Порты <c>--filter-tcp</c>.</summary>
-    public string TcpPorts { get; init; } = "80,443-65535";
+    /// <summary>Порты <c>--filter-tcp</c>; <c>null</c> — ключ не добавляется (например, для UDP секций).</summary>
+    public string? TcpPorts { get; init; } = "80,443-65535";
 
     /// <summary>Порты <c>--filter-udp</c>; <c>null</c> — ключ не добавляется.</summary>
     public string? UdpPorts { get; init; }
@@ -36,7 +36,7 @@ public sealed record PresetGene
     {
         string outRange = "-d8";
         string? udpPorts = null;
-        string tcpPorts = "80,443-65535";
+        string? tcpPorts = null;
         string? ipSetPath = null;
         string payload = "tls_client_hello,http_req";
         int repeats = 1;
@@ -74,6 +74,10 @@ public sealed record PresetGene
                     payload = val;
             }
         }
+
+        // Если в исходной секции не было ни tcp, ни udp — считаем по умолчанию TCP
+        if (tcpPorts is null && udpPorts is null)
+            tcpPorts = "80,443-65535";
 
         var steps = section.DesyncRecipes.ToList();
         foreach (var step in steps)

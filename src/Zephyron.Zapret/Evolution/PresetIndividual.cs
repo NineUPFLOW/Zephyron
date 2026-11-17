@@ -135,7 +135,8 @@ public sealed class PresetIndividual
             }
             if (arg.StartsWith("--filter-tcp=", StringComparison.OrdinalIgnoreCase))
             {
-                rawArgs.Add($"--filter-tcp={gene.TcpPorts}");
+                if (!string.IsNullOrWhiteSpace(gene.TcpPorts))
+                    rawArgs.Add($"--filter-tcp={gene.TcpPorts}");
                 handledTcp = true;
                 continue;
             }
@@ -170,8 +171,8 @@ public sealed class PresetIndividual
             rawArgs.Add(arg);
         }
 
-        // Если какого-то обязательного мутируемого флага не было в исходных RawArguments — добавляем
-        if (!handledTcp)
+        // Если какого-то обязательного флага не было в исходных аргументах — добавляем только если он уместен
+        if (!handledTcp && !handledUdp && !string.IsNullOrWhiteSpace(gene.TcpPorts))
             rawArgs.Insert(Math.Min(1, rawArgs.Count), $"--filter-tcp={gene.TcpPorts}");
         if (!handledUdp && !string.IsNullOrWhiteSpace(gene.UdpPorts))
             rawArgs.Add($"--filter-udp={gene.UdpPorts}");

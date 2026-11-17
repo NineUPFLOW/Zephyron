@@ -262,6 +262,8 @@ public partial class EvolutionView : UserControl
 
     private CancellationTokenSource? _cts;
     private CancellationTokenSource? _benchmarkCts;
+    private CancellationTokenSource? _trialCts;
+    private string? _preTrialPresetName;
     private string? _lastExportedFile;
     private PresetIndividual? _lastWinner;
     private ZapretPreset? _lastBasePreset;
@@ -615,10 +617,15 @@ public partial class EvolutionView : UserControl
         _benchmarkCts = new CancellationTokenSource();
         var ct = _benchmarkCts.Token;
 
+        bool zeroDowntime = ZeroDowntimeCheck?.IsChecked == true;
         bool wasRunning = EngineControl.IsRunning;
         var probe = new FitnessProbe(zapretRoot, zapretPaths?.ExecutablePath);
 
         AppendLog($"⚡ Запуск бенчмарка: проверка {presets.Count} пресетов на {targetHosts.Count} доменах...", Brushes.DeepSkyBlue);
+        if (zeroDowntime)
+        {
+            AppendLog("🌐 Режим Zero-Downtime активен: основной интернет не отключается во время замеров.", Brushes.LightSkyBlue);
+        }
 
         var conflictReport = EnvironmentConflictChecker.Check();
         if (conflictReport.HasConflicts)
@@ -653,7 +660,7 @@ public partial class EvolutionView : UserControl
 
         try
         {
-            if (wasRunning)
+            if (wasRunning && !zeroDowntime)
             {
                 BenchmarkStatusText.Text = "Освобождение порта winws2 для изолированных замеров...";
                 await EngineControl.StopAsync("бенчмарк", ct);
@@ -743,7 +750,7 @@ public partial class EvolutionView : UserControl
             foreach (var item in _benchmarkItems)
                 item.IsEvaluating = false;
 
-            if (wasRunning)
+            if (wasRunning && !zeroDowntime)
             {
                 _ = EngineControl.StartAsync("бенчмарк", CancellationToken.None);
             }
@@ -838,6 +845,8 @@ public partial class EvolutionView : UserControl
         StopEvolutionButton.IsEnabled = true;
         BenchmarkAllButton.IsEnabled = false;
         ExportCard.Visibility = Visibility.Collapsed;
+        QualityCertCard.Visibility = Visibility.Collapsed;
+        TrialRunCard.Visibility = Visibility.Collapsed;
         _fitnessHistory.Clear();
         FitnessHistoryCard.Visibility = Visibility.Collapsed;
         _initialBaseFitness = 0.0;
@@ -853,9 +862,14 @@ public partial class EvolutionView : UserControl
         var exporter = new PresetExporter();
         var engine = new EvolutionEngine(probe, store, exporter);
 
+        bool zeroDowntime = ZeroDowntimeCheck?.IsChecked == true;
         bool wasRunning = EngineControl.IsRunning;
 
         AppendLog($"🧬 Старт эволюции: засевание генофонда из {selectedPresets.Count} родительских пресетов...", Brushes.Cyan);
+        if (zeroDowntime)
+        {
+            AppendLog("🌐 Режим Zero-Downtime: интернет остаётся активным во время эволюции.", Brushes.LightSkyBlue);
+        }
         foreach (var p in selectedPresets.Take(3))
         {
             AppendLog($"  • Родительский донор: «{p.Name}»", Brushes.DeepSkyBlue);
@@ -872,7 +886,7 @@ public partial class EvolutionView : UserControl
 
         try
         {
-            if (wasRunning)
+            if (wasRunning && !zeroDowntime)
             {
                 PhaseText.Text = "Освобождение сетевого драйвера winws2 для эволюции...";
                 await EngineControl.StopAsync("эволюция", ct);
@@ -911,7 +925,7 @@ public partial class EvolutionView : UserControl
         }
         finally
         {
-            if (wasRunning)
+            if (wasRunning && !zeroDowntime)
             {
                 _ = EngineControl.StartAsync("эволюция", CancellationToken.None);
             }
@@ -992,6 +1006,14 @@ public partial class EvolutionView : UserControl
                         bg
                     ));
                 }
+            }
+
+            if (prog.Certificate is not null)
+            {
+                QualityCertCard.Visibility = Visibility.Visible;
+                QualityCertScoreText.Text = $"{prog.Certificate.QualityScore}%";
+                QualityCertVerdictText.Text = prog.Certificate.Verdict;
+                QualityBadgesList.ItemsSource = prog.Certificate.QualityBadges;
             }
 
             if (prog.WinnerIndividual is not null)
@@ -1171,6 +1193,112 @@ public partial class EvolutionView : UserControl
         finally
         {
             ABTestButton.IsEnabled = true;
+        }
+    }
+
+    private async void OnTrialPreset(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_lastExportedFile) || !File.Exists(_lastExportedFile))
+        {
+            MessageBox.Show("Файл адаптированного пресета не найден. Запустите эволюцию пресета.", "Пробный запуск", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            _trialCts?.Cancel();
+            _trialCts = new CancellationTokenSource();
+            var ct = _trialCts.Token;
+
+            var presetStem = Path.GetFileNameWithoutExtension(_lastExportedFile);
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
+            _preTrialPresetName = settings.PresetName;
+
+            settings = settings with { PresetName = presetStem };
+            settings.Save();
+
+            TrialButton.IsEnabled = false;
+            TrialRunCard.Visibility = Visibility.Visible;
+            TrialProgressBar.Maximum = 30;
+            TrialProgressBar.Value = 30;
+
+            AppendLog($"🧪 Пробный запуск в бою (30 сек) пресета «{presetStem}»...", Brushes.Gold);
+            await EngineControl.RestartAsync("пробный запуск 30с", ct);
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    for (int rem = 30; rem >= 0; rem--)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        int remaining = rem;
+                        await Dispatcher.InvokeAsync(() =>
+                        {
+                            TrialCountdownText.Text = $"Откройте YouTube и Discord в браузере. До автовозврата: {remaining} сек...";
+                            TrialProgressBar.Value = remaining;
+                        });
+                        await Task.Delay(1000, ct);
+                    }
+
+                    // Таймер истек без подтверждения - автоматический откат
+                    await Dispatcher.InvokeAsync(async () =>
+                    {
+                        TrialRunCard.Visibility = Visibility.Collapsed;
+                        TrialButton.IsEnabled = true;
+                        AppendLog("⌛ Время пробного теста истекло. Автоматический возврат к прежнему пресету...", Brushes.Orange);
+                        await RevertTrialPresetAsync();
+                    });
+                }
+                catch (OperationCanceledException)
+                {
+                    // Пользователь подтвердил или отменил пробный режим
+                }
+            }, ct);
+        }
+        catch (Exception ex)
+        {
+            TrialRunCard.Visibility = Visibility.Collapsed;
+            TrialButton.IsEnabled = true;
+            MessageBox.Show($"Ошибка запуска пробного режима: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void OnConfirmTrialKeep(object sender, RoutedEventArgs e)
+    {
+        _trialCts?.Cancel();
+        TrialRunCard.Visibility = Visibility.Collapsed;
+        TrialButton.IsEnabled = true;
+        AppendLog("✅ Пользователь подтвердил качество: пресет оставлен навсегда!", Brushes.LimeGreen);
+        PhaseText.Text = "Пресет подтверждён и закреплён!";
+    }
+
+    private async void OnCancelTrialRevert(object sender, RoutedEventArgs e)
+    {
+        _trialCts?.Cancel();
+        TrialRunCard.Visibility = Visibility.Collapsed;
+        TrialButton.IsEnabled = true;
+        AppendLog("⏹ Пользователь отменил пробный запуск.", Brushes.Orange);
+        await RevertTrialPresetAsync();
+    }
+
+    private async Task RevertTrialPresetAsync()
+    {
+        if (string.IsNullOrEmpty(_preTrialPresetName))
+            return;
+
+        try
+        {
+            var settings = AppSettings.Load(AppSettings.DefaultPath);
+            settings = settings with { PresetName = _preTrialPresetName };
+            settings.Save();
+            AppendLog($"↩️ Восстановлен прежний пресет «{_preTrialPresetName}»...", Brushes.Gold);
+            await EngineControl.RestartAsync("откат пробного запуска", CancellationToken.None);
+            PhaseText.Text = $"Возвращён исходный пресет «{_preTrialPresetName}».";
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Ошибка возврата пресета: {ex.Message}", Brushes.OrangeRed);
         }
     }
 
