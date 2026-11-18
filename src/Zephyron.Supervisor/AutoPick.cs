@@ -781,6 +781,18 @@ public static class AutoPick
                 }
             }
 
+            // Проба открывает соединение системным TLS — коротким приветствием. Chrome и Edge шлют
+            // длинное, с постквантовым ключом, и его тот же рецепт может не провести (18.11:
+            // nexusmods.com — проба 403 от Cloudflare, браузер — обрыв). Засчитываем путь, только
+            // если проходит и приветствие как у браузера: иначе подбор ставит рецепт, с которым
+            // в браузере сайт не откроется.
+            if (works && (await BrowserHello.AskAsync(addresses[row], row.Host, TimeSpan.FromSeconds(5), cancellationToken)).Answer
+                is not (HelloAnswer.Accepted or HelloAnswer.Refused))
+            {
+                works = false;
+                partly = "короткое приветствие проходит, а браузерное (как у Chrome) — нет: в браузере сайт не откроется";
+            }
+
             // Проверка на робота Cloudflare проходится, только если браузер достанет её скрипт
             // с challenges.cloudflare.com. Закрыт он у провайдера (18.11: nexusmods.com — бесконечная
             // проверка напрямую) — путь не годится, и выигрывает VPN.
