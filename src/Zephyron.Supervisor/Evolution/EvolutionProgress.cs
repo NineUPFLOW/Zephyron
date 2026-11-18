@@ -22,4 +22,5 @@ public sealed record EvolutionProgress
     public Zapret.Evolution.PresetIndividual? WinnerIndividual { get; init; }
     public string? LiveOutcomeDetail { get; init; }
     public PresetQualityCertificate? Certificate { get; init; }
+    public IspProfile? DetectedIsp { get; init; }
 }

@@ -12,6 +12,8 @@ public sealed class EvolutionEngine
     private readonly EvolutionStore _store;
     private readonly PresetExporter _exporter;
     private readonly IslandModel _islandModel;
+    private DpiProfile? _lastDetectedDpiProfile;
+    private IspProfile? _lastDetectedIsp;
 
     public EvolutionEngine(FitnessProbe probe, EvolutionStore store, PresetExporter exporter)
     {
@@ -65,14 +67,17 @@ public sealed class EvolutionEngine
             sampleResults["discord.com"] = false;
 
         var dpiProfile = DpiFingerprinter.DetectProfile(sampleResults);
+        _lastDetectedDpiProfile = dpiProfile;
+        _lastDetectedIsp = await IspIdentifier.ResolveCurrentIspAsync(ct);
         int targetMaxGen = settings.FastSprintMode ? Math.Min(settings.MaxGenerations, 4) : settings.MaxGenerations;
 
         progress.Report(new EvolutionProgress
         {
             Generation = 0,
             MaxGenerations = targetMaxGen,
-            Phase = $"DPI Fingerprint: {dpiProfile.IspFilterType}. Засевание генофонда...",
-            DetectedDpiProfile = dpiProfile
+            Phase = $"Оператор: {_lastDetectedIsp.DisplaySummary} · DPI: {dpiProfile.IspFilterType}. Засевание генофонда...",
+            DetectedDpiProfile = dpiProfile,
+            DetectedIsp = _lastDetectedIsp
         });
 
         // Поколение 0: Засевание из ВСЕХ отобранных пресетов-родителей
@@ -378,8 +383,9 @@ public sealed class EvolutionEngine
         // 5. Построение отчёта об изменениях («Было / Стало»)
         var diffEntries = PresetDiffInspector.Inspect(basePreset, winner);
 
-        // 6. Экспортируем финального победителя с сертификатом качества
-        var exportPath = _exporter.Export(winner, basePreset, outputDirectory, certificate);
+        // 6. Экспортируем финального победителя с сертификатом качества, провайдером и DPI-профилем
+        _lastDetectedIsp ??= await IspIdentifier.ResolveCurrentIspAsync(ct);
+        var exportPath = _exporter.Export(winner, basePreset, outputDirectory, certificate, _lastDetectedIsp, _lastDetectedDpiProfile);
 
         progress.Report(new EvolutionProgress
         {
@@ -397,7 +403,9 @@ public sealed class EvolutionEngine
             SynergyReport = synergyReport,
             DiffEntries = diffEntries,
             WinnerIndividual = winner,
-            Certificate = certificate
+            Certificate = certificate,
+            DetectedIsp = _lastDetectedIsp,
+            DetectedDpiProfile = _lastDetectedDpiProfile
         });
 
         return (winner, exportPath);

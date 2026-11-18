@@ -19,7 +19,9 @@ public sealed class PresetExporter
         PresetIndividual winner,
         ZapretPreset template,
         string outputDirectory,
-        PresetQualityCertificate? certificate = null)
+        PresetQualityCertificate? certificate = null,
+        IspProfile? isp = null,
+        DpiProfile? dpi = null)
     {
         if (!Directory.Exists(outputDirectory))
             Directory.CreateDirectory(outputDirectory);
@@ -62,6 +64,10 @@ public sealed class PresetExporter
             if (certificate.QualityBadges.Count > 0)
                 sb.AppendLine($"# QualityBadges: {string.Join(", ", certificate.QualityBadges)}");
         }
+        if (isp is not null && !string.IsNullOrEmpty(isp.IspName))
+            sb.AppendLine($"# TargetISP: {isp.DisplaySummary}");
+        if (dpi is not null && !string.IsNullOrEmpty(dpi.IspFilterType))
+            sb.AppendLine($"# DpiFingerprint: {dpi.IspFilterType}");
         sb.AppendLine($"# IconColor: #4CAF50");
         sb.AppendLine($"# Description: Адаптированный пресет на основе {baseName}. Поколение {totalGen}. Успешность проб: {winner.ProbesPassed}/{winner.ProbesTotal}, средняя задержка: {winner.AvgLatencyMs} мс.");
         sb.AppendLine();

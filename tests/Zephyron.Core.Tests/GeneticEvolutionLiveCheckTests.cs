@@ -447,4 +447,155 @@ public sealed class GeneticEvolutionLiveCheckTests
         Assert.False(invalidValid, "Invalid preset must fail dry-run validation");
         Assert.Contains("winws2", invalidDetail, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void PresetDnaSnapshot_ExportsAndReconstructsGenome_Correctly()
+    {
+        var tempFile = Path.Combine(Path.GetTempPath(), $"ZephyronTestDna_{Guid.NewGuid():N}.gene.json");
+
+        try
+        {
+            var basePreset = new ZapretPreset
+            {
+                Name = "Base Snapshot Preset",
+                FilePath = "base.cmd",
+                GlobalArguments = ["--wf-tcp-out=80,443"],
+                Sections =
+                [
+                    new ZapretSection
+                    {
+                        Name = "YouTube Section",
+                        HostListPaths = [],
+                        InlineDomains = [],
+                        IpSetPaths = [],
+                        DesyncRecipes = ["fake"],
+                        IsPassThrough = false,
+                        RawArguments = ["--filter-tcp=80,443", "--lua-desync=fake"]
+                    }
+                ]
+            };
+
+            var individual = new PresetIndividual
+            {
+                GenerationNumber = 7,
+                FitnessScore = 0.94,
+                Genes = new Dictionary<string, PresetGene>
+                {
+                    ["YouTube Section"] = new PresetGene
+                    {
+                        DesyncSteps = ["fake:blob=tls_google", "multisplit:pos=sniext+1:seqovl=500"],
+                        TcpPorts = "80,443",
+                        OutRange = "-d8",
+                        Payload = "tls_client_hello"
+                    }
+                }
+            };
+
+            var isp = new IspProfile("Rostelecom Test", "AS12389", "1.2.3.4", "RU");
+            var dpi = new DpiProfile
+            {
+                IspFilterType = "РДП/Гарда",
+                PrefersSeqOvl = true,
+                PrefersSniExt = true,
+                RecommendedSeedSteps = ["multisplit:pos=sniext+1"]
+            };
+
+            PresetDnaSnapshot.SaveToFile(individual, basePreset, tempFile, isp, dpi, streamingSpeedKBps: 18400);
+            Assert.True(File.Exists(tempFile));
+
+            var loaded = PresetDnaSnapshot.LoadFromFile(tempFile);
+            Assert.Equal(7, loaded.Generation);
+            Assert.Equal(0.94, loaded.FitnessScore, 2);
+            Assert.Equal("Rostelecom Test", loaded.IspName);
+            Assert.Equal("AS12389", loaded.IspAsn);
+            Assert.Equal("РДП/Гарда", loaded.DpiFilterType);
+            Assert.Equal(18400, loaded.StreamingSpeedKBps);
+
+            var reconstructed = loaded.ToIndividual();
+            Assert.Equal(7, reconstructed.GenerationNumber);
+            Assert.Equal(0.94, reconstructed.FitnessScore, 2);
+            Assert.Single(reconstructed.Genes);
+            Assert.Equal(2, reconstructed.Genes["YouTube Section"].DesyncSteps.Count);
+            Assert.Equal("fake:blob=tls_google", reconstructed.Genes["YouTube Section"].DesyncSteps[0]);
+        }
+        finally
+        {
+            if (File.Exists(tempFile))
+                File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task IspIdentifier_ReturnsValidProfile_OrFallback()
+    {
+        var profile = await IspIdentifier.ResolveCurrentIspAsync(CancellationToken.None);
+        Assert.NotNull(profile);
+        Assert.False(string.IsNullOrWhiteSpace(profile.IspName));
+        Assert.False(string.IsNullOrWhiteSpace(profile.DisplaySummary));
+    }
+
+    [Fact]
+    public void PresetExporter_IncludesIspAndDpiMetadata_InPresetHeader()
+    {
+        var exporter = new PresetExporter();
+        var tempDir = Path.Combine(Path.GetTempPath(), "ZephyronTestHeader_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            var basePreset = new ZapretPreset
+            {
+                Name = "Base Header Preset",
+                FilePath = "base.cmd",
+                GlobalArguments = [],
+                Sections =
+                [
+                    new ZapretSection
+                    {
+                        Name = "Test",
+                        HostListPaths = [],
+                        InlineDomains = [],
+                        IpSetPaths = [],
+                        DesyncRecipes = ["pass"],
+                        IsPassThrough = false,
+                        RawArguments = ["--filter-tcp=80,443", "--lua-desync=pass"]
+                    }
+                ]
+            };
+
+            var individual = PresetIndividual.FromPreset(basePreset, 2);
+            var isp = new IspProfile("MTS PJSC", "AS8359", "5.6.7.8", "RU");
+            var dpi = new DpiProfile
+            {
+                IspFilterType = "Экотелеком РДП",
+                PrefersSeqOvl = true,
+                PrefersSniExt = true,
+                RecommendedSeedSteps = ["sniext"]
+            };
+
+            var path = exporter.Export(individual, basePreset, tempDir, isp: isp, dpi: dpi);
+            Assert.True(File.Exists(path));
+
+            var content = File.ReadAllText(path);
+            Assert.Contains("# TargetISP: MTS PJSC (AS8359)", content);
+            Assert.Contains("# DpiFingerprint: Экотелеком РДП", content);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void EvolutionSentinel_HasRegisteredServices_AndKeySectionMapping()
+    {
+        Assert.NotEmpty(EvolutionSentinel.MonitoredServices);
+        Assert.True(EvolutionSentinel.MonitoredServices.ContainsKey("YouTube"));
+        Assert.True(EvolutionSentinel.MonitoredServices.ContainsKey("Discord"));
+
+        var (youtubeSection, youtubeHosts) = EvolutionSentinel.MonitoredServices["YouTube"];
+        Assert.Equal("youtube", youtubeSection);
+        Assert.Contains("googlevideo.com", youtubeHosts);
+    }
 }

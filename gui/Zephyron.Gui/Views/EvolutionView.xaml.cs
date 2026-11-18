@@ -270,6 +270,10 @@ public partial class EvolutionView : UserControl
     private string? _previousPresetName;
     private double _initialBaseFitness = 0.0;
     private int _lastLoggedGen = -1;
+    private EvolutionSentinel? _sentinel;
+    private DegradationReport? _currentDegradation;
+    private IspProfile? _lastDetectedIsp;
+    private DpiProfile? _lastDpiProfile;
 
     public EvolutionView()
     {
@@ -287,7 +291,23 @@ public partial class EvolutionView : UserControl
         ApplySettingsToUi();
         ReloadPresetsFromDisk();
 
-        Loaded += (_, _) => ReloadPresetsFromDisk();
+        Loaded += (_, _) =>
+        {
+            ReloadPresetsFromDisk();
+            _ = Task.Run(async () =>
+            {
+                var isp = await IspIdentifier.ResolveCurrentIspAsync();
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    if (isp is not null && !string.IsNullOrEmpty(isp.IspName))
+                    {
+                        _lastDetectedIsp = isp;
+                        IspProfileText.Text = $"🌐 {isp.DisplaySummary}";
+                        IspProfileBadge.Visibility = Visibility.Visible;
+                    }
+                });
+            });
+        };
     }
 
     private void InitializeDomainGroups()
@@ -971,8 +991,16 @@ public partial class EvolutionView : UserControl
                 SynergyReportText.Visibility = Visibility.Collapsed;
             }
 
+            if (prog.DetectedIsp is not null)
+            {
+                _lastDetectedIsp = prog.DetectedIsp;
+                IspProfileText.Text = $"🌐 {prog.DetectedIsp.DisplaySummary}";
+                IspProfileBadge.Visibility = Visibility.Visible;
+            }
+
             if (prog.DetectedDpiProfile is not null)
             {
+                _lastDpiProfile = prog.DetectedDpiProfile;
                 DpiProfileText.Text = $"DPI: {prog.DetectedDpiProfile.IspFilterType}";
                 DpiProfileBadge.Visibility = Visibility.Visible;
             }
@@ -1356,5 +1384,202 @@ public partial class EvolutionView : UserControl
         {
             Process.Start("explorer.exe", ZapretPaths.PresetDirectory);
         }
+    }
+
+    private void OnExportDna(object sender, RoutedEventArgs e)
+    {
+        if (_lastWinner is null || _lastBasePreset is null)
+        {
+            MessageBox.Show("Нет данных для экспорта ДНК. Запустите эволюцию пресета.", "Экспорт ДНК", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            var saveDialog = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = "Экспорт снимка генома пресета",
+                Filter = "Файл ДНК пресета (*.gene.json)|*.gene.json|Все файлы (*.*)|*.*",
+                FileName = $"Dna_{_lastBasePreset.Name}_Gen{_lastWinner.GenerationNumber}.gene.json",
+                InitialDirectory = ZapretPaths.PresetDirectory
+            };
+
+            if (saveDialog.ShowDialog() == true)
+            {
+                PresetDnaSnapshot.SaveToFile(
+                    _lastWinner,
+                    _lastBasePreset,
+                    saveDialog.FileName,
+                    _lastDetectedIsp,
+                    _lastDpiProfile
+                );
+                AppendLog($"🧬 Снимок генома успешно экспортирован в «{Path.GetFileName(saveDialog.FileName)}»!", Brushes.LimeGreen);
+                MessageBox.Show($"Снимок генома успешно сохранён:\n{saveDialog.FileName}", "Экспорт ДНК", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Ошибка экспорта ДНК: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void OnImportDna(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var openDialog = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Импорт снимка генома пресета",
+                Filter = "Файл ДНК пресета (*.gene.json)|*.gene.json|Все файлы (*.*)|*.*",
+                InitialDirectory = ZapretPaths.PresetDirectory
+            };
+
+            if (openDialog.ShowDialog() == true)
+            {
+                var snapshot = PresetDnaSnapshot.LoadFromFile(openDialog.FileName);
+                var individual = snapshot.ToIndividual();
+
+                AppendLog($"🧬 Успешно импортирован геном «{snapshot.PresetName}» (Поколение {snapshot.Generation}, фитнес: {snapshot.FitnessScore:P0}, оператор: {snapshot.IspName ?? "Общий"})!", Brushes.DeepSkyBlue);
+
+                var basePreset = ZapretPaths.PresetFiles
+                    .Select(f => new PresetReader().Load(f))
+                    .FirstOrDefault(p => p.Name.Equals(snapshot.BasePresetName, StringComparison.OrdinalIgnoreCase))
+                    ?? ZapretPaths.PresetFiles.Select(f => new PresetReader().Load(f)).FirstOrDefault();
+
+                if (basePreset is not null)
+                {
+                    var outputDir = ZapretPaths.PresetDirectory;
+                    var exportedPath = new PresetExporter().Export(
+                        individual,
+                        basePreset,
+                        outputDir,
+                        isp: new IspProfile(snapshot.IspName ?? "Импортированный", snapshot.IspAsn ?? "", "", "RU"));
+
+                    ReloadPresetsFromDisk(Path.GetFileNameWithoutExtension(exportedPath));
+                    MessageBox.Show($"Геном «{snapshot.PresetName}» успешно импортирован и добавлен в список пресетов!", "Импорт ДНК", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show($"Снимок генома импортирован, но базовый пресет «{snapshot.BasePresetName}» не найден.", "Импорт ДНК", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Ошибка импорта ДНК: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async void OnCheckHealthClick(object sender, RoutedEventArgs e)
+    {
+        var zapretPaths = ZapretPaths.Discover();
+        if (zapretPaths?.Root is null) return;
+
+        SelfHealingCheckButton.IsEnabled = false;
+        SelfHealingCheckButton.Content = "🩺 Проверка...";
+        AppendLog("🩺 Запуск экспресс-диагностики ключевых сервисов (YouTube, Discord, Telegram)...", Brushes.DeepSkyBlue);
+
+        try
+        {
+            var probe = new FitnessProbe(zapretPaths.Root, zapretPaths.ExecutablePath);
+            var store = new EvolutionStore();
+            var exporter = new PresetExporter();
+            var engine = new EvolutionEngine(probe, store, exporter);
+            _sentinel ??= new EvolutionSentinel(probe, engine);
+
+            var reports = await _sentinel.CheckHealthNowAsync(CancellationToken.None);
+            if (reports.Count > 0)
+            {
+                var rep = reports[0];
+                _currentDegradation = rep;
+                DegradedServiceText.Text = rep.ServiceName;
+                DegradationDetailText.Text = $"Сбой доступа к {rep.FailedHost}: {rep.ErrorDetail} (обнаружено {rep.ConsecutiveFailures} сбоев подряд).";
+                SelfHealingCard.Visibility = Visibility.Visible;
+
+                AppendLog($"⚠ Обнаружена деградация сервиса «{rep.ServiceName}» ({rep.FailedHost})! Рекомендуется самоисцеление.", Brushes.OrangeRed);
+            }
+            else
+            {
+                SelfHealingCard.Visibility = Visibility.Collapsed;
+                AppendLog("🩺 Экспресс-диагностика: все целевые сервисы (YouTube, Discord, Telegram) доступны и стабильны ✔", Brushes.LimeGreen);
+                MessageBox.Show("Все ключевые сервисы (YouTube, Discord, Telegram) работают стабильно!", "Диагностика здоровья", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Ошибка диагностики: {ex.Message}", Brushes.OrangeRed);
+        }
+        finally
+        {
+            SelfHealingCheckButton.IsEnabled = true;
+            SelfHealingCheckButton.Content = "🩺 Диагностика сбоев";
+        }
+    }
+
+    private async void OnTriggerSelfHealingClick(object sender, RoutedEventArgs e)
+    {
+        if (_currentDegradation is null) return;
+
+        var selectedPreset = _benchmarkItems.FirstOrDefault(x => x.IsSelected)?.Preset
+            ?? _benchmarkItems.FirstOrDefault()?.Preset;
+
+        var zapretPaths = ZapretPaths.Discover();
+        if (selectedPreset is null || zapretPaths?.Root is null) return;
+
+        try
+        {
+            TriggerHealButton.IsEnabled = false;
+            TriggerHealButton.Content = "🩹 Идёт исцеление...";
+            AppendLog($"🩹 Запуск самоисцеления сервиса «{_currentDegradation.ServiceName}» (секция: {_currentDegradation.SectionKey})...", Brushes.Cyan);
+
+            var probe = new FitnessProbe(zapretPaths.Root, zapretPaths.ExecutablePath);
+            var store = new EvolutionStore();
+            var exporter = new PresetExporter();
+            var engine = new EvolutionEngine(probe, store, exporter);
+            _sentinel ??= new EvolutionSentinel(probe, engine);
+
+            var progress = new Progress<EvolutionProgress>(UpdateProgressUi);
+            var res = await _sentinel.HealServiceAsync(
+                _currentDegradation.SectionKey,
+                selectedPreset,
+                zapretPaths.Root,
+                ZapretPaths.PresetDirectory,
+                progress,
+                CancellationToken.None);
+
+            if (res.Success && res.HealedPresetPath is not null)
+            {
+                SelfHealingCard.Visibility = Visibility.Collapsed;
+                _lastExportedFile = res.HealedPresetPath;
+                var stem = Path.GetFileNameWithoutExtension(res.HealedPresetPath);
+                ReloadPresetsFromDisk(stem);
+
+                var settings = AppSettings.Load(AppSettings.DefaultPath);
+                settings = settings with { PresetName = stem };
+                settings.Save();
+                await EngineControl.RestartAsync("самоисцеление", CancellationToken.None);
+
+                AppendLog($"🎉 {res.Message} Пресет «{stem}» активирован в системе!", Brushes.LimeGreen);
+                MessageBox.Show($"Сервис «{_currentDegradation.ServiceName}» успешно самоисцелен!\n\nНовый пресет «{stem}» применен и работает.", "Самоисцеление завершено", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else
+            {
+                AppendLog($"⚠ Результат самоисцеления: {res.Message}", Brushes.Orange);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Сбой самоисцеления: {ex.Message}", Brushes.OrangeRed);
+        }
+        finally
+        {
+            TriggerHealButton.IsEnabled = true;
+            TriggerHealButton.Content = "🩹 Самоисцеление в 1 клик";
+        }
+    }
+
+    private void OnDismissHealingClick(object sender, RoutedEventArgs e)
+    {
+        SelfHealingCard.Visibility = Visibility.Collapsed;
     }
 }

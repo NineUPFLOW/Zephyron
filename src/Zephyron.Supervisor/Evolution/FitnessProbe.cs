@@ -22,6 +22,58 @@ public sealed class FitnessProbe
         _winwsPath = ResolveWinwsPath(zapretRoot, winwsPath);
     }
 
+    /// <summary>
+    /// Выполняет одиночную проверку доступности хоста через TLS-рукопожатие.
+    /// </summary>
+    public async Task<ProbeOutcome> ProbeHostAsync(string host, int timeoutSeconds = 4, CancellationToken ct = default)
+    {
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+
+            var address = await RecipeTrial.AddressForAsync(host, cts.Token);
+            if (address is null)
+            {
+                return new ProbeOutcome
+                {
+                    Success = false,
+                    LatencyMs = sw.ElapsedMilliseconds,
+                    Detail = "DNS не разрешил имя хоста"
+                };
+            }
+
+            var flow = await RecipeTrial.OpensAsync(host, address, cts.Token);
+            sw.Stop();
+
+            return new ProbeOutcome
+            {
+                Success = flow.Passed && !flow.Stub,
+                LatencyMs = sw.ElapsedMilliseconds,
+                Detail = flow.Ending
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            return new ProbeOutcome
+            {
+                Success = false,
+                LatencyMs = sw.ElapsedMilliseconds,
+                Detail = "Таймаут подключения"
+            };
+        }
+        catch (Exception ex)
+        {
+            return new ProbeOutcome
+            {
+                Success = false,
+                LatencyMs = sw.ElapsedMilliseconds,
+                Detail = RecipeTrial.Short(ex)
+            };
+        }
+    }
+
     private static string ResolveWinwsPath(string zapretRoot, string? explicitPath)
     {
         if (!string.IsNullOrEmpty(explicitPath) && File.Exists(explicitPath))
@@ -135,7 +187,12 @@ public sealed class FitnessProbe
                         try
                         {
                             using var hostCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                            hostCts.CancelAfter(TimeSpan.FromSeconds(settings.ProbeTimeoutSeconds));
+                            int effectiveTimeoutSeconds = (host.Contains("googlevideo", StringComparison.OrdinalIgnoreCase) ||
+                                                           host.Contains("youtube", StringComparison.OrdinalIgnoreCase) ||
+                                                           host.Contains("twitch", StringComparison.OrdinalIgnoreCase))
+                                ? Math.Max(settings.ProbeTimeoutSeconds, 5)
+                                : Math.Max(settings.ProbeTimeoutSeconds, 3);
+                            hostCts.CancelAfter(TimeSpan.FromSeconds(effectiveTimeoutSeconds));
 
                             var address = await RecipeTrial.AddressForAsync(host, hostCts.Token);
                             if (address is null)
