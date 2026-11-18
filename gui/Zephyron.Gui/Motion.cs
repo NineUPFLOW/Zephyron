@@ -62,8 +62,30 @@ public static class Motion
             Hosts.Add(new WeakReference<Window>(window));
         }
 
-        SetStill(window, IsStill);
+        // Окно за чужим или свёрнутое тоже «стоит»: бесконечные анимации шаблонов
+        // (полосы загрузки, дуги, бег пунктира) держали отрисовку на 30–60 кадрах
+        // и в фоне — 19.11 окно ело 40–50 % ядра, с выключенными анимациями — 7 %.
+        window.Activated -= OnWindowChanged;
+        window.Activated += OnWindowChanged;
+        window.Deactivated -= OnWindowChanged;
+        window.Deactivated += OnWindowChanged;
+        window.StateChanged -= OnWindowChanged;
+        window.StateChanged += OnWindowChanged;
+
+        SetStill(window, StillFor(window));
     }
+
+    private static void OnWindowChanged(object? sender, EventArgs e)
+    {
+        if (sender is Window window)
+            SetStill(window, StillFor(window));
+    }
+
+    private static bool StillFor(Window window) =>
+        IsStill || !(_active ?? window.IsActive) || window.WindowState == WindowState.Minimized;
+
+    /// <summary>Окна проверок не активируются: <see cref="Use"/> считает их активными.</summary>
+    private static bool? _active;
 
     private static void ApplyStill()
     {
@@ -74,7 +96,7 @@ public static class Motion
             alive = Hosts.Select(h => h.TryGetTarget(out var w) ? w : null!).Where(w => w is not null).ToList();
 
         foreach (var window in alive)
-            window.Dispatcher.BeginInvoke(() => SetStill(window, still));
+            window.Dispatcher.BeginInvoke(() => SetStill(window, still || StillFor(window)));
     }
 
     /// <summary>Вызов из App.OnStartup: запускает статический конструктор до первого окна.</summary>
@@ -142,10 +164,11 @@ public static class Motion
     }
 
     /// <summary>Подставить настройки без файла — для проверок; анимации Windows — включены, если не сказано иначе.</summary>
-    internal static void Use(AppSettings settings, bool windowsAnimations = true)
+    internal static void Use(AppSettings settings, bool windowsAnimations = true, bool windowActive = true)
     {
         _cfg = settings;
         _windows = windowsAnimations;
+        _active = windowActive;
         _profile = null;
         Changed?.Invoke(null, EventArgs.Empty);
     }

@@ -114,6 +114,9 @@ public partial class MainWindow : Window
         // Свернули или скрыли — ореол точки гаснет; вернули — ShowTopDot зажжёт его снова.
         IsVisibleChanged += (_, _) => ShowTopDot();
         StateChanged += (_, _) => ShowTopDot();
+        // Ореол дышит только у окна на переднем плане — как и слой частиц.
+        Activated += (_, _) => Breathe(IsLoaded && EffectiveMode() == FieldMode.Running);
+        Deactivated += (_, _) => Breathe(false);
 
         // Слой «сеть»: курсор и клики — с корня окна, в том числе уже обработанные
         // (кнопки и поля съедают нажатие, а слой должен его видеть). Обработчики
@@ -880,13 +883,13 @@ public partial class MainWindow : Window
     /// </summary>
     /// <remarks>
     /// Единственное движение в полосе без действия человека: работающий обход
-    /// должен быть заметен краем глаза. Гаснет вместе с обходом, со скрытым
-    /// и свёрнутым окном, с выключенными анимациями и в профиле «Лёгкий»;
+    /// должен быть заметен краем глаза. Гаснет вместе с обходом, со скрытым,
+    /// свёрнутым и неактивным окном, с выключенными анимациями и в профиле «Лёгкий»;
     /// тридцать кадров в секунду. Motion.Changed останавливает его сразу.
     /// </remarks>
     private void Breathe(bool on)
     {
-        on = on && Motion.Enabled && Motion.Profile != EffectsProfile.Lite && IsVisible && WindowState != WindowState.Minimized;
+        on = on && Motion.Enabled && Motion.Profile != EffectsProfile.Lite && IsVisible && WindowState != WindowState.Minimized && IsActive;
 
         if (on == _breathing)
             return;

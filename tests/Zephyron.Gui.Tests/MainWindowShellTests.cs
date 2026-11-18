@@ -74,6 +74,30 @@ public sealed class MainWindowShellTests
     });
 
     [Fact]
+    public void A_window_in_the_background_stands_still() => Sta.Run(() =>
+    {
+        var bar = new ProgressBar { IsIndeterminate = true };
+        var window = new Window { Content = bar, ShowActivated = false };
+        window.Show();
+        Pump();
+
+        try
+        {
+            Motion.Use(new AppSettings { Effects = EffectsProfile.Full }, windowActive: false);
+            Pump();
+            Assert.True(Motion.GetStill(bar));
+
+            Motion.Use(new AppSettings { Effects = EffectsProfile.Full });
+            Pump();
+            Assert.False(Motion.GetStill(bar));
+        }
+        finally
+        {
+            window.Close();
+        }
+    });
+
+    [Fact]
     public void Template_switch_follows_Motion() => Sta.Run(() =>
     {
         Motion.Use(new AppSettings { Effects = EffectsProfile.Full });
