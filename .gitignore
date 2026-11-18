@@ -76,6 +76,9 @@ config/rules.user.yaml
 # как и сам rules.user.yaml (в них ваши маршруты и пины hosts).
 config/autopick-journal.json
 config/rules.user.before-autopick.yaml
+config/evolution-settings.json
+config/evolution/
+config/settings.json
 
 # Свои домены — файлами списков (OwnLists): личное, как и rules.user.yaml.
 config/lists/own/

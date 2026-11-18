@@ -755,6 +755,12 @@ internal static class SupervisorHost
     private static void AddTelegramProxy(List<SupervisedService> services)
     {
         var settings = AppSettings.Load(AppSettings.DefaultPath);
+        if (!TgWsProxy.IsSecret(settings.TelegramProxySecret))
+        {
+            settings = TgWsProxy.Switch(settings, true);
+            settings.Save();
+        }
+
         var executable = TgWsProxy.Executable();
 
         Console.WriteLine($"Прокси Telegram: 127.0.0.1:{settings.TelegramProxyPort}, {executable}");

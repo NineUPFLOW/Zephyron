@@ -218,6 +218,7 @@ public partial class UpdateWindow : Window
         ["dns"] = "",
         ["hosts"] = "",
         ["watch"] = "",
+        ["evolution"] = "\uE945",
         ["doctor"] = "",
         ["look"] = "",
         ["more"] = "",
