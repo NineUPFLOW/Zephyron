@@ -490,6 +490,9 @@ public static class RecipeTrial
         /// </remarks>
         public bool Stub { get; init; }
 
+        /// <summary>Ответ — проверка на робота Cloudflare (<c>cf-mitigated: challenge</c>).</summary>
+        public bool Challenge { get; init; }
+
         public static Flow Nothing(string ending) => new() { Bytes = 0, Ending = ending };
     }
 
@@ -626,6 +629,7 @@ public static class RecipeTrial
             Location = where,
             Ending = ending,
             Stub = Refused(head, total, status, where),
+            Challenge = IsChallenge(head),
         };
     }
 
@@ -657,6 +661,13 @@ public static class RecipeTrial
         }
 
         return IsStub(head, total);
+    }
+
+    /// <summary>Проверка на робота Cloudflare: заголовок <c>cf-mitigated: challenge</c>.</summary>
+    public static bool IsChallenge(string head)
+    {
+        int end = head.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+        return (end < 0 ? head : head[..end]).ToLowerInvariant().Contains("\ncf-mitigated: challenge", StringComparison.Ordinal);
     }
 
     /// <summary>Фразы отказа по стране; ищутся в теле в нижнем регистре.</summary>

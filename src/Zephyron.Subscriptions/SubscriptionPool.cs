@@ -174,8 +174,13 @@ public static class SubscriptionPool
     /// запуска, а изменившийся список предлагается перезапуском, как у
     /// перечитывания без живых выходов.
     /// </para>
+    /// <para>
+    /// 18.11 — неделя вместо суток: запас от позавчера заставлял запуск ждать молчащую
+    /// панель 12 с и всё равно брать тот же запас. Устаревший список заменится сам:
+    /// панель спрашивается сразу после запуска, и новые серверы встают перезапуском.
+    /// </para>
     /// </remarks>
-    public static readonly TimeSpan StartFromReserveFor = TimeSpan.FromHours(24);
+    public static readonly TimeSpan StartFromReserveFor = TimeSpan.FromDays(7);
 
     /// <summary>Подписка из запаса без панели — для запуска; <c>null</c> — запас не годится, читать как обычно.</summary>
     internal static PoolPart? Deferred(PoolSource source, string folder, DateTimeOffset now)

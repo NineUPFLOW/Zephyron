@@ -326,7 +326,7 @@ public sealed class SubscriptionPoolTests
         }
     }
 
-    /// <summary>Запас старше суток (после выходных) — панель ждут, как прежде.</summary>
+    /// <summary>Запас старше недели — панель ждут, как прежде (до недели запуск идёт из запаса, 18.11).</summary>
     [Fact]
     public async Task An_old_reserve_still_waits_for_the_panel()
     {
@@ -336,7 +336,7 @@ public sealed class SubscriptionPoolTests
         {
             var dead = new PoolSource("Лежит", "http://127.0.0.1:1/sub");
             SubscriptionPool.SaveReserve(folder, dead.Url, "trojan://secret@a.example:443#Германия\n");
-            Age(folder, TimeSpan.FromDays(2));
+            Age(folder, TimeSpan.FromDays(8));
 
             var part = Assert.Single((await SubscriptionPool.BuildAsync([dead], CancellationToken.None, folder, deferPanels: true)).Parts);
 

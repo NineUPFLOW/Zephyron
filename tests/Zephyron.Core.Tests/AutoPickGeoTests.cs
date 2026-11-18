@@ -143,6 +143,14 @@ public sealed class AutoPickGeoTests : IDisposable
     public void Country_refusal_follows_block_check(string head, int status, string? location, bool refused) =>
         Assert.Equal(refused, RecipeTrial.Refused(head, 100, status, location));
 
+    /// <summary>nexusmods.com 18.11: проверка Cloudflare узнаётся по заголовку, а не по телу.</summary>
+    [Theory]
+    [InlineData("HTTP/1.1 403 Forbidden\r\nCf-Mitigated: challenge\r\n\r\nJust a moment...", true)]
+    [InlineData("HTTP/1.1 403 Forbidden\r\n\r\ncf-mitigated: challenge в теле — не заголовок", false)]
+    [InlineData("HTTP/1.1 200 OK\r\n\r\n<html>", false)]
+    public void Cloudflare_challenge_is_seen_in_the_headers(string head, bool challenge) =>
+        Assert.Equal(challenge, RecipeTrial.IsChallenge(head));
+
     [Fact]
     public void Json_refusal_is_not_a_country_stub() =>
         Assert.False(RecipeTrial.IsStub(

@@ -748,6 +748,16 @@ public static class AutoPick
 
         var live = rows.Where(r => r.Skip is null).ToList();
 
+        // Открывается ли напрямую сам сервер проверки Cloudflare — спрашиваем один раз за подбор.
+        Task<bool>? challengeHost = null;
+
+        Task<bool> ChallengeHostOpens() => challengeHost ??= Task.Run(async () =>
+        {
+            const string host = "challenges.cloudflare.com";
+            var address = await RecipeTrial.AddressForAsync(host, cancellationToken);
+            return address is not null && (await RecipeTrial.OpensAsync(host, address, cancellationToken)).Status is not null;
+        });
+
         async Task<bool> Measure(AutoPickRow row, AutoPickWay way, string? recipe, string? title)
         {
             var clock = Stopwatch.StartNew();
@@ -769,6 +779,15 @@ public static class AutoPick
                         break;
                     }
                 }
+            }
+
+            // Проверка на робота Cloudflare проходится, только если браузер достанет её скрипт
+            // с challenges.cloudflare.com. Закрыт он у провайдера (18.11: nexusmods.com — бесконечная
+            // проверка напрямую) — путь не годится, и выигрывает VPN.
+            if (works && flow.Challenge && !await ChallengeHostOpens())
+            {
+                works = false;
+                partly = "сайт отвечает проверкой Cloudflare, а её сервер challenges.cloudflare.com здесь закрыт — проверка не пройдёт";
             }
 
             clock.Stop();
