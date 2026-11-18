@@ -37,6 +37,8 @@ public sealed class TgWsProxyService : SupervisedService
 
     protected override async Task BeforeStartAsync(CancellationToken cancellationToken)
     {
+        FreePort();
+
         if (Routes is null)
             return;
 
@@ -46,6 +48,37 @@ public sealed class TgWsProxyService : SupervisedService
             + (_routes.CfDomains is { Count: > 0 } first
                 ? $", домены Cloudflare первыми: {string.Join(", ", first)}"
                 : ", домены Cloudflare — общий список"));
+    }
+
+    /// <summary>
+    /// Снимает брошенный экземпляр нашего же прокси: он держит порт, и новый падает
+    /// с «cannot bind … os error 10048» на каждом перезапуске (18.11: Telegram стоял
+    /// полчаса, пока процесс от прошлого запуска не сняли руками). Перед запуском
+    /// нашего процесса нет, поэтому живой с тем же файлом — чужой хвост.
+    /// </summary>
+    private void FreePort()
+    {
+        var ours = Path.GetFullPath(_executablePath);
+
+        foreach (var process in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(ours)))
+        {
+            using (process)
+            {
+                try
+                {
+                    if (!string.Equals(process.MainModule?.FileName, ours, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    process.Kill();
+                    process.WaitForExit(3000);
+                    Note($"снят брошенный прокси от прошлого запуска (PID {process.Id}) — держал порт {_port}");
+                }
+                catch (Exception)
+                {
+                    // Ушёл сам или не даётся — запуск скажет о порте своим порядком.
+                }
+            }
+        }
     }
 
     /// <summary>Имя службы — по нему её узнаёт EngineHealth как необязательную.</summary>
