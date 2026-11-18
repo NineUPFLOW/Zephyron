@@ -24,6 +24,13 @@
 --wf-raw-part=@windivert.filter/windivert_part.wireguard.txt
 
 --blob=tls_google:@bin/tls_clienthello_www_google_com.bin
+--blob=tls_awswaf:@bin/zy-tls_clienthello_awswaf_com.bin
+--blob=tls_steam_chat:@bin/zy-tls_clienthello_steam_chat_com.bin
+--blob=tls_steamstatic:@bin/zy-tls_clienthello_steamstatic_com.bin
+--blob=tls_teamspeak:@bin/zy-tls_clienthello_teamspeak_com.bin
+--blob=quic_steam_chat:@bin/zy-quic_initial_steam_chat_com.bin
+--blob=quic_steamstatic:@bin/zy-quic_initial_steamstatic_com.bin
+--blob=quic_lemana:@bin/zy-quic_initial_lemana_pro.bin
 --blob=tls1:@bin/tls_clienthello_1.bin
 --blob=tls2:@bin/tls_clienthello_2.bin
 --blob=tls2n:@bin/tls_clienthello_2n.bin
@@ -354,12 +361,17 @@
 
 --new
 
+# Весь поток, а не первые 8 пакетов: с окном -n8 звук проходил, а видео
+# трансляции (Go Live, 104.29.x:193xx) не шло — ошибка 2012, 18.11. udplen
+# ничего не дублирует, трафик и задержка те же (см. Zephyron Adaptive).
 --name=Discord · UDP (обычно не нужно)
---filter-udp=443-65535
+# Только порты голоса: udplen на игровом UDP к Cloudflare из ipset-discord ломал бы игры,
+# а на 443 — QUIC видео YouTube (в ipset-discord сети Google 74.125/173.194): видео замирало.
+--filter-udp=19294-19344,50000-50100
 --ipset=lists/ipset-discord.txt
---out-range=-n8
+--out-range=a
 --payload=all
---lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=10:payload=all
+--lua-desync=udplen:increment=2:min=64
 
 --new
 

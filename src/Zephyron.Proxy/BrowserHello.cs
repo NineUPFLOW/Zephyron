@@ -369,6 +369,54 @@ public static class BrowserHello
     }
 
     /// <summary>
+    /// Сколько байт ответа сервер прислал на приветствие как у браузера — до <paramref name="enough"/>.
+    /// </summary>
+    /// <remarks>
+    /// ServerHello ещё не значит, что сайт откроется: 18.11 у nexusmods.com на 172.64.145.202
+    /// он приходил, а сертификат за ним — нет (0 байт против 4 КБ на 104.18.42.54).
+    /// Полный ответ сервера Cloudflare — 3–4 КБ.
+    /// </remarks>
+    public static async Task<int> FlightAsync(
+        IPAddress via,
+        string host,
+        TimeSpan wait,
+        CancellationToken cancellationToken,
+        int enough = 2048)
+    {
+        int total = 0;
+
+        try
+        {
+            using var client = new TcpClient(AddressFamily.InterNetwork);
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            limit.CancelAfter(wait);
+
+            await client.ConnectAsync(via, 443, limit.Token);
+
+            var stream = client.GetStream();
+            await stream.WriteAsync(Build(host), limit.Token);
+
+            var buffer = new byte[4096];
+
+            while (total < enough)
+            {
+                int read = await stream.ReadAsync(buffer, limit.Token);
+
+                if (read == 0)
+                    break;
+
+                total += read;
+            }
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Обрыв, молчание, нет пути — сколько успело прийти, столько и есть.
+        }
+
+        return total;
+    }
+
+    /// <summary>
     /// Читает первую запись ответа и больше ничего.
     /// </summary>
     /// <remarks>

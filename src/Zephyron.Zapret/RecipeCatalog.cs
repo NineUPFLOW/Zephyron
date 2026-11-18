@@ -254,6 +254,21 @@ public static class RecipeCatalog
             Note = "Против обрыва длинного приветствия браузера на Cloudflare. Под туннелем "
                 + "подделки ломаются — см. «Разрез по имени».",
         },
+        // 18.11: заморозка TCP к Cloudflare после ~15 КБ снимается только этим (стратегия 10
+        // пресета white sni (circular)); остальные рецепты каталога замирали на 7–21 КБ.
+        new CatalogRecipe
+        {
+            Id = "white-ya-multisplit",
+            Title = "Белое имя и разрез",
+            What = "Шлёт поддельные приветствия с именем ya.ru и сдвинутой меткой времени — фильтр "
+                + "принимает соединение за разрешённое, — затем настоящее, разрезанное по имени.",
+            Steps =
+            [
+                "fake:blob=fake_default_tls:tls_mod=rnd,dupsid,sni=ya.ru:tcp_ts=-600000:repeats=6",
+                "multisplit:pos=1,midsld",
+            ],
+            Note = "Против заморозки сайтов на Cloudflare после первых 16 КБ.",
+        },
         new CatalogRecipe
         {
             Id = "seqovl-4pda",

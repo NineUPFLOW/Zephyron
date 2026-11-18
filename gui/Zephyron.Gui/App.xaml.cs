@@ -227,6 +227,7 @@ public partial class App : Application
         DiscordVoiceWatch.Start(Dispatcher);
         VideoNodeWatch.Start(Dispatcher);
         YouTubeWatch.Start();
+        CloudflareWatch.Start();
         RobloxServerWatch.Start();
 
         // Пины к посредникам: плановая проверка раз в 6 часов при работающих движках.

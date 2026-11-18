@@ -122,6 +122,8 @@ public static class LuaModules
     public static IReadOnlySet<string> BlobsOf(ZapretPreset preset) =>
         Blob.Matches(string.Join('\n', preset.GlobalArguments))
             .Select(m => m.Groups["name"].Value)
+            // Встроенные образцы winws2 (fake_default_tls и др.) объявлять не нужно.
+            .Concat(FakeChoice.BuiltIns.Select(b => b.Id))
             .ToHashSet(StringComparer.Ordinal);
 
     private static string ReadQuietly(string path)
