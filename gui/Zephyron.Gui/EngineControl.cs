@@ -37,6 +37,9 @@ internal static class EngineControl
     /// <summary>Жив ли супервизор — в том числе поднимающийся, ещё без файла состояния.</summary>
     public static bool IsRunning => SupervisorHost.IsRunning(_spawned);
 
+    /// <summary>Процесс супервизора этого запуска движков: сменился — движки перезапускались.</summary>
+    public static int? Supervisor => _spawned;
+
     private static int _starting;
     private static int _stopping;
 

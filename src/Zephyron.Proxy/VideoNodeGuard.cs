@@ -36,6 +36,12 @@ public static class VideoNodeGuard
 
     public static readonly TimeSpan MaxAge = TimeSpan.FromHours(12);
 
+    /// <summary>
+    /// Отказ узлу, молчащему на запросы плеера (<see cref="HangTracker"/>), — коротко: ролики,
+    /// которые в кэше есть, он отдаёт быстрее всех, а проверкой его не перепроверить.
+    /// </summary>
+    public static readonly TimeSpan HangHold = TimeSpan.FromMinutes(10);
+
     /// <summary>Больше отказов в hosts не бывает: остальное решает окно или плеер сам.</summary>
     public const int MaxRefused = 32;
 
@@ -43,8 +49,8 @@ public static class VideoNodeGuard
 
     public static string StatePath => Path.Combine("runtime", "video-guard.json");
 
-    /// <summary>Имя узла, его настоящий адрес и когда отказ поставлен или проверен.</summary>
-    public sealed record Entry(string Address, DateTimeOffset At, DateTimeOffset Checked);
+    /// <summary>Имя узла, его настоящий адрес и когда отказ поставлен или проверен; <c>Hang</c> — отказ за молчание на запросы плеера.</summary>
+    public sealed record Entry(string Address, DateTimeOffset At, DateTimeOffset Checked, bool Hang = false);
 
     /// <summary>Узлы видео из кэша DNS Windows с их адресами IPv4.</summary>
     public static IReadOnlyList<(string Host, IPAddress Address)> Candidates()
@@ -157,8 +163,39 @@ public static class VideoNodeGuard
 
     /// <summary>Чьи отказы пора перепроверить, а чьи снять по возрасту.</summary>
     public static (IReadOnlyList<string> Recheck, IReadOnlyList<string> Expired) Due(IReadOnlyDictionary<string, Entry> state, DateTimeOffset now) =>
-        (state.Where(p => now - p.Value.At < MaxAge && now - p.Value.Checked >= Recheck).Select(p => p.Key).ToList(),
-         state.Where(p => now - p.Value.At >= MaxAge).Select(p => p.Key).ToList());
+        (state.Where(p => !p.Value.Hang && now - p.Value.At < MaxAge && now - p.Value.Checked >= Recheck).Select(p => p.Key).ToList(),
+         state.Where(p => now - p.Value.At >= (p.Value.Hang ? HangHold : MaxAge)).Select(p => p.Key).ToList());
+
+    /// <summary>Отказ узлам, которые молчат на запросы плеера (<see cref="HangTracker"/>), на <see cref="HangHold"/>.</summary>
+    /// <returns>Кому отказ поставлен сейчас: уже отключённые и сверх <see cref="MaxRefused"/> пропускаются.</returns>
+    public static IReadOnlyList<string> RefuseHung(IReadOnlyCollection<(string Host, IPAddress Address)> nodes, string? hostsPath = null, string? statePath = null)
+    {
+        var now = DateTimeOffset.Now;
+        var state = Load(statePath);
+        var refused = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (host, address) in nodes)
+        {
+            if (state.ContainsKey(host) || state.Count >= MaxRefused)
+                continue;
+
+            refused[host] = address.ToString();
+            state[host] = new Entry(address.ToString(), now, now, Hang: true);
+        }
+
+        if (refused.Count == 0)
+            return [];
+
+        HostsEditor.Pin(
+            refused.ToDictionary(p => p.Key, _ => Refused, StringComparer.OrdinalIgnoreCase),
+            hostsPath,
+            "узлы видео YouTube молчат на запросы плеера — отказ на время, чтобы плеер сразу взял другой",
+            refused.ToDictionary(p => p.Key, _ => Via, StringComparer.OrdinalIgnoreCase));
+
+        Save(state, statePath);
+        HostsEditor.FlushDns();
+        return refused.Keys.ToList();
+    }
 
     /// <summary>Что сделал круг сторожа: отключённые и возвращённые узлы.</summary>
     public sealed record Round(IReadOnlyList<string> Refused, IReadOnlyList<string> Restored);
