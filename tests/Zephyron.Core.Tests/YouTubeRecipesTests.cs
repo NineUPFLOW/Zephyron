@@ -69,6 +69,9 @@ public sealed class YouTubeRecipesTests : IDisposable
         YouTubeRecipes.Write(3, path);
         Assert.Equal(3, YouTubeRecipes.Read(path));
 
+        // Выбор из прошлого (другая версия, другая сеть) — снова первый способ.
+        Assert.Equal(0, YouTubeRecipes.Read(path, DateTime.UtcNow + YouTubeRecipes.Memory + TimeSpan.FromMinutes(1)));
+
         File.WriteAllText(path, "мусор");
         Assert.Equal(0, YouTubeRecipes.Read(path));
 

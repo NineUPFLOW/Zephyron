@@ -196,6 +196,19 @@
 
 --new
 
+# 23.11, отчёт того же человека на 1.8.0: с секцией выше Discord на Strict всё равно не работал,
+# на Adaptive — работал. Осталось одно отличие — голосовые серверы discord.media (управление
+# звонком по TCP): здесь их брала секция Discord по адресу (syndata+multidisorder), в Adaptive —
+# своя, отправка повтором и syndata с приветствием Google. Её и ставим.
+--name=Discord · голосовые серверы
+--filter-tcp=80,443,1080,2053,2083,2087,2096,8443
+--hostlist=lists/zy-discord-media.txt
+--out-range=-d10
+--lua-desync=send:repeats=3
+--lua-desync=syndata:blob=tls_google
+
+--new
+
 # 22.11, отчёт: прокси Telegram не доходил ни до одного моста Cloudflare, а оригинальный
 # прокси на той же сети подключился. Здесь Cloudflare по адресу не берётся, и мосты шли
 # голыми. Рецепт — секции Cloudflare из Stable: через неё у владельца прокси ходит к мостам.
