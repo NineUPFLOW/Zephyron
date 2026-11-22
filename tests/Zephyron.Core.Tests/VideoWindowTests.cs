@@ -14,7 +14,7 @@ public sealed class VideoWindowTests
         Assert.Equal("--new", profile[0]);
         Assert.Contains("--filter-l7=unknown", profile);
         Assert.Contains(profile, a => a.StartsWith("--ipset-ip=") && a.Contains("74.125.0.0/16"));
-        Assert.Equal("--lua-desync=zy_video_window:syn", profile[^1]);
+        Assert.Equal(VideoWindow.SynStep, profile[^1]);
     }
 
     [Fact]
@@ -147,5 +147,53 @@ public sealed class PanelProfileTests
         Assert.Contains("--hostlist-domains=gate.vpnomni.com,svyaz-26.ru", arguments);
         Assert.StartsWith("--lua-desync=", arguments[arguments.FindIndex(at, a => a.StartsWith("--lua-desync=", StringComparison.Ordinal))]);
         Assert.DoesNotContain("--name=Zephyron: панели подписок", WinwsCommandLine.Build(preset));
+    }
+
+    /// <summary>
+    /// Пересчёт окна встаёт последним в каждую секцию TCP, кроме секции SYN, и только при
+    /// заниженном множителе: соединение после приветствия уходит в секцию по имени.
+    /// </summary>
+    [Fact]
+    public void RampGoesLastIntoEveryTcpSectionButTheSynOne()
+    {
+        var arguments = new List<string>
+        {
+            "--wf-tcp-out=80,443",
+            "--filter-tcp=443", "--hostlist=lists/googlevideo.txt", "--lua-desync=multidisorder:pos=1",
+            "--new", "--filter-udp=443", "--lua-desync=fake:blob=quic_google",
+            "--new", "--filter-tcp=80,443", "--ipset=lists/ipset-all.txt", "--lua-desync=syndata",
+        };
+        arguments.AddRange(VideoWindow.SynProfile());
+
+        VideoWindow.Ramp(arguments);
+
+        // Две секции TCP пресета и страховка последним профилем.
+        Assert.Equal(3, arguments.Count(a => a == VideoWindow.RampStep));
+        Assert.Equal(VideoWindow.RampStep, arguments[^1]);
+        Assert.Contains("--name=Zephyron: узлы видео (окно)", arguments);
+
+        int synSection = arguments.IndexOf(VideoWindow.SynStep);
+        int synStart = arguments.LastIndexOf("--new", synSection);
+        int synEnd = arguments.IndexOf("--new", synSection);
+        Assert.DoesNotContain(VideoWindow.RampStep, arguments.Skip(synStart).Take(synEnd - synStart));
+
+        int udp = arguments.IndexOf("--filter-udp=443");
+        int next = arguments.IndexOf("--new", udp);
+        Assert.DoesNotContain(VideoWindow.RampStep, arguments.Skip(udp).Take(next - udp));
+
+        int first = arguments.IndexOf(VideoWindow.RampStep);
+        Assert.Equal(["--out-range=a", "--payload=all"], arguments.Skip(first - 2).Take(2));
+
+        // Повторный вызов ничего не удваивает.
+        VideoWindow.Ramp(arguments);
+        Assert.Equal(3, arguments.Count(a => a == VideoWindow.RampStep));
+    }
+
+    [Fact]
+    public void WithoutTheSynStepThereIsNoRamp()
+    {
+        var arguments = new List<string> { "--filter-tcp=443", "--lua-desync=syndata" };
+        VideoWindow.Ramp(arguments);
+        Assert.DoesNotContain(VideoWindow.RampStep, arguments);
     }
 }

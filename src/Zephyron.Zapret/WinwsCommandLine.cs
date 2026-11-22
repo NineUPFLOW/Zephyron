@@ -126,13 +126,16 @@ public static class WinwsCommandLine
 
         TunnelCapture.Apply(arguments, tunnelServers, tunnelFakeRange, udpOff, tunAddresses, lans);
 
+        // Малое окно с заниженным множителем: пересчёт окна — в каждой секции TCP (VideoWindow.Ramp).
+        VideoWindow.Ramp(arguments);
+
         // Строка запуска Windows — не длиннее 32 767 символов (14.11: переполнение молча
         // не давало winws2 подняться). Необязательное — исключения «напрямую» — уходит первым.
         if (Length(arguments) > SafeLength && arguments.RemoveAll(a => directList is not null && a == DirectAddresses.Exclude(directList)) > 0)
             Console.WriteLine("Строка winws2 близка к пределу Windows: сети «напрямую» из секций по адресам не исключены.");
 
         // Окну нужно подтверждение рукопожатия, а оно без данных (VideoWindow).
-        if (arguments.Any(a => a == "--lua-desync=zy_video_window:syn") && !VideoWindow.CaptureEmptyAcks(arguments))
+        if (arguments.Contains(VideoWindow.SynStep) && !VideoWindow.CaptureEmptyAcks(arguments))
             Console.WriteLine("Видео под фильтром: у пресета фильтр перехвата задан файлом, малое окно не встанет.");
 
         return arguments;

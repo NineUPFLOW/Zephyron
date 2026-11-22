@@ -85,8 +85,77 @@ public static class VideoWindow
         "--ipset-ip=" + string.Join(',', GoogleFrontEnds),
         "--out-range=-n4",
         "--payload=all",
-        "--lua-desync=zy_video_window:syn",
+        SynStep,
     ];
+
+    /// <summary>
+    /// Шаг SYN: множитель окна занижается до 1, а не снимается — малое окно до 131 КБ вместо 64,
+    /// вдвое быстрее (замер 13–14.11: 11,5–21,5 Мбит/с против 5,1–9,2 на тех же узлах; 22.11 у владельца
+    /// SYN к узлу под окном ушёл с wscale 1, и видео с него шло в 2160p).
+    /// Каждое окно такого соединения пересчитывает шаг <see cref="RampStep"/>.
+    /// </summary>
+    public const string SynStep = "--lua-desync=zy_video_window:syn:scale=1";
+
+    /// <summary>Страховочный профиль пересчёта окна на адресах Google — последним в строке.</summary>
+    public const string RampProfileName = "--name=Zephyron: узлы видео (окно)";
+
+    /// <summary>Пересчёт окна соединения с заниженным множителем — последним в каждой секции TCP.</summary>
+    public const string RampStep = "--lua-desync=zy_video_window:ramp";
+
+    /// <summary>
+    /// Дописывает пересчёт окна в конец каждой секции TCP, кроме секции SYN.
+    /// </summary>
+    /// <remarks>
+    /// После приветствия соединение уходит в секцию по своему имени — googlevideo, youtube,
+    /// свой рецепт, щит «напрямую», «Google (сервисы)», — и пересчитывать окно должна она:
+    /// иначе сервер видит окно в 128 раз меньше и соединение почти встаёт (замер 11.11:
+    /// 45 КБ за 30 с). Последним, под <c>--out-range=a</c> и <c>--payload=all</c>: шаг видит
+    /// каждый исходящий пакет, пустые подтверждения тоже, и не сдвигает диапазоны рецептов
+    /// секции. Прочим соединениям шаг не делает ничего и выключается на первом пакете.
+    /// </remarks>
+    public static void Ramp(List<string> arguments)
+    {
+        if (!arguments.Contains(SynStep))
+            return;
+
+        int end = arguments.Count;
+
+        for (int i = arguments.Count - 1; i >= -1; i--)
+        {
+            if (i >= 0 && arguments[i] != "--new")
+                continue;
+
+            int start = i + 1;
+            var section = arguments.GetRange(start, end - start);
+
+            if (section.Any(a => a.StartsWith("--filter-tcp=", StringComparison.Ordinal))
+                && !section.Contains(SynStep)
+                && !section.Contains(RampStep))
+            {
+                arguments.InsertRange(end, ["--out-range=a", "--payload=all", RampStep]);
+            }
+
+            end = i;
+        }
+
+        // Страховка последним профилем: соединение к узлу Google с заниженным множителем, чьё имя
+        // не взяла ни одна секция (обновления Chrome gvt1.com идут с тех же узлов, а общая секция
+        // Adaptive ловит сайты по именам), осталось бы без пересчёта и почти встало бы.
+        // Здесь — только пересчёт: другим соединениям шаг ничего не делает.
+        if (arguments.Contains(RampProfileName))
+            return;
+
+        arguments.AddRange(
+        [
+            "--new",
+            RampProfileName,
+            "--filter-tcp=443",
+            "--ipset-ip=" + string.Join(',', GoogleFrontEnds),
+            "--out-range=a",
+            "--payload=all",
+            RampStep,
+        ]);
+    }
 
     /// <summary>Секция ловит имена видео YouTube: в её списке googlevideo или youtube.</summary>
     public static bool IsVideoSection(IReadOnlyList<string> arguments) =>
