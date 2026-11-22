@@ -734,7 +734,6 @@ public partial class MainWindow : Window
 
         ShowState();
         ApplyBackdropKind();
-        UpdateSideValues();
     }
 
     /// <summary>Режим слоя и знака по ключу цвета состояния (ShowTopDot).</summary>
@@ -946,8 +945,7 @@ public partial class MainWindow : Window
     /// </remarks>
     private void FitNav()
     {
-        // С боковым меню сжимать нечего: пункты стоят столбцом и помещаются всегда.
-        if (Nav is null || Nav.ActualWidth <= 0 || Nav.Style == (Style)FindResource("SidePanel"))
+        if (Nav is null || Nav.ActualWidth <= 0)
             return;
 
         double room = Nav.ActualWidth - Nav.Padding.Left - Nav.Padding.Right;

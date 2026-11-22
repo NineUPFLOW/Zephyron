@@ -209,7 +209,7 @@ public partial class UpdateWindow : Window
     /// </remarks>
     internal static IReadOnlyDictionary<string, string> Glyphs { get; } = new Dictionary<string, string>
     {
-        ["status"] = "",
+        ["status"] = "",
         ["vpn"] = "",
         ["desync"] = "",
         ["routes"] = "",

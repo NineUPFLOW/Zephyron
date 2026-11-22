@@ -45,7 +45,7 @@ public static class NotesCategories
     /// <summary>В порядке меню; «Общее» — для того, чего в меню нет: обновление, трей, мастер.</summary>
     public static IReadOnlyList<NotesCategory> All { get; } =
     [
-        new("status", "Обзор", ["Главная"]),
+        new("status", "Главная", []),
         new("vpn", "VPN", ["ВПН", "Туннель"]),
         new("desync", "Десинк", []),
         new("routes", "Маршруты", []),
@@ -60,7 +60,7 @@ public static class NotesCategories
         new("look", "Оформление", []),
         // «Прочее» с 0.16: «Ещё» теперь — выпадающее меню, в котором этот
         // раздел лежит. Старое имя — синонимом: им озаглавлены прежние чейнджлоги.
-        new("more", "Настройки", ["Прочее", "Ещё"]),
+        new("more", "Прочее", ["Ещё"]),
         new("general", "Общее", []),
     ];
 
