@@ -453,8 +453,14 @@ public partial class DnsView : UserControl
             ? settings.DnsServer
             : $"{known.Name} · {known.TlsAddress}";
 
+        // Шифрованный DNS перебивает резолвер и путь: показывать выбранный резолвер при нём
+        // значило бы называть то, что не работает (22.11: «AliDNS · автовыбор» при DNSCrypt).
+        var crypt = settings.DnsCryptActive;
+
         if (settings.UseRouterDns)
             ChosenName.Text = $"Роутер · {settings.RouterDnsAddress}:53 · UDP/LAN";
+        else if (crypt is { } mode)
+            ChosenName.Text = $"{DnsCrypt.Describe(mode).Title} · шифрованный DNS";
         else if (settings.DnsAuto)
             ChosenName.Text += " · автовыбор";
         var fallback = RouterDnsConnection.ConfigWarning(settings);
@@ -485,10 +491,20 @@ public partial class DnsView : UserControl
         }
         RouterDnsSwitch.IsChecked = settings.UseRouterDns;
         RouterDnsIp.Text = settings.RouterDnsAddress;
-        TunnelMode.IsEnabled = !settings.UseRouterDns;
+        TunnelMode.IsEnabled = !settings.UseRouterDns && crypt is null;
 
-        // Автовыбор при DNS роутера хранится, но не действует (RouterDnsSettings.Select).
+        // Автовыбор при DNS роутера и при шифрованном DNS хранится, но не действует.
         AutoDnsSwitch.IsChecked = settings.DnsAuto && !settings.UseRouterDns;
+
+        // Вся карточка — кнопка: отключать надо её, иначе щелчок включал автоподбор, который не действует.
+        bool autoApplies = !settings.UseRouterDns && crypt is null;
+        AutoDnsCard.IsEnabled = autoApplies;
+        AutoDnsCard.Opacity = autoApplies ? 1 : 0.55;
+        AutoDnsLine.Text = autoApplies
+            ? "Программа сама замерит резолверы из вашего места и поставит самый быстрый по DoH. Замер повторяется при каждой проверке выше; выбор строкой ниже автовыбор выключает."
+            : settings.UseRouterDns
+                ? "Не действует, пока включён DNS роутера."
+                : "Не действует, пока включён шифрованный DNS: запросы идут в dnscrypt-proxy.";
 
         // Заполняем, не поднимая события выбора: иначе показ состояния
         // тут же записал бы его обратно в настройки и позвал уведомление
@@ -503,7 +519,10 @@ public partial class DnsView : UserControl
         _filling = false;
 
         // Цена пути — те же слова, что в мастере первого запуска.
-        TunnelHint.Text = DnsRoutes.Explain(settings);
+        TunnelHint.Text = crypt is null || settings.UseRouterDns
+            ? DnsRoutes.Explain(settings)
+            : "Запросы идут в dnscrypt-proxy на этом компьютере, шифрованно. Путь, автоподбор и резолвер из списка ниже "
+              + "сейчас не используются; выбор резолвера в списке выключит шифрованный DNS.";
     }
 
     /// <summary>
@@ -577,7 +596,7 @@ public partial class DnsView : UserControl
     /// <param name="enabled">DNS роутера уже включён — подпись говорит о включённом.</param>
     private async Task<RouterDnsCheck?> CheckRouterAsync(string address, bool enabled)
     {
-        RouterDnsSwitch.IsEnabled = RouterDnsUse.IsEnabled = RouterDnsTest.IsEnabled = false;
+        RouterDnsSwitch.IsEnabled = RouterDnsTest.IsEnabled = false;
         ShowRouterStatus("Проверяю роутер: отвечает ли он и не подменяет ли заблокированные имена…", null);
         try
         {
@@ -593,14 +612,21 @@ public partial class DnsView : UserControl
         }
         finally
         {
-            RouterDnsSwitch.IsEnabled = RouterDnsUse.IsEnabled = RouterDnsTest.IsEnabled = true;
+            RouterDnsSwitch.IsEnabled = RouterDnsTest.IsEnabled = true;
         }
     }
 
-    private async void OnRouterDnsUse(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// Enter в поле адреса: у включённого DNS роутера — смена адреса с той же проверкой.
+    /// Отдельной кнопки «Включить» нет: она делала то же, что выключатель (владелец 22.11: «зачем 2 кнопки?»).
+    /// </summary>
+    private async void OnRouterDnsIpKey(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (await SaveRouterDnsAsync())
-            RouterDnsSwitch.IsChecked = true;
+        if (e.Key != System.Windows.Input.Key.Enter || RouterDnsSwitch.IsChecked != true)
+            return;
+
+        e.Handled = true;
+        await SaveRouterDnsAsync();
     }
 
     private async void OnRouterDnsToggle(object sender, RoutedEventArgs e)
@@ -878,7 +904,7 @@ public partial class DnsView : UserControl
     {
         var settings = AppSettings.Load(AppSettings.DefaultPath);
 
-        if (!settings.DnsAuto || settings.UseRouterDns)
+        if (!settings.DnsAuto || settings.UseRouterDns || settings.DnsCryptActive is not null)
             return;
 
         if (DnsSurvey.Fastest(all) is not { TlsAddress: { } address } best)

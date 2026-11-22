@@ -215,7 +215,7 @@
                 в туннель, — после каждого обзора. Выбор строкой ниже
                 автовыбор выключает.
             -->
-            <Button Style="{StaticResource Choice}" Margin="0,14,0,0" Click="OnAutoDns"
+            <Button x:Name="AutoDnsCard" Style="{StaticResource Choice}" Margin="0,14,0,0" Click="OnAutoDns"
                     Selector.IsSelected="{Binding IsChecked, ElementName=AutoDnsSwitch, Mode=OneWay}">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -255,8 +255,8 @@
                                Text="ВАЖНО: режим для роутера со своим DoH/DoT (https-dns-proxy, stubby). Если он пересылает обычный DNS провайдеру, YouTube и домены под десинком могут получить NXDOMAIN или заглушку. Если нужная LAN не найдена, включится запасной DoH с предупреждением; PBR роутера может перестать действовать." />
                     <WrapPanel Margin="0,14,0,0">
                         <TextBox x:Name="RouterDnsIp" Width="170" Margin="0,0,8,6" VerticalContentAlignment="Center"
-                                 ToolTip="LAN IPv4 роутера, например 192.168.1.1" />
-                        <Button x:Name="RouterDnsUse" Style="{StaticResource Ghost}" Content="Включить" Click="OnRouterDnsUse" Margin="0,0,8,6" />
+                                 KeyDown="OnRouterDnsIpKey"
+                                 ToolTip="LAN IPv4 роутера, например 192.168.1.1. Включается выключателем выше; сменить адрес у включённого — Enter" />
                         <Button x:Name="RouterDnsTest" Style="{StaticResource Ghost}" Content="Опросить роутер" Click="OnRouterDnsTest" Margin="0,0,0,6" />
                     </WrapPanel>
                     <TextBlock x:Name="RouterDnsStatus" Style="{StaticResource Caption}" Margin="0,6,0,0" TextWrapping="Wrap"
