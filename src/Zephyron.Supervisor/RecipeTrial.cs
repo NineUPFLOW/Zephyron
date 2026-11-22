@@ -1,7 +1,9 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
+using System.Text.Json;
 using Zephyron.Zapret;
 
 namespace Zephyron.Supervisor;
@@ -93,6 +95,14 @@ public static class RecipeTrial
             RedirectStandardError = true,
         };
 
+        var exeDir = Path.GetDirectoryName(Path.GetFullPath(winws));
+        if (!string.IsNullOrEmpty(exeDir) && Directory.Exists(exeDir))
+        {
+            var curPath = start.EnvironmentVariables["PATH"] ?? Environment.GetEnvironmentVariable("PATH") ?? "";
+            if (!curPath.Contains(exeDir, StringComparison.OrdinalIgnoreCase))
+                start.EnvironmentVariables["PATH"] = exeDir + Path.PathSeparator + curPath;
+        }
+
         foreach (var argument in arguments)
             start.ArgumentList.Add(argument);
 
@@ -112,7 +122,23 @@ public static class RecipeTrial
             await ReadyAsync(process, cancellationToken);
 
             if (process.HasExited)
-                return Elevated() ? "winws2 не поднялся" : "winws2 не поднялся: окно без прав администратора";
+            {
+                string? stderr = null;
+                try
+                {
+                    stderr = (await process.StandardError.ReadToEndAsync(cancellationToken)).Trim();
+                }
+                catch
+                {
+                }
+
+                if (!string.IsNullOrWhiteSpace(stderr))
+                    return $"winws2: {stderr}";
+
+                return Elevated()
+                    ? $"winws2 завершился с кодом {process.ExitCode}"
+                    : "winws2 не поднялся: окно без прав администратора";
+            }
 
             await body();
 
@@ -774,10 +800,49 @@ public static class RecipeTrial
     /// остановиться.
     /// </para>
     /// </remarks>
+    private static readonly ConcurrentDictionary<string, IPAddress> DnsCache = new(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly HttpClient DohHttpClient = new(new SocketsHttpHandler
+    {
+        ConnectTimeout = TimeSpan.FromSeconds(2),
+        PooledConnectionLifetime = TimeSpan.FromMinutes(10)
+    })
+    {
+        Timeout = TimeSpan.FromSeconds(3)
+    };
+
+    private static readonly IReadOnlyDictionary<string, string> KnownHostIps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["www.youtube.com"] = "142.251.156.4",
+        ["youtube.com"] = "142.251.156.4",
+        ["m.youtube.com"] = "142.251.156.4",
+        ["googlevideo.com"] = "142.250.187.206",
+        ["discord.com"] = "162.159.138.232",
+        ["gateway.discord.gg"] = "162.159.138.232",
+        ["cdn.discordapp.com"] = "162.159.138.232",
+        ["twitch.tv"] = "151.101.66.167",
+        ["www.twitch.tv"] = "151.101.66.167",
+        ["instagram.com"] = "157.240.247.174",
+        ["www.instagram.com"] = "157.240.247.174",
+        ["rutracker.org"] = "104.21.32.39",
+        ["nnmclub.to"] = "104.21.75.98",
+        ["ntc.party"] = "172.67.182.196",
+        ["stun.l.google.com"] = "74.125.250.129",
+        ["stun1.l.google.com"] = "142.250.187.127",
+    };
+
+    /// <summary>
+    /// Разрешает адрес имени: сначала пробует локальный DNS Windows, затем безопасный DoH (Cloudflare/Google),
+    /// а при их блокировке — резервные статические Anycast адреса.
+    /// </summary>
     public static async Task<IPAddress?> AddressForAsync(
         string host,
         CancellationToken cancellationToken)
     {
+        if (DnsCache.TryGetValue(host, out var cached))
+            return cached;
+
+        // 1. Проверяем локальный/системный DNS
         foreach (var name in HostNames.ZoneChain(host))
         {
             try
@@ -788,11 +853,89 @@ public static class RecipeTrial
                     a.AddressFamily == AddressFamily.InterNetwork) ?? found.FirstOrDefault();
 
                 if (address is not null)
+                {
+                    DnsCache[host] = address;
                     return address;
+                }
             }
             catch (Exception)
             {
                 // Не разрешилось — спросим про предка.
+            }
+        }
+
+        // 2. DoH: запрос через Cloudflare и Google DNS-over-HTTPS (обходит блокировку UDP 53)
+        var dohAddress = await QueryDohAsync(host, cancellationToken);
+        if (dohAddress is not null)
+        {
+            DnsCache[host] = dohAddress;
+            return dohAddress;
+        }
+
+        // 3. Статический Anycast каталог
+        if (KnownHostIps.TryGetValue(host, out var ipStr) && IPAddress.TryParse(ipStr, out var staticIp))
+        {
+            DnsCache[host] = staticIp;
+            return staticIp;
+        }
+
+        foreach (var (knownHost, knownIp) in KnownHostIps)
+        {
+            if (host.EndsWith("." + knownHost, StringComparison.OrdinalIgnoreCase) && IPAddress.TryParse(knownIp, out var suffixIp))
+            {
+                DnsCache[host] = suffixIp;
+                return suffixIp;
+            }
+        }
+
+        return null;
+    }
+
+    private static async Task<IPAddress?> QueryDohAsync(string host, CancellationToken ct)
+    {
+        string[] dohUrls =
+        [
+            $"https://cloudflare-dns.com/dns-query?name={Uri.EscapeDataString(host)}&type=A",
+            $"https://dns.google/resolve?name={Uri.EscapeDataString(host)}&type=A"
+        ];
+
+        foreach (var url in dohUrls)
+        {
+            if (ct.IsCancellationRequested)
+                break;
+
+            try
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Get, url);
+                req.Headers.TryAddWithoutValidation("Accept", "application/dns-json");
+
+                using var resp = await DohHttpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+                if (!resp.IsSuccessStatusCode)
+                    continue;
+
+                using var stream = await resp.Content.ReadAsStreamAsync(ct);
+                using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+
+                if (doc.RootElement.TryGetProperty("Answer", out var answerArray) &&
+                    answerArray.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in answerArray.EnumerateArray())
+                    {
+                        if (item.TryGetProperty("data", out var dataProp))
+                        {
+                            var candidate = dataProp.GetString();
+                            if (!string.IsNullOrEmpty(candidate) && IPAddress.TryParse(candidate, out var parsedIp) &&
+                                parsedIp.AddressFamily == AddressFamily.InterNetwork)
+                            {
+                                return parsedIp;
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Пробуем следующий источник
             }
         }
 
