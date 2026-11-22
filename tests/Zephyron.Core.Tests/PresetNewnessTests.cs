@@ -60,6 +60,21 @@ public sealed class PresetNewnessTests
         Assert.Equal(["Default v5 (game filter)", "Default v1 (game filter)", "ALL TCP & UDP multisplit_stun"], theirs);
     }
 
+    /// <summary>Наши пресеты — сверху: Adaptive, за ним Stable и Strict, затем пронумерованные.</summary>
+    [Fact]
+    public void Our_presets_come_first()
+    {
+        (string Name, string? Version)[] presets =
+        [
+            ("Universal V12 Lite", "2.26"), ("Zephyron Strict", "1.0"), ("ALL TCP & UDP multisplit_stun", null),
+            ("Zephyron Adaptive", "1.0"), ("Default v5 (game filter)", null), ("Zephyron Stable", "1.0"),
+        ];
+
+        Assert.Equal(
+            ["Zephyron Adaptive", "Zephyron Stable", "Zephyron Strict", "Universal V12 Lite", "Default v5 (game filter)", "ALL TCP & UDP multisplit_stun"],
+            PresetNewness.Order(presets, p => p.Name, p => p.Version).Select(p => p.Name));
+    }
+
     /// <summary>Без номера в имени решает версия шапки, как в макете владельца: Mega Lite 2.10 над Россией 2.03.</summary>
     [Fact]
     public void Without_a_number_the_header_version_decides()

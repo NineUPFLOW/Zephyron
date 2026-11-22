@@ -42,13 +42,16 @@ env:
   # осознанно, вместе с проверкой вживую.
   SINGBOX_URL: https://github.com/shtorm-7/sing-box-extended/releases/download/v1.14.3-extended-2.7.3/sing-box-1.14.3-extended-2.7.3-windows-amd64.zip
   SINGBOX_DIR: sing-box-1.14.3-extended-2.7.3-windows-amd64
-  TGWS_URL: https://github.com/valnesfjord/tg-ws-proxy-rs/releases/download/v2.7.0/tg-ws-proxy-x86_64-pc-windows-gnu.zip
+  TGWS_URL: https://github.com/valnesfjord/tg-ws-proxy-rs/releases/download/v2.7.2/tg-ws-proxy-x86_64-pc-windows-gnu.zip
+  TGWS_SHA256: eeaa98e1fcba72de7db4f7d328ed8f79e6cb79d3fcafe45c90e5f42436f99546
   # dnscrypt-proxy (ISC): шифрованный DNS. Хеш — защита от подмены архива.
-  DNSCRYPT_URL: https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/2.1.20/dnscrypt-proxy-win64-2.1.20.zip
-  DNSCRYPT_SHA256: 9e498cb9bdbae57756db19ce516362ac307e9340a6996214964cfcc7c489abc3
-  WINWS2_URL: https://git.zapret.moe/zapretdiscordyoutube/zapret2-fork/releases/download/v1.0.7-34-gfd8ae05-native/winws2.exe
+  DNSCRYPT_URL: https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/2.1.21/dnscrypt-proxy-win64-2.1.21.zip
+  DNSCRYPT_SHA256: d4eaf32b53ed47351d7d4a92675fecd578f1a47f4fcdda0b31464ee6132ee033
+  # Сборка форка живёт недолго: старые выпуски там удаляются (22.11 закреплённый дал 404).
+  # Проверенный файл лежит в служебном черновике «engines» этого репозитория.
+  WINWS2_TAG: v1.0.7-34-gfd8ae05-native-3-g0de505f-native-106-gf01107c-native
   # Чужой сервер, а движок работает с правами администратора: файл сверяется по хешу.
-  WINWS2_SHA256: b24d1e85907ac2c7bd597ed14e70919e091479500a40083a54027af7c1136dee
+  WINWS2_SHA256: cac7f62890e684e867204dfb8bf690d4f92e672d45df0aac4537d972556863df
 
 jobs:
   release:
@@ -91,15 +94,18 @@ jobs:
           cp "$MSQUIC" stage/Zephyron/
 
       - name: Скачать движки
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -e
           mkdir -p dl
           curl -fsSL -o dl/singbox.zip "$SINGBOX_URL"
           curl -fsSL -o dl/tgws.zip "$TGWS_URL"
-          curl -fsSL -o dl/winws2.exe "$WINWS2_URL"
+          gh release download engines --repo "$GITHUB_REPOSITORY" --pattern winws2.exe --dir dl
           curl -fsSL -o dl/dnscrypt.zip "$DNSCRYPT_URL"
           echo "$DNSCRYPT_SHA256  dl/dnscrypt.zip" | sha256sum -c -
           echo "$WINWS2_SHA256  dl/winws2.exe" | sha256sum -c -
+          echo "$TGWS_SHA256  dl/tgws.zip" | sha256sum -c -
           unzip -q dl/singbox.zip -d dl/singbox
           unzip -q dl/tgws.zip -d dl/tgws
           unzip -q dl/dnscrypt.zip -d dl/dnscrypt

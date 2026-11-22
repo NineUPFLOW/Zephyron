@@ -1825,7 +1825,7 @@ public partial class StatusView : UserControl
         {
             if (AutostartTask.IsInstalled(AutostartTask.DefaultTaskName))
             {
-                var (removed, output) = AutostartTask.Remove(AutostartTask.DefaultTaskName);
+                var (removed, output) = Autostart.TurnOff();
 
                 if (!removed)
                     ShowProblem("Автозапуск не убрался: " + output);
