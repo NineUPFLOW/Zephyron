@@ -184,6 +184,18 @@
 
 --new
 
+# 22.11, отчёт (Ростелеком): Discord не открывался на Strict и Stable, а на Adaptive открывался.
+# Разница — рецепт: здесь Discord брали «Мои сайты» и секция Discord ниже (syndata+multidisorder),
+# в Adaptive — подделки имён google.com/vimeo.com. Он и стоит здесь, по именам Discord, выше них.
+--name=Discord · переписка и обновления
+--filter-tcp=80,443,1080,2053,2083,2087,2096,8443
+--hostlist=lists/zy-discord.txt
+--hostlist=lists/zy-discord-updates.txt
+--out-range=-d10
+--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2
+
+--new
+
 --name=Мои сайты
 --filter-tcp=80,443-65535
 --ipset=lists/ipset-all.txt

@@ -184,6 +184,20 @@
 
 --new
 
+# 22.11, отчёт (Ростелеком): Discord не открывался на Stable и Strict, а на Adaptive открывался.
+# Разница — рецепт: здесь Discord брала секция Cloudflare ниже (подделка ya.ru) или
+# syndata+multidisorder, в Adaptive — подделки имён google.com/vimeo.com. Он и стоит здесь:
+# по именам Discord, выше секции Cloudflare. discord.media (трансляции) в списках нет —
+# его по-прежнему берёт секция Cloudflare: у Билайна без неё трансляция рвётся (ошибка 2012).
+--name=Discord · переписка и обновления
+--filter-tcp=80,443,1080,2053,2083,2087,2096,8443
+--hostlist=lists/zy-discord.txt
+--hostlist=lists/zy-discord-updates.txt
+--out-range=-d10
+--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2
+
+--new
+
 # 18.11: провайдер замораживает TCP к Cloudflare после ~15 КБ — на всех адресах и при
 # любом прежнем рецепте; страница проверки на nexusmods крутится вечно, у трансляций
 # Discord рвётся управляющий канал (*.discord.media:2053/2083/2087, ошибка 2012).
