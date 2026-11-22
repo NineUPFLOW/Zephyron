@@ -99,7 +99,11 @@ public sealed class PinRefreshTests
             Assert.NotEmpty(s.Fallback);
             Assert.StartsWith("/", s.Path);
             Assert.Matches("^[a-z0-9-]+$", s.Key);
+            Assert.All(s.Fallback.Concat(s.Plain ?? []), a => Assert.True(System.Net.IPAddress.TryParse(a, out _), a));
         });
+
+        // Без DoH остаются те, у кого есть обычный DNS: 22.11 у GeoHide EU не открывался DoH.
+        Assert.True(IntermediaryDns.Servers.Count(s => s.Plain is { Count: > 0 }) >= 5);
 
         Assert.Equal(IntermediaryDns.Servers.Count, IntermediaryDns.Servers.Select(s => s.Key).Distinct().Count());
 

@@ -1,0 +1,16 @@
+# Minecraft: моды, загрузчики и лаунчер.
+#
+# Замер 22.11 у владельца (Билайн, Zephyron Stable): все отвечают и без VPN —
+# modrinth.com, api.modrinth.com, curseforge.com, edge.forgecdn.net,
+# files.minecraftforge.net, meta.fabricmc.net, maven.fabricmc.net, quiltmc.org,
+# prismlauncher.org, neoforged.net; maven.neoforged.net — только с пином из
+# каталога адресов (catalog.yaml), его адреса из DNS закрыты.
+# Список нужен, чтобы путь можно было выбрать сервису целиком.
+modrinth.com
+curseforge.com
+forgecdn.net
+minecraftforge.net
+fabricmc.net
+neoforged.net
+quiltmc.org
+prismlauncher.org
