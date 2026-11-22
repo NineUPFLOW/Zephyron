@@ -277,7 +277,8 @@
                                     её ширина берётся по содержимому и отнимается у слова
                                     и пояснения слева.
                                 -->
-                                <StackPanel Grid.Column="2" VerticalAlignment="Top" HorizontalAlignment="Right">
+                                <!-- С 1.8.1 обход включают кнопкой в боковом меню (MainWindow.OnPower): здесь её дубль. -->
+                                <StackPanel Grid.Column="2" VerticalAlignment="Top" HorizontalAlignment="Right" Visibility="Collapsed">
                                     <Grid HorizontalAlignment="Right">
                                         <Button x:Name="StartButton" Style="{StaticResource Primary}" Height="40" MinWidth="150" Padding="22,0"
                                                 Click="OnStart" Visibility="Collapsed"

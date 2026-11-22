@@ -1862,9 +1862,11 @@ public partial class StatusView : UserControl
     /// <summary>Ctrl+Enter: та кнопка, что сейчас на виду, — «Запустить» или «Остановить».</summary>
     internal void Toggle()
     {
-        if (StartButton is { IsVisible: true, IsEnabled: true })
+        // По своей Visibility, а не IsVisible: колонка кнопок скрыта (их место — в боковом меню),
+        // и IsVisible у обеих ложно всегда.
+        if (StartButton is { Visibility: Visibility.Visible, IsEnabled: true })
             OnStart(StartButton, new RoutedEventArgs());
-        else if (StopButton is { IsVisible: true, IsEnabled: true })
+        else if (StopButton is { Visibility: Visibility.Visible, IsEnabled: true })
             OnStop(StopButton, new RoutedEventArgs());
     }
 

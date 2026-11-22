@@ -195,34 +195,32 @@ public sealed class FixesSignalTests
 
     // 6
     [Fact]
-    public void Nav_indicator_moves_by_transform_with_fixed_width() => Sta.Run(() =>
+    public void Side_menu_marks_the_section_itself_and_shows_section_states() => Sta.Run(() =>
     {
+        var window = new MainWindow { ShowActivated = false };
+        window.Show();
+        Pump();
+
         try
         {
-            Motion.Use(new AppSettings { Effects = EffectsProfile.Full });
+            // С боковым меню выбор отмечает сам пункт, черта прежней полосы скрыта.
+            var bar = (Rectangle)window.FindName("NavIndicator");
+            Assert.False(bar.IsVisible, "черта верхней полосы видна при боковом меню");
 
-            var window = new MainWindow { ShowActivated = false };
-            window.Show();
-            Pump();
+            var home = (RadioButton)window.FindName("RailStatus");
+            Assert.True(home.IsChecked);
+            Assert.Equal("Обзор", home.Content);
 
-            try
-            {
-                var bar = (Rectangle)window.FindName("NavIndicator");
-                var scale = (ScaleTransform)window.FindName("NavScale");
+            // У ежедневных разделов справа — их состояние.
+            var vpn = (RadioButton)window.FindName("SideVpn");
+            Assert.Contains(SideValue.GetText(vpn), new[] { "Вкл", "Выкл" });
 
-                Assert.Equal(MainWindow.IndicatorBase, bar.Width);
-                Assert.False(bar.HasAnimatedProperties, "у черты анимируется свойство раскладки");
-                Assert.True(scale.ScaleX > 0, "черта не поставлена");
-                Assert.IsType<DropShadowEffect>(bar.Effect);
-            }
-            finally
-            {
-                Close(window);
-            }
+            var power = (TextBlock)window.FindName("PowerLabel");
+            Assert.Contains(power.Text, new[] { "Включить обход", "Выключить обход" });
         }
         finally
         {
-            Motion.Use(new AppSettings());
+            Close(window);
         }
     });
 

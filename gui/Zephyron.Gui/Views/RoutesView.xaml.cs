@@ -555,6 +555,22 @@ public sealed record ServiceRow(string Name, IReadOnlyList<PartRow> Parts) : INo
         }
     }
 
+    /// <summary>Части, путь которых можно менять, — их и меняет кнопка пути всего сервиса.</summary>
+    public IReadOnlyList<PartRow> Routable => Parts.Where(p => p.CanRoute).ToList();
+
+    /// <summary>Кнопка пути всего сервиса — где частей больше одной: у одной есть своя кнопка.</summary>
+    public Visibility GroupRouteShown => Routable.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>Путь сервиса словом на кнопке: общий для всех частей или «разные».</summary>
+    public string GroupRouteLabel
+    {
+        get
+        {
+            var labels = Routable.Select(p => p.RouteLabel).Distinct().ToList();
+            return labels.Count == 1 ? labels[0] : "разные";
+        }
+    }
+
     /// <summary>Цвет итога; при расхождении — приглушённый, чтобы не выдавать одну часть за весь сервис.</summary>
     public Brush Color =>
         Parts.Select(p => p.Route).Distinct().Count() == 1 && Parts.Count > 0

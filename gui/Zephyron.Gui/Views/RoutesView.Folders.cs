@@ -1,7 +1,9 @@
 using System.Windows;
 using System.Windows.Controls;
 using Zephyron.Core;
+using Zephyron.Core.Rules;
 using Zephyron.Core.Services;
+using Zephyron.Proxy;
 
 namespace Zephyron.Gui.Views;
 
@@ -18,6 +20,107 @@ public partial class RoutesView
 {
     /// <summary>Папка, в которую ляжет следующий добавленный свой маршрут; <c>null</c> — никуда.</summary>
     private string? _addInto;
+
+    /// <summary>Путь всего сервиса: то же окно пути, выбор — всем частям сразу.</summary>
+    private void OnFolderRoute(object sender, RoutedEventArgs e)
+    {
+        // Кнопка внутри шапки папки: без этого щелчок ещё и свернул бы папку.
+        e.Handled = true;
+
+        if (sender is FrameworkElement { DataContext: ServiceRow folder })
+            Dispatcher.BeginInvoke(() => AskGroupPath(folder), System.Windows.Threading.DispatcherPriority.Background);
+    }
+
+    private void AskGroupPath(ServiceRow folder)
+    {
+        var parts = folder.Routable;
+
+        if (parts.Count == 0)
+            return;
+
+        static PathPick Pick(PartRow row) => !row.Explicit && row.DefaultLabel is not null
+            ? PathPick.Default
+            : row.Applied switch { 0 => PathPick.Direct, 1 => PathPick.Desync, PartRow.Off => PathPick.Off, _ => PathPick.Proxy };
+
+        var picks = parts.Select(Pick).Distinct().ToList();
+        var defaults = parts.Select(p => p.DefaultLabel).Distinct().ToList();
+
+        var window = new PathWindow(folder.Shown + " — все части", picks.Count == 1 ? picks[0] : PathPick.Default,
+            parts.Select(p => p.PoolId).Distinct().Count() == 1 ? parts[0].PoolId : null,
+            defaults.Count == 1 ? defaults[0] : "у каждой части своё",
+            canRecipe: false,
+            "Чинит пресет. Свой рецепт части останется, если она уже на десинке.", _pools)
+        {
+            Owner = Window.GetWindow(this),
+            PoolsHint = _path == TunnelPath.Warp ? "Туннель идёт через WARP: пулы серверов работают с VPN."
+                : !_tunnelOn ? "Режим «Десинк»: туннеля нет, пока режим не сменён на «Главной», такой маршрут идёт через десинк." : null,
+        };
+
+        if (window.ShowDialog() != true)
+            return;
+
+        try
+        {
+            var file = UserRulesFile.Load();
+            int changed = 0;
+
+            foreach (var row in parts)
+            {
+                if (RouteKeys.Parse(row.Key) is not var (kind, value))
+                    continue;
+
+                var match = RouteKeys.MatchOf(kind, value);
+                var within = ServiceCatalog.All.SelectMany(s => s.Parts)
+                    .FirstOrDefault(p => string.Equals(p.List, value, StringComparison.OrdinalIgnoreCase))?.Within;
+
+                switch (window.Picked)
+                {
+                    case PathPick.Default:
+                        if (row.Explicit && file.Remove(match, value))
+                            changed++;
+                        break;
+
+                    case PathPick.Direct:
+                        file.Set(match, value, RoutingMode.Direct, recipe: null, before: within);
+                        changed++;
+                        break;
+
+                    // Часть уже на десинке со своим рецептом — его не трогаем: выбран путь, а не рецепт.
+                    case PathPick.Desync when row.Explicit && row.Applied == 1:
+                        break;
+
+                    case PathPick.Desync:
+                        file.Set(match, value, RoutingMode.Desync, recipe: null, before: within);
+                        changed++;
+                        break;
+
+                    case PathPick.Proxy:
+                        file.Set(match, value, RoutingMode.Proxy, recipe: null, before: within,
+                            server: window.Pool is { } pool ? ServerPools.RuleServer(pool) : null);
+                        changed++;
+                        break;
+
+                    case PathPick.Off:
+                        file.SetOff(match, value, before: within);
+                        changed++;
+                        break;
+                }
+            }
+
+            if (changed == 0)
+                return;
+
+            file.Save();
+            Reload();
+
+            Status.Text = $"«{folder.Shown}»: путь сменён у частей — {changed}. Вступит в силу после следующего запуска движков.";
+            this.Offer("Маршрут изменён");
+        }
+        catch (Exception ex)
+        {
+            Status.Text = "Не записалось: " + ex.GetBaseException().Message;
+        }
+    }
 
     /// <summary>«Добавить папку»: пустая папка, куда перетаскивают маршруты.</summary>
     private void OnAddFolder(object sender, RoutedEventArgs e)
