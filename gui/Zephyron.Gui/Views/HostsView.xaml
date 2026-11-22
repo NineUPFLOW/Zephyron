@@ -249,7 +249,7 @@
                             <TextBlock x:Name="DeadGlyph" Style="{StaticResource StatGlyph}" Text="&#xE783;" />
                             <StackPanel Grid.Column="1">
                                 <TextBlock x:Name="DeadText" Text="—" Style="{StaticResource StatNumber}" />
-                                <TextBlock x:Name="DeadCaption" Text="не отвечают: не проверялось" Style="{StaticResource Caption}"
+                                <TextBlock x:Name="DeadCaption" Text="ещё не проверяли" Style="{StaticResource Caption}"
                                            TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                         </Grid>

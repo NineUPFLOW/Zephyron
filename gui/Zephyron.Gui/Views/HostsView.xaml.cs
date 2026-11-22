@@ -183,7 +183,7 @@ public partial class HostsView : UserControl
         if (!_checked)
         {
             DeadText.Text = "—";
-            DeadCaption.Text = "не отвечают: не проверялось";
+            DeadCaption.Text = "ещё не проверяли";
             DeadGlyph.SetResourceReference(TextBlock.ForegroundProperty, "Faint");
             return;
         }
