@@ -434,7 +434,13 @@ public static class Doctor
         {
             var engine = RuleSetLoader.LoadFor(settings);
 
-            var problems = RuleSetExpander.Expand(engine.RuleSet, ZapretPaths.Discover()?.Root);
+            var problems = RuleSetExpander.Expand(engine.RuleSet, ZapretPaths.Discover()?.Root).ToList();
+
+            // Адреса правила программы копятся, пока она ходит в сеть: пустой список у
+            // программы, которую ещё не запускали, — не поломка (отчёт 22.11: java.exe
+            // и лаунчер стояли красным у человека, у которого всё работало).
+            int learning = problems.RemoveAll(p => p.Contains(ProgramRoutes.Folder, StringComparison.OrdinalIgnoreCase)
+                && p.Contains("список пуст", StringComparison.Ordinal));
 
             int own = engine.RuleSet.Rules.Count(r => r.Source == RuleSource.User);
 
@@ -443,6 +449,9 @@ public static class Doctor
 
             // Ненайденный список не совпадает ни с чем, оставаясь на вид живым:
             // правило есть, а трафик мимо.
+            if (learning > 0)
+                lines.Add(Ok($"Адреса программ ещё копятся: {learning} — заполнятся, когда программа выйдет в сеть."));
+
             lines.Add(problems.Count == 0
                 ? Ok("Все списки на месте.")
                 : Bad($"Списков не нашлось: {problems.Count}. Эти правила не действуют — "

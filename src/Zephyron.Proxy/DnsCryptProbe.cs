@@ -139,6 +139,10 @@ public static class DnsCryptProbe
         return new(default, times[times.Count / 2], string.Empty);
     }
 
+    /// <summary>Ответил ли резолвер на петле адресами на вопрос об имени — готов ли он работать.</summary>
+    public static async Task<bool> AnswersAsync(int port, string name, CancellationToken cancellationToken) =>
+        (await AskAsync(port, name, cancellationToken)).Ms is not null;
+
     /// <summary>Один вопрос по UDP к петле.</summary>
     internal static async Task<(double? Ms, DnsWire.Answer? Answer)> AskAsync(int port, string name, CancellationToken cancellationToken)
     {

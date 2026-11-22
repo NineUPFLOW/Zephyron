@@ -10,18 +10,19 @@ public sealed record HostsRepeat
 
     public required string Address { get; init; }
 
-    /// <summary>Строка, которая действует: Windows берёт первую запись имени.</summary>
+    /// <summary>Первая строка этого имени в файле.</summary>
     public required int FirstLine { get; init; }
 
     public required string FirstAddress { get; init; }
 
     /// <summary>
-    /// Другой адрес, чем у действующей записи.
+    /// Другой адрес, чем у первой записи, — и в другом месте файла.
     /// </summary>
     /// <remarks>
-    /// Такой повтор не безвреден, а обманчив: в файле видно «имя → B»,
-    /// а работает «имя → A» строкой выше. Снявший первую запись получит
-    /// вторую — и решит, что снятие не сработало.
+    /// Windows отдаёт программам все адреса имени (замер 22.11), так что такая
+    /// строка действует наравне с первой: имя ведут сразу два хозяина, и программа
+    /// может пойти по любому. Второй адрес в том же блоке — это не повтор, а запасной
+    /// адрес пина, и в отчёт он не попадает.
     /// </remarks>
     public bool Conflicts => !string.Equals(Address, FirstAddress, StringComparison.OrdinalIgnoreCase);
 
@@ -61,9 +62,10 @@ public sealed record HostsDuplicateReport
 /// <remarks>
 /// <para>
 /// Замер 23.09 на живом файле: все имена Claude прибиты дважды к одному
-/// адресу — нашим блоком и блоком ZapretGUI ниже. Windows берёт первую
-/// запись имени, так что вторая ничего не делает, но в редакторе выглядит
-/// рабочей, и снявший наш пин продолжал бы ходить по чужому.
+/// адресу — нашим блоком и блоком ZapretGUI ниже. Повтор с тем же адресом
+/// ничего не добавляет, а с другим адресом из другого блока — действует наравне
+/// с первым: Windows отдаёт все адреса имени (замер 22.11), и снявший наш пин
+/// продолжал бы ходить по чужому.
 /// </para>
 /// <para>
 /// Только чтение. Убирает строки <see cref="HostsEditor.Remove"/> — с копией
@@ -109,6 +111,14 @@ public static class HostsDuplicates
                 if (!first.TryGetValue(name, out var earlier))
                 {
                     first[name] = (entry.Line, entry.Address);
+                    allSame = false;
+                    continue;
+                }
+
+                // Другой адрес в том же блоке — запасной адрес того же пина, не повтор.
+                if (!string.Equals(entry.Address, earlier.Address, StringComparison.OrdinalIgnoreCase)
+                    && blocks.GetValueOrDefault(entry.Line) == blocks.GetValueOrDefault(earlier.Line))
+                {
                     allSame = false;
                     continue;
                 }

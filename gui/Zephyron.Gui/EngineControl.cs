@@ -184,6 +184,14 @@ internal static class EngineControl
     {
         var settings = AppSettings.Load(AppSettings.DefaultPath);
         var note = string.Empty;
+        var stage = System.Diagnostics.Stopwatch.StartNew();
+        var stages = new List<string>();
+
+        void Took(string what)
+        {
+            stages.Add($"{what} {stage.Elapsed.TotalSeconds:0.0} с");
+            stage.Restart();
+        }
 
         // Конфиг собирается при каждом запуске: иначе смена сервера, правки
         // маршрутов и переключение режима показываются новыми, а до туннеля
@@ -202,6 +210,8 @@ internal static class EngineControl
 
                 note = built.Message + " Запускаю с ранее собранным конфигом. ";
             }
+
+            Took("конфиг туннеля");
         }
 
         // При одном десинке и DNS «через туннель» — движок только ради DNS
@@ -214,6 +224,9 @@ internal static class EngineControl
         bool poisoned = !settings.NeedsDnsEngine && !settings.NeedsProxy && settings.NeedsDesync
             && !settings.UseRouterDns && settings.DnsVia == DnsRoute.Auto
             && await Task.Run(() => Zephyron.Core.Diagnostics.SystemDnsCheck.Poisoned(), cancellationToken);
+
+        if (stage.Elapsed > TimeSpan.FromMilliseconds(50))
+            Took("проверка DNS");
 
         if (poisoned)
         {
@@ -240,7 +253,11 @@ internal static class EngineControl
 
             if (!lists.Ok)
                 note += lists.Message + " ";
+
+            Took("списки десинка");
         }
+
+        Journal.Write("движки", "подготовка: " + string.Join(", ", stages));
 
         var exe = Environment.ProcessPath;
 

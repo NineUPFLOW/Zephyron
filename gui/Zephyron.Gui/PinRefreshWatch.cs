@@ -58,6 +58,9 @@ internal static class PinRefreshWatch
         if (result.Reordered.Count > 0)
             Journal.Write("пин", $"живой адрес поставлен первым ({how}): " + string.Join("; ", result.Reordered));
 
+        if (result.Pruned.Count > 0)
+            Journal.Write("пин", $"молчащий запасной адрес убран, первый живой остался ({how}): " + string.Join("; ", result.Pruned));
+
         if (result.Dead.Count > 0)
             Journal.Write("пин", $"без замены остались ({how}): {string.Join(", ", result.Dead.Take(8))}"
                 + (result.Dead.Count > 8 ? $" и ещё {result.Dead.Count - 8}" : string.Empty));
@@ -69,10 +72,46 @@ internal static class PinRefreshWatch
             Journal.Write("пин", $"проверка пинов ({how}): {error}");
 
         if (result.Changes.Count == 0 && result.Moved.Count == 0 && result.Reordered.Count == 0
-            && result.Dead.Count == 0 && result.Error is null)
+            && result.Pruned.Count == 0 && result.Dead.Count == 0 && result.Error is null)
         {
             Journal.Write("пин", $"проверка пинов ({how}): просмотрено {result.Checked}, менять нечего"
                 + (result.Suspects > 0 ? $"; промолчали {result.Suspects}, при повторном молчании будут заменены" : string.Empty));
         }
+    }
+
+    /// <summary>Итог проверки словами — что сделано и чего не сделано.</summary>
+    internal static string Describe(PinRefreshResult result)
+    {
+        if (result.Checked == 0 && result.Error is null)
+            return "В hosts нет пинов на адреса посредников — проверять нечего.";
+
+        var parts = new List<string>();
+
+        if (result.Error is { } error)
+            parts.Add($"Ничего не заменено: {error}.");
+
+        if (result.Changes.Count > 0)
+            parts.Add($"Заменено: {string.Join("; ", result.Changes)}.");
+
+        if (result.Moved.Count > 0)
+            parts.Add($"Перенесено за посредником: {string.Join("; ", result.Moved)}.");
+
+        if (result.Reordered.Count > 0)
+            parts.Add($"Живой адрес поставлен первым: {string.Join("; ", result.Reordered)}.");
+
+        if (result.Pruned.Count > 0)
+            parts.Add($"Убраны молчащие запасные адреса: {string.Join("; ", result.Pruned)}.");
+
+        if (result.Dead.Count > 0)
+            parts.Add($"Живой замены не нашлось: {string.Join(", ", result.Dead.Take(6))}"
+                + (result.Dead.Count > 6 ? $" и ещё {result.Dead.Count - 6}." : "."));
+
+        if (result.Silent.Count > 0)
+            parts.Add($"По DoH не ответили: {string.Join(", ", result.Silent)}.");
+
+        if (parts.Count == 0)
+            parts.Add($"Проверено адресов: {result.Checked}, все отвечают, менять нечего.");
+
+        return string.Join(" ", parts);
     }
 }
