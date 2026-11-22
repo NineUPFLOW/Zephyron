@@ -686,7 +686,8 @@ internal static class SupervisorHost
             warpApi: settings.WarpEnabled && !options.NoProxy, videoWindow: settings.GuardVideoNodes,
             directList: File.Exists(DirectAddresses.DefaultPath) ? Path.GetFullPath(DirectAddresses.DefaultPath) : null,
             panelHosts: Zephyron.Subscriptions.SubscriptionHosts.From(
-                [settings.SubscriptionUrl, .. SubscriptionBook.Load().Entries.Select(e => e.Url)])).ToList();
+                [settings.SubscriptionUrl, .. SubscriptionBook.Load().Entries.Select(e => e.Url)]),
+            zapretRoot: paths.Root).ToList();
 
         // Подделки секций, выбранные в «Десинке»; образцы разрешаются от рабочей папки winws2 (корень Zapret).
         if (FakeChoice.Apply(arguments, Path.GetFileNameWithoutExtension(presetPath), settings.FakeSwaps) is > 0 and var swapped)

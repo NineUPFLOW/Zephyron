@@ -196,6 +196,19 @@
 
 --new
 
+# 22.11, отчёт: прокси Telegram не доходил ни до одного моста Cloudflare, а оригинальный
+# прокси на той же сети подключился. Здесь Cloudflare по адресу не берётся, и мосты шли
+# голыми. Рецепт — секции Cloudflare из Stable: через неё у владельца прокси ходит к мостам.
+--name=Прокси Telegram · мосты Cloudflare
+--filter-tcp=443
+--hostlist=lists/zy-tg-bridges.txt
+--out-range=-d10
+--payload=tls_client_hello
+--lua-desync=fake:blob=fake_default_tls:tls_mod=rnd,dupsid,sni=ya.ru:tcp_ts=-600000:repeats=6
+--lua-desync=multisplit:pos=1,midsld
+
+--new
+
 --name=Мои сайты
 --filter-tcp=80,443-65535
 --ipset=lists/ipset-all.txt

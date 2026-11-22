@@ -388,6 +388,20 @@
 
 --new
 
+# 22.11, отчёт: на Adaptive прокси Telegram пять дней не дошёл ни до одного моста Cloudflare
+# («CF WS timed out» на всех двадцати), а оригинальный прокси на той же сети подключился.
+# Мосты здесь ничья секция не брала — шли голыми. Рецепт — секции Cloudflare из Stable,
+# через неё у владельца (Билайн) прокси ходит к тем же мостам.
+--name=Прокси Telegram · мосты Cloudflare
+--filter-tcp=443
+--hostlist=lists/zy-tg-bridges.txt
+--out-range=-d10
+--payload=tls_client_hello
+--lua-desync=fake:blob=fake_default_tls:tls_mod=rnd,dupsid,sni=ya.ru:tcp_ts=-600000:repeats=6
+--lua-desync=multisplit:pos=1,midsld
+
+--new
+
 --name=Facebook
 --filter-tcp=80,443
 --hostlist=lists/facebook.txt

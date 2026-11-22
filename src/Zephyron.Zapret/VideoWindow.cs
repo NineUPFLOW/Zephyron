@@ -113,7 +113,13 @@ public static class VideoWindow
     /// каждый исходящий пакет, пустые подтверждения тоже, и не сдвигает диапазоны рецептов
     /// секции. Прочим соединениям шаг не делает ничего и выключается на первом пакете.
     /// </remarks>
-    public static void Ramp(List<string> arguments)
+    /// <param name="listHasGoogle">
+    /// Есть ли в списке имена Google; <c>null</c> — не проверять, пересчёт в каждую секцию TCP.
+    /// Секция, отбирающая только по спискам без имён Google, соединение к узлу Google
+    /// не возьмёт, и шаг ей ни к чему: 22.11 шаг в каждой из шестидесяти секций Adaptive
+    /// (по 60 символов) вывел строку запуска за предел Windows, и winws2 не поднимался.
+    /// </param>
+    public static void Ramp(List<string> arguments, Func<string, bool>? listHasGoogle = null)
     {
         if (!arguments.Contains(SynStep))
             return;
@@ -130,7 +136,8 @@ public static class VideoWindow
 
             if (section.Any(a => a.StartsWith("--filter-tcp=", StringComparison.Ordinal))
                 && !section.Contains(SynStep)
-                && !section.Contains(RampStep))
+                && !section.Contains(RampStep)
+                && MaySeeGoogle(section, listHasGoogle))
             {
                 arguments.InsertRange(end, ["--out-range=a", "--payload=all", RampStep]);
             }
@@ -155,6 +162,37 @@ public static class VideoWindow
             "--payload=all",
             RampStep,
         ]);
+    }
+
+    /// <summary>Части имён, по которым видно Google: узлы видео, сайты и CDN Google, хранилище googleapis.</summary>
+    private static readonly string[] GoogleMarks =
+        ["google", "youtube", "youtu.be", "ytimg", "ggpht", "gstatic", "gvt1", "gvt2", "doubleclick"];
+
+    /// <summary>Есть ли среди имён имя Google.</summary>
+    public static bool HasGoogleName(IEnumerable<string> names) =>
+        names.Any(n => GoogleMarks.Any(m => n.Contains(m, StringComparison.OrdinalIgnoreCase)));
+
+    /// <summary>
+    /// Может ли секция взять соединение к узлу Google: отбирает не по именам (адреса, порты,
+    /// протокол) или в её списках есть имя Google.
+    /// </summary>
+    private static bool MaySeeGoogle(List<string> section, Func<string, bool>? listHasGoogle)
+    {
+        if (listHasGoogle is null)
+            return true;
+
+        var lists = section.Where(a => a.StartsWith("--hostlist=", StringComparison.Ordinal))
+            .Select(a => a["--hostlist=".Length..].Trim('"'))
+            .ToList();
+
+        var inline = section.Where(a => a.StartsWith("--hostlist-domains=", StringComparison.Ordinal))
+            .SelectMany(a => a["--hostlist-domains=".Length..].Split(','))
+            .ToList();
+
+        if (lists.Count == 0 && inline.Count == 0)
+            return true;
+
+        return HasGoogleName(inline) || lists.Any(listHasGoogle);
     }
 
     /// <summary>Секция ловит имена видео YouTube: в её списке googlevideo или youtube.</summary>

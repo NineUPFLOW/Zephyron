@@ -294,8 +294,12 @@ public static class IntermediaryDns
 
         var live = Servers.Zip(routes)
             .Where(p => p.Second is not null)
-            .Select(p => (Server: p.First, Route: p.Second!))
+            .Select(p => (Server: p.First, Route: p.Second!, Http: p.Second!.Plain ? null : DnsSurvey.DohClient(p.Second.Address, nic)))
             .ToList();
+
+        // Одно соединение HTTP/2 на сервер на весь опрос: по сессии на вопрос это десятки
+        // рукопожатий к одному адресу за секунды — провайдер такой адрес гасит (22.11).
+        using var clients = new DisposeAll(live.Select(l => l.Http));
 
         var silent = Servers.Zip(routes).Where(p => p.Second is null).Select(p => p.First.Name).ToList();
         var wanted = hosts.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -312,7 +316,7 @@ public static class IntermediaryDns
             {
                 await Task.WhenAll(live.Select(async l =>
                 {
-                    var answer = await AskAsync(l.Route, l.Server, null, host, nic, cancellationToken);
+                    var answer = await AskAsync(l.Route, l.Server, l.Http, host, nic, cancellationToken);
 
                     lock (raw)
                         raw[l.Server.Name][host] = answer is { Code: 0 } ? answer.Addresses : [];
@@ -376,6 +380,13 @@ public static class IntermediaryDns
 
     /// <summary>Чем спрашивать сервер: DoH на этом адресе или обычный DNS (порт 53) на нём.</summary>
     private sealed record Route(string Address, bool Plain);
+
+    private sealed class DisposeAll(IEnumerable<IDisposable?> items) : IDisposable
+    {
+        private readonly List<IDisposable?> _items = [.. items];
+
+        public void Dispose() => _items.ForEach(i => i?.Dispose());
+    }
 
     /// <summary>
     /// Вопрос по найденному пути. Обычный DNS — сначала UDP, затем TCP: UDP к чужому

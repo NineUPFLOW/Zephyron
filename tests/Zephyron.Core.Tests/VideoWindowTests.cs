@@ -190,6 +190,44 @@ public sealed class PanelProfileTests
     }
 
     [Fact]
+    public void RampSkipsSectionsWhoseListsHaveNoGoogleName()
+    {
+        var arguments = new List<string>
+        {
+            "--filter-tcp=443", "--hostlist=lists/googlevideo.txt", "--lua-desync=multidisorder:pos=1",
+            "--new", "--filter-tcp=443", "--hostlist=lists/signal.txt", "--lua-desync=hostfakesplit",
+            "--new", "--filter-tcp=443", "--hostlist-domains=disboard.org", "--lua-desync=hostfakesplit",
+            "--new", "--filter-tcp=443", "--hostlist=lists/zy-discord.txt", "--lua-desync=hostfakesplit",
+            "--new", "--filter-tcp=80,443", "--ipset=lists/ipset-all.txt", "--lua-desync=syndata",
+        };
+        arguments.AddRange(VideoWindow.SynProfile());
+
+        var google = new Dictionary<string, bool>
+        {
+            ["lists/googlevideo.txt"] = true,
+            ["lists/signal.txt"] = false,
+            // Вложения Discord лежат в storage.googleapis.com — список с именем Google.
+            ["lists/zy-discord.txt"] = VideoWindow.HasGoogleName(["discord.com", "discord-attachments-uploads-prd.storage.googleapis.com"]),
+        };
+
+        VideoWindow.Ramp(arguments, list => google[list]);
+
+        string Section(string marker)
+        {
+            int at = arguments.IndexOf(marker);
+            int end = arguments.IndexOf("--new", at);
+            return string.Join(' ', arguments.Skip(at).Take((end < 0 ? arguments.Count : end) - at));
+        }
+
+        Assert.Contains(VideoWindow.RampStep, Section("--hostlist=lists/googlevideo.txt"));
+        Assert.DoesNotContain(VideoWindow.RampStep, Section("--hostlist=lists/signal.txt"));
+        Assert.DoesNotContain(VideoWindow.RampStep, Section("--hostlist-domains=disboard.org"));
+        Assert.Contains(VideoWindow.RampStep, Section("--hostlist=lists/zy-discord.txt"));
+        Assert.Contains(VideoWindow.RampStep, Section("--ipset=lists/ipset-all.txt"));
+        Assert.Equal(VideoWindow.RampStep, arguments[^1]);
+    }
+
+    [Fact]
     public void WithoutTheSynStepThereIsNoRamp()
     {
         var arguments = new List<string> { "--filter-tcp=443", "--lua-desync=syndata" };
