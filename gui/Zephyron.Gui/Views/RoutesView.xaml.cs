@@ -283,7 +283,16 @@ public sealed record PartRow : INotifyPropertyChanged
     public Visibility MoreShown => Movable ? Visibility.Visible : Visibility.Collapsed;
 
     /// <summary>Выбранный путь словом — на кнопке выбора (макет владельца 13.10).</summary>
-    public string RouteLabel => Choice switch
+    public string RouteLabel => Label(Choice);
+
+    /// <summary>Путь на момент сборки строки словом — для кнопки пути всего сервиса.</summary>
+    /// <remarks>
+    /// По <see cref="Applied"/>, как и итог шапки: <see cref="Choice"/> пишет привязка списка, и у части
+    /// свёрнутой папки он мог разойтись с маршрутом — кнопка Discord писала «разные» при «везде: напрямую» (23.11).
+    /// </remarks>
+    public string AppliedLabel => Label(Applied);
+
+    private string Label(int choice) => choice switch
     {
         0 => "напрямую",
         1 => "десинк",
@@ -566,7 +575,7 @@ public sealed record ServiceRow(string Name, IReadOnlyList<PartRow> Parts) : INo
     {
         get
         {
-            var labels = Routable.Select(p => p.RouteLabel).Distinct().ToList();
+            var labels = Routable.Select(p => p.AppliedLabel).Distinct().ToList();
             return labels.Count == 1 ? labels[0] : "разные";
         }
     }

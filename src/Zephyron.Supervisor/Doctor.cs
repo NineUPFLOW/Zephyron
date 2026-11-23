@@ -273,7 +273,7 @@ public static class Doctor
     private static IReadOnlyList<DoctorCheck> Engines()
     {
         var lines = new List<DoctorCheck>();
-        var singBox = Path.Combine(AppContext.BaseDirectory, "engines", "sing-box", "sing-box.exe");
+        var singBox = Path.Combine(Zephyron.Core.InstallRoot.AppFolder, "engines", "sing-box", "sing-box.exe");
 
         if (File.Exists(singBox))
         {
@@ -649,9 +649,13 @@ public static class Doctor
             + "имена могут разрешаться медленнее или неверно.");
     }
 
-    private static IReadOnlyList<DoctorCheck> InterceptedResolver(AppSettings settings)
+    /// <remarks>
+    /// С шифрованным DNS (DNSCrypt) движок резолвер из настроек не спрашивает вовсе — подмена
+    /// его ответов ни на что не влияет. 23.11 у владельца проверка горела красным при работающем DNSCrypt.
+    /// </remarks>
+    internal static IReadOnlyList<DoctorCheck> InterceptedResolver(AppSettings settings)
     {
-        if (settings.UseRouterDns || DnsTrust.IsIntercepted(settings.DnsServer) != true)
+        if (settings.UseRouterDns || settings.DnsCryptActive is not null || DnsTrust.IsIntercepted(settings.DnsServer) != true)
             return [];
 
         var better = DnsTrust.CleanAlternative();

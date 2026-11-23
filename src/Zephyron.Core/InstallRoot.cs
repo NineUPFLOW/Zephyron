@@ -25,6 +25,23 @@ public static class InstallRoot
     /// <summary>Файл, по которому установка узнаёт себя.</summary>
     public static readonly string Marker = Path.Combine("config", "rules.yaml");
 
+    /// <summary>
+    /// Папка самой программы — там, где лежит Zephyron.exe.
+    /// </summary>
+    /// <remarks>
+    /// Не <c>AppContext.BaseDirectory</c>: с 23.11 однофайловая сборка распаковывает
+    /// библиотеки во временную папку (IncludeAllContentForSelfExtract) — так они грузятся
+    /// образами, а не копируются в частную память: окно занимает на 70–80 МБ меньше.
+    /// BaseDirectory тогда — та временная папка, а движки, пресеты и флаги лежат рядом с exe.
+    /// В тестах и при запуске из исходников процесс не наш — папка сборки, как и была.
+    /// </remarks>
+    public static string AppFolder { get; } =
+        Environment.ProcessPath is { } exe
+        && string.Equals(Path.GetFileName(exe), "Zephyron.exe", StringComparison.OrdinalIgnoreCase)
+        && Path.GetDirectoryName(exe) is { } folder
+            ? folder + Path.DirectorySeparatorChar
+            : AppContext.BaseDirectory;
+
     /// <summary>Установка ли это.</summary>
     public static bool Is(string directory) =>
         File.Exists(Path.Combine(directory, Marker));
@@ -58,7 +75,7 @@ public static class InstallRoot
     {
         try
         {
-            if (Find(Directory.GetCurrentDirectory(), AppContext.BaseDirectory) is { } root)
+            if (Find(Directory.GetCurrentDirectory(), AppFolder) is { } root)
                 Directory.SetCurrentDirectory(root);
         }
         catch (Exception)

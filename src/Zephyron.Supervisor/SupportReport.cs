@@ -399,7 +399,7 @@ public static class SupportReport
         text.AppendLine($"WARP у провайдера, похоже, недоступен: {YesNo(WarpReach.LooksBlocked(At(root, ServerHealthCache.DefaultPath)))}");
 
         var winws = Zephyron.Zapret.ZapretPaths.Discover()?.ExecutablePath;
-        var singBox = Path.Combine(AppContext.BaseDirectory, "engines", "sing-box", "sing-box.exe");
+        var singBox = Path.Combine(Zephyron.Core.InstallRoot.AppFolder, "engines", "sing-box", "sing-box.exe");
 
         text.AppendLine($"winws2.exe: {Fingerprint(winws)}");
         text.AppendLine($"sing-box.exe: {Fingerprint(singBox)}");

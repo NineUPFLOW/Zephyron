@@ -263,6 +263,9 @@ public partial class App : Application
         // туннеля» (владелец 07.10). И при запуске в трей, и с окном.
         StartupSweep.Start();
 
+        // Распакованные библиотеки прошлых версий — из временной папки.
+        BundleFolders.SweepOld();
+
         // Память замеров серверов — стирается по сроку (владелец 07.10, неделя).
         ServerMemoryClock.Start();
 

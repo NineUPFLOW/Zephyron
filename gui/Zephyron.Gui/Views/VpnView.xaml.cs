@@ -3540,7 +3540,7 @@ public partial class VpnView : UserControl
     /// <summary>Где лежит движок; <c>null</c> — не нашли.</summary>
     private static string? FindSingBox()
     {
-        var beside = Path.Combine(AppContext.BaseDirectory, "engines", "sing-box", "sing-box.exe");
+        var beside = Path.Combine(Zephyron.Core.InstallRoot.AppFolder, "engines", "sing-box", "sing-box.exe");
 
         return File.Exists(beside) ? beside : null;
     }
