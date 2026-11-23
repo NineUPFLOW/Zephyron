@@ -66,7 +66,18 @@
       их не рисовал и потому работал, а «Серверы» роняли окно.
     -->
     <InvariantGlobalization>false</InvariantGlobalization>
+
+    <!--
+      Живая куча окна — около 30 МБ, а сборщик держал вдвое больше (замер 23.11:
+      фрагментация 50 %, большие объекты). Без фоновой сборки и с уплотнением
+      по фрагментации окно занимает на ~15 МБ меньше; пауза сборки на такой куче — миллисекунды.
+    -->
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
   </PropertyGroup>
+
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="7" />
+  </ItemGroup>
 
   <!--
     Библиотеки берутся как есть и не правятся. В них двенадцать тысяч строк

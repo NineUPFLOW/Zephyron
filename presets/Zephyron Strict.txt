@@ -70,6 +70,9 @@
 --blob=quic6:@bin/quic_6.bin
 --blob=quic7:@bin/quic_7.bin
 --blob=stun_pat:@bin/stun.bin
+--blob=tls_sferum:@bin/tls_clienthello_www_sferum_ru.bin
+--blob=stun2:@bin/stun2.bin
+--blob=discord_udp:@bin/ACTIVE_DISCORD_UDP.bin
 --blob=quic_test:@bin/quic_test_00.bin
 --blob=fake_tls:@bin/fake_tls_1.bin
 --blob=fake_tls_1:@bin/fake_tls_1.bin
@@ -176,23 +179,34 @@
 
 --new
 
+# 23.11: запасной рецепт голоса — подделка пакета Discord, сменится сам, если звонок молчит.
 --name=Голосовые звонки/чаты
 --filter-l7=stun,discord
 --out-range=-n8
+--in-range=-n8
+--lua-desync=circular:fails=1:time=300
 --payload=stun,discord_ip_discovery
---lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=10:payload=all
+--lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=10:payload=all:strategy=1
+--lua-desync=fake:blob=discord_udp:repeats=6:strategy=2
 
 --new
 
 # 22.11, отчёт (Ростелеком): Discord не открывался на Strict и Stable, а на Adaptive открывался.
 # Разница — рецепт: здесь Discord брали «Мои сайты» и секция Discord ниже (syndata+multidisorder),
 # в Adaptive — подделки имён google.com/vimeo.com. Он и стоит здесь, по именам Discord, выше них.
+# 23.11: запасной рецепт — подделки stun и sferum.ru, затем разрез со сдвигом 664: у человека с ним Discord работает, с нашими нет.
+# circular меняет рецепт имени сам, если на первом соединение виснет (повторы, сброс).
 --name=Discord · переписка и обновления
 --filter-tcp=80,443,1080,2053,2083,2087,2096,8443
 --hostlist=lists/zy-discord.txt
 --hostlist=lists/zy-discord-updates.txt
 --out-range=-d10
---lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2
+--in-range=-s5556
+--lua-desync=circular:fails=1:time=300:retrans=3:nld=2
+--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2:strategy=1
+--lua-desync=fake:blob=stun2:tcp_ts=-600000:repeats=8:payload=tls_client_hello:strategy=2
+--lua-desync=fake:blob=tls_sferum:tcp_ts=-600000:repeats=8:payload=tls_client_hello:strategy=2
+--lua-desync=multisplit:pos=1:seqovl=664:seqovl_pattern=tls_sferum:payload=tls_client_hello:strategy=2
 
 --new
 
@@ -200,12 +214,18 @@
 # на Adaptive — работал. Осталось одно отличие — голосовые серверы discord.media (управление
 # звонком по TCP): здесь их брала секция Discord по адресу (syndata+multidisorder), в Adaptive —
 # своя, отправка повтором и syndata с приветствием Google. Её и ставим.
+# 23.11: запасной рецепт — подделки stun и sferum.ru, затем разрез со сдвигом 664: у человека с ним Discord работает, с нашими нет.
+# circular меняет рецепт имени сам, если на первом соединение виснет (повторы, сброс).
 --name=Discord · голосовые серверы
 --filter-tcp=80,443,1080,2053,2083,2087,2096,8443
 --hostlist=lists/zy-discord-media.txt
 --out-range=-d10
---lua-desync=send:repeats=3
---lua-desync=syndata:blob=tls_google
+--in-range=-s5556
+--lua-desync=circular:fails=1:time=300:retrans=3:nld=2
+--lua-desync=send:repeats=3:strategy=1
+--lua-desync=syndata:blob=tls_google:strategy=1
+--lua-desync=fake:blob=tls_google:tcp_ts=-600000:repeats=8:payload=tls_client_hello:strategy=2
+--lua-desync=multisplit:pos=1:seqovl=681:seqovl_pattern=tls_google:payload=tls_client_hello:strategy=2
 
 --new
 

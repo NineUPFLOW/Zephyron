@@ -44,6 +44,24 @@ public sealed class TgProxyTuneTests
 
         Assert.False(routes.DirectMain);
         Assert.DoesNotContain("--cf-domain", TgWsProxy.Arguments(1443, routes));
+        Assert.DoesNotContain("--cf-ip", TgWsProxy.Arguments(1443, routes));
+    }
+
+    /// <summary>Адреса Cloudflare, через которые мосты ответили, — прокси, без повторов (отчёт 23.11).</summary>
+    [Fact]
+    public void Answering_edges_go_to_the_proxy()
+    {
+        var tuning = new TgProxyTuning(DateTimeOffset.Now, false, null,
+        [
+            new TgBridge("a.co.uk", 120, "172.67.1.1"),
+            new TgBridge("b.co.uk", 130, "172.67.1.1"),
+            new TgBridge("c.co.uk", 140, "104.21.2.2"),
+            new TgBridge("d.co.uk", 150),
+        ], 20);
+
+        var arguments = TgWsProxy.Arguments(1443, TgProxyTune.Apply(new TgWsProxyRoutes(), tuning)).ToList();
+
+        Assert.Equal("172.67.1.1,104.21.2.2", arguments[arguments.IndexOf("--cf-ip") + 1]);
     }
 
     [Fact]

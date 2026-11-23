@@ -152,6 +152,11 @@ public static class TgWsProxy
         if (routes.CfDomains is { Count: > 0 } domains)
             arguments.AddRange(["--cf-domain", string.Join(",", domains)]);
 
+        // Адреса Cloudflare, через которые мосты ответили на замере: без них прокси берёт
+        // адрес из DNS и упирается в закрытый, хотя соседний отвечает (отчёт 23.11).
+        if (routes.CfIps is { Count: > 0 } edges)
+            arguments.AddRange(["--cf-ip", string.Join(",", edges)]);
+
         int timeout = CfTimeout(routes.CfConnectTimeout);
 
         if (timeout != DefaultCfConnectTimeout)
@@ -258,12 +263,14 @@ public static class TgWsProxy
 /// <param name="DirectOther">Прямой путь к DC1, DC3 и DC5 (<see cref="TgWsProxy.DirectOther"/>).</param>
 /// <param name="CfConnectTimeout">Сколько ждать один домен Cloudflare, секунды.</param>
 /// <param name="CfDomains">Домены Cloudflare первыми — по замеру автонастройки.</param>
+/// <param name="CfIps">Адреса Cloudflare, через которые мосты ответили на замере.</param>
 public sealed record TgWsProxyRoutes(
     bool DirectMain = false,
     bool DirectOther = false,
     int CfConnectTimeout = TgWsProxy.DefaultCfConnectTimeout,
     string? Worker = null,
-    IReadOnlyList<string>? CfDomains = null)
+    IReadOnlyList<string>? CfDomains = null,
+    IReadOnlyList<string>? CfIps = null)
 {
     public static TgWsProxyRoutes From(AppSettings settings) => new(
         settings.TelegramProxyDirect,

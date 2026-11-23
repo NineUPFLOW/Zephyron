@@ -67,6 +67,27 @@ public static class DirectAddresses
         }
     }
 
+    /// <summary>Список на запуск: сети человека и все адреса серверов туннеля.</summary>
+    /// <remarks>
+    /// Фильтр перехвата вмещает только <see cref="TunnelCapture.Limit"/> серверов, остальные
+    /// шли в секции пресета. Отчёт 23.11: из 69 серверов 29 вне фильтра, «Мои сайты» добавляли
+    /// данные к их SYN — почти все «не отвечали», на телефоне те же серверы работали. Сервер,
+    /// который не ответил, не попадал и в первые сорок по замеру: круг замыкался.
+    /// </remarks>
+    /// <returns>Путь к списку; <c>null</c> — исключать нечего.</returns>
+    public static string? WithServers(string? userList, IReadOnlyList<System.Net.IPAddress> servers, string path)
+    {
+        if (servers.Count == 0)
+            return userList;
+
+        var user = userList is not null && File.Exists(userList) ? File.ReadAllLines(userList) : [];
+
+        Write([.. user.Where(line => line.Trim() is { Length: > 0 } and not Placeholder),
+               .. servers.Select(server => server.ToString())], path);
+
+        return File.Exists(path) ? Path.GetFullPath(path) : userList;
+    }
+
     /// <summary>Ключ для секции winws2.</summary>
     public static string Exclude(string path) => "--ipset-exclude=" + path.Replace('\\', '/');
 }

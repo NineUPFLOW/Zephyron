@@ -1194,6 +1194,8 @@ public sealed record AppSettings
         WarpIsPath = true,
         WarpEnabled = true,
         TelegramProxy = true,
+        // Без секрета прокси не поднимается (отчёт 23.11: пять перезапусков сразу после мастера).
+        TelegramProxySecret = TgWsProxy.NewSecret(),
         GameFilterReset = true,
         VerifyTrafficReset = true,
         TelegramProxyAutoReset = true,

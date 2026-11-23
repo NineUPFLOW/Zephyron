@@ -684,7 +684,9 @@ internal static class SupervisorHost
 
         var arguments = WinwsCommandLine.Build(preset, exclude, own, gameFilter, servers, fakeRange, udpOff, tun, settings.Capture, keep, lans,
             warpApi: settings.WarpEnabled && !options.NoProxy, videoWindow: settings.GuardVideoNodes,
-            directList: File.Exists(DirectAddresses.DefaultPath) ? Path.GetFullPath(DirectAddresses.DefaultPath) : null,
+            directList: DirectAddresses.WithServers(
+                File.Exists(DirectAddresses.DefaultPath) ? Path.GetFullPath(DirectAddresses.DefaultPath) : null,
+                servers, Path.Combine("runtime", "desync-skip.txt")),
             panelHosts: Zephyron.Subscriptions.SubscriptionHosts.From(
                 [settings.SubscriptionUrl, .. SubscriptionBook.Load().Entries.Select(e => e.Url)]),
             zapretRoot: paths.Root).ToList();
@@ -727,7 +729,7 @@ internal static class SupervisorHost
             Console.WriteLine(skipped == 0
                 ? "Серверы туннеля остались в перехвате десинка: у пресета свой --wf-raw-filter файлом."
                 : skipped < servers.Count
-                    ? $"Десинк не перехватывает соединения туннеля: {skipped} адресов серверов из {servers.Count}, остальные в фильтр не поместились."
+                    ? $"Десинк не перехватывает соединения туннеля: {skipped} адресов серверов из {servers.Count}, остальные выведены из секций списком."
                     : $"Десинк не перехватывает соединения туннеля: адресов серверов — {skipped}.");
         }
 
@@ -769,6 +771,13 @@ internal static class SupervisorHost
     {
         var settings = AppSettings.Load(AppSettings.DefaultPath);
         var executable = TgWsProxy.Executable();
+
+        // Включён, а секрета нет (настройки первого запуска до 1.8.2) — создаётся здесь, а не просьбой включить заново.
+        if (!TgWsProxy.IsSecret(settings.TelegramProxySecret))
+        {
+            settings = TgWsProxy.Switch(settings, on: true);
+            settings.Save(AppSettings.DefaultPath);
+        }
 
         Console.WriteLine($"Прокси Telegram: 127.0.0.1:{settings.TelegramProxyPort}, {executable}");
 
