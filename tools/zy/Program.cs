@@ -345,16 +345,24 @@ async Task<int> Watch(List<string> options)
 
     await using (watch)
     {
-        await foreach (var entry in watch.ReadAsync(stop.Token))
+        try
         {
-            if (routed && !entry.Routed)
-                continue;
+            await foreach (var entry in watch.ReadAsync(stop.Token))
+            {
+                if (routed && !entry.Routed)
+                    continue;
 
-            if (process is not null && !string.Equals(entry.Process, process, StringComparison.OrdinalIgnoreCase))
-                continue;
+                if (process is not null && !string.Equals(entry.Process, process, StringComparison.OrdinalIgnoreCase))
+                    continue;
 
-            shown++;
-            Console.WriteLine($"{entry.Time.ToLocalTime():HH:mm:ss.fff}  {entry.ModeWord,-8}  {entry.Protocol}  {entry.Process,-24}  {entry.Endpoint,-40}  {entry.RuleShown}");
+                shown++;
+                Console.WriteLine($"{entry.Time.ToLocalTime():HH:mm:ss.fff}  {entry.ModeWord,-8}  {entry.Protocol}  {entry.Process,-24}  {entry.Endpoint,-40}  {entry.RuleShown}");
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Сбой ETW-сессии: коротко, без трассы стека.
+            Console.Error.WriteLine($"наблюдение оборвалось: {ex.GetBaseException().Message}");
         }
     }
 

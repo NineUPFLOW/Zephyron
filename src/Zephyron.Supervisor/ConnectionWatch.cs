@@ -141,23 +141,25 @@ public sealed class ConnectionWatch : IAsyncDisposable
             ObserveDns = true,
         });
 
+        // Всё после Start — под тем же try: упавший журнал иначе оставил бы
+        // ETW-сессию жить на всю машину, и zy watch отказывался бы стартовать.
         try
         {
             source.Start();
+
+            var log = journal is null ? null : new RollingLog(journal, JournalBytes, generations: 1);
+            var watch = new ConnectionWatch(source, engine, log, settings.DescribeMode(), Context(settings), learner);
+
+            log?.AppendLine(WatchEntry.Session(DateTimeOffset.Now,
+                $"{WatchEntry.Started}: режим «{watch.Mode}», правил {watch.RuleCount}"));
+
+            return watch;
         }
         catch
         {
             source.DisposeAsync().AsTask().GetAwaiter().GetResult();
             throw;
         }
-
-        var log = journal is null ? null : new RollingLog(journal, JournalBytes, generations: 1);
-        var watch = new ConnectionWatch(source, engine, log, settings.DescribeMode(), Context(settings), learner);
-
-        log?.AppendLine(WatchEntry.Session(DateTimeOffset.Now,
-            $"{WatchEntry.Started}: режим «{watch.Mode}», правил {watch.RuleCount}"));
-
-        return watch;
     }
 
     /// <summary>Соединения по мере появления, с решением правил; каждое — в журнал.</summary>

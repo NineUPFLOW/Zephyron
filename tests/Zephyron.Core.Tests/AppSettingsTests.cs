@@ -18,6 +18,44 @@ public sealed class AppSettingsTests : IDisposable
     }
 
     [Fact]
+    public void Unknown_enum_value_keeps_the_rest_of_the_file()
+    {
+        File.WriteAllText(_path, "{\"SubscriptionUrl\":\"https://s.example/x\",\"DnsVia\":\"FromTheFuture\",\"Capture\":{\"a\":1},\"TelegramProxySecret\":\"" + new string('a', 32) + "\"}");
+
+        var loaded = AppSettings.TryLoad(_path, out var result);
+
+        Assert.Equal(AppSettings.ReadResult.Read, result);
+        Assert.Equal("https://s.example/x", loaded.SubscriptionUrl);
+        Assert.Equal(DnsRoute.Auto, loaded.DnsVia);
+        Assert.Equal(new string('a', 32), loaded.TelegramProxySecret);
+    }
+
+    [Fact]
+    public void Fresh_secret_is_stable_within_the_process() =>
+        Assert.Equal(AppSettings.Fresh.TelegramProxySecret, AppSettings.Fresh.TelegramProxySecret);
+
+    [Fact]
+    public void Corrupt_file_is_copied_to_bad_only_once()
+    {
+        File.WriteAllText(_path, "{ not json");
+        AppSettings.TryLoad(_path, out _);
+        AppSettings.TryLoad(_path, out _);
+
+        var bad = Directory.GetFiles(Path.GetDirectoryName(_path)!, Path.GetFileName(_path) + ".bad-*");
+
+        try { Assert.Single(bad); }
+        finally { foreach (var f in bad) File.Delete(f); }
+    }
+
+    [Fact]
+    public void Null_preset_survives_a_save()
+    {
+        new AppSettings { PresetName = null }.Save(_path);
+
+        Assert.Null(AppSettings.Load(_path).PresetName);
+    }
+
+    [Fact]
     public void Locked_settings_are_never_saved_over_the_file()
     {
         File.WriteAllText(_path, "{}");

@@ -265,25 +265,31 @@ public partial class DoctorView : UserControl
     /// <summary>Закрывает браузеры, правит их и открывает заново; потом проверяет ещё раз.</summary>
     private async void FixBrowsers()
     {
-        var open = Zephyron.Core.Diagnostics.BrowserSetup.OpenToFix();
-
-        if (open.Count > 0 && ConfirmDialog.Show(
-                Window.GetWindow(this),
-                $"Закрою {string.Join(", ", open)}, поправлю настройки и открою снова с теми же вкладками.\n\n"
-                + "Если на какой-то странице не сохранено (письмо, форма) — сохраните сначала.",
-                "Исправить браузеры",
-                MessageBoxButton.OKCancel,
-                MessageBoxImage.Question,
-                MessageBoxResult.OK) != MessageBoxResult.OK)
-        {
+        // Повторный щелчок, пока идёт диалог или правка, не должен закрывать браузеры дважды.
+        if (_fixing)
             return;
-        }
 
-        Status.Visibility = Visibility.Visible;
-        Status.Text = "Исправляю браузеры…";
+        _fixing = true;
 
         try
         {
+            var open = Zephyron.Core.Diagnostics.BrowserSetup.OpenToFix();
+
+            if (open.Count > 0 && ConfirmDialog.Show(
+                    Window.GetWindow(this),
+                    $"Закрою {string.Join(", ", open)}, поправлю настройки и открою снова с теми же вкладками.\n\n"
+                    + "Если на какой-то странице не сохранено (письмо, форма) — сохраните сначала.",
+                    "Исправить браузеры",
+                    MessageBoxButton.OKCancel,
+                    MessageBoxImage.Question,
+                    MessageBoxResult.OK) != MessageBoxResult.OK)
+            {
+                return;
+            }
+
+            Status.Visibility = Visibility.Visible;
+            Status.Text = "Исправляю браузеры…";
+
             var (done, stuck) = await Task.Run(Zephyron.Core.Diagnostics.BrowserSetup.Fix);
 
             Status.Text = (done.Count > 0 ? $"Исправлено: {string.Join(", ", done)}. " : string.Empty)
@@ -291,7 +297,12 @@ public partial class DoctorView : UserControl
         }
         catch (Exception ex)
         {
+            Status.Visibility = Visibility.Visible;
             Status.Text = "Настройки браузеров не поправились: " + ex.GetBaseException().Message;
+        }
+        finally
+        {
+            _fixing = false;
         }
 
         // Проверка идёт заново в фоне, и её итог перепишет строку состояния — ответ кнопки сохраняем.
@@ -301,6 +312,8 @@ public partial class DoctorView : UserControl
 
     /// <summary>Что сказала кнопка «Исправить» — показать поверх итога следующей проверки.</summary>
     private string? _fixNote;
+
+    private bool _fixing;
 
     /// <summary>Знак раздела — по его имени из <see cref="Doctor.Run"/>.</summary>
     private static string GlyphOf(string title) => title switch

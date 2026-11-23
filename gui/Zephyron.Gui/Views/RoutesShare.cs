@@ -68,6 +68,8 @@ public partial class RoutesView
 
         var dialog = new SaveFileDialog
         {
+            // Иначе диалог меняет рабочую папку, и config/, runtime/, engines/ ищутся не там.
+            RestoreDirectory = true,
             Title = "Куда сохранить маршруты",
             FileName = "zephyron-routes" + RouteBundle.Extension,
             Filter = "Маршруты со своими списками (*.zyroutes)|*.zyroutes|Только правила (*.yaml)|*.yaml|Все файлы|*.*",
@@ -114,6 +116,8 @@ public partial class RoutesView
     {
         var dialog = new OpenFileDialog
         {
+            // Иначе диалог меняет рабочую папку, и config/, runtime/, engines/ ищутся не там.
+            RestoreDirectory = true,
             Title = "Откуда загрузить маршруты",
             Filter = "Маршруты Zephyron (*.zyroutes;*.yaml)|*.zyroutes;*.yaml|Все файлы|*.*",
         };
@@ -231,7 +235,7 @@ public partial class RoutesView
 
     private void ImportTxt()
     {
-        var dialog = new OpenFileDialog { Title = "Список доменов", Filter = "Текст (*.txt)|*.txt|Все файлы|*.*" };
+        var dialog = new OpenFileDialog { RestoreDirectory = true, Title = "Список доменов", Filter = "Текст (*.txt)|*.txt|Все файлы|*.*" };
 
         if (dialog.ShowDialog() != true)
             return;
@@ -267,6 +271,8 @@ public partial class RoutesView
 
             var dialog = new SaveFileDialog
             {
+                // Иначе диалог меняет рабочую папку, и config/, runtime/, engines/ ищутся не там.
+                RestoreDirectory = true,
                 Title = "Куда сохранить список",
                 FileName = "zephyron-domains.txt",
                 Filter = "Текст (*.txt)|*.txt|Все файлы|*.*",

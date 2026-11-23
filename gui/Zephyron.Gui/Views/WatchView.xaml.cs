@@ -259,6 +259,10 @@ public partial class WatchView : UserControl
 
     private async void OnPower(object sender, RoutedEventArgs e)
     {
+        // Запуск уже идёт — нажатие ничего не меняет, и пометку автозапуска трогать нельзя.
+        if (_starting)
+            return;
+
         // Нажатое человеком — его: остановка по выходу программы такой сеанс не тронет.
         _auto = null;
 
@@ -269,9 +273,6 @@ public partial class WatchView : UserControl
             ShowCounters();
             return;
         }
-
-        if (_starting)
-            return;
 
         // Кисти — здесь, в потоке окна: строки собираются в фоне.
         _brushes = Palette();
@@ -991,6 +992,8 @@ public partial class WatchView : UserControl
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
+            // Иначе диалог меняет рабочую папку, и config/, runtime/, engines/ ищутся не там.
+            RestoreDirectory = true,
             Title = "Программа",
             Filter = "Программы|*.exe",
         };

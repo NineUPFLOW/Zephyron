@@ -83,14 +83,26 @@ public partial class RoutesSettingsWindow : Window
                 result = PinSolutions.Enable(solution, _ipV6 ?? false);
             }
 
-            _ = HostsEditor.FlushDnsAsync();
-
             var settings = AppSettings.Load(AppSettings.DefaultPath);
+            var listsFailed = string.Empty;
 
-            // Щит перечитывается winws2 сам, при смене файла: пометка пина
-            // действует без перезапуска. Движки стоят — файл просто перепишется
-            // заново при запуске.
-            TunnelConfig.WriteDesyncLists(settings);
+            // Откат: hosts вернули как было — сбрасывать DNS и предлагать перезапуск не с чего.
+            if (result.Reverted is null)
+            {
+                _ = HostsEditor.FlushDnsAsync();
+
+                // Щит перечитывается winws2 сам, при смене файла: пометка пина
+                // действует без перезапуска. Движки стоят — файл просто перепишется
+                // заново при запуске. Отдельный try: hosts уже записан, и «не записалось» было бы неправдой.
+                try
+                {
+                    TunnelConfig.WriteDesyncLists(settings);
+                }
+                catch (Exception ex)
+                {
+                    listsFailed = " Но списки десинка не обновились: " + ex.GetBaseException().Message;
+                }
+            }
 
             var said = result.Reverted
                 ?? (was.On
@@ -103,8 +115,10 @@ public partial class RoutesSettingsWindow : Window
             if (!was.On && result.Reverted is null)
                 said += Blockers(solution, settings);
 
-            Status.Text = said;
-            (Owner as MainWindow)?.OfferRestart("Пины в hosts изменены");
+            Status.Text = said + listsFailed;
+
+            if (result.Reverted is null)
+                (Owner as MainWindow)?.OfferRestart("Пины в hosts изменены");
         }
         catch (Exception ex)
         {

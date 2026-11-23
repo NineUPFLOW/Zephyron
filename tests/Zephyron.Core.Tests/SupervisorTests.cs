@@ -80,10 +80,19 @@ public sealed class SupervisorStateTests : IDisposable
     [Fact]
     public void OwnProcessIsSeenAsAlive()
     {
-        var state = Sample(pid: Environment.ProcessId);
+        var state = Sample(pid: Environment.ProcessId) with { StartedAt = DateTimeOffset.Now };
         state.Save(_path);
 
         Assert.True(SupervisorState.Load(_path)!.IsSupervisorAlive());
+    }
+
+    [Fact]
+    public void ReusedPidIsNotSeenAsAlive()
+    {
+        // Файл остался от супервизора, умершего вчера; его PID теперь у процесса, родившегося позже.
+        var state = Sample(pid: Environment.ProcessId) with { StartedAt = DateTimeOffset.Now.AddDays(-1) };
+
+        Assert.False(state.IsSupervisorAlive());
     }
 
     [Fact]

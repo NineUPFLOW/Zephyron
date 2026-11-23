@@ -1113,6 +1113,7 @@ public partial class RoutesView : UserControl
             Chevrons.Turn(OrderChevron, true);
 
             Status.Text = $"Порядок записан: {source.Value} встал на место {target.Value}. Вступит в силу после следующего запуска движков.";
+            this.Offer("Порядок правил изменён");
         }
         catch (Exception ex)
         {
@@ -2545,6 +2546,8 @@ public partial class RoutesView : UserControl
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
+            // Иначе диалог меняет рабочую папку, и config/, runtime/, engines/ ищутся не там.
+            RestoreDirectory = true,
             Title = "Программа",
             Filter = "Программы|*.exe",
         };

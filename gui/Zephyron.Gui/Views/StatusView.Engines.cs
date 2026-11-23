@@ -94,7 +94,17 @@ public partial class StatusView
         {
             BeginStarting();
 
-            var outcome = await EngineControl.RestartAsync("меню у «Остановить» на «Главной»", CancellationToken.None);
+            EngineOutcome outcome;
+
+            try
+            {
+                outcome = await EngineControl.RestartAsync("меню у «Остановить» на «Главной»", CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                // Без этого «запуск» остался бы идущим навсегда.
+                outcome = new(false, "Перезапустить не удалось: " + ex.GetBaseException().Message);
+            }
 
             if (!outcome.Ok)
             {

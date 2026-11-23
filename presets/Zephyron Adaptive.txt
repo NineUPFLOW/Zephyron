@@ -246,9 +246,12 @@
 
 --new
 
+# cloudflare-ech.com — внешнее имя ECH для любых сайтов за Cloudflare, Discord тоже;
+# ТСПУ режет его само по себе, и pass здесь отдавал его голым раньше секций Discord.
 --name=Cloudflare TCP
 --filter-tcp=80,443-65535
 --hostlist=lists/cloudflare.txt
+--hostlist-exclude-domains=cloudflare-ech.com
 --out-range=-d8
 --lua-desync=pass
 

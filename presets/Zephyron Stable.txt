@@ -150,6 +150,19 @@
 --lua-desync=fake:blob=quic_google:repeats=2
 
 --new
+# ipset-youtube держит лишь часть сетей узлов googlevideo (нет 142.250/15, 172.217/16,
+# 173.194/16 и др. — см. VideoWindow.GoogleFrontEnds): QUIC к ним шёл без подделки.
+# Досылаем по имени из Initial, тем же рецептом.
+--name=YouTube · QUIC по имени
+--filter-udp=443
+--filter-l7=quic
+--hostlist=lists/googlevideo.txt
+--hostlist=lists/youtube.txt
+--out-range=-n8
+--payload=all
+--lua-desync=fake:blob=quic_google:repeats=2
+
+--new
 
 --name=Бэкенд Google
 --filter-tcp=80,443

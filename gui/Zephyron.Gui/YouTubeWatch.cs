@@ -142,7 +142,19 @@ internal static class YouTubeWatch
         Journal.Write("YouTube", $"YouTube перестал открываться ({string.Join("; ", results.Select(r => r.Describe()))}) — "
             + $"пробую другой способ обхода: {next + 1} из {YouTubeRecipes.Recipes.Count}.");
 
-        await EngineControl.RestartAsync("YouTube: смена способа обхода", CancellationToken.None).ConfigureAwait(false);
+        await RestartAsync("YouTube: смена способа обхода").ConfigureAwait(false);
+    }
+
+    /// <summary>Пока шёл долгий опрос, пользователь мог нажать «Стоп» — против его воли не поднимаем.</summary>
+    private static async Task RestartAsync(string reason)
+    {
+        if (App.Exiting || !EngineControl.IsRunning)
+            return;
+
+        var outcome = await EngineControl.RestartAsync(reason, CancellationToken.None).ConfigureAwait(false);
+
+        if (!outcome.Ok)
+            TrayIcon.Current?.Notify("Zephyron", outcome.Message, link: null);
     }
 
     /// <summary>Пора ли менять способ: два отказа подряд, пауза после прошлой смены и не больше круга за полчаса.</summary>
@@ -172,7 +184,7 @@ internal static class YouTubeWatch
         Journal.Write("YouTube", $"Ни один способ обхода в Zephyron Adaptive не открыл YouTube ({string.Join("; ", results.Select(r => r.Describe()))}) — "
             + $"включаю пресет {YouTubeRecipes.FallbackPreset} для строгих провайдеров. Вернуть прежний можно на вкладке «Десинк».");
 
-        await EngineControl.RestartAsync("YouTube: пресет для строгих провайдеров", CancellationToken.None).ConfigureAwait(false);
+        await RestartAsync("YouTube: пресет для строгих провайдеров").ConfigureAwait(false);
     }
 
     /// <summary>Свой маршрут YouTube — через VPN: тогда способ десинка ни при чём.</summary>

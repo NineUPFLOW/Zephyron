@@ -54,6 +54,15 @@ internal static class EngineControl
     /// через пять секунд после перезапуска — второй супервизор сменил первый,
     /// и движки поднимались заново.
     /// </remarks>
+    /// <summary>
+    /// Супервизор, поднятый окном, умер сам: ни остановки, ни запуска сейчас нет.
+    /// </summary>
+    public static bool Lost =>
+        _spawned is not null
+        && Volatile.Read(ref _stopping) == 0
+        && Volatile.Read(ref _starting) == 0
+        && !IsRunning;
+
     public static bool Coming =>
         Volatile.Read(ref _stopping) == 0
         && (Volatile.Read(ref _starting) > 0 || IsRunning);
@@ -182,7 +191,16 @@ internal static class EngineControl
 
     private static async Task<EngineOutcome> StartCoreAsync(CancellationToken cancellationToken)
     {
+        // Пути движков относительные: рабочую папку мог увести кто угодно в процессе
+        // (журнал 23.11, 15:25: «sing-box.exe не найден в engines/» при целой установке).
+        InstallRoot.MoveTo();
+
         var settings = AppSettings.Load(AppSettings.DefaultPath);
+
+        // Файл занят/не читается — это Fresh, а не выбор человека: по нему собрался бы WARP-конфиг поверх runtime/singbox.json.
+        if (settings.LoadFailed)
+            return new EngineOutcome(false, "Не удалось прочитать настройки (файл занят или повреждён). Запуск отменён, чтобы не затереть конфиг. Повторите через минуту.");
+
         var note = string.Empty;
         var stage = System.Diagnostics.Stopwatch.StartNew();
         var stages = new List<string>();

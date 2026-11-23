@@ -635,11 +635,16 @@ public partial class StatusView : UserControl
             // недавних выходов — файлом.
             var (server, _) = await Task.Run(() => TunnelStatus.CurrentExitAsync(CancellationToken.None));
 
-            if (server is null || server == _exit)
+            // Раздел могли закрыть, пока шёл запрос, — писать в него уже нельзя.
+            if (server is null || server == _exit || !IsLoaded)
                 return;
 
             _exit = server;
             ServerValue.Text = TunnelStatus.ServerLine(settings, server);
+        }
+        catch (Exception)
+        {
+            // Фоновое чтение: не вышло — прежняя строка остаётся до следующего тика.
         }
         finally
         {
@@ -1809,7 +1814,7 @@ public partial class StatusView : UserControl
         }
     }
 
-    private void OnAutostart(object sender, RoutedEventArgs e)
+    private async void OnAutostart(object sender, RoutedEventArgs e)
     {
         // Задача поднимает эту же программу в роли супервизора. Прежде она
         // звала консольную рядом, и без неё автозапуск молча не работал.
@@ -1821,11 +1826,17 @@ public partial class StatusView : UserControl
             return;
         }
 
+        var toggle = sender as UIElement;
+
+        // schtasks — внешний процесс: на потоке окна он вешал бы интерфейс.
+        if (toggle is not null)
+            toggle.IsEnabled = false;
+
         try
         {
-            if (AutostartTask.IsInstalled(AutostartTask.DefaultTaskName))
+            if (await Task.Run(() => AutostartTask.IsInstalled(AutostartTask.DefaultTaskName)))
             {
-                var (removed, output) = Autostart.TurnOff();
+                var (removed, output) = await Task.Run(Autostart.TurnOff);
 
                 if (!removed)
                     ShowProblem("Автозапуск не убрался: " + output);
@@ -1834,7 +1845,7 @@ public partial class StatusView : UserControl
             {
                 // Тот же код, что у мастера первого запуска: задача поднимает окно в трей,
                 // а движки оно заводит само.
-                var (ok, output) = Autostart.TurnOn();
+                var (ok, output) = await Task.Run(Autostart.TurnOn);
 
                 if (!ok)
                     ShowProblem("Автозапуск не создался: " + output);
@@ -1843,6 +1854,11 @@ public partial class StatusView : UserControl
         catch (Exception ex)
         {
             ShowProblem("Планировщик отклонил запрос: " + ex.GetBaseException().Message);
+        }
+        finally
+        {
+            if (toggle is not null)
+                toggle.IsEnabled = true;
         }
 
         // Задачу только что завели или убрали — запомненный ответ устарел.

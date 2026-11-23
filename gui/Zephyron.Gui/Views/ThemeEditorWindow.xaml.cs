@@ -603,6 +603,8 @@ public partial class ThemeEditorWindow : Window
     {
         var dialog = new OpenFileDialog
         {
+            // Иначе диалог меняет рабочую папку, и config/, runtime/, engines/ ищутся не там.
+            RestoreDirectory = true,
             Title = "Картинка или видео для фона",
 
             // Видео — живой фон по кругу (07.10); стекла под карточками у него нет.
@@ -709,7 +711,14 @@ public partial class ThemeEditorWindow : Window
             // Нечитаемая не применяется: остаётся то, что было до редактора.
             var result = problems.Count == 0 ? Themes.Apply(id) : Themes.Apply(_original);
 
-            if (problems.Count == 0 && result.Ok)
+            // Файл записан, а тема не встала: окно не закрываем — закрытие выглядело бы успехом.
+            if (problems.Count == 0 && !result.Ok)
+            {
+                Say("Тема записана, но не применилась: " + string.Join("; ", result.Problems.Take(2)));
+                return;
+            }
+
+            if (problems.Count == 0)
                 (AppSettings.Load(AppSettings.DefaultPath) with { Theme = id }).Save(AppSettings.DefaultPath);
 
             SavedId = id;

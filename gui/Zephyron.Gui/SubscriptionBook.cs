@@ -119,11 +119,22 @@ public sealed class SubscriptionBook
                 ? JsonSerializer.Deserialize<SubscriptionBook>(File.ReadAllText(target), Options) ?? new()
                 : new SubscriptionBook();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // Испорченный файл не повод не открыть раздел: действующая
             // подписка всё равно приедет из настроек строкой ниже.
             book = new SubscriptionBook();
+
+            // Испорченный (не занятый антивирусом) — в .bad: иначе первая же запись
+            // затёрла бы остальные подписки и ключи. Метка времени бережёт прежний .bad.
+            try
+            {
+                if (ex is JsonException && File.Exists(target))
+                    File.Move(target, target + ".bad-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"), overwrite: true);
+            }
+            catch (Exception)
+            {
+            }
         }
 
         book.Entries.RemoveAll(e => string.IsNullOrWhiteSpace(e.Url));
@@ -197,7 +208,7 @@ public sealed class SubscriptionBook
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
 
-        File.WriteAllText(target, JsonSerializer.Serialize(this, Options), new UTF8Encoding(false));
+        AtomicFile.WriteAllText(target, JsonSerializer.Serialize(this, Options), new UTF8Encoding(false));
     }
 
     /// <summary>
@@ -317,6 +328,6 @@ public sealed class SubscriptionBook
         }
     }
 
-    private static bool Same(string? left, string? right) =>
+    internal static bool Same(string? left, string? right) =>
         string.Equals(left?.Trim(), right?.Trim(), StringComparison.Ordinal);
 }

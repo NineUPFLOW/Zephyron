@@ -176,7 +176,14 @@ internal static class CloudflareWatch
 
         Journal.Write("Cloudflare", "сайт не открывается ни на одном адресе — пробую другой способ обхода: " + string.Join("; ", changed) + ".");
 
-        await EngineControl.RestartAsync("Cloudflare: смена способа обхода", CancellationToken.None).ConfigureAwait(false);
+        // Пока шёл долгий опрос, пользователь мог нажать «Стоп» — против его воли не поднимаем.
+        if (App.Exiting || !EngineControl.IsRunning)
+            return;
+
+        var outcome = await EngineControl.RestartAsync("Cloudflare: смена способа обхода", CancellationToken.None).ConfigureAwait(false);
+
+        if (!outcome.Ok)
+            TrayIcon.Current?.Notify("Zephyron", outcome.Message, link: null);
     }
 
     /// <summary>Имена правила: «*.site» — и сам сайт, и www.</summary>

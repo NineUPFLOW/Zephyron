@@ -15,6 +15,8 @@ public sealed class DomainInputTests
     [InlineData("http://cdn.example.com:8443/a", "cdn.example.com")]
     [InlineData("*.example.com", "example.com")]
     [InlineData("example.com/", "example.com")]
+    [InlineData("example.com.", "example.com")]
+    [InlineData("пример.рф", "xn--e1afmkfd.xn--p1ai")]
     public void ANameIsTakenFromWhatPeopleType(string text, string expected) =>
         Assert.Equal(expected, DomainInput.Normalize(text));
 

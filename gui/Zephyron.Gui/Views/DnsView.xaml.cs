@@ -494,7 +494,7 @@ public partial class DnsView : UserControl
         TunnelMode.IsEnabled = !settings.UseRouterDns && crypt is null;
 
         // Автовыбор при DNS роутера и при шифрованном DNS хранится, но не действует.
-        AutoDnsSwitch.IsChecked = settings.DnsAuto && !settings.UseRouterDns;
+        AutoDnsSwitch.IsChecked = settings.DnsAuto && !settings.UseRouterDns && crypt is null;
 
         // Вся карточка — кнопка: отключать надо её, иначе щелчок включал автоподбор, который не действует.
         bool autoApplies = !settings.UseRouterDns && crypt is null;
@@ -634,8 +634,19 @@ public partial class DnsView : UserControl
         if (RouterDnsSwitch.IsChecked == true)
         {
             // Выключатель встаёт сам, только когда проверка пропустила.
+            // Пока идёт проверка, он погашен: второй щелчок запустил бы вторую.
             RouterDnsSwitch.IsChecked = false;
-            RouterDnsSwitch.IsChecked = await SaveRouterDnsAsync();
+            RouterDnsSwitch.IsEnabled = false;
+
+            try
+            {
+                RouterDnsSwitch.IsChecked = await SaveRouterDnsAsync();
+            }
+            finally
+            {
+                RouterDnsSwitch.IsEnabled = true;
+            }
+
             return;
         }
         try
