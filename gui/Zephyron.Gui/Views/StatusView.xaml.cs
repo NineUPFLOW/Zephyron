@@ -572,7 +572,10 @@ public partial class StatusView : UserControl
             ? RouterDnsConnection.ConfigWarning(settings) is not null
                 ? $"Запасной DoH · {settings.DnsServer} (DNS роутера недоступен)"
                 : $"Роутер · {settings.RouterDnsAddress}:53 · UDP"
-            : settings.DnsServer;
+            // При DNSCrypt DnsServer не используется — карточка показывала 8.8.4.4 вместо того, что работает.
+            : settings.DnsCryptActive is { } crypt
+                ? DnsCrypt.Describe(crypt).Title
+                : settings.DnsServer;
         SubscriptionValue.Text = seen.Subscriptions;
 
         var state = seen.State;
