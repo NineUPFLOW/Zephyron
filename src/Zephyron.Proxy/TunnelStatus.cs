@@ -318,12 +318,12 @@ public static class TunnelStatus
     /// </remarks>
     public static string? FindSingBox()
     {
-        var beside = Path.Combine(AppContext.BaseDirectory, "engines", "sing-box", "sing-box.exe");
+        var beside = Path.Combine(Zephyron.Core.InstallRoot.AppFolder, "engines", "sing-box", "sing-box.exe");
 
         if (File.Exists(beside))
             return beside;
 
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        var directory = new DirectoryInfo(Zephyron.Core.InstallRoot.AppFolder);
 
         while (directory is not null)
         {

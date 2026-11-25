@@ -115,7 +115,7 @@ public static class OwnLists
         foreach (var domain in domains)
             body.Append(domain.Trim().TrimStart('*', '.')).Append("\r\n");
 
-        File.WriteAllText(full, body.ToString(), new UTF8Encoding(false));
+        AtomicFile.WriteAllText(full, body.ToString(), new UTF8Encoding(false));
         return value;
     }
 

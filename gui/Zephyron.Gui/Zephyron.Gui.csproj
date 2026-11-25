@@ -66,7 +66,38 @@
       их не рисовал и потому работал, а «Серверы» роняли окно.
     -->
     <InvariantGlobalization>false</InvariantGlobalization>
+
+    <!--
+      Живая куча окна — около 30 МБ, а сборщик держал вдвое больше (замер 23.11:
+      фрагментация 50 %, большие объекты). Без фоновой сборки и с уплотнением
+      по фрагментации окно занимает на ~15 МБ меньше; пауза сборки на такой куче — миллисекунды.
+    -->
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+
+    <!--
+      Однофайловая сборка: библиотеки .NET и WPF распаковываются во временную папку
+      и грузятся образами. Без этого каждая копировалась из exe в частную память —
+      замер 23.11: окно 212 МБ при запуске против 129 МБ с распаковкой, после прохода
+      по всем разделам 250–265 против 181. Пути установки — InstallRoot.AppFolder.
+    -->
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
   </PropertyGroup>
+
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="7" />
+  </ItemGroup>
+
+  <!--
+    msquic.dll — внутрь однофайловой сборки: System.Net.Quic ищет его рядом с собой,
+    а с распаковкой (IncludeAllContentForSelfExtract) это временная папка, не папка exe.
+    Без него проверка QUIC молча не идёт (замер 23.11: System.Net.Quic загружен, msquic — нет).
+  -->
+  <Target Name="BundleMsQuic" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(PublishSingleFile)' == 'true'">
+    <ItemGroup>
+      <_ZephyronMsQuic Include="@(ResolvedRuntimePack->'%(PackageDirectory)\runtimes\$(RuntimeIdentifier)\native\msquic.dll')" Condition="'%(ResolvedRuntimePack.FrameworkName)' == 'Microsoft.NETCore.App'" />
+      <ResolvedFileToPublish Include="@(_ZephyronMsQuic)" Condition="Exists('%(Identity)')" RelativePath="msquic.dll" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
 
   <!--
     Библиотеки берутся как есть и не правятся. В них двенадцать тысяч строк

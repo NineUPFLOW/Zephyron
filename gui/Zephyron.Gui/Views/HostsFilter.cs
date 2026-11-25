@@ -74,7 +74,7 @@ public sealed class HostsLine(HostsRow row) : INotifyPropertyChanged
 
     /// <summary>Строка под именем: почему запись не действует либо её подпись.</summary>
     public string Sub =>
-        Row.Repeat ? "повтор: действует запись выше"
+        Row.Repeat ? "повтор: та же запись есть выше"
         : Note is { Length: > 0 } note ? note
         : string.Empty;
 

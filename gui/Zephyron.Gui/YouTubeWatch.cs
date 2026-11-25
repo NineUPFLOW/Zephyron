@@ -31,6 +31,7 @@ internal static class YouTubeWatch
 
     private static bool _started;
     private static string? _videoNode;
+    private static bool _nodeRefreshed;
     private static int _streak;
     private static bool _switched;
     private static DateTime _lastSwitch = DateTime.MinValue;
@@ -89,7 +90,11 @@ internal static class YouTubeWatch
         // Свой видеосервер человека — один раз за сторожа: узел меняется редко, а redirector
         // отвечает и тогда, когда режут само видео.
         _videoNode ??= await GoogleVideoNode.FindAsync(cancel.Token).ConfigureAwait(false);
-        string[] probes = _videoNode is { } node ? [.. Probes, node] : Probes;
+
+        // Узел, которому отказал наш же сторож узлов (0.0.0.0 в hosts), закрыт нами, а не провайдером:
+        // плеер берёт другие. 22.11 у владельца на Adaptive такой узел четыре раза подряд
+        // засчитывался отказом YouTube, и сторож сменил рабочий способ на три нерабочих.
+        string[] probes = _videoNode is { } node && !VideoNodeGuard.Load().ContainsKey(node) ? [.. Probes, node] : Probes;
 
         var results = await Task.WhenAll(probes.Select(h => BlockCheck.CheckAsync(h, "YouTube", cancel.Token))).ConfigureAwait(false);
 
@@ -101,9 +106,20 @@ internal static class YouTubeWatch
 
             _streak = 0;
             _switched = false;
+            _nodeRefreshed = false;
             return;
         }
 
+        // Не открылся один узел, а страница и картинки — да: узел мог смениться или уйти под отказ.
+        // Сначала узнаём свой узел заново, и засчитывается только отказ и нового.
+        if (results.Take(Probes.Length).All(r => r.Kind == BlockKind.None) && !_nodeRefreshed)
+        {
+            _videoNode = null;
+            _nodeRefreshed = true;
+            return;
+        }
+
+        _nodeRefreshed = false;
         _streak++;
 
         if (!Due(_streak, DateTime.UtcNow, _lastSwitch, Switches))
@@ -126,7 +142,19 @@ internal static class YouTubeWatch
         Journal.Write("YouTube", $"YouTube перестал открываться ({string.Join("; ", results.Select(r => r.Describe()))}) — "
             + $"пробую другой способ обхода: {next + 1} из {YouTubeRecipes.Recipes.Count}.");
 
-        await EngineControl.RestartAsync("YouTube: смена способа обхода", CancellationToken.None).ConfigureAwait(false);
+        await RestartAsync("YouTube: смена способа обхода").ConfigureAwait(false);
+    }
+
+    /// <summary>Пока шёл долгий опрос, пользователь мог нажать «Стоп» — против его воли не поднимаем.</summary>
+    private static async Task RestartAsync(string reason)
+    {
+        if (App.Exiting || !EngineControl.IsRunning)
+            return;
+
+        var outcome = await EngineControl.RestartAsync(reason, CancellationToken.None).ConfigureAwait(false);
+
+        if (!outcome.Ok)
+            TrayIcon.Current?.Notify("Zephyron", outcome.Message, link: null);
     }
 
     /// <summary>Пора ли менять способ: два отказа подряд, пауза после прошлой смены и не больше круга за полчаса.</summary>
@@ -156,7 +184,7 @@ internal static class YouTubeWatch
         Journal.Write("YouTube", $"Ни один способ обхода в Zephyron Adaptive не открыл YouTube ({string.Join("; ", results.Select(r => r.Describe()))}) — "
             + $"включаю пресет {YouTubeRecipes.FallbackPreset} для строгих провайдеров. Вернуть прежний можно на вкладке «Десинк».");
 
-        await EngineControl.RestartAsync("YouTube: пресет для строгих провайдеров", CancellationToken.None).ConfigureAwait(false);
+        await RestartAsync("YouTube: пресет для строгих провайдеров").ConfigureAwait(false);
     }
 
     /// <summary>Свой маршрут YouTube — через VPN: тогда способ десинка ни при чём.</summary>

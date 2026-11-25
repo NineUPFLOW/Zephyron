@@ -185,6 +185,8 @@ public sealed record AppSettings
     /// для YouTube по нескольку раз за день, а один рецепт этого не переживает.
     /// </para>
     /// </remarks>
+    // null = «не запускать»: без Never он пропадал при записи и читался как умолчание.
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
     public string? PresetName { get; init; } = DefaultPresetName;
 
     public const string DefaultPresetName = "Zephyron Adaptive";
@@ -917,12 +919,80 @@ public sealed record AppSettings
 
     public static string DefaultPath => Path.Combine("config", "zephyron.json");
 
+    // Один секрет на процесс: пока файла нет, все читающие должны видеть один и тот же.
+    private static readonly Lazy<string> FreshSecret = new(TgWsProxy.NewSecret);
+
+    /// <summary>Выставляется, когда значение enum не распознано: <see cref="Options"/> не присваивает такое свойство.</summary>
+    [ThreadStatic]
+    private static bool enumSkipped;
+
+    /// <summary>
+    /// Неизвестное имя enum (файл новее программы или правка руками) не должно делать
+    /// «испорченным» весь файл: свойство остаётся со значением по умолчанию.
+    /// </summary>
+    private sealed class LenientEnumConverter : JsonConverterFactory
+    {
+        private static readonly JsonStringEnumConverter Inner = new();
+
+        public override bool CanConvert(Type typeToConvert) => Inner.CanConvert(typeToConvert);
+
+        public override JsonConverter CreateConverter(Type type, JsonSerializerOptions options) =>
+            (JsonConverter)Activator.CreateInstance(typeof(Wrapper<>).MakeGenericType(type), Inner.CreateConverter(type, options))!;
+
+        private sealed class Wrapper<T>(JsonConverter inner) : JsonConverter<T> where T : struct, Enum
+        {
+            private readonly JsonConverter<T> inner = (JsonConverter<T>)inner;
+
+            public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            {
+                var copy = reader;
+
+                try
+                {
+                    var value = inner.Read(ref copy, typeToConvert, options);
+                    reader = copy;
+                    return value;
+                }
+                catch (Exception ex) when (ex is JsonException or ArgumentException or InvalidOperationException)
+                {
+                    reader.Skip(); // объект/массив — целиком; у строки и числа Skip ничего не двигает
+                    enumSkipped = true;
+                    return default;
+                }
+            }
+
+            public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options) =>
+                inner.Write(writer, value, options);
+        }
+    }
+
     private static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        Converters = { new JsonStringEnumConverter() },
+        Converters = { new LenientEnumConverter() },
+        TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver
+        {
+            Modifiers =
+            {
+                static info =>
+                {
+                    foreach (var prop in info.Properties)
+                    {
+                        if (prop.Set is not { } set || prop.CustomConverter is not null
+                            || !(Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType).IsEnum)
+                            continue;
+
+                        prop.Set = (o, v) =>
+                        {
+                            if (enumSkipped) enumSkipped = false;
+                            else set(o, v);
+                        };
+                    }
+                },
+            },
+        },
         AllowTrailingCommas = true,
         ReadCommentHandling = JsonCommentHandling.Skip,
     };
@@ -1194,6 +1264,8 @@ public sealed record AppSettings
         WarpIsPath = true,
         WarpEnabled = true,
         TelegramProxy = true,
+        // Без секрета прокси не поднимается (отчёт 23.11: пять перезапусков сразу после мастера).
+        TelegramProxySecret = FreshSecret.Value,
         GameFilterReset = true,
         VerifyTrafficReset = true,
         TelegramProxyAutoReset = true,
@@ -1242,6 +1314,8 @@ public sealed record AppSettings
 
         try
         {
+            // Флаг мог остаться от прошлого чтения, оборванного ошибкой JSON.
+            enumSkipped = false;
             var read = JsonSerializer.Deserialize<AppSettings>(text, Options)
                 ?? throw new JsonException("пустой файл настроек");
 
@@ -1274,7 +1348,14 @@ public sealed record AppSettings
             // подписку человека без следа.
             try
             {
-                File.Copy(target, target + ".bad-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"), overwrite: true);
+                // Один раз на содержимое: каждое чтение испорченного файла плодило копии.
+                var dir = Path.GetDirectoryName(Path.GetFullPath(target))!;
+                var bytes = File.ReadAllBytes(target);
+                var same = Directory.EnumerateFiles(dir, Path.GetFileName(target) + ".bad-*")
+                    .Any(f => new FileInfo(f).Length == bytes.Length && File.ReadAllBytes(f).AsSpan().SequenceEqual(bytes));
+
+                if (!same)
+                    File.WriteAllBytes(target + ".bad-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"), bytes);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {

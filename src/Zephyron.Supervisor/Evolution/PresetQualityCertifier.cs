@@ -135,30 +135,19 @@ public sealed class PresetQualityCertifier
                 break;
 
             var result = await _probe.EvaluateAsync(individual, templatePreset, stressSettings, ct);
-            if (result.Passed == result.Total && result.Total > 0)
+            if (result.Total > 0 && result.Passed >= Math.Max(1, result.Total - 1))
             {
                 passedRounds++;
             }
-            else if (result.Passed >= result.Total - 1 && result.Passed > 0)
+
+            if (result.StreamingSpeedKBps > maxSpeed)
             {
-                if (r == 0) passedRounds++;
+                maxSpeed = result.StreamingSpeedKBps;
             }
 
-            foreach (var (_, outcome) in result.HostResults)
+            if (result.DiscordVoicePassed)
             {
-                if (outcome.Detail.Contains("Скорость:", StringComparison.OrdinalIgnoreCase))
-                {
-                    var m = System.Text.RegularExpressions.Regex.Match(outcome.Detail, @"Скорость:\s*(\d+(?:[.,]\d+)?)\s*КБ/с");
-                    if (m.Success && double.TryParse(m.Groups[1].Value.Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double spd))
-                    {
-                        if (spd > maxSpeed)
-                            maxSpeed = spd;
-                    }
-                }
-                if (outcome.Detail.Contains("Voice UDP ✔", StringComparison.OrdinalIgnoreCase))
-                {
-                    voicePassed = true;
-                }
+                voicePassed = true;
             }
         }
 

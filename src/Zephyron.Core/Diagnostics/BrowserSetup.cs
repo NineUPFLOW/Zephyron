@@ -368,7 +368,10 @@ public static class BrowserSetup
         try
         {
             var script = Path.Combine(Path.GetTempPath(), $"zephyron-reopen-{Guid.NewGuid():N}.cmd");
-            File.WriteAllText(script, $"@start \"\" \"{exe}\" {arguments}\r\n@del \"%~f0\"\r\n");
+            // cmd читает файл в OEM-кодировке: кириллица в имени пользователя
+            // (C:\Users\Иван\...) без chcp 65001 превращалась в мусор. % в пути — удваиваем.
+            static string Cmd(string s) => s.Replace("%", "%%");
+            File.WriteAllText(script, $"@chcp 65001>nul\r\n@start \"\" \"{Cmd(exe)}\" {Cmd(arguments)}\r\n@del \"%~f0\"\r\n");
             Process.Start(new ProcessStartInfo("explorer.exe") { ArgumentList = { script }, UseShellExecute = false })?.Dispose();
         }
         catch (Exception)

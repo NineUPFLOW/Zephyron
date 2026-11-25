@@ -109,10 +109,36 @@ public sealed class EtwConnectionSource : IConnectionEventSource
 
         StopStaleSession();
 
-        _session = new TraceEventSession(SessionName) { StopOnDispose = true };
-        _session.EnableKernelProvider(KernelTraceEventParser.Keywords.NetworkTCPIP);
+        var session = new TraceEventSession(SessionName) { StopOnDispose = true };
 
-        var kernel = _session.Source.Kernel;
+        try
+        {
+            Enable(session);
+        }
+        catch
+        {
+            // Полузапущенная сессия держала бы имя на всю машину и запрещала новый Start.
+            session.Dispose();
+            throw;
+        }
+
+        _session = session;
+
+        // Process() блокирует до остановки сессии, поэтому живёт на своём потоке.
+        _pumpThread = new Thread(PumpEvents)
+        {
+            IsBackground = true,
+            Name = "zephyron-etw",
+        };
+
+        _pumpThread.Start();
+    }
+
+    private void Enable(TraceEventSession session)
+    {
+        session.EnableKernelProvider(KernelTraceEventParser.Keywords.NetworkTCPIP);
+
+        var kernel = session.Source.Kernel;
         kernel.TcpIpConnect += OnTcpConnect;
         kernel.TcpIpConnectIPV6 += OnTcpConnectV6;
         kernel.UdpIpSend += OnUdpSend;
@@ -124,18 +150,9 @@ public sealed class EtwConnectionSource : IConnectionEventSource
             // в той же сессии, что и ядерный. Одна сессия проще в уборке,
             // и порядок событий между провайдерами сохраняется, а он важен:
             // ответ DNS должен успеть записаться до события о соединении.
-            _session.EnableProvider(DnsClientProvider);
-            _session.Source.Dynamic.All += OnDynamicEvent;
+            session.EnableProvider(DnsClientProvider);
+            session.Source.Dynamic.All += OnDynamicEvent;
         }
-
-        // Process() блокирует до остановки сессии, поэтому живёт на своём потоке.
-        _pumpThread = new Thread(PumpEvents)
-        {
-            IsBackground = true,
-            Name = "zephyron-etw",
-        };
-
-        _pumpThread.Start();
     }
 
     /// <summary>
@@ -214,6 +231,11 @@ public sealed class EtwConnectionSource : IConnectionEventSource
         catch (Exception) when (_disposed)
         {
             // Остановка сессии на выходе прерывает Process() — это штатно.
+        }
+        catch (Exception ex)
+        {
+            // Необработанное исключение фонового потока убило бы весь процесс (окно или zy).
+            _channel.Writer.TryComplete(ex);
         }
         finally
         {

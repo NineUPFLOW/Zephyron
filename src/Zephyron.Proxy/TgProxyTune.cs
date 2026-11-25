@@ -9,14 +9,19 @@ using Zephyron.Core;
 
 namespace Zephyron.Proxy;
 
-/// <summary>Рабочий домен Cloudflare для прокси Telegram и его время ответа.</summary>
-public sealed record TgBridge(string Domain, int Ms);
+/// <summary>Рабочий домен Cloudflare для прокси Telegram, его время ответа и адрес Cloudflare, через который ответил.</summary>
+public sealed record TgBridge(string Domain, int Ms, string? Edge = null);
 
 /// <summary>Итог автонастройки прокси Telegram.</summary>
 /// <param name="Direct">Прямой путь к DC2 и DC4 (149.154.167.220) отвечает переходом на WebSocket.</param>
 /// <param name="Bridges">Домены Cloudflare, ответившие переходом, — быстрые первыми.</param>
 /// <param name="Tried">Сколько доменов проверено.</param>
-public sealed record TgProxyTuning(DateTimeOffset At, bool Direct, int? DirectMs, IReadOnlyList<TgBridge> Bridges, int Tried);
+public sealed record TgProxyTuning(DateTimeOffset At, bool Direct, int? DirectMs, IReadOnlyList<TgBridge> Bridges, int Tried)
+{
+    /// <summary>Адреса Cloudflare, через которые мосты ответили, — быстрые первыми.</summary>
+    public IReadOnlyList<string> Edges =>
+        Bridges.Where(b => b.Edge is not null).Select(b => b.Edge!).Distinct(StringComparer.Ordinal).Take(TgProxyTune.Keep).ToList();
+}
 
 /// <summary>
 /// Автонастройка прокси Telegram: какие пути к Telegram сейчас живы.
@@ -169,6 +174,7 @@ public static class TgProxyTune
             {
                 DirectMain = tuning.Direct,
                 CfDomains = tuning.Bridges.Take(Keep).Select(b => b.Domain).ToList(),
+                CfIps = tuning.Edges,
             };
 
     /// <summary>Итог словами — для вкладки и журнала.</summary>
@@ -195,39 +201,84 @@ public static class TgProxyTune
             var domains = await DomainsAsync(cancellationToken);
 
             var direct = ProbeDirectAsync(cancellationToken);
-            using var slots = new SemaphoreSlim(6);
 
-            var probes = await Task.WhenAll(domains.Select(async domain =>
+            var bridges = await BridgesAsync(domains, null, cancellationToken);
+
+            // Ни один адрес из DNS не ответил — пробуем адреса Cloudflare сами: мосты
+            // отвечают на любом его адресе (замер 23.11), а системный DNS мог дать закрытый.
+            foreach (var edge in KnownEdges)
             {
-                await slots.WaitAsync(cancellationToken);
+                if (bridges.Count > 0)
+                    break;
 
-                try
-                {
-                    // Сначала kws2, затем kws4 — главные DC у Telegram Desktop.
-                    var ms = await UpgradeAsync(null, $"kws2.{domain}", cancellationToken)
-                             ?? await UpgradeAsync(null, $"kws4.{domain}", cancellationToken);
-
-                    return ms is { } value ? new TgBridge(domain, value) : null;
-                }
-                finally
-                {
-                    slots.Release();
-                }
-            }));
+                bridges = await BridgesAsync(domains, IPAddress.Parse(edge), cancellationToken);
+            }
 
             var directMs = await direct;
 
-            return new TgProxyTuning(
-                DateTimeOffset.Now,
-                directMs is not null,
-                directMs,
-                probes.OfType<TgBridge>().OrderBy(b => b.Ms).ToList(),
-                domains.Count);
+            return new TgProxyTuning(DateTimeOffset.Now, directMs is not null, directMs, bridges, domains.Count);
         }
         finally
         {
             Gate.Release();
         }
+    }
+
+    /// <summary>
+    /// Адреса Cloudflare на случай, когда DNS дал только закрытые. Замер 23.11 (Билайн):
+    /// pclead, havegreatday и fixtelega отвечают переходом на всех четырёх.
+    /// </summary>
+    internal static readonly string[] KnownEdges = ["104.16.0.1", "188.114.96.1", "104.18.0.1", "188.114.98.1"];
+
+    /// <summary>Мосты, ответившие переходом, — быстрые первыми.</summary>
+    /// <param name="edge"><c>null</c> — каждый адрес, что даёт DNS; иначе только этот адрес Cloudflare.</param>
+    private static async Task<List<TgBridge>> BridgesAsync(IReadOnlyList<string> domains, IPAddress? edge, CancellationToken cancellationToken)
+    {
+        using var slots = new SemaphoreSlim(6);
+
+        var probes = await Task.WhenAll(domains.Select(async domain =>
+        {
+            await slots.WaitAsync(cancellationToken);
+
+            try
+            {
+                // Сначала kws2, затем kws4 — главные DC у Telegram Desktop.
+                return await BridgeAsync(domain, $"kws2.{domain}", edge, cancellationToken)
+                       ?? await BridgeAsync(domain, $"kws4.{domain}", edge, cancellationToken);
+            }
+            finally
+            {
+                slots.Release();
+            }
+        }));
+
+        return probes.OfType<TgBridge>().OrderBy(b => b.Ms).ToList();
+    }
+
+    /// <summary>
+    /// Переход через каждый адрес имени разом, быстрейший ответивший. Прежде брался первый адрес
+    /// из DNS: у Cloudflare их два, и закрытым первым мост считался мёртвым, хотя второй отвечал
+    /// (отчёт 23.11: после смены DNS в системе нашлось 15 живых мостов вместо нуля).
+    /// </summary>
+    private static async Task<TgBridge?> BridgeAsync(string domain, string host, IPAddress? edge, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<IPAddress> addresses;
+
+        try
+        {
+            addresses = edge is not null
+                ? [edge]
+                : await Dns.GetHostAddressesAsync(host, AddressFamily.InterNetwork, cancellationToken);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+
+        var answers = await Task.WhenAll(addresses.Select(async address =>
+            (Address: address, Ms: await UpgradeAsync(address.ToString(), host, cancellationToken))));
+
+        return answers.Where(a => a.Ms is not null).OrderBy(a => a.Ms).Select(a => new TgBridge(domain, a.Ms!.Value, a.Address.ToString())).FirstOrDefault();
     }
 
     /// <summary>Общий список Flowseal; не скачался — домены прошлой проверки.</summary>

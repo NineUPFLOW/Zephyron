@@ -210,13 +210,14 @@ public abstract class SupervisedService
         ForgetRunState();
         _fatal = null;
 
-        await BeforeStartAsync(cancellationToken);
-
         try
         {
+            // Подготовка (списки, порт, маршруты) тоже может упасть — это беда
+            // одной службы, а не повод ронять весь супервизор.
+            await BeforeStartAsync(cancellationToken);
             Process = Process.Start(BuildStartInfo());
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LastError = ex.GetBaseException().Message;
             return false;

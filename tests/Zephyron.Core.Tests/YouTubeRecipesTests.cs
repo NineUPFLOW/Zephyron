@@ -69,6 +69,9 @@ public sealed class YouTubeRecipesTests : IDisposable
         YouTubeRecipes.Write(3, path);
         Assert.Equal(3, YouTubeRecipes.Read(path));
 
+        // Выбор из прошлого (другая версия, другая сеть) — снова первый способ.
+        Assert.Equal(0, YouTubeRecipes.Read(path, DateTime.UtcNow + YouTubeRecipes.Memory + TimeSpan.FromMinutes(1)));
+
         File.WriteAllText(path, "мусор");
         Assert.Equal(0, YouTubeRecipes.Read(path));
 
@@ -99,6 +102,10 @@ public sealed class YouTubeRecipesTests : IDisposable
 
         Assert.Equal([YouTubeRecipes.Recipes[0]], section.DesyncRecipes);
         Assert.Equal([YouTubeRecipes.Recipes[0]], Assert.Single(preset.Sections, s => s.Name == YouTubeRecipes.VideoSectionName).DesyncRecipes);
-        Assert.DoesNotContain(preset.Sections.SelectMany(s => s.RawArguments), a => a.Contains("circular", StringComparison.Ordinal));
+        // Рецепт YouTube меняет программа: circular в его секциях сбивал соседние сайты.
+        // У Discord он свой (23.11) — в секциях только с именами Discord.
+        Assert.DoesNotContain(preset.Sections
+            .Where(s => s.RawArguments.Any(a => a.Contains("youtube", StringComparison.OrdinalIgnoreCase) || a.Contains("google", StringComparison.OrdinalIgnoreCase) && a.StartsWith("--hostlist", StringComparison.Ordinal)))
+            .SelectMany(s => s.RawArguments), a => a.Contains("circular", StringComparison.Ordinal));
     }
 }

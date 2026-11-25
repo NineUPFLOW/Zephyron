@@ -131,9 +131,27 @@ public sealed record SupervisorState
         try
         {
             using var process = System.Diagnostics.Process.GetProcessById(SupervisorProcessId);
-            return !process.HasExited;
+
+            if (process.HasExited)
+                return false;
+
+            // После аварии или перезагрузки файл состояния остаётся, а его PID
+            // достаётся чужому процессу: тот родился позже записавшего супервизора.
+            try
+            {
+                return process.StartTime <= StartedAt.LocalDateTime.AddSeconds(5);
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                // Время старта чужого повышенного процесса не прочесть — верим PID.
+                return true;
+            }
         }
         catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (InvalidOperationException)
         {
             return false;
         }

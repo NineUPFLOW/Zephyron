@@ -773,6 +773,7 @@ public partial class DesyncView : UserControl
 
             (settings with { FakeSwaps = swaps }).Save(AppSettings.DefaultPath);
             Status.Text = "Подделки секций сохранены. Подействуют со следующего запуска движков.";
+            this.Offer("Подделки секций изменены");
         }
         catch (Exception ex)
         {

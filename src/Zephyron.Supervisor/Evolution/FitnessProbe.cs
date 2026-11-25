@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using Zephyron.Zapret;
@@ -10,6 +11,7 @@ namespace Zephyron.Supervisor.Evolution;
 /// </summary>
 public sealed class FitnessProbe
 {
+    private static readonly SemaphoreSlim WinwsProcessLock = new(1, 1);
     private readonly string _zapretRoot;
     private readonly string _winwsPath;
 
@@ -140,17 +142,13 @@ public sealed class FitnessProbe
             arguments.Insert(0, "--wf-dup-check=0");
         }
 
-        var outcomes = new Dictionary<string, ProbeOutcome>(StringComparer.OrdinalIgnoreCase);
-        var latencies = new List<long>();
-        var throughputScores = new List<double>();
-        var voiceScores = new List<double>();
-
         // Если бинарник winws не существует или нет прав — эмулируем безопасный провал
         if (!File.Exists(_winwsPath))
         {
+            var fallback = new Dictionary<string, ProbeOutcome>(StringComparer.OrdinalIgnoreCase);
             foreach (var h in settings.TargetHosts)
             {
-                outcomes[h] = new ProbeOutcome
+                fallback[h] = new ProbeOutcome
                 {
                     Success = false,
                     LatencyMs = 0,
@@ -164,12 +162,21 @@ public sealed class FitnessProbe
                 Passed = 0,
                 Total = settings.TargetHosts.Count,
                 AvgLatencyMs = 0,
-                HostResults = outcomes
+                StreamingSpeedKBps = 0.0,
+                DiscordVoicePassed = false,
+                HostResults = fallback
             };
         }
 
+        await WinwsProcessLock.WaitAsync(ct);
         try
         {
+            var outcomes = new ConcurrentDictionary<string, ProbeOutcome>(StringComparer.OrdinalIgnoreCase);
+            var latencies = new ConcurrentBag<long>();
+            var throughputScores = new ConcurrentBag<double>();
+            var voiceScores = new ConcurrentBag<double>();
+            var rawSpeeds = new ConcurrentBag<double>();
+
             // Запускаем winws2 с конфигурацией данной особи
             string? launchError = await RecipeTrial.WithWinwsAsync(
                 _winwsPath,
@@ -177,11 +184,11 @@ public sealed class FitnessProbe
                 arguments,
                 async () =>
                 {
-                    // Проверяем все целевые хосты
-                    foreach (var host in settings.TargetHosts)
+                    // Параллельно проверяем все целевые хосты внутри запущенного экземпляра winws2
+                    var hostTasks = settings.TargetHosts.Select(async host =>
                     {
                         if (ct.IsCancellationRequested)
-                            break;
+                            return;
 
                         var sw = Stopwatch.StartNew();
                         try
@@ -203,7 +210,7 @@ public sealed class FitnessProbe
                                     LatencyMs = sw.ElapsedMilliseconds,
                                     Detail = "DNS не разрешил имя"
                                 };
-                                continue;
+                                return;
                             }
 
                             var flow = await RecipeTrial.OpensAsync(host, address, hostCts.Token);
@@ -223,15 +230,17 @@ public sealed class FitnessProbe
                                 {
                                     try
                                     {
-                                        var speedRes = await L7ThroughputProbe.MeasureSpeedAsync(host, address, 2, hostCts.Token);
+                                        var speedRes = await L7ThroughputProbe.MeasureSpeedAsync(host, address, 4, hostCts.Token);
                                         if (speedRes.Success)
                                         {
                                             throughputScores.Add(Math.Min(1.0, speedRes.SpeedKBps / 1200.0));
+                                            rawSpeeds.Add(speedRes.SpeedKBps);
                                             detail += $" · {speedRes.Detail}";
                                         }
                                         else if (speedRes.IsThrottled)
                                         {
                                             throughputScores.Add(0.25);
+                                            rawSpeeds.Add(speedRes.SpeedKBps);
                                             detail += $" · ⚠ {speedRes.Detail}";
                                         }
                                     }
@@ -246,7 +255,7 @@ public sealed class FitnessProbe
                                 {
                                     try
                                     {
-                                        var voiceRes = await DiscordVoiceProbe.TestVoiceUdpAsync(1000, hostCts.Token);
+                                        var voiceRes = await DiscordVoiceProbe.TestVoiceUdpAsync(800, hostCts.Token);
                                         if (voiceRes.Success)
                                         {
                                             voiceScores.Add(1.0);
@@ -282,7 +291,9 @@ public sealed class FitnessProbe
                                 Detail = RecipeTrial.Short(ex)
                             };
                         }
-                    }
+                    });
+
+                    await Task.WhenAll(hostTasks);
                 },
                 ct);
 
@@ -299,54 +310,76 @@ public sealed class FitnessProbe
                     };
                 }
             }
+
+            int passed = outcomes.Values.Count(o => o.Success);
+            int total = settings.TargetHosts.Count;
+            long avgLatency = latencies.Count > 0 ? (long)latencies.Average() : 2000;
+            double maxSpeed = rawSpeeds.Count > 0 ? rawSpeeds.Max() : 0.0;
+            bool voicePassed = voiceScores.Any(v => v >= 0.9);
+
+            // Формула фитнеса 2.0 (Многокритериальная оптимизация с L7 Throughput и Discord Voice):
+            // 0.55 * passRatio (проходимость L4/TLS)
+            // 0.20 * speedBonus (пропускная способность видеостриминга)
+            // 0.10 * voiceBonus (прохождение UDP Discord Voice)
+            // 0.10 * latencyBonus (минимальный пинг)
+            // 0.05 * efficiencyBonus (компактность цепочки пакетов)
+            double passRatio = total > 0 ? (double)passed / total : 0.0;
+            double speedBonus = throughputScores.Count > 0 ? throughputScores.Average() : 0.5;
+            double voiceBonus = voiceScores.Count > 0 ? voiceScores.Average() : 0.5;
+            
+            // Быстрый отклик (<80мс -> ~0.98, 200мс -> 0.90, 500мс -> 0.69, >1500мс -> 0.0)
+            double latencyBonus = Math.Clamp(1.0 - (Math.Max(0, avgLatency - 50) / 1450.0), 0.0, 1.0);
+
+            int totalSteps = individual.Genes.Values.Sum(g => g.DesyncSteps.Count);
+            double efficiencyBonus = Math.Max(0.0, 1.0 - (totalSteps / 25.0));
+
+            double score = (0.55 * passRatio) 
+                         + (0.20 * speedBonus) 
+                         + (0.10 * voiceBonus) 
+                         + (0.10 * latencyBonus) 
+                         + (0.05 * efficiencyBonus);
+
+            individual.StreamingSpeedKBps = maxSpeed;
+
+            return new FitnessResult
+            {
+                Score = Math.Round(Math.Clamp(score, 0.0, 1.0), 3),
+                Passed = passed,
+                Total = total,
+                AvgLatencyMs = avgLatency,
+                StreamingSpeedKBps = maxSpeed,
+                DiscordVoicePassed = voicePassed,
+                HostResults = outcomes
+            };
         }
         catch (Exception ex)
         {
+            var fallbackOutcomes = new Dictionary<string, ProbeOutcome>(StringComparer.OrdinalIgnoreCase);
             foreach (var h in settings.TargetHosts)
             {
-                outcomes[h] = new ProbeOutcome
+                fallbackOutcomes[h] = new ProbeOutcome
                 {
                     Success = false,
                     LatencyMs = 0,
                     Detail = RecipeTrial.Short(ex)
                 };
             }
+
+            return new FitnessResult
+            {
+                Score = 0.0,
+                Passed = 0,
+                Total = settings.TargetHosts.Count,
+                AvgLatencyMs = 0,
+                StreamingSpeedKBps = 0.0,
+                DiscordVoicePassed = false,
+                HostResults = fallbackOutcomes
+            };
         }
-
-        int passed = outcomes.Values.Count(o => o.Success);
-        int total = settings.TargetHosts.Count;
-        long avgLatency = latencies.Count > 0 ? (long)latencies.Average() : 2000;
-
-        // Формула фитнеса 2.0 (Многокритериальная оптимизация с L7 Throughput и Discord Voice):
-        // 0.55 * passRatio (проходимость L4/TLS)
-        // 0.20 * speedBonus (пропускная способность видеостриминга)
-        // 0.10 * voiceBonus (прохождение UDP Discord Voice)
-        // 0.10 * latencyBonus (минимальный пинг)
-        // 0.05 * efficiencyBonus (компактность цепочки пакетов)
-        double passRatio = total > 0 ? (double)passed / total : 0.0;
-        double speedBonus = throughputScores.Count > 0 ? throughputScores.Average() : 0.5;
-        double voiceBonus = voiceScores.Count > 0 ? voiceScores.Average() : 0.5;
-        
-        // Быстрый отклик (<80мс -> ~0.98, 200мс -> 0.90, 500мс -> 0.69, >1500мс -> 0.0)
-        double latencyBonus = Math.Clamp(1.0 - (Math.Max(0, avgLatency - 50) / 1450.0), 0.0, 1.0);
-
-        int totalSteps = individual.Genes.Values.Sum(g => g.DesyncSteps.Count);
-        double efficiencyBonus = Math.Max(0.0, 1.0 - (totalSteps / 25.0));
-
-        double score = (0.55 * passRatio) 
-                     + (0.20 * speedBonus) 
-                     + (0.10 * voiceBonus) 
-                     + (0.10 * latencyBonus) 
-                     + (0.05 * efficiencyBonus);
-
-        return new FitnessResult
+        finally
         {
-            Score = Math.Round(Math.Clamp(score, 0.0, 1.0), 3),
-            Passed = passed,
-            Total = total,
-            AvgLatencyMs = avgLatency,
-            HostResults = outcomes
-        };
+            WinwsProcessLock.Release();
+        }
     }
 
     /// <summary>
@@ -360,9 +393,13 @@ public sealed class FitnessProbe
         CancellationToken ct)
     {
         var preset = individual.ToPreset(templatePreset);
-        var arguments = WinwsCommandLine.Build(preset);
+        var arguments = new List<string>(WinwsCommandLine.Build(preset));
+        if (!arguments.Any(a => a.StartsWith("--wf-priority", StringComparison.OrdinalIgnoreCase)))
+            arguments.Insert(0, "--wf-priority=1000");
+        if (!arguments.Any(a => a.StartsWith("--wf-dup-check", StringComparison.OrdinalIgnoreCase)))
+            arguments.Insert(0, "--wf-dup-check=0");
 
-        var statuses = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var statuses = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         int passed = 0;
         var hosts = settings.TargetHosts;
 
@@ -378,6 +415,7 @@ public sealed class FitnessProbe
             };
         }
 
+        await WinwsProcessLock.WaitAsync(ct);
         try
         {
             string? launchError = await RecipeTrial.WithWinwsAsync(
@@ -386,11 +424,11 @@ public sealed class FitnessProbe
                 arguments,
                 async () =>
                 {
-                    // Проверяем устойчивость связки: выполняем 2 раунда сетевых запросов
-                    foreach (var host in hosts)
+                    // Проверяем устойчивость связки параллельно по всем хостам: выполняем 2 раунда сетевых запросов
+                    var hostTasks = hosts.Select(async host =>
                     {
                         if (ct.IsCancellationRequested)
-                            break;
+                            return;
 
                         int successRounds = 0;
                         long totalLat = 0;
@@ -424,7 +462,7 @@ public sealed class FitnessProbe
 
                         if (successRounds > 0)
                         {
-                            passed++;
+                            Interlocked.Increment(ref passed);
                             long avg = totalLat / successRounds;
                             statuses[host] = $"Стабильно ({avg} мс, {successRounds}/2)";
                         }
@@ -432,7 +470,9 @@ public sealed class FitnessProbe
                         {
                             statuses[host] = "Блокируется DPI / Таймаут";
                         }
-                    }
+                    });
+
+                    await Task.WhenAll(hostTasks);
                 },
                 ct);
 
@@ -458,6 +498,10 @@ public sealed class FitnessProbe
                 SynergyScore = 0.0,
                 Verdict = $"Сбой верификации: {RecipeTrial.Short(ex)}"
             };
+        }
+        finally
+        {
+            WinwsProcessLock.Release();
         }
 
         double synergyRatio = hosts.Count > 0 ? (double)passed / hosts.Count : 0.0;

@@ -68,9 +68,14 @@
                 <Button x:Name="OpenButton" Style="{StaticResource Ghost}" Content="Открыть hosts"
                         Click="OnOpen" Margin="0,0,8,0" gui:ButtonGlyph.Lead="&#xE8E5;"
                         ToolTip="В Блокноте целиком, вместе с комментариями, которых нет в таблице" />
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0"
+                            ToolTip="Раз в 6 часов, пока работают движки: молчащий адрес прибитого имени меняется живым от посредника, молчащий запасной убирается. Имя с пина не снимается никогда — напрямую оно не уйдёт.">
+                    <TextBlock Text="Чинить пины сам" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <ToggleButton x:Name="AutoRepinSwitch" Style="{StaticResource Switch}" Click="OnAutoRepin" VerticalAlignment="Center" />
+                </StackPanel>
                 <Button x:Name="CheckButton" Style="{StaticResource Primary}" Content="Проверить доступность"
                         Click="OnCheck" gui:ButtonGlyph.Lead="&#xE72C;"
-                        ToolTip="Подключается по 443 к каждому адресу действующих записей, по восемь сразу" />
+                        ToolTip="Проверяет каждый адрес файла и сразу чинит наши пины: молчащий адрес меняется живым, молчащий запасной убирается" />
             </WrapPanel>
         </ContentControl>
 
@@ -94,8 +99,9 @@
             </Border>
 
             <!--
-                Повторы: имя прибито не в первый раз. Windows берёт первую
-                запись, так что повтор ничего не делает, но выглядит рабочим.
+                Повторы: та же запись ещё раз или то же имя у другого адреса
+                в другом блоке. Windows отдаёт программам все адреса имени
+                (замер 22.11), так что чужой адрес действует наравне с нашим.
                 Замер 23.09: 68 повторов, из них 29 — тот же адрес в блоке
                 ZapretGUI, 39 — ChatGPT на старом адресе под нашим пином.
             -->
@@ -243,7 +249,7 @@
                             <TextBlock x:Name="DeadGlyph" Style="{StaticResource StatGlyph}" Text="&#xE783;" />
                             <StackPanel Grid.Column="1">
                                 <TextBlock x:Name="DeadText" Text="—" Style="{StaticResource StatNumber}" />
-                                <TextBlock x:Name="DeadCaption" Text="не отвечают: не проверялось" Style="{StaticResource Caption}"
+                                <TextBlock x:Name="DeadCaption" Text="ещё не проверяли" Style="{StaticResource Caption}"
                                            TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                         </Grid>

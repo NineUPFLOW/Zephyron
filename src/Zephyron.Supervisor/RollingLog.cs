@@ -1,4 +1,6 @@
+using System.Runtime.InteropServices;
 using System.Text;
+using Microsoft.Win32.SafeHandles;
 
 namespace Zephyron.Supervisor;
 
@@ -88,11 +90,15 @@ public sealed class RollingLog : IDisposable
         // FileShare.ReadWrite обязателен: иначе лог невозможно прочитать,
         // пока служба работает, — а именно тогда он и нужен. Проверено
         // на себе: разбор падения упёрся в «файл занят другим процессом».
-        var stream = new FileStream(
-            _path,
-            FileMode.Append,
-            FileAccess.Write,
-            FileShare.ReadWrite);
+        // Доступ — только дописывание (FILE_APPEND_DATA): Windows пишет в нынешний конец файла.
+        // «Очистить журналы» обнуляет файл из окна, и писатель с обычным доступом продолжал
+        // с прежнего места — отчёт 22.11: 4 МБ нулевых байт впереди журнала tg-ws-proxy.
+        var handle = CreateFileW(_path, AppendData | Synchronize, FileShare.ReadWrite, IntPtr.Zero, FileMode.OpenOrCreate, NormalFile, IntPtr.Zero);
+
+        if (handle.IsInvalid)
+            throw new IOException($"Журнал не открылся: {_path} (ошибка {Marshal.GetLastPInvokeError()})");
+
+        var stream = new FileStream(handle, FileAccess.Write);
 
         _writer = new StreamWriter(stream, new UTF8Encoding(false))
         {
@@ -138,6 +144,12 @@ public sealed class RollingLog : IDisposable
     }
 
     private string Generation(int index) => $"{_path}.{index}";
+
+    private const uint AppendData = 0x0004, Synchronize = 0x0010_0000, NormalFile = 0x80;
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern SafeFileHandle CreateFileW(string name, uint access, FileShare share, IntPtr security,
+        FileMode disposition, uint flags, IntPtr template);
 
     public void Dispose()
     {

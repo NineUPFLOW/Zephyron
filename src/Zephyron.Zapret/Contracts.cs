@@ -38,12 +38,12 @@ public sealed record ZapretPaths
     /// </remarks>
     private static string FindPresetDirectory()
     {
-        var beside = Path.Combine(AppContext.BaseDirectory, "presets");
+        var beside = Path.Combine(Zephyron.Core.InstallRoot.AppFolder, "presets");
 
         if (Directory.Exists(beside))
             return beside;
 
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        var directory = new DirectoryInfo(Zephyron.Core.InstallRoot.AppFolder);
 
         while (directory is not null)
         {
@@ -198,6 +198,8 @@ public sealed record ZapretPaths
     /// </remarks>
     private static IEnumerable<string> BundledRoots()
     {
+        yield return Path.Combine(Zephyron.Core.InstallRoot.AppFolder, BundleDirectory, "zapret");
+
         var beside = Path.Combine(AppContext.BaseDirectory, BundleDirectory, "zapret");
         yield return beside;
 

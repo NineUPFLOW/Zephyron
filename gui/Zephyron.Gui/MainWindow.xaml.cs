@@ -140,6 +140,19 @@ public partial class MainWindow : Window
         Loaded += (_, _) => ApplyBackdropKind();
 
         _release.Tick += (_, _) => Release();
+
+        _settle.Tick += (_, _) =>
+        {
+            _settle.Stop();
+            GiveBackMemory();
+        };
+        _trim.Tick += (_, _) => GiveBackMemory();
+        _trim.Start();
+        Closed += (_, _) =>
+        {
+            _settle.Stop();
+            _trim.Stop();
+        };
         IsVisibleChanged += (_, _) =>
         {
             if (IsVisible)
@@ -176,6 +189,47 @@ public partial class MainWindow : Window
 
     private readonly DispatcherTimer _release = new() { Interval = ReleaseAfter };
 
+    /// <summary>
+    /// Через сколько после перехода между разделами отдать освободившуюся память.
+    /// </summary>
+    /// <remarks>
+    /// Замер 23.11: живых объектов окна 30–60 МБ, а сборщик держал за ними до 150 МБ —
+    /// каждый проход по разделам добавлял к частной памяти 25–30 МБ, за пару часов
+    /// окно доходило до 365 МБ. Разделы читают списки и каталоги, и мусора от
+    /// перехода много; сборка Aggressive уплотняет кучу и возвращает системе всё
+    /// свободное. Пауза — пока человек смотрит на раздел, а не листает их.
+    /// </remarks>
+    private static readonly TimeSpan SettleAfter = TimeSpan.FromSeconds(4);
+
+    private readonly DispatcherTimer _settle = new() { Interval = SettleAfter };
+
+    /// <summary>Отдаёт системе свободное после работы самих разделов (замеры, журналы) — раз в десять минут.</summary>
+    private readonly DispatcherTimer _trim = new() { Interval = TimeSpan.FromMinutes(10) };
+
+    /// <summary>Полная сборка с уплотнением и возвратом свободной памяти системе — вне потока окна.</summary>
+    /// <remarks>Дважды: между сборками финализаторы отпускают неуправляемое (картинки, кисти WPF), и вторая собирает их обёртки.</remarks>
+    /// <param name="trim">
+    /// Окно закрыто, программа в трее: ещё и выгрузить страницы из памяти (EmptyWorkingSet). Замер 23.11:
+    /// в трее живых объектов 13 МБ, а частная память — 140 МБ (код, шрифты и данные отрисовки), и почти
+    /// всё это до открытия окна не нужно. Понадобится — Windows подгрузит страницы обратно.
+    /// </param>
+    internal static void GiveBackMemory(bool trim = false) =>
+        Task.Run(() =>
+        {
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+            GC.WaitForPendingFinalizers();
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+
+            if (trim)
+            {
+                using var self = System.Diagnostics.Process.GetCurrentProcess();
+                EmptyWorkingSet(self.Handle);
+            }
+        });
+
+    [System.Runtime.InteropServices.DllImport("psapi.dll")]
+    private static extern bool EmptyWorkingSet(IntPtr process);
+
     /// <summary>Окно закрывается по-настоящему — крестик это не отменяет.</summary>
     private bool _releasing;
 
@@ -197,12 +251,7 @@ public partial class MainWindow : Window
 
         // Отдать системе, а не только освободить: без сборки с уплотнением
         // занятое так и висело бы за процессом до следующей сборки мусора.
-        Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
-        {
-            System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
-            GC.WaitForPendingFinalizers();
-        }));
+        Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => GiveBackMemory(trim: true)));
     }
 
     /// <summary>
@@ -535,6 +584,10 @@ public partial class MainWindow : Window
 
         // Черта едет после раскладки: в сжатой полосе пункт мог ещё не встать на место.
         Dispatcher.InvokeAsync(() => MoveIndicator(), DispatcherPriority.Loaded);
+
+        // Мусор ушедшего раздела — системе, когда человек остановится на новом.
+        _settle.Stop();
+        _settle.Start();
 
         // Скорость слоя — только с «Главной»: уходим — данных нет.
         if (name != "status")
@@ -1258,7 +1311,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            var path = Path.Combine(AppContext.BaseDirectory, "build-number.txt");
+            var path = Path.Combine(Zephyron.Core.InstallRoot.AppFolder, "build-number.txt");
 
             if (!File.Exists(path))
                 return null;

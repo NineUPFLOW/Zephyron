@@ -2,7 +2,9 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Zephyron.Core;
 using Zephyron.Proxy;
+using Zephyron.Supervisor;
 
 namespace Zephyron.Gui.Views;
 
@@ -81,6 +83,8 @@ public partial class HostsView : UserControl
 
     private void Reload()
     {
+        AutoRepinSwitch.IsChecked = AppSettings.Load(AppSettings.DefaultPath).AutoRepin;
+
         if (HostsEditor.WhoReplaced() is { } who)
         {
             ReplacedCard.Visibility = Visibility.Visible;
@@ -179,7 +183,7 @@ public partial class HostsView : UserControl
         if (!_checked)
         {
             DeadText.Text = "—";
-            DeadCaption.Text = "не отвечают: не проверялось";
+            DeadCaption.Text = "ещё не проверяли";
             DeadGlyph.SetResourceReference(TextBlock.ForegroundProperty, "Faint");
             return;
         }
@@ -555,7 +559,7 @@ public partial class HostsView : UserControl
     /// адрес уже известен, и подбирать нечего. Проверка строгая — строка,
     /// не разобравшаяся в адрес, ушла бы в файл и осталась там молча нерабочей.
     /// Запись ложится в наш блок в начале файла: при двух записях на одно имя
-    /// Windows берёт первую, и дописанная в конец проиграла бы чужой молча.
+    /// Windows отдаёт адреса по порядку строк, и программа пробует первый.
     /// </remarks>
     private void AddPins()
     {
@@ -639,9 +643,8 @@ public partial class HostsView : UserControl
     /// Карточка повторов: сколько, каких и что из них можно убрать.
     /// </summary>
     /// <remarks>
-    /// Спорящие адреса называются отдельно и не убираются кнопкой. Сейчас
-    /// они не действуют — выше то же имя прибито к другому, — но удаливший
-    /// верхнюю запись получит нижнюю, и это решение человека, а не наше.
+    /// Спорящие адреса называются отдельно и не убираются кнопкой: Windows
+    /// отдаёт программам оба, и какой из них лишний, решает человек, а не мы.
     /// </remarks>
     private void ShowRepeats()
     {
@@ -669,7 +672,7 @@ public partial class HostsView : UserControl
             parts.Add($"{report.Same} — тот же адрес ещё раз: Windows берёт первую запись, повтор ничего не делает.");
 
         if (report.Conflicting > 0)
-            parts.Add($"{report.Conflicting} — другой адрес: сейчас не действуют, но всплывут, если удалить запись выше.");
+            parts.Add($"{report.Conflicting} — другой адрес в другом месте файла: Windows отдаёт оба, и программа может пойти по любому.");
 
         if (report.ForeignBlocks.Count > 0)
             parts.Add($"Часть лежит в блоке {string.Join(", ", report.ForeignBlocks)} — он может вернуть их.");
@@ -736,6 +739,29 @@ public partial class HostsView : UserControl
 
         try
         {
+            // Сначала наши пины чинятся тем же ходом, что и по расписанию (PinRefresh):
+            // одна кнопка вместо двух (владелец 22.11: «зачем 2 кнопки?»). Имя с пина
+            // не снимается никогда: если живой замены нет, пин остаётся как был.
+            string? repaired = null;
+
+            if (HostsEditor.PinsAll().Count > 0)
+            {
+                var state = SupervisorState.Load(SupervisorState.DefaultPath);
+                bool engines = state is not null && state.IsSupervisorAlive();
+                var fixedPins = await Task.Run(() => PinRefresh.RunAsync(_work.Token, byHand: true));
+
+                PinRefreshWatch.Write("кнопкой", fixedPins);
+
+                if (fixedPins.Changes.Count + fixedPins.Moved.Count + fixedPins.Reordered.Count + fixedPins.Pruned.Count > 0
+                    || fixedPins.Dead.Count > 0 || fixedPins.Error is not null)
+                {
+                    repaired = PinRefreshWatch.Describe(fixedPins)
+                        + (engines ? string.Empty : " Движки не подняты — часть посредников без десинка не отвечает.");
+                }
+
+                Reload();
+            }
+
             var progress = new Progress<PinHealth>(health =>
             {
                 var state = !health.Tested ? HostsHealth.Untested
@@ -757,11 +783,12 @@ public partial class HostsView : UserControl
             int deadAddresses = results.Count(r => r.Tested && !r.Alive);
             int deadNames = _all.Count(l => l.Row.Enabled && l.Health == HostsHealth.Dead);
 
-            Say(deadAddresses == 0
+            Say((repaired is null ? string.Empty : repaired + " ")
+                + (deadAddresses == 0
                 ? $"Все {results.Count} адресов отвечают."
                 : $"Молчат {deadAddresses} адресов из {results.Count} — на них {deadNames} записей. "
-                  + "Такой пин ведёт в никуда и выглядит блокировкой: удалите его или подберите адрес заново. "
-                  + "Раскрыть");
+                  + "У наших пинов живой замены не нашлось — они оставлены, чтобы имя не ушло напрямую; "
+                  + "чужую запись на молчащий адрес лучше удалить. Раскрыть"));
         }
         catch (OperationCanceledException)
         {
@@ -775,6 +802,20 @@ public partial class HostsView : UserControl
         {
             CheckButton.IsEnabled = true;
             CheckButton.Content = "Проверить доступность";
+        }
+    }
+
+    /// <summary>Выключатель плановой починки пинов; сторож читает его на каждом круге.</summary>
+    private void OnAutoRepin(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            (AppSettings.Load(AppSettings.DefaultPath) with { AutoRepin = AutoRepinSwitch.IsChecked == true })
+                .Save(AppSettings.DefaultPath);
+        }
+        catch (Exception ex)
+        {
+            Say("Не удалось сохранить настройку: " + ex.GetBaseException().Message);
         }
     }
 

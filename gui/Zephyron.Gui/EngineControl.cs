@@ -54,6 +54,15 @@ internal static class EngineControl
     /// через пять секунд после перезапуска — второй супервизор сменил первый,
     /// и движки поднимались заново.
     /// </remarks>
+    /// <summary>
+    /// Супервизор, поднятый окном, умер сам: ни остановки, ни запуска сейчас нет.
+    /// </summary>
+    public static bool Lost =>
+        _spawned is not null
+        && Volatile.Read(ref _stopping) == 0
+        && Volatile.Read(ref _starting) == 0
+        && !IsRunning;
+
     public static bool Coming =>
         Volatile.Read(ref _stopping) == 0
         && (Volatile.Read(ref _starting) > 0 || IsRunning);
@@ -182,8 +191,25 @@ internal static class EngineControl
 
     private static async Task<EngineOutcome> StartCoreAsync(CancellationToken cancellationToken)
     {
+        // Пути движков относительные: рабочую папку мог увести кто угодно в процессе
+        // (журнал 23.11, 15:25: «sing-box.exe не найден в engines/» при целой установке).
+        InstallRoot.MoveTo();
+
         var settings = AppSettings.Load(AppSettings.DefaultPath);
+
+        // Файл занят/не читается — это Fresh, а не выбор человека: по нему собрался бы WARP-конфиг поверх runtime/singbox.json.
+        if (settings.LoadFailed)
+            return new EngineOutcome(false, "Не удалось прочитать настройки (файл занят или повреждён). Запуск отменён, чтобы не затереть конфиг. Повторите через минуту.");
+
         var note = string.Empty;
+        var stage = System.Diagnostics.Stopwatch.StartNew();
+        var stages = new List<string>();
+
+        void Took(string what)
+        {
+            stages.Add($"{what} {stage.Elapsed.TotalSeconds:0.0} с");
+            stage.Restart();
+        }
 
         // Конфиг собирается при каждом запуске: иначе смена сервера, правки
         // маршрутов и переключение режима показываются новыми, а до туннеля
@@ -202,6 +228,8 @@ internal static class EngineControl
 
                 note = built.Message + " Запускаю с ранее собранным конфигом. ";
             }
+
+            Took("конфиг туннеля");
         }
 
         // При одном десинке и DNS «через туннель» — движок только ради DNS
@@ -214,6 +242,9 @@ internal static class EngineControl
         bool poisoned = !settings.NeedsDnsEngine && !settings.NeedsProxy && settings.NeedsDesync
             && !settings.UseRouterDns && settings.DnsVia == DnsRoute.Auto
             && await Task.Run(() => Zephyron.Core.Diagnostics.SystemDnsCheck.Poisoned(), cancellationToken);
+
+        if (stage.Elapsed > TimeSpan.FromMilliseconds(50))
+            Took("проверка DNS");
 
         if (poisoned)
         {
@@ -240,7 +271,11 @@ internal static class EngineControl
 
             if (!lists.Ok)
                 note += lists.Message + " ";
+
+            Took("списки десинка");
         }
+
+        Journal.Write("движки", "подготовка: " + string.Join(", ", stages));
 
         var exe = Environment.ProcessPath;
 

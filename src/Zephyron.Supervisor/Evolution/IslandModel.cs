@@ -116,8 +116,19 @@ public sealed class IslandModel
                     var emigrant = GeneticOperators.Elite(islands[i], 1).FirstOrDefault();
                     if (emigrant != null)
                     {
-                        // Заменяем худшую особь на следующем острове
-                        var worstIdx = islands[nextIsland].FindIndex(x => x.FitnessScore == islands[nextIsland].Min(w => w.FitnessScore));
+                        // Безопасно находим худшую особь на следующем острове, учитывая NaN
+                        int worstIdx = -1;
+                        double worstScore = double.PositiveInfinity;
+                        for (int w = 0; w < islands[nextIsland].Count; w++)
+                        {
+                            var cand = islands[nextIsland][w];
+                            double sc = cand.HasValidFitness ? cand.FitnessScore : -1.0;
+                            if (sc < worstScore)
+                            {
+                                worstScore = sc;
+                                worstIdx = w;
+                            }
+                        }
                         if (worstIdx >= 0)
                             islands[nextIsland][worstIdx] = emigrant;
                     }

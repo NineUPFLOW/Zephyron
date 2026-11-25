@@ -115,7 +115,8 @@ public static class WinwsCommandLine
         bool warpApi = false,
         bool videoWindow = false,
         IReadOnlyList<string>? panelHosts = null,
-        string? directList = null)
+        string? directList = null,
+        string? zapretRoot = null)
     {
         var arguments = BuildPreset(preset, excludeList, own, keepList, warpApi, videoWindow, panelHosts, directList);
 
@@ -126,13 +127,16 @@ public static class WinwsCommandLine
 
         TunnelCapture.Apply(arguments, tunnelServers, tunnelFakeRange, udpOff, tunAddresses, lans);
 
+        // Малое окно с заниженным множителем: пересчёт окна — в каждой секции TCP (VideoWindow.Ramp).
+        VideoWindow.Ramp(arguments, zapretRoot is null ? null : ListHasGoogle(zapretRoot));
+
         // Строка запуска Windows — не длиннее 32 767 символов (14.11: переполнение молча
         // не давало winws2 подняться). Необязательное — исключения «напрямую» — уходит первым.
         if (Length(arguments) > SafeLength && arguments.RemoveAll(a => directList is not null && a == DirectAddresses.Exclude(directList)) > 0)
             Console.WriteLine("Строка winws2 близка к пределу Windows: сети «напрямую» из секций по адресам не исключены.");
 
         // Окну нужно подтверждение рукопожатия, а оно без данных (VideoWindow).
-        if (arguments.Any(a => a == "--lua-desync=zy_video_window:syn") && !VideoWindow.CaptureEmptyAcks(arguments))
+        if (arguments.Contains(VideoWindow.SynStep) && !VideoWindow.CaptureEmptyAcks(arguments))
             Console.WriteLine("Видео под фильтром: у пресета фильтр перехвата задан файлом, малое окно не встанет.");
 
         return arguments;
@@ -313,6 +317,38 @@ public static class WinwsCommandLine
         }
 
         return arguments;
+    }
+
+    /// <summary>
+    /// Проверка списка секции на имена Google для <see cref="VideoWindow.Ramp"/>: путь — от корня
+    /// Zapret, как его разрешает winws2. Нет файла или не прочитался — «есть»: лишний шаг
+    /// безвреден, пропущенный оставил бы соединение с узлом видео без пересчёта окна.
+    /// </summary>
+    private static Func<string, bool> ListHasGoogle(string zapretRoot)
+    {
+        var seen = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+
+        return list =>
+        {
+            var path = Path.IsPathRooted(list) ? list : Path.Combine(zapretRoot, list.Replace('/', Path.DirectorySeparatorChar));
+
+            if (seen.TryGetValue(path, out bool known))
+                return known;
+
+            bool found;
+
+            try
+            {
+                found = !File.Exists(path)
+                    || VideoWindow.HasGoogleName(File.ReadLines(path).Where(l => !l.TrimStart().StartsWith('#')));
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                found = true;
+            }
+
+            return seen[path] = found;
+        };
     }
 
     /// <summary>Запас до предела строки запуска Windows (32 767): путь к exe и кавычки.</summary>

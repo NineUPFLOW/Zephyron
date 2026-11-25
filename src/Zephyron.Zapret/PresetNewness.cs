@@ -44,6 +44,10 @@ public static class PresetNewness
         items
             // Пресет по умолчанию — первым (владелец 15.11: «добавляй выше всех»).
             .OrderByDescending(item => string.Equals(name(item), Core.AppSettings.DefaultPresetName, StringComparison.OrdinalIgnoreCase))
+
+            // Остальные наши — сразу за ним, а не в хвосте среди безномерных (владелец 22.11:
+            // «почему новые пресеты внизу?» — Stable и Strict стояли под ALL TCP & UDP).
+            .ThenByDescending(item => name(item).StartsWith("Zephyron ", StringComparison.OrdinalIgnoreCase))
             .ThenByDescending(item => Number(name(item)) ?? -1)
 
             // При равном номере основной — первым: «Universal V11» (12.10)

@@ -98,6 +98,64 @@ public sealed class PinRefreshFlowTests : IDisposable
 
     private string[] Lines() => File.ReadAllLines(_hosts).Select(l => l.Trim()).ToArray();
 
+    /// <summary>
+    /// Первый адрес жив, запасной молчит (у пользователя 21.11 — 67 имён на одном таком):
+    /// запасной убирается со второго промаха, первый и пометка посредника остаются.
+    /// </summary>
+    [Fact]
+    public async Task A_silent_spare_address_goes_on_the_second_miss_and_the_live_head_stays()
+    {
+        Hosts("5.175.161.3 claude.ai # zy:via=geohide-eu", "5.175.161.40 claude.ai # zy:via=geohide-eu");
+
+        var net = new FakeNet();
+        net.Verdicts["5.175.161.3"] = PinVerdict.Works;
+        net.Replies["geohide-eu"] = Reply(["5.175.161.3", "5.175.161.40"]);
+
+        var first = await Run(net);
+
+        Assert.Empty(first.Pruned);
+        Assert.Contains("5.175.161.40 claude.ai # zy:via=geohide-eu", Lines());
+
+        var second = await Run(net);
+
+        Assert.Single(second.Pruned);
+        Assert.Contains("5.175.161.3 claude.ai # zy:via=geohide-eu", Lines());
+        Assert.DoesNotContain(Lines(), l => l.StartsWith("5.175.161.40 ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_silent_spare_goes_at_once_by_hand_but_never_without_a_network()
+    {
+        Hosts("5.175.161.3 claude.ai # zy:via=geohide-eu", "5.175.161.40 claude.ai # zy:via=geohide-eu");
+
+        var net = new FakeNet { Online = false };
+        net.Verdicts["5.175.161.3"] = PinVerdict.Works;
+        net.Replies["geohide-eu"] = Reply(["5.175.161.3", "5.175.161.40"]);
+
+        Assert.Empty((await Run(net, byHand: true)).Pruned);
+        Assert.Contains("5.175.161.40 claude.ai # zy:via=geohide-eu", Lines());
+
+        net.Online = true;
+
+        Assert.Single((await Run(net, byHand: true)).Pruned);
+        Assert.DoesNotContain(Lines(), l => l.StartsWith("5.175.161.40 ", StringComparison.Ordinal));
+        Assert.Contains("5.175.161.3 claude.ai # zy:via=geohide-eu", Lines());
+    }
+
+    /// <summary>Молчат все адреса — имя не снимается: оно не должно уйти напрямую.</summary>
+    [Fact]
+    public async Task A_name_whose_every_address_is_silent_keeps_its_pin()
+    {
+        Hosts("5.175.161.3 claude.ai # zy:via=geohide-eu", "5.175.161.40 claude.ai # zy:via=geohide-eu");
+
+        var net = new FakeNet();
+        net.Replies["geohide-eu"] = Reply(["5.175.161.3", "5.175.161.40"]);
+
+        await Run(net, byHand: true);
+
+        Assert.Contains(Lines(), l => l.EndsWith(" claude.ai # zy:via=geohide-eu", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task An_old_pin_gets_the_profile_of_the_intermediary_that_gives_its_address()
     {

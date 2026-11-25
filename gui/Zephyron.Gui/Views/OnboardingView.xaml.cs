@@ -1001,9 +1001,15 @@ public partial class OnboardingView : UserControl
 
             var book = SubscriptionBook.Load();
 
-            var entry = new SubscriptionEntry { Name = book.FreeName(), Url = parsed.ToString() };
-            book.Entries.Add(entry);
-            book.Save();
+            // Та же ссылка уже в списке (мастер заново после сброса) — берём её, а не заводим вторую.
+            var entry = book.Entries.FirstOrDefault(e => SubscriptionBook.Same(e.Url, parsed.ToString()));
+
+            if (entry is null)
+            {
+                entry = new SubscriptionEntry { Name = book.FreeName(), Url = parsed.ToString() };
+                book.Entries.Add(entry);
+                book.Save();
+            }
 
             SubscriptionBook.MakeActive(entry);
 

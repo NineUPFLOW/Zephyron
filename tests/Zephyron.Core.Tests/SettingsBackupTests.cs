@@ -77,6 +77,23 @@ public sealed class SettingsBackupTests : IDisposable
     }
 
     [Fact]
+    public void RestoreRemovesBackupSetFilesAbsentFromTheBackup()
+    {
+        var src = Path.Combine(_dir, "src2");
+        Put(src, "config/zephyron.json", "{}");
+        var file = Pack(src);
+        var target = Path.Combine(_dir, "dst2");
+        var warp = Put(target, "config/warp.conf", "old");
+        var list = Put(target, "config/lists/own/old.txt", "a.com");
+
+        var restored = SettingsBackup.Import(file, Password, target);
+
+        Assert.False(File.Exists(warp));
+        Assert.False(File.Exists(list));
+        Assert.Equal("old", File.ReadAllText(Path.Combine(restored.BackupDir, "config", "warp.conf")));
+    }
+
+    [Fact]
     public void WrongPasswordAndTamperingGiveTheSameMessage()
     {
         var file = Pack(Source());

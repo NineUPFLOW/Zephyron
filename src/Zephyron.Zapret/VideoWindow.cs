@@ -85,8 +85,115 @@ public static class VideoWindow
         "--ipset-ip=" + string.Join(',', GoogleFrontEnds),
         "--out-range=-n4",
         "--payload=all",
-        "--lua-desync=zy_video_window:syn",
+        SynStep,
     ];
+
+    /// <summary>
+    /// Шаг SYN: множитель окна занижается до 1, а не снимается — малое окно до 131 КБ вместо 64,
+    /// вдвое быстрее (замер 13–14.11: 11,5–21,5 Мбит/с против 5,1–9,2 на тех же узлах; 22.11 у владельца
+    /// SYN к узлу под окном ушёл с wscale 1, и видео с него шло в 2160p).
+    /// Каждое окно такого соединения пересчитывает шаг <see cref="RampStep"/>.
+    /// </summary>
+    public const string SynStep = "--lua-desync=zy_video_window:syn:scale=1";
+
+    /// <summary>Страховочный профиль пересчёта окна на адресах Google — последним в строке.</summary>
+    public const string RampProfileName = "--name=Zephyron: узлы видео (окно)";
+
+    /// <summary>Пересчёт окна соединения с заниженным множителем — последним в каждой секции TCP.</summary>
+    public const string RampStep = "--lua-desync=zy_video_window:ramp";
+
+    /// <summary>
+    /// Дописывает пересчёт окна в конец каждой секции TCP, кроме секции SYN.
+    /// </summary>
+    /// <remarks>
+    /// После приветствия соединение уходит в секцию по своему имени — googlevideo, youtube,
+    /// свой рецепт, щит «напрямую», «Google (сервисы)», — и пересчитывать окно должна она:
+    /// иначе сервер видит окно в 128 раз меньше и соединение почти встаёт (замер 11.11:
+    /// 45 КБ за 30 с). Последним, под <c>--out-range=a</c> и <c>--payload=all</c>: шаг видит
+    /// каждый исходящий пакет, пустые подтверждения тоже, и не сдвигает диапазоны рецептов
+    /// секции. Прочим соединениям шаг не делает ничего и выключается на первом пакете.
+    /// </remarks>
+    /// <param name="listHasGoogle">
+    /// Есть ли в списке имена Google; <c>null</c> — не проверять, пересчёт в каждую секцию TCP.
+    /// Секция, отбирающая только по спискам без имён Google, соединение к узлу Google
+    /// не возьмёт, и шаг ей ни к чему: 22.11 шаг в каждой из шестидесяти секций Adaptive
+    /// (по 60 символов) вывел строку запуска за предел Windows, и winws2 не поднимался.
+    /// </param>
+    public static void Ramp(List<string> arguments, Func<string, bool>? listHasGoogle = null)
+    {
+        if (!arguments.Contains(SynStep))
+            return;
+
+        int end = arguments.Count;
+
+        for (int i = arguments.Count - 1; i >= -1; i--)
+        {
+            if (i >= 0 && arguments[i] != "--new")
+                continue;
+
+            int start = i + 1;
+            var section = arguments.GetRange(start, end - start);
+
+            if (section.Any(a => a.StartsWith("--filter-tcp=", StringComparison.Ordinal))
+                && !section.Contains(SynStep)
+                && !section.Contains(RampStep)
+                && MaySeeGoogle(section, listHasGoogle))
+            {
+                arguments.InsertRange(end, ["--out-range=a", "--payload=all", RampStep]);
+            }
+
+            end = i;
+        }
+
+        // Страховка последним профилем: соединение к узлу Google с заниженным множителем, чьё имя
+        // не взяла ни одна секция (обновления Chrome gvt1.com идут с тех же узлов, а общая секция
+        // Adaptive ловит сайты по именам), осталось бы без пересчёта и почти встало бы.
+        // Здесь — только пересчёт: другим соединениям шаг ничего не делает.
+        if (arguments.Contains(RampProfileName))
+            return;
+
+        arguments.AddRange(
+        [
+            "--new",
+            RampProfileName,
+            "--filter-tcp=443",
+            "--ipset-ip=" + string.Join(',', GoogleFrontEnds),
+            "--out-range=a",
+            "--payload=all",
+            RampStep,
+        ]);
+    }
+
+    /// <summary>Части имён, по которым видно Google: узлы видео, сайты и CDN Google, хранилище googleapis.</summary>
+    private static readonly string[] GoogleMarks =
+        ["google", "youtube", "youtu.be", "ytimg", "ggpht", "gstatic", "gvt1", "gvt2", "doubleclick"];
+
+    /// <summary>Есть ли среди имён имя Google.</summary>
+    public static bool HasGoogleName(IEnumerable<string> names) =>
+        names.Any(n => GoogleMarks.Any(m => n.Contains(m, StringComparison.OrdinalIgnoreCase)));
+
+    /// <summary>
+    /// Может ли секция взять соединение к узлу Google: отбирает не по именам (адреса, порты,
+    /// протокол) или в её списках есть имя Google.
+    /// </summary>
+    private static bool MaySeeGoogle(List<string> section, Func<string, bool>? listHasGoogle)
+    {
+        if (listHasGoogle is null)
+            return true;
+
+        var lists = section.Where(a => a.StartsWith("--hostlist=", StringComparison.Ordinal))
+            .Select(a => a["--hostlist=".Length..].Trim('"'))
+            .ToList();
+
+        var inline = section.Where(a => a.StartsWith("--hostlist-domains=", StringComparison.Ordinal))
+            .SelectMany(a => a["--hostlist-domains=".Length..].Split(','))
+            .ToList();
+
+        if (lists.Count == 0 && inline.Count == 0)
+            return true;
+
+        return HasGoogleName(inline) || lists.Any(listHasGoogle);
+    }
 
     /// <summary>Секция ловит имена видео YouTube: в её списке googlevideo или youtube.</summary>
     public static bool IsVideoSection(IReadOnlyList<string> arguments) =>

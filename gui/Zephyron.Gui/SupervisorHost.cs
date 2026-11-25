@@ -134,6 +134,7 @@ internal static class SupervisorHost
     public static async Task<int> RunAsync(string[] args, CancellationToken cancellationToken)
     {
         var options = Parse(args);
+        var prepare = System.Diagnostics.Stopwatch.StartNew();
 
         // Весь вывод уходит в файл: у окна консоли нет, и писать ему некуда.
         // Окно «Журнал» (из «Диагностики») показывает этот файл отдельным пунктом.
@@ -206,7 +207,9 @@ internal static class SupervisorHost
             // (WinwsService.Ready). Всё, что туннель откроет следом, — уже
             // под десинком. Прежде sing-box шёл первым, и первое соединение
             // WARP уходило мимо десинка и замерзало (01.10).
+            var stage = System.Diagnostics.Stopwatch.StartNew();
             AddWinws(options, services);
+            var desyncTime = stage.Elapsed;
 
             // dnscrypt-proxy — раньше sing-box: тот с первого запроса спросит 127.0.0.1.
             if (!options.NoProxy && Zephyron.Core.DnsCrypt.Parse(options.DnsCrypt) is { } cryptMode)
@@ -217,8 +220,12 @@ internal static class SupervisorHost
                     OutputLogPath = Path.Combine("runtime", "dnscrypt-proxy.log"),
                 });
 
+            stage.Restart();
+
             if (!options.NoProxy && !TryAddSingBox(options, services))
                 return 2;
+
+            var tunnelTime = stage.Elapsed;
 
             // Прокси Telegram — последним: его соединения к Telegram и доменам
             // за Cloudflare идут по правилам, и десинку с туннелем лучше
@@ -247,6 +254,11 @@ internal static class SupervisorHost
             // до этой строки, не принадлежит никому: владельца нет, а TUN
             // и WinDivert они держат. Такое снимаем — иначе не поднимется
             // ничего, и человек опять останется с кнопкой, которая не работает.
+            // Сколько ушло до запуска движков — по стадиям: долгий старт виден в отчёте,
+            // а не угадывается (владелец 22.11: «запуск 13–15 секунд»).
+            Console.WriteLine($"Подготовка движков: {prepare.Elapsed.TotalSeconds:0.0} с "
+                + $"(десинк {desyncTime.TotalSeconds:0.0} с, туннель {tunnelTime.TotalSeconds:0.0} с).");
+
             var orphans = ProcessSupervisor.FindOrphans(services);
 
             if (orphans.Count > 0)
@@ -672,9 +684,12 @@ internal static class SupervisorHost
 
         var arguments = WinwsCommandLine.Build(preset, exclude, own, gameFilter, servers, fakeRange, udpOff, tun, settings.Capture, keep, lans,
             warpApi: settings.WarpEnabled && !options.NoProxy, videoWindow: settings.GuardVideoNodes,
-            directList: File.Exists(DirectAddresses.DefaultPath) ? Path.GetFullPath(DirectAddresses.DefaultPath) : null,
+            directList: DirectAddresses.WithServers(
+                File.Exists(DirectAddresses.DefaultPath) ? Path.GetFullPath(DirectAddresses.DefaultPath) : null,
+                servers, Path.Combine("runtime", "desync-skip.txt")),
             panelHosts: Zephyron.Subscriptions.SubscriptionHosts.From(
-                [settings.SubscriptionUrl, .. SubscriptionBook.Load().Entries.Select(e => e.Url)])).ToList();
+                [settings.SubscriptionUrl, .. SubscriptionBook.Load().Entries.Select(e => e.Url)]),
+            zapretRoot: paths.Root).ToList();
 
         // Подделки секций, выбранные в «Десинке»; образцы разрешаются от рабочей папки winws2 (корень Zapret).
         if (FakeChoice.Apply(arguments, Path.GetFileNameWithoutExtension(presetPath), settings.FakeSwaps) is > 0 and var swapped)
@@ -714,7 +729,7 @@ internal static class SupervisorHost
             Console.WriteLine(skipped == 0
                 ? "Серверы туннеля остались в перехвате десинка: у пресета свой --wf-raw-filter файлом."
                 : skipped < servers.Count
-                    ? $"Десинк не перехватывает соединения туннеля: {skipped} адресов серверов из {servers.Count}, остальные в фильтр не поместились."
+                    ? $"Десинк не перехватывает соединения туннеля: {skipped} адресов серверов из {servers.Count}, остальные выведены из секций списком."
                     : $"Десинк не перехватывает соединения туннеля: адресов серверов — {skipped}.");
         }
 
@@ -762,6 +777,13 @@ internal static class SupervisorHost
         }
 
         var executable = TgWsProxy.Executable();
+
+        // Включён, а секрета нет (настройки первого запуска до 1.8.2) — создаётся здесь, а не просьбой включить заново.
+        if (!TgWsProxy.IsSecret(settings.TelegramProxySecret))
+        {
+            settings = TgWsProxy.Switch(settings, on: true);
+            settings.Save(AppSettings.DefaultPath);
+        }
 
         Console.WriteLine($"Прокси Telegram: 127.0.0.1:{settings.TelegramProxyPort}, {executable}");
 

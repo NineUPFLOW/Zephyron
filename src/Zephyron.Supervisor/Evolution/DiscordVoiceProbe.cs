@@ -31,9 +31,9 @@ public static class DiscordVoiceProbe
 
     private static readonly (string Host, int Port)[] VoiceGateways =
     [
-        ("gateway.discord.gg", 443),
         ("stun.l.google.com", 19302),
-        ("stun1.l.google.com", 19302)
+        ("stun1.l.google.com", 19302),
+        ("stun.cloudflare.com", 3478)
     ];
 
     /// <summary>

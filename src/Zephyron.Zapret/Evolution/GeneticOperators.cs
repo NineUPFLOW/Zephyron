@@ -199,15 +199,18 @@ public static class GeneticOperators
             return false;
 
         var lower = sectionName.ToLowerInvariant();
+        int successfulCount = 0;
+
         foreach (var (host, success) in outcomes)
         {
             if (!success)
                 continue;
 
+            successfulCount++;
             var h = host.ToLowerInvariant();
-            if (lower.Contains("youtube") && h.Contains("youtube"))
-                return true;
-            if (lower.Contains("googlevideo") && h.Contains("googlevideo"))
+
+            // Точечное сопоставление по имени сервиса или домену
+            if ((lower.Contains("youtube") || lower.Contains("googlevideo")) && (h.Contains("youtube") || h.Contains("googlevideo")))
                 return true;
             if (lower.Contains("discord") && h.Contains("discord"))
                 return true;
@@ -215,6 +218,26 @@ public static class GeneticOperators
                 return true;
             if (lower.Contains("steam") && h.Contains("steam"))
                 return true;
+            if (lower.Contains("telegram") && h.Contains("telegram"))
+                return true;
+            if (lower.Contains("vk") && h.Contains("vk"))
+                return true;
+
+            // Прямое вхождение хоста в имя секции
+            var hostRoot = h.Split('.')[0];
+            if (hostRoot.Length > 2 && lower.Contains(hostRoot))
+                return true;
+        }
+
+        // Для общих секций (general, all, default, tcp, main) секция считается рабочей,
+        // если большинство целевых сетевых проб успешно пробиты
+        bool isGeneralSection = lower.Contains("general") || lower.Contains("all") ||
+                                lower.Contains("default") || lower.Contains("main") ||
+                                lower.Contains("tcp");
+
+        if (isGeneralSection && outcomes.Count > 0)
+        {
+            return (double)successfulCount / outcomes.Count >= 0.70;
         }
 
         return false;

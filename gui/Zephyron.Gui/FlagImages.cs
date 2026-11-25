@@ -29,7 +29,7 @@ public static class FlagImages
     /// <summary>Загруженное запоминается: строк с одной страной бывает много.</summary>
     private static readonly Dictionary<string, BitmapImage?> Loaded = new(StringComparer.OrdinalIgnoreCase);
 
-    private static string Folder => Path.Combine(AppContext.BaseDirectory, "Assets", "flags");
+    private static string Folder => Path.Combine(Zephyron.Core.InstallRoot.AppFolder, "Assets", "flags");
 
     /// <summary>Есть ли вообще папка с флагами.</summary>
     public static bool Any => Directory.Exists(Folder);

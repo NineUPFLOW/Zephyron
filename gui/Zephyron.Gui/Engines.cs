@@ -28,10 +28,10 @@ internal static class Engines
 
     private static string? Find(string fileName)
     {
-        if (FindIn(Path.Combine(AppContext.BaseDirectory, "engines"), fileName) is { } bundled)
+        if (FindIn(Path.Combine(Zephyron.Core.InstallRoot.AppFolder, "engines"), fileName) is { } bundled)
             return bundled;
 
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        var directory = new DirectoryInfo(Zephyron.Core.InstallRoot.AppFolder);
 
         while (directory is not null)
         {

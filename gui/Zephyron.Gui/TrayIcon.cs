@@ -221,8 +221,20 @@ internal sealed class TrayIcon : IDisposable
 
     private string? _subscriptionNotice;
 
+    /// <summary>Супервизор, о падении которого уже сказали: одно уведомление на падение.</summary>
+    private int? _lostNoticed;
+
     private void Update()
     {
+        // Супервизор упал сам — движки ушли с ним (задание Windows), и обход
+        // выключен. Перезапускать сами не вправе, но молчать — тоже: человек
+        // считал бы, что обход работает.
+        if (EngineControl.Lost && EngineControl.Supervisor is { } lost && lost != _lostNoticed)
+        {
+            _lostNoticed = lost;
+            Notify("Движки остановились", "Супервизор завершился сам, обход выключен. Запустите движки снова из окна или меню.", link: null);
+        }
+
         var notice = SubscriptionRefreshNotice.Load();
         if (notice is not null && notice.Id != _subscriptionNotice
             && SupervisorState.Load(SupervisorState.DefaultPath) is { } live

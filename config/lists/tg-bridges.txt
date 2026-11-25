@@ -1,0 +1,28 @@
+# Мосты прокси Telegram — домены Cloudflare из общего списка Flowseal
+# (.github/cfproxy-domains.txt репозитория tg-ws-proxy; прокси ходит на kwsN.<домен>).
+#
+# Нужен пресетам, где Cloudflare не берётся по адресу (Adaptive, Strict): без секции
+# соединения прокси с мостами шли голыми. Отчёт 22.11 (Adaptive, режим «Десинк»):
+# за пять дней ни одного моста — «CF WS timed out» на всех двадцати, а оригинальный
+# прокси на той же сети подключился. В Stable те же мосты берёт секция Cloudflare
+# по адресу, и у владельца (Билайн) прокси через них работает.
+pclead.co.uk
+offshor.co.uk
+cakeisalie.co.uk
+noskomnadzor.co.uk
+lovetrue.co.uk
+sorokdva.co.uk
+pyatdesyatdva.co.uk
+kartoshka.co.uk
+sorokodin.co.uk
+pyatdesyatodin.co.uk
+notelega.co.uk
+ebally.co.uk
+nebally.co.uk
+havegreatday.co.uk
+pomogite.co.uk
+fixtelega.co.uk
+sadnews.co.uk
+onedaychamp.co.uk
+stopblocking.co.uk
+nothingthere.co.uk

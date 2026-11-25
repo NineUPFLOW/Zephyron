@@ -212,6 +212,8 @@ public partial class MoreView : UserControl
     {
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
+            // Иначе диалог меняет рабочую папку, и config/, runtime/, engines/ ищутся не там.
+            RestoreDirectory = true,
             Title = "Куда сохранить копию настроек",
             FileName = "zephyron-backup" + SettingsBackup.Extension,
             Filter = "Копия настроек Zephyron (*.zybackup)|*.zybackup",
@@ -258,6 +260,8 @@ public partial class MoreView : UserControl
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
+            // Иначе диалог меняет рабочую папку, и config/, runtime/, engines/ ищутся не там.
+            RestoreDirectory = true,
             Title = "Откуда восстановить настройки",
             Filter = "Копия настроек Zephyron (*.zybackup)|*.zybackup|Все файлы|*.*",
         };
@@ -327,7 +331,15 @@ public partial class MoreView : UserControl
             // Движки — уже по восстановленным настройкам; окно читает их заново
             // только при запуске, поэтому программа перезапускается сама.
             if (running)
-                await EngineControl.StartAsync("восстановление копии настроек", CancellationToken.None);
+            {
+                var started = await EngineControl.StartAsync("восстановление копии настроек", CancellationToken.None);
+
+                if (!started.Ok)
+                {
+                    Status.Text = "Копия восстановлена, но движки не запустились: " + started.Message;
+                    return;
+                }
+            }
 
             App.Relaunch();
         }
@@ -342,7 +354,19 @@ public partial class MoreView : UserControl
 
             // Остановили ради записи — не оставляем человека без обхода.
             if (stopped)
-                await EngineControl.StartAsync("восстановление копии не удалось", CancellationToken.None);
+            {
+                try
+                {
+                    var started = await EngineControl.StartAsync("восстановление копии не удалось", CancellationToken.None);
+
+                    if (!started.Ok)
+                        Status.Text += " Запустить не удалось: " + started.Message;
+                }
+                catch (Exception restartEx)
+                {
+                    Status.Text += " Запустить не удалось: " + restartEx.GetBaseException().Message;
+                }
+            }
         }
         finally
         {
@@ -454,19 +478,49 @@ public partial class MoreView : UserControl
 
         try
         {
-            var subscription = AppSettings.Load(AppSettings.DefaultPath).SubscriptionUrl;
+            var old = AppSettings.Load(AppSettings.DefaultPath);
+
+            // Не прочитались — Fresh вместо них стёр бы ссылку подписки.
+            if (old.LoadFailed)
+            {
+                Status.Text = "Настройки не читаются (файл занят?) — сброс отменён.";
+
+                return;
+            }
+
+            var subscription = old.SubscriptionUrl;
+            bool keys = SubscriptionBook.Load().PoolKeys.Count > 0;
+
+            // Fresh включает WARP, а он ставит подписки на паузу: с ссылкой или ключами выход — они.
+            var fresh = AppSettings.Fresh with
+            {
+                SubscriptionUrl = subscription,
+                KeysEnabled = keys,
+                WarpEnabled = string.IsNullOrWhiteSpace(subscription) && !keys,
+            };
 
             // Runtime первым: он единственный, что не откатить, и если занят —
-            // настройки с маршрутами ещё на месте.
+            // настройки с маршрутами ещё на месте. backups — копии до восстановления, их не трогаем.
             if (Directory.Exists("runtime"))
-                Directory.Delete("runtime", recursive: true);
+            {
+                foreach (var entry in new DirectoryInfo("runtime").EnumerateFileSystemInfos())
+                {
+                    if (entry.Name.Equals("backups", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    if (entry is DirectoryInfo folder)
+                        folder.Delete(recursive: true);
+                    else
+                        entry.Delete();
+                }
+            }
 
             try
             {
                 SetAside(AppSettings.DefaultPath);
                 SetAside(UserRulesFile.DefaultPath);
 
-                (AppSettings.Fresh with { SubscriptionUrl = subscription }).Save(AppSettings.DefaultPath);
+                fresh.Save(AppSettings.DefaultPath);
             }
             catch
             {
@@ -486,8 +540,13 @@ public partial class MoreView : UserControl
                 throw;
             }
 
+            // Как при запуске: тема, масштаб и шрифт — заводские, движение пересчитано, мастер — заново.
+            Themes.Apply(fresh.Theme, fresh);
+            Motion.Refresh();
+
             Reload();
             Status.Text = "Настройки сброшены, подписка осталась. Прежние сохранены рядом с расширением .bak.";
+            (Window.GetWindow(this) as MainWindow)?.RestartOnboarding();
         }
         catch (Exception ex)
         {

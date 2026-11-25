@@ -73,7 +73,8 @@ public sealed record PresetDnaSnapshot
         var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions
         {
             WriteIndented = true,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
         });
 
         var dir = Path.GetDirectoryName(filePath);
@@ -94,7 +95,8 @@ public sealed record PresetDnaSnapshot
         var json = File.ReadAllText(filePath);
         var snapshot = JsonSerializer.Deserialize<PresetDnaSnapshot>(json, new JsonSerializerOptions
         {
-            PropertyNameCaseInsensitive = true
+            PropertyNameCaseInsensitive = true,
+            NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
         });
 
         return snapshot ?? throw new InvalidOperationException("Не удалось разобрать файл снимка генома ДНК.");

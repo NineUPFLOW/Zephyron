@@ -38,8 +38,25 @@ public static class DomainInput
         if (colon > 0 && raw[(colon + 1)..].All(char.IsDigit))
             raw = raw[..colon];
 
+        // Корневая точка («example.com.») — тот же сайт; вторая подряд — уже не имя.
+        if (raw.EndsWith('.'))
+            raw = raw[..^1];
+
         if (raw.Length == 0 || !raw.Contains('.') || raw.EndsWith('.') || raw.Any(char.IsWhiteSpace))
             return null;
+
+        // Правила и движок сравнивают punycode: «пример.рф» иначе не совпал бы ни с чем.
+        if (raw.Any(c => c > 127))
+        {
+            try
+            {
+                raw = new System.Globalization.IdnMapping().GetAscii(raw);
+            }
+            catch (ArgumentException)
+            {
+                return null;
+            }
+        }
 
         // Последняя часть из цифр — адрес или его обрывок («144.76», ссылка на IP), а не имя:
         // правило «*.144.76.194.29» не совпадало ни с чем (владелец 15.11).

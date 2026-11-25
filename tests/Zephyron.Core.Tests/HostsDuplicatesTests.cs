@@ -49,15 +49,39 @@ public sealed class HostsDuplicatesTests : IDisposable
     }
 
     /// <summary>
-    /// Другой адрес — спор, а не повтор: убирать его молча нельзя,
-    /// в файле видно одно, а работает другое.
+    /// Другой адрес того же имени в том же месте — запасной адрес, не повтор:
+    /// Windows отдаёт программам оба (замер 22.11).
     /// </summary>
     [Fact]
-    public void ADifferentAddressIsAConflictAndStays()
+    public void ASecondAddressInTheSamePlaceIsNotARepeat()
     {
         var report = Find("""
+            # >>> zephyron begin >>>
+            5.175.161.3 claude.ai
+            5.175.161.40 claude.ai
+            # <<< zephyron end <<<
             1.2.3.4 example.com
             5.6.7.8 example.com
+            """);
+
+        Assert.False(report.Any);
+        Assert.Empty(report.Removable);
+    }
+
+    /// <summary>
+    /// Другой адрес из другого блока — спор: имя ведут два хозяина, и убирать
+    /// чужую строку молча нельзя.
+    /// </summary>
+    [Fact]
+    public void ADifferentAddressFromAnotherBlockIsAConflictAndStays()
+    {
+        var report = Find("""
+            # >>> zephyron begin >>>
+            87.228.47.204 claude.ai
+            # <<< zephyron end <<<
+            # >>> zapretgui:hosts managed begin >>>
+            5.6.7.8 claude.ai
+            # <<< zapretgui:hosts managed end <<<
             """);
 
         Assert.True(Assert.Single(report.Repeats).Conflicts);

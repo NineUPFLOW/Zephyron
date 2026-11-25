@@ -257,7 +257,17 @@ public sealed class ProcessSupervisor
         foreach (var service in _services)
         {
             if (_health[service.Name] == ServiceHealth.Faulted)
+            {
+                // Причина могла уйти (закрыли чужой обход, державший WinDivert):
+                // после долгой паузы пробуем снова, а не ждём перезапуска супервизора.
+                if (DateTimeOffset.Now - _since[service.Name] < _options.StableResetsRestarts)
+                    continue;
+
+                Log($"{service.Name}: после паузы пробую поднять снова");
+                service.ForgetRestarts();
+                await RestartAsync(service, cancellationToken);
                 continue;
+            }
 
             if (!service.IsProcessAlive)
             {
@@ -266,7 +276,18 @@ public sealed class ProcessSupervisor
                 continue;
             }
 
-            var check = await service.CheckFunctionalAsync(cancellationToken);
+            ServiceCheck check;
+
+            try
+            {
+                check = await service.CheckFunctionalAsync(cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Упавшая проверка одной службы не должна ронять цикл всех.
+                Log($"{service.Name}: проверка упала — {ex.GetBaseException().Message}");
+                check = ServiceCheck.Broken;
+            }
 
             if (check == ServiceCheck.Healthy)
             {

@@ -15,6 +15,9 @@ public sealed record PinRefreshResult(
 
     public IReadOnlyList<string> Reordered { get; init; } = [];
 
+    /// <summary>Молчащие запасные адреса, убранные у имён с живым первым адресом.</summary>
+    public IReadOnlyList<string> Pruned { get; init; } = [];
+
     public int Suspects { get; init; }
 
     public int Assigned { get; init; }
@@ -258,6 +261,7 @@ public static class PinRefresh
     {
         IReadOnlyDictionary<string, IReadOnlyList<string>> pins;
         IReadOnlyDictionary<string, string> profiles;
+        IReadOnlyDictionary<string, string> raw;
 
         try
         {
@@ -267,7 +271,9 @@ public static class PinRefresh
                 .Where(p => !own.Contains(p.Key) && p.Value.Count > 0 && !p.Value.Contains(VideoNodeGuard.Refused))
                 .ToDictionary(p => p.Key, p => p.Value, StringComparer.OrdinalIgnoreCase);
 
-            profiles = HostsEditor.PinsVia(path)
+            raw = HostsEditor.PinsVia(path);
+
+            profiles = raw
                 .Where(p => pins.ContainsKey(p.Key) && IntermediaryDns.ByKey(p.Value) is not null)
                 .ToDictionary(p => p.Key, p => IntermediaryDns.ByKey(p.Value)!.Key, StringComparer.OrdinalIgnoreCase);
         }
@@ -422,6 +428,8 @@ public static class PinRefresh
         var replaced = new List<(string Name, string Line)>();
         var moved = new List<(string Name, string Line)>();
         var reordered = new List<(string Name, string Line)>();
+        var pruned = new List<(string Name, string Line)>();
+        var silentSpares = new HashSet<string>(StringComparer.Ordinal);
         var pending = new List<string>();
         var dead = new List<string>();
         bool? online = null;
@@ -464,8 +472,45 @@ public static class PinRefresh
                 }
             }
 
-            if (head is null || alive[head])
+            if (head is null)
                 continue;
+
+            // Первый адрес жив — запасные проверяются тоже. Windows отдаёт программам
+            // все адреса имени (замер 22.11), и молчащий запасной — это ожидание
+            // в пустоту у каждой, кто до него дошёл: у пользователя 21.11 один такой
+            // адрес стоял вторым у 67 имён. Убирается только запасной: первый живой
+            // остаётся, и имя не уходит напрямую. Два промаха подряд, как у первого.
+            if (alive[head])
+            {
+                var gone = new List<string>();
+
+                foreach (var extra in current.Where(a => a != head && Checkable(a)))
+                {
+                    if (await ProbeAsync(extra, name) != PinVerdict.Dead)
+                        continue;
+
+                    silentSpares.Add(extra);
+
+                    if (byHand || before.Contains(extra))
+                        gone.Add(extra);
+                }
+
+                if (gone.Count == 0)
+                    continue;
+
+                online ??= await OnlineAsync(net, cancellationToken);
+
+                if (online != true)
+                    continue;
+
+                entries[name] = current.Where(a => !gone.Contains(a)).ToList();
+
+                if ((profile ?? raw.GetValueOrDefault(name)) is { } keep)
+                    via[name] = keep;
+
+                pruned.Add((name, $"убран молчащий {Join(gone)}"));
+                continue;
+            }
 
             if (!byHand && !before.Contains(head))
                 continue;
@@ -570,7 +615,7 @@ public static class PinRefresh
                 dead.Add(name);
         }
 
-        var suspects = alive.Where(p => !p.Value).Select(p => p.Key).ToList();
+        var suspects = alive.Where(p => !p.Value).Select(p => p.Key).Concat(silentSpares).Distinct(StringComparer.Ordinal).ToList();
         SaveSuspects(suspectsPath, suspects);
 
         string? offline = online == false
@@ -608,6 +653,7 @@ public static class PinRefresh
                 Silent = silent,
                 Moved = Grouped(moved),
                 Reordered = Grouped(reordered),
+                Pruned = Grouped(pruned),
                 Suspects = suspects.Count,
                 Assigned = assigned.Count,
             };

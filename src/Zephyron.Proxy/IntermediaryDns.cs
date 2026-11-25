@@ -4,13 +4,15 @@ using Zephyron.Core;
 namespace Zephyron.Proxy;
 
 /// <summary>DNS-посредник: имя, ключ для метки пина, адрес DoH и запасные адреса сервера.</summary>
+/// <param name="Plain">Адреса обычного DNS (порт 53) — путь, когда DoH не отвечает.</param>
 public sealed record Intermediary(
     string Name,
     string Key,
     string DohName,
     IReadOnlyList<string> Fallback,
     string Path = "/dns-query",
-    string? RelayName = null);
+    string? RelayName = null,
+    IReadOnlyList<string>? Plain = null);
 
 /// <summary>Ответ одного сервера на опрос: адреса по именам и ответ на служебное имя.</summary>
 public sealed record ServerAnswers(
@@ -46,22 +48,40 @@ public sealed record RelayNow(
     IReadOnlyList<string> Addresses,
     bool ByRelayCheck = false);
 
-/// <summary>Опрос посредников по DoH: какие прокси они отдают именам сейчас.</summary>
+/// <summary>Опрос посредников (DoH, а без ответа — обычный DNS): какие прокси они отдают именам сейчас.</summary>
 public static class IntermediaryDns
 {
     public static IReadOnlyList<Intermediary> Servers { get; } =
     [
-        new("Comss DNS", "comss", "dns.comss.one", ["212.109.221.20", "195.133.25.16", "212.109.195.93"]),
+        // Plain — адреса, где 22.11 ответил обычный DNS: у GeoHide EU DoH в тот день не открывался
+        // (TCP 443 молчал), а на порту 53 те же прокси отдавались за 0,07 с.
+        new("Comss DNS", "comss", "dns.comss.one", ["212.109.221.20", "195.133.25.16", "212.109.195.93"],
+            Plain: ["212.109.221.20", "212.109.195.93"]),
 
         new("Zapret DNS", "zapret", "dns.zapret.moe", ["188.114.96.1", "188.114.97.1"], RelayName: "relay.check.dns.zapret.moe"),
-        new("GeoHide EU", "geohide-eu", "eu.geohide.ru", ["5.175.161.3", "5.175.161.40", "143.20.64.192"]),
-        new("GeoHide US", "geohide-us", "us.geohide.ru", ["192.255.159.240", "192.255.159.241"]),
+        new("GeoHide EU", "geohide-eu", "eu.geohide.ru", ["5.175.161.3", "5.175.161.40", "143.20.64.192"],
+            Plain: ["5.175.161.3", "5.175.161.40", "143.20.64.192"]),
+        new("GeoHide US", "geohide-us", "us.geohide.ru", ["192.255.159.240", "192.255.159.241"],
+            Plain: ["192.255.159.240", "192.255.159.241"]),
+        // 22.11, адреса — из официального списка серверов GeoHide: российская пара.
+        // DoH по имени отвечал за 6 с, обычный DNS — за 0,05 с, прокси свои (193.233.112.x).
+        new("GeoHide", "geohide", "geohide.ru", ["193.233.112.67", "193.233.112.68"],
+            Plain: ["193.233.112.67", "193.233.112.68"]),
+        // 22.11: DoH — только HTTP/2 (на HTTP/1.1 код 505), обычный DNS отвечал с обоих
+        // адресов; ChatGPT отдаёт своим прокси 48.102.233.174.
+        new("Malw.link", "malw", "dns.malw.link", ["179.254.166.171", "164.5.224.81"],
+            Plain: ["179.254.166.171", "164.5.224.81"]),
+        // 22.11: DoH по имени не открывался, по адресу 31.58.216.201 — да; обычный DNS —
+        // с обоих. ChatGPT и Notion отдаёт своим прокси.
+        new("Bezmezhau", "bezmezhau", "dns.bezmezhau.com", ["31.58.216.201", "143.20.64.55"],
+            Plain: ["31.58.216.201", "143.20.64.55"]),
         // Замер 07.11 по DoH: оба отдают на ChatGPT свой прокси (wlrus — 191.217.212.16,
         // dagami — 45.86.65.240), через него ChatGPT и Gemini отвечают 200 с настоящим
         // сертификатом. Запасные адреса — честный DoH на то же имя.
         new("WLRUS DNS", "wlrus", "dns.wlrus.cfd", ["95.85.240.254", "138.124.254.134"]),
         new("Dagami DNS", "dagami", "dns.dagami.ru", ["45.86.65.240"]),
-        new("DNS-AI", "dns-ai", "dns.dns-ai.ru", ["194.87.196.13", "45.151.102.219"]),
+        // Адреса с официального dns-ai.ru на 22.11 (прежние 194.87.196.13 и 45.151.102.219 молчат).
+        new("DNS-AI", "dns-ai", "dns.dns-ai.ru", ["192.144.59.14", "186.246.49.127"]),
         new("AstraCat", "astracat", "dns.astracat.network", ["135.106.217.200", "135.106.197.22"]),
     ];
 
@@ -77,7 +97,7 @@ public static class IntermediaryDns
     {
         var nic = DnsSurvey.PhysicalInterface();
 
-        if (await RouteAsync(server, nic, cancellationToken) is not { } address)
+        if (await RouteAsync(server, nic, cancellationToken) is not { } route)
             return null;
 
         var asked = names.Concat(Controls).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -85,7 +105,7 @@ public static class IntermediaryDns
         var unanswered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         using var slots = new SemaphoreSlim(6);
 
-        using var http = DnsSurvey.DohClient(address, nic);
+        using var http = route.Plain ? null : DnsSurvey.DohClient(route.Address, nic);
 
         await Task.WhenAll(asked.Select(async host =>
         {
@@ -93,8 +113,7 @@ public static class IntermediaryDns
 
             try
             {
-                var answer = await DnsSurvey.DohQueryAsync(
-                    http, server.DohName, server.Path, host, DnsWire.TypeA, cancellationToken);
+                var answer = await AskAsync(route, server, http, host, nic, cancellationToken);
 
                 lock (result)
                 {
@@ -123,8 +142,7 @@ public static class IntermediaryDns
         try
         {
             if (server.RelayName is { } relayName
-                && await DnsSurvey.DohQueryAsync(http, server.DohName, server.Path, relayName, DnsWire.TypeA, cancellationToken)
-                    is { Code: 0 } answered)
+                && await AskAsync(route, server, http, relayName, nic, cancellationToken) is { Code: 0 } answered)
             {
                 relay = answered.Addresses;
             }
@@ -276,8 +294,12 @@ public static class IntermediaryDns
 
         var live = Servers.Zip(routes)
             .Where(p => p.Second is not null)
-            .Select(p => (Server: p.First, Address: p.Second!))
+            .Select(p => (Server: p.First, Route: p.Second!, Http: p.Second!.Plain ? null : DnsSurvey.DohClient(p.Second.Address, nic)))
             .ToList();
+
+        // Одно соединение HTTP/2 на сервер на весь опрос: по сессии на вопрос это десятки
+        // рукопожатий к одному адресу за секунды — провайдер такой адрес гасит (22.11).
+        using var clients = new DisposeAll(live.Select(l => l.Http));
 
         var silent = Servers.Zip(routes).Where(p => p.Second is null).Select(p => p.First.Name).ToList();
         var wanted = hosts.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -294,8 +316,7 @@ public static class IntermediaryDns
             {
                 await Task.WhenAll(live.Select(async l =>
                 {
-                    var answer = await DnsSurvey.DohQueryAsync(
-                        l.Address, l.Server.DohName, l.Server.Path, host, DnsWire.TypeA, nic, cancellationToken);
+                    var answer = await AskAsync(l.Route, l.Server, l.Http, host, nic, cancellationToken);
 
                     lock (raw)
                         raw[l.Server.Name][host] = answer is { Code: 0 } ? answer.Addresses : [];
@@ -357,7 +378,37 @@ public static class IntermediaryDns
         return result;
     }
 
-    private static async Task<string?> RouteAsync(Intermediary server, int? nic, CancellationToken cancellationToken)
+    /// <summary>Чем спрашивать сервер: DoH на этом адресе или обычный DNS (порт 53) на нём.</summary>
+    private sealed record Route(string Address, bool Plain);
+
+    private sealed class DisposeAll(IEnumerable<IDisposable?> items) : IDisposable
+    {
+        private readonly List<IDisposable?> _items = [.. items];
+
+        public void Dispose() => _items.ForEach(i => i?.Dispose());
+    }
+
+    /// <summary>
+    /// Вопрос по найденному пути. Обычный DNS — сначала UDP, затем TCP: UDP к чужому
+    /// резолверу провайдер заворачивает чаще. Подмену провайдера отсеивают <see cref="Proxies"/>
+    /// (адрес должен прийти двум контрольным именам) и проверка адреса перед пином.
+    /// </summary>
+    private static async Task<DnsWire.Answer?> AskAsync(
+        Route route, Intermediary server, HttpClient? http, string host, int? nic, CancellationToken cancellationToken)
+    {
+        if (!route.Plain)
+        {
+            return http is null
+                ? await DnsSurvey.DohQueryAsync(route.Address, server.DohName, server.Path, host, DnsWire.TypeA, nic, cancellationToken)
+                : await DnsSurvey.DohQueryAsync(http, server.DohName, server.Path, host, DnsWire.TypeA, cancellationToken);
+        }
+
+        return (await DnsSurvey.UdpAsync(route.Address, host, DnsWire.TypeA, nic, cancellationToken)).Answer
+            ?? await DnsSurvey.TcpAsync(route.Address, host, DnsWire.TypeA, nic, cancellationToken);
+    }
+
+    /// <summary>Путь к серверу: DoH по адресам имени и запасным, а не ответил — обычный DNS (<see cref="Intermediary.Plain"/>).</summary>
+    private static async Task<Route?> RouteAsync(Intermediary server, int? nic, CancellationToken cancellationToken)
     {
         IReadOnlyList<IPAddress> named = [];
 
@@ -376,10 +427,41 @@ public static class IntermediaryDns
             .Distinct(StringComparer.Ordinal)
             .Take(6);
 
-        foreach (var address in addresses)
+        // Адреса — разом, а не по очереди: молчащий сервер стоил по 3 с на адрес, и опрос
+        // ждал его до 30 с (22.11), хотя остальные ответили за секунду.
+        return await FirstAsync(addresses.Select(a => new Route(a, Plain: false)), server, nic, cancellationToken)
+            ?? await FirstAsync((server.Plain ?? []).Select(a => new Route(a, Plain: true)), server, nic, cancellationToken);
+    }
+
+    /// <summary>Первый путь, по которому сервер ответил на проверочный вопрос; прочие вопросы снимаются.</summary>
+    private static async Task<Route?> FirstAsync(IEnumerable<Route> routes, Intermediary server, int? nic, CancellationToken cancellationToken)
+    {
+        using var done = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        var pending = routes
+            .Select(async route => await AskAsync(route, server, null, Probe, nic, done.Token) is not null ? route : null)
+            .ToList();
+
+        while (pending.Count > 0)
         {
-            if (await DnsSurvey.DohQueryAsync(address, server.DohName, server.Path, Probe, DnsWire.TypeA, nic, cancellationToken) is not null)
-                return address;
+            var finished = await Task.WhenAny(pending);
+            pending.Remove(finished);
+
+            Route? found = null;
+
+            try
+            {
+                found = await finished;
+            }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            {
+            }
+
+            if (found is not null)
+            {
+                done.Cancel();
+                return found;
+            }
         }
 
         return null;

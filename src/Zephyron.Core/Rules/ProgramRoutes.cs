@@ -184,7 +184,7 @@ public static class ProgramRoutes
             .Append("# «Наблюдение». Дописывать можно и руками, по одному в строке.\r\n")
             .Append("# Правка действует со следующего запуска движков.\r\n");
 
-        File.WriteAllText(full, body.ToString(), new UTF8Encoding(false));
+        AtomicFile.WriteAllText(full, body.ToString(), new UTF8Encoding(false));
     }
 
     private static string Full(string value, string? root) =>

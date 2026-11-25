@@ -51,7 +51,7 @@ public static class DnsCrypt
 
     /// <summary>Папка движка: там же списки серверов, которыми он стартует.</summary>
     public static string ShippedDirectory(string? baseDirectory = null) =>
-        Path.Combine(baseDirectory ?? AppContext.BaseDirectory, "engines", "dnscrypt");
+        Path.Combine(baseDirectory ?? InstallRoot.AppFolder, "engines", "dnscrypt");
 
     /// <summary>Рабочая папка: конфиг и списки, которые dnscrypt-proxy обновляет сам.</summary>
     public static string RuntimeDirectory => Path.Combine("runtime", "dnscrypt");

@@ -49,18 +49,41 @@ public static class IspIdentifier
             };
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
 
-            var traceUrl = "https://1.1.1.1/cdn-cgi/trace";
-            var resp = await client.GetStringAsync(traceUrl, cts.Token);
-
             string ip = "";
             string loc = "RU";
-            var lines = resp.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            foreach (var line in lines)
+
+            try
             {
-                var parts = line.Split('=', 2);
-                if (parts.Length != 2) continue;
-                if (parts[0] == "ip") ip = parts[1];
-                if (parts[0] == "loc") loc = parts[1];
+                var traceUrl = "https://1.1.1.1/cdn-cgi/trace";
+                var resp = await client.GetStringAsync(traceUrl, cts.Token);
+                var lines = resp.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                foreach (var line in lines)
+                {
+                    var parts = line.Split('=', 2);
+                    if (parts.Length != 2) continue;
+                    if (parts[0] == "ip") ip = parts[1];
+                    if (parts[0] == "loc") loc = parts[1];
+                }
+            }
+            catch
+            {
+                // Fallback 1: api.ipify.org
+                try
+                {
+                    ip = (await client.GetStringAsync("https://api.ipify.org", cts.Token)).Trim();
+                }
+                catch
+                {
+                    // Fallback 2: ifconfig.me
+                    try
+                    {
+                        ip = (await client.GetStringAsync("https://ifconfig.me/ip", cts.Token)).Trim();
+                    }
+                    catch
+                    {
+                        // Все внешние эндпоинты недоступны
+                    }
+                }
             }
 
             // Пытаемся получить информацию об организации провайдера

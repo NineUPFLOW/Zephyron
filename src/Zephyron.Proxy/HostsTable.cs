@@ -39,8 +39,14 @@ public sealed record HostsRow
     public required HostsPinKind Kind { get; init; }
 
     /// <summary>
-    /// Имя уже прибито действующей строкой выше: Windows берёт первую, эта не действует.
+    /// Та же пара «имя — адрес» уже стоит выше: строка ничего не добавляет.
     /// </summary>
+    /// <remarks>
+    /// Другой адрес того же имени повтором не считается: Windows отдаёт программам
+    /// все адреса имени, а не первый (замер 22.11: miro.com с двумя строками —
+    /// оба адреса и у .NET, и у Resolve-DnsName). Прежняя пометка «не действует»
+    /// у таких строк была неправдой.
+    /// </remarks>
     public bool Repeat { get; init; }
 }
 
@@ -100,7 +106,7 @@ public static class HostsTable
             {
                 // Выключенная строка повтором не бывает и сама не заслоняет
                 // нижние: Windows её не читает.
-                bool repeat = entry.Enabled && !seen.Add(name);
+                bool repeat = entry.Enabled && !seen.Add(name + " " + entry.Address);
 
                 rows.Add(new HostsRow
                 {

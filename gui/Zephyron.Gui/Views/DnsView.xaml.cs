@@ -296,7 +296,6 @@ public partial class DnsView : UserControl
 
         ShowChosen(settings);
         ShowSystem();
-        ShowPinWatch(settings);
 
         var verdicts = ResolverVerdicts.Load();
 
@@ -454,8 +453,14 @@ public partial class DnsView : UserControl
             ? settings.DnsServer
             : $"{known.Name} · {known.TlsAddress}";
 
+        // Шифрованный DNS перебивает резолвер и путь: показывать выбранный резолвер при нём
+        // значило бы называть то, что не работает (22.11: «AliDNS · автовыбор» при DNSCrypt).
+        var crypt = settings.DnsCryptActive;
+
         if (settings.UseRouterDns)
             ChosenName.Text = $"Роутер · {settings.RouterDnsAddress}:53 · UDP/LAN";
+        else if (crypt is { } mode)
+            ChosenName.Text = $"{DnsCrypt.Describe(mode).Title} · шифрованный DNS";
         else if (settings.DnsAuto)
             ChosenName.Text += " · автовыбор";
         var fallback = RouterDnsConnection.ConfigWarning(settings);
@@ -486,10 +491,20 @@ public partial class DnsView : UserControl
         }
         RouterDnsSwitch.IsChecked = settings.UseRouterDns;
         RouterDnsIp.Text = settings.RouterDnsAddress;
-        TunnelMode.IsEnabled = !settings.UseRouterDns;
+        TunnelMode.IsEnabled = !settings.UseRouterDns && crypt is null;
 
-        // Автовыбор при DNS роутера хранится, но не действует (RouterDnsSettings.Select).
-        AutoDnsSwitch.IsChecked = settings.DnsAuto && !settings.UseRouterDns;
+        // Автовыбор при DNS роутера и при шифрованном DNS хранится, но не действует.
+        AutoDnsSwitch.IsChecked = settings.DnsAuto && !settings.UseRouterDns && crypt is null;
+
+        // Вся карточка — кнопка: отключать надо её, иначе щелчок включал автоподбор, который не действует.
+        bool autoApplies = !settings.UseRouterDns && crypt is null;
+        AutoDnsCard.IsEnabled = autoApplies;
+        AutoDnsCard.Opacity = autoApplies ? 1 : 0.55;
+        AutoDnsLine.Text = autoApplies
+            ? "Программа сама замерит резолверы из вашего места и поставит самый быстрый по DoH. Замер повторяется при каждой проверке выше; выбор строкой ниже автовыбор выключает."
+            : settings.UseRouterDns
+                ? "Не действует, пока включён DNS роутера."
+                : "Не действует, пока включён шифрованный DNS: запросы идут в dnscrypt-proxy.";
 
         // Заполняем, не поднимая события выбора: иначе показ состояния
         // тут же записал бы его обратно в настройки и позвал уведомление
@@ -504,7 +519,10 @@ public partial class DnsView : UserControl
         _filling = false;
 
         // Цена пути — те же слова, что в мастере первого запуска.
-        TunnelHint.Text = DnsRoutes.Explain(settings);
+        TunnelHint.Text = crypt is null || settings.UseRouterDns
+            ? DnsRoutes.Explain(settings)
+            : "Запросы идут в dnscrypt-proxy на этом компьютере, шифрованно. Путь, автоподбор и резолвер из списка ниже "
+              + "сейчас не используются; выбор резолвера в списке выключит шифрованный DNS.";
     }
 
     /// <summary>
@@ -578,7 +596,7 @@ public partial class DnsView : UserControl
     /// <param name="enabled">DNS роутера уже включён — подпись говорит о включённом.</param>
     private async Task<RouterDnsCheck?> CheckRouterAsync(string address, bool enabled)
     {
-        RouterDnsSwitch.IsEnabled = RouterDnsUse.IsEnabled = RouterDnsTest.IsEnabled = false;
+        RouterDnsSwitch.IsEnabled = RouterDnsTest.IsEnabled = false;
         ShowRouterStatus("Проверяю роутер: отвечает ли он и не подменяет ли заблокированные имена…", null);
         try
         {
@@ -594,14 +612,21 @@ public partial class DnsView : UserControl
         }
         finally
         {
-            RouterDnsSwitch.IsEnabled = RouterDnsUse.IsEnabled = RouterDnsTest.IsEnabled = true;
+            RouterDnsSwitch.IsEnabled = RouterDnsTest.IsEnabled = true;
         }
     }
 
-    private async void OnRouterDnsUse(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// Enter в поле адреса: у включённого DNS роутера — смена адреса с той же проверкой.
+    /// Отдельной кнопки «Включить» нет: она делала то же, что выключатель (владелец 22.11: «зачем 2 кнопки?»).
+    /// </summary>
+    private async void OnRouterDnsIpKey(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (await SaveRouterDnsAsync())
-            RouterDnsSwitch.IsChecked = true;
+        if (e.Key != System.Windows.Input.Key.Enter || RouterDnsSwitch.IsChecked != true)
+            return;
+
+        e.Handled = true;
+        await SaveRouterDnsAsync();
     }
 
     private async void OnRouterDnsToggle(object sender, RoutedEventArgs e)
@@ -609,8 +634,19 @@ public partial class DnsView : UserControl
         if (RouterDnsSwitch.IsChecked == true)
         {
             // Выключатель встаёт сам, только когда проверка пропустила.
+            // Пока идёт проверка, он погашен: второй щелчок запустил бы вторую.
             RouterDnsSwitch.IsChecked = false;
-            RouterDnsSwitch.IsChecked = await SaveRouterDnsAsync();
+            RouterDnsSwitch.IsEnabled = false;
+
+            try
+            {
+                RouterDnsSwitch.IsChecked = await SaveRouterDnsAsync();
+            }
+            finally
+            {
+                RouterDnsSwitch.IsEnabled = true;
+            }
+
             return;
         }
         try
@@ -879,7 +915,7 @@ public partial class DnsView : UserControl
     {
         var settings = AppSettings.Load(AppSettings.DefaultPath);
 
-        if (!settings.DnsAuto || settings.UseRouterDns)
+        if (!settings.DnsAuto || settings.UseRouterDns || settings.DnsCryptActive is not null)
             return;
 
         if (DnsSurvey.Fastest(all) is not { TlsAddress: { } address } best)
@@ -1034,128 +1070,4 @@ public partial class DnsView : UserControl
         }
     }
 
-    /// <summary>
-    /// Проверяет адреса пинов и меняет умершие на те, что посредники отдают сейчас.
-    /// </summary>
-    /// <remarks>
-    /// Не прерывается уходом с вкладки: посреди неё может идти запись hosts,
-    /// а итог всё равно ляжет в журнал. Токен поэтому не раздела, а пустой.
-    /// </remarks>
-    private async void OnPins(object sender, RoutedEventArgs e)
-    {
-        PinsButton.IsEnabled = false;
-
-        try
-        {
-            var state = SupervisorState.Load(SupervisorState.DefaultPath);
-            bool engines = state is not null && state.IsSupervisorAlive();
-
-            PinsStatus.Text = "Проверяю: по одному соединению на первый адрес каждого имени и вопрос посредникам…";
-
-            PinRefreshResult result;
-
-            try
-            {
-                result = await Task.Run(() => PinRefresh.RunAsync(CancellationToken.None, byHand: true));
-            }
-            catch (Exception ex)
-            {
-                PinsStatus.Text = "Проверить не удалось: " + ex.GetBaseException().Message;
-                Journal.Write("пин", "проверка адресов не удалась: " + ex.GetBaseException().Message);
-                return;
-            }
-
-            PinsStatus.Text = Describe(result)
-                + (engines ? string.Empty : " Движки не подняты — часть посредников без десинка не отвечает, и мёртвыми могли показаться живые.");
-
-            // Проверка прошла; сбой записи в журнал наблюдения её не отменяет.
-            try
-            {
-                PinRefreshWatch.Write("кнопкой", result);
-                ShowPinWatch(AppSettings.Load(AppSettings.DefaultPath));
-            }
-            catch (Exception ex)
-            {
-                PinsStatus.Text += " Запись о проверке не сохранилась: " + ex.GetBaseException().Message;
-            }
-        }
-        catch (Exception ex)
-        {
-            PinsStatus.Text = "Проверить не удалось: " + ex.GetBaseException().Message;
-        }
-        finally
-        {
-            PinsButton.IsEnabled = true;
-        }
-    }
-
-    /// <summary>Выключатель плановой проверки; сторож читает его на каждом круге.</summary>
-    private void OnAutoRepin(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            var settings = AppSettings.Load(AppSettings.DefaultPath) with { AutoRepin = AutoRepinSwitch.IsChecked == true };
-
-            settings.Save(AppSettings.DefaultPath);
-            ShowPinWatch(settings);
-        }
-        catch (Exception ex)
-        {
-            PinsStatus.Text = "Не удалось сохранить настройку: " + ex.GetBaseException().Message;
-        }
-    }
-
-    /// <summary>Выключатель и строка о том, что под присмотром и когда была проверка.</summary>
-    private void ShowPinWatch(AppSettings settings)
-    {
-        AutoRepinSwitch.IsChecked = settings.AutoRepin;
-
-        var watch = PinRefresh.Watch();
-        var parts = new List<string>();
-
-        if (watch.Watched > 0)
-            parts.Add("под присмотром: " + string.Join(", ", watch.Groups.Select(g => $"{g.Intermediary ?? "без посредника"} — {g.Count}")));
-
-        parts.Add(watch.Last is { } last
-            ? $"последняя проверка {last.ToLocalTime():dd.MM HH:mm}"
-            : "проверок ещё не было");
-
-        if (watch.Suspects.Count > 0)
-            parts.Add($"промолчали в прошлый раз: {watch.Suspects.Count}");
-
-        PinsWatchLine.Text = char.ToUpper(parts[0][0]) + parts[0][1..] + (parts.Count > 1 ? "; " + string.Join("; ", parts.Skip(1)) : string.Empty) + ".";
-    }
-
-    /// <summary>Итог проверки словами — что сделано и чего не сделано.</summary>
-    internal static string Describe(PinRefreshResult result)
-    {
-        if (result.Checked == 0 && result.Error is null)
-            return "В hosts нет пинов на адреса посредников — проверять нечего.";
-
-        var parts = new List<string>();
-
-        if (result.Error is { } error)
-            parts.Add($"Ничего не заменено: {error}.");
-
-        if (result.Changes.Count > 0)
-            parts.Add($"Заменено: {string.Join("; ", result.Changes)}.");
-
-        if (result.Moved.Count > 0)
-            parts.Add($"Перенесено за посредником: {string.Join("; ", result.Moved)}.");
-
-        if (result.Reordered.Count > 0)
-            parts.Add($"Живой адрес поставлен первым: {string.Join("; ", result.Reordered)}.");
-
-        if (result.Dead.Count > 0)
-            parts.Add($"Живой замены не нашлось: {string.Join(", ", result.Dead.Take(6))}"
-                + (result.Dead.Count > 6 ? $" и ещё {result.Dead.Count - 6}." : "."));
-
-        if (result.Silent.Count > 0)
-            parts.Add($"По DoH не ответили: {string.Join(", ", result.Silent)}.");
-
-        if (parts.Count == 0)
-            parts.Add($"Проверено адресов: {result.Checked}, все отвечают, менять нечего.");
-
-        return string.Join(" ", parts);
-    }
 }

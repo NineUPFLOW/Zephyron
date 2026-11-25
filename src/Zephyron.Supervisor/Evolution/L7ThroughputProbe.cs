@@ -25,7 +25,7 @@ public sealed record ThroughputResult
 /// </summary>
 public static class L7ThroughputProbe
 {
-    private const int TargetTestBytes = 256 * 1024; // 256 КБ
+    private const int TargetTestBytes = 128 * 1024; // 128 КБ (достаточно для точного замера скорости и обнаружения замедления ТСПУ)
     private const double ThrottleThresholdKBps = 180.0; // Порог замедления (ниже 180 КБ/с = замедлено DPI)
 
     /// <summary>
@@ -44,7 +44,8 @@ public static class L7ThroughputProbe
         {
             using var client = new TcpClient();
             using var linkCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            linkCts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+            int effectiveTimeout = Math.Max(timeoutSeconds, 4);
+            linkCts.CancelAfter(TimeSpan.FromSeconds(effectiveTimeout));
 
             await client.ConnectAsync(address, 443, linkCts.Token);
             long connectMs = sw.ElapsedMilliseconds;
@@ -63,7 +64,7 @@ public static class L7ThroughputProbe
 
             // Формируем L7 HTTP/1.1 запрос с Range-запросом фрагмента видео
             string path = host.Contains("googlevideo", StringComparison.OrdinalIgnoreCase)
-                ? "/videoplayback?mime=video%2Fmp4&range=0-262143"
+                ? $"/videoplayback?mime=video%2Fmp4&range=0-{TargetTestBytes - 1}"
                 : "/";
 
             var request = $"GET {path} HTTP/1.1\r\n" +
@@ -90,7 +91,7 @@ public static class L7ThroughputProbe
                 totalBytesRead += read;
 
                 // Если поток данных читается слишком медленно (DPI throttling stall)
-                if (streamSw.ElapsedMilliseconds > 6000 && totalBytesRead < 32 * 1024)
+                if (streamSw.ElapsedMilliseconds > 2500 && totalBytesRead < 16 * 1024)
                 {
                     break;
                 }

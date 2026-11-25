@@ -34,6 +34,22 @@ public static class TunnelEndpoints
 {
     private static readonly TimeSpan ResolveTimeout = TimeSpan.FromSeconds(2);
 
+    /// <summary>
+    /// Срок, когда все имена уже знакомы по прошлому запуску (<see cref="CacheName"/>).
+    /// </summary>
+    /// <remarks>
+    /// Замер 22.11: живые имена серверов разрешаются за 0–7 мс, а мёртвые имена из подписок
+    /// («wiseKeys», «dont-touch-me-ru.com») — за 2,8 с или никогда, и каждый запуск ждал
+    /// полные 2 с ради них. Знакомым именам хватает доли секунды; не успевшие берут адрес
+    /// прошлого раза, а имя, не разрешившееся тогда, не ждётся вовсе.
+    /// </remarks>
+    private static readonly TimeSpan KnownTimeout = TimeSpan.FromMilliseconds(300);
+
+    /// <summary>Файл прошлых ответов рядом с конфигом движка: имя → адреса (пусто — не разрешилось).</summary>
+    public const string CacheName = "tunnel-endpoints.json";
+
+    private static readonly object CacheLock = new();
+
     /// <summary>Адреса серверов из конфига sing-box; не прочитался — пусто.</summary>
     /// <param name="first">
     /// Тег выхода, чей адрес идёт первым, — закреплённый сервер. В фильтр
@@ -58,29 +74,71 @@ public static class TunnelEndpoints
             return [];
         }
 
+        var cachePath = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(configPath)) ?? ".", CacheName);
+        var cache = LoadCache(cachePath);
+
         // Порядок серверов сохраняется: готовый адрес — уже решённая задача.
-        var lookups = Hosts(config, first)
+        var hosts = Hosts(config, first).ToList();
+        var lookups = hosts
             .Select(host => IPAddress.TryParse(host, out var address)
                 ? Task.FromResult(new[] { address })
                 : Dns.GetHostAddressesAsync(host))
             .ToList();
 
-        // Не дождавшиеся поиски бросаем — их поздние ошибки надо прочесть.
-        foreach (var lookup in lookups)
-            _ = lookup.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+        // Не дождавшиеся поиски бросаем — их поздние ошибки надо прочесть,
+        // а поздний ответ запомнить для следующего запуска.
+        for (int i = 0; i < lookups.Count; i++)
+        {
+            var host = hosts[i];
+            _ = lookups[i].ContinueWith(t =>
+            {
+                _ = t.Exception;
+
+                if (t.IsCompletedSuccessfully)
+                    Remember(cachePath, host, t.Result);
+            }, TaskContinuationOptions.ExecuteSynchronously);
+        }
+
+        bool allKnown = hosts.All(h => IPAddress.TryParse(h, out _) || cache.ContainsKey(h));
 
         try
         {
-            Task.WaitAll([.. lookups], ResolveTimeout);
+            Task.WaitAll([.. lookups], allKnown ? KnownTimeout : ResolveTimeout);
         }
         catch (Exception)
         {
             // Не разрешилось — этот сервер десинк по-прежнему видит, и только.
         }
 
-        var result = lookups
-            .Where(l => l.IsCompletedSuccessfully)
-            .SelectMany(l => l.Result);
+        var found = new List<IPAddress>();
+        var now = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+
+        for (int i = 0; i < lookups.Count; i++)
+        {
+            var lookup = lookups[i];
+            var host = hosts[i];
+
+            if (lookup.IsCompletedSuccessfully)
+            {
+                found.AddRange(lookup.Result);
+                now[host] = lookup.Result.Select(a => a.ToString()).ToArray();
+            }
+            else if (!lookup.IsFaulted && cache.TryGetValue(host, out var known))
+            {
+                // Не успело — адрес прошлого раза; ответ «нет такого имени» прошлым адресом не подменяется.
+                found.AddRange(known.Select(IPAddress.Parse));
+                now[host] = known;
+            }
+            else
+            {
+                // Нет такого имени или не ответило за полный срок — в следующий раз не ждём его вовсе.
+                now[host] = [];
+            }
+        }
+
+        SaveCache(cachePath, now);
+
+        var result = found;
 
         return result
             .Select(a => a.IsIPv4MappedToIPv6 ? a.MapToIPv4() : a)
@@ -88,6 +146,45 @@ public static class TunnelEndpoints
             .Where(a => !IPAddress.IsLoopback(a) && !a.Equals(IPAddress.Any) && !a.Equals(IPAddress.IPv6Any))
             .Distinct()
             .ToList();
+    }
+
+    private static Dictionary<string, string[]> LoadCache(string path)
+    {
+        try
+        {
+            lock (CacheLock)
+            {
+                var raw = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string[]>>(File.ReadAllText(path));
+
+                return raw is null
+                    ? new(StringComparer.OrdinalIgnoreCase)
+                    : new(raw.Where(p => p.Value.All(a => IPAddress.TryParse(a, out _))), StringComparer.OrdinalIgnoreCase);
+            }
+        }
+        catch (Exception)
+        {
+            return new(StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    private static void SaveCache(string path, IReadOnlyDictionary<string, string[]> entries)
+    {
+        try
+        {
+            lock (CacheLock)
+                Zephyron.Core.AtomicFile.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(entries));
+        }
+        catch (Exception)
+        {
+            // Не записалось — следующий запуск подождёт полный срок, и только.
+        }
+    }
+
+    private static void Remember(string path, string host, IPAddress[] addresses)
+    {
+        var cache = LoadCache(path);
+        cache[host] = addresses.Select(a => a.ToString()).ToArray();
+        SaveCache(path, cache);
     }
 
     /// <summary>
