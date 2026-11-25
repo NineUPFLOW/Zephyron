@@ -128,6 +128,8 @@ public partial class SubscriptionAddWindow : Window
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
+            // Иначе диалог меняет рабочую папку, и config/, runtime/, engines/ ищутся не там.
+            RestoreDirectory = true,
             Title = "Файл с ключом",
             Filter = "Ключ или QR-код|*.conf;*.txt;*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp|Все файлы|*.*",
         };

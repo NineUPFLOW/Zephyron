@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using Zephyron.Core;
+using Zephyron.Proxy;
 
 namespace Zephyron.Supervisor;
 
@@ -9,9 +10,11 @@ namespace Zephyron.Supervisor;
 /// </summary>
 /// <remarks>
 /// Поднимается раньше sing-box: тот на первом же запросе спросит 127.0.0.1, и без
-/// прокси всё до его готовности разрешалось бы в пустоту. Готов, когда назвал
-/// число живых серверов (<see cref="DnsCrypt.ReadyMarker"/>), обычно за 3–4 с.
-/// Здоровье — жив ли процесс: серверы он перебирает сам.
+/// прокси всё до его готовности разрешалось бы в пустоту. Готов, когда ответил
+/// адресами на настоящий вопрос — через 1–2 с после старта — или назвал число живых
+/// серверов (<see cref="DnsCrypt.ReadyMarker"/>). Только по этой строке ждать нельзя:
+/// серверов в списке стало 172, и строка приходила через 14–36 с, а весь запуск
+/// программы шёл 15–18 с (замер 22.11). Здоровье — жив ли процесс: серверы он перебирает сам.
 /// </remarks>
 public sealed class DnsCryptService : SupervisedService
 {
@@ -82,8 +85,13 @@ public sealed class DnsCryptService : SupervisedService
     /// Готов по строке, а без неё — через 10 с живого процесса, как winws2:
     /// замер серверов у медленной сети бывает дольше, а sing-box ждать нечего.
     /// </summary>
-    public override Task<ServiceCheck> CheckFunctionalAsync(CancellationToken cancellationToken) =>
-        Task.FromResult(WinwsService.Ready(IsProcessAlive, _ready, StartedAt, DateTimeOffset.Now)
+    public override async Task<ServiceCheck> CheckFunctionalAsync(CancellationToken cancellationToken)
+    {
+        if (!_ready && IsProcessAlive && await DnsCryptProbe.AnswersAsync(DnsCrypt.Port, "www.google.com", cancellationToken))
+            _ready = true;
+
+        return WinwsService.Ready(IsProcessAlive, _ready, StartedAt, DateTimeOffset.Now)
             ? ServiceCheck.Healthy
-            : ServiceCheck.Broken);
+            : ServiceCheck.Broken;
+    }
 }

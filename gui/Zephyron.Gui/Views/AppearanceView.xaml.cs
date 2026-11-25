@@ -309,11 +309,14 @@ public partial class AppearanceView : UserControl
         static string? Pick(ComboBox box) =>
             box.SelectedItem is FontItem { Name: var name } && name != ThemeFont ? name : null;
 
+        var current = AppSettings.Load(AppSettings.DefaultPath);
+
+        // Масштаб не выбран (список ещё пуст) — остаётся сохранённый, а не 1.0.
         var scale = ScaleChoice.SelectedIndex is int i && i >= 0 && i < Appearance.Scales.Count
             ? Appearance.Scales[i]
-            : 1.0;
+            : current.UiScale;
 
-        ApplyLook(AppSettings.Load(AppSettings.DefaultPath) with
+        ApplyLook(current with
         {
             UiFont = Pick(UiFontChoice),
             UiScale = scale,
@@ -345,15 +348,17 @@ public partial class AppearanceView : UserControl
     {
         try
         {
-            settings.Save(AppSettings.DefaultPath);
-
             var result = Themes.Apply(Themes.Current, settings);
+
+            // Пишем только применившееся: иначе при следующем запуске тема не встанет.
+            if (result.Ok)
+                settings.Save(AppSettings.DefaultPath);
 
             Status.Text = result.Ok
                 ? string.Empty
                 : "Тема не применилась с этими настройками: " + string.Join("; ", result.Problems.Take(2));
 
-            ShowTheme(settings, reread: false);
+            ShowTheme(result.Ok ? settings : AppSettings.Load(AppSettings.DefaultPath), reread: false);
         }
         catch (Exception ex)
         {
@@ -501,6 +506,8 @@ public partial class AppearanceView : UserControl
 
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
+            // Иначе диалог меняет рабочую папку, и config/, runtime/, engines/ ищутся не там.
+            RestoreDirectory = true,
             Title = "Сохранить тему",
             FileName = $"zephyron-{id}.zip",
             Filter = "Тема Zephyron (*.zip)|*.zip",
@@ -524,6 +531,8 @@ public partial class AppearanceView : UserControl
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
+            // Иначе диалог меняет рабочую папку, и config/, runtime/, engines/ ищутся не там.
+            RestoreDirectory = true,
             Title = "Взять тему",
             Filter = "Тема Zephyron (*.zip)|*.zip",
         };

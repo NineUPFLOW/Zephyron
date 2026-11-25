@@ -49,6 +49,17 @@ public sealed class SingBoxRunner : IAsyncDisposable
         if (IsRunning)
             throw new InvalidOperationException("Процесс уже запущен.");
 
+        // Порт уже слушает чужая программа: иначе «готовность» отметит её,
+        // а запросы с нашими логином и паролем уйдут ей. Прежний наш экземпляр
+        // может отпускать порт ещё пару секунд — даём ему это время.
+        for (var busySince = DateTime.UtcNow;
+             await IsPortAcceptingAsync(readinessPort, TimeSpan.FromMilliseconds(300), cancellationToken);
+             await Task.Delay(200, cancellationToken))
+        {
+            if (DateTime.UtcNow - busySince > TimeSpan.FromSeconds(2))
+                return false;
+        }
+
         var startInfo = new ProcessStartInfo
         {
             FileName = _executablePath,

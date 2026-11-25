@@ -1844,7 +1844,8 @@ public partial class CheckView : UserControl
             {
                 $"Режим: {settings.DescribeMode()}",
                 $"Пресет: {settings.DescribePreset()}",
-                $"Сервер: {server ?? "не определён"}",
+                // Флаг-эмодзи окно не рисует («н. Польша» вместо 🇵🇱 Польша): страна видна в имени.
+                $"Сервер: {(server is null ? "не определён" : Zephyron.Subscriptions.CountryTag.Split(server).Name)}",
                 $"Туннель: {TunnelHealth.Describe(_tunnel)}",
             };
 

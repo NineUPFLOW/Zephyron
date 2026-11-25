@@ -190,7 +190,8 @@ public static class DnsSurvey
             Group: DnsGroup.Filtering),
         new("Yandex", ["77.88.8.8", "77.88.8.1"], "77.88.8.8", "common.dot.dns.yandex.net",
             Note: "российский, быстрый"),
-        new("Comss.one", ["83.220.169.155", "212.109.195.93"], "83.220.169.155", "dns.comss.one",
+        // 22.11: 83.220.169.155 не отвечал ни по DoH, ни по UDP; 212.109.221.20 и .195.93 — оба.
+        new("Comss.one", ["212.109.221.20", "212.109.195.93"], "212.109.221.20", "dns.comss.one",
             Note: "российский, отвечает честно — для обхода подмены",
             Group: DnsGroup.Intermediary),
         // Mullvad (194.242.2.2) убран 10.10 по слову владельца: DoH не ответил
@@ -627,36 +628,6 @@ public static class DnsSurvey
 
         return "TIMEOUT";
     }
-    /// <summary>Читает ответ HTTP/1.1 с Content-Length.</summary>
-    private static async Task<(int Status, byte[] Body)> ReadHttpAsync(Stream stream, CancellationToken cancellationToken)
-    {
-        var header = new List<byte>();
-        var one = new byte[1];
-
-        while (header.Count < 8192)
-        {
-            await stream.ReadExactlyAsync(one, cancellationToken);
-            header.Add(one[0]);
-
-            if (header.Count >= 4 && header[^4] == '\r' && header[^3] == '\n' && header[^2] == '\r' && header[^1] == '\n')
-                break;
-        }
-
-        var text = Encoding.ASCII.GetString([.. header]);
-        var lines = text.Split("\r\n");
-        int status = int.TryParse(lines[0].Split(' ').ElementAtOrDefault(1), out var code) ? code : 0;
-
-        int length = lines
-            .Where(l => l.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
-            .Select(l => int.TryParse(l[15..].Trim(), out var n) ? n : 0)
-            .FirstOrDefault();
-
-        var body = new byte[length];
-        await stream.ReadExactlyAsync(body, cancellationToken);
-
-        return (status, body);
-    }
-
     /// <summary>Имя для замера задержки: короткое и заведомо существующее.</summary>
     private const string DnsProbeName = "example.com";
 
@@ -723,40 +694,47 @@ public static class DnsSurvey
         return answer?.Texts.FirstOrDefault();
     }
 
+    /// <summary>Сколько помнить честный ответ: имена служебных вопросов за минуту не меняются.</summary>
+    private static readonly TimeSpan HonestMemory = TimeSpan.FromSeconds(60);
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<(string Name, ushort Type, int? Nic), (DateTime At, DnsWire.Answer Answer)> HonestAnswers = new();
+
+    private static readonly object HonestSync = new();
+    private static (int? Nic, HttpClient Http)? _honestClient;
+
     /// <summary>Один запрос через честный DoH.</summary>
+    /// <remarks>
+    /// Все вопросы — одним соединением HTTP/2, а одинаковые за минуту — из памяти. Прежде каждый
+    /// вопрос открывал своё TLS к 1.1.1.1, и автозамена пинов, опрос посредников и проверки
+    /// давали десятки рукопожатий в минуту. 22.11 у владельца резолвер после пары таких заходов
+    /// переставал отвечать: DoH — таймаут, DoT — SYN без ответа, а по одному заходу отвечали все.
+    /// Провайдер гасит адрес, к которому часто открывают сессии, — и гас тот самый
+    /// Cloudflare, который человек выбрал резолвером.
+    /// </remarks>
     public static async Task<DnsWire.Answer?> HonestAsync(
         string name, ushort type, int? nic, CancellationToken cancellationToken)
     {
-        var (stream, _) = await TlsAsync(Honest.TlsAddress!, 443, Honest.TlsName!, nic, cancellationToken);
+        var key = (name.ToLowerInvariant(), type, nic);
 
-        if (stream is null)
-            return null;
+        if (HonestAnswers.TryGetValue(key, out var known) && DateTime.UtcNow - known.At < HonestMemory)
+            return known.Answer;
 
-        await using (stream)
+        HttpClient http;
+
+        lock (HonestSync)
         {
-            try
-            {
-                using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                limit.CancelAfter(Timeout);
+            if (_honestClient is not { } current || current.Nic != nic)
+                _honestClient = current = (nic, DohClient(Honest.TlsAddress!, nic));
 
-                var query = DnsWire.Query(name, type);
-                var head = Encoding.ASCII.GetBytes(
-                    $"POST {Honest.DohPath} HTTP/1.1\r\nHost: {Honest.TlsName}\r\n"
-                    + "Content-Type: application/dns-message\r\nAccept: application/dns-message\r\n"
-                    + $"Content-Length: {query.Length}\r\n\r\n");
-
-                await stream.WriteAsync(head, limit.Token);
-                await stream.WriteAsync(query, limit.Token);
-
-                var (status, body) = await ReadHttpAsync(stream, limit.Token);
-
-                return status == 200 ? DnsWire.Parse(body) : null;
-            }
-            catch (Exception) when (!cancellationToken.IsCancellationRequested)
-            {
-                return null;
-            }
+            http = current.Http;
         }
+
+        var answer = await DohQueryAsync(http, Honest.TlsName!, Honest.DohPath!, name, type, cancellationToken);
+
+        if (answer is not null)
+            HonestAnswers[key] = (DateTime.UtcNow, answer);
+
+        return answer;
     }
 
     /// <summary>

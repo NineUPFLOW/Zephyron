@@ -419,6 +419,7 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
 
                                         <Path Grid.Column="0" Style="{StaticResource Chevron}" Margin="4,0,12,0">
@@ -470,7 +471,28 @@
                                                           ToolTip="{Binding AutoFillHint}" />
                                         </StackPanel>
 
-                                        <Button Grid.Column="4" Style="{StaticResource IconGhost}" Content="&#xE712;"
+                                        <!--
+                                            Путь всего сервиса одной кнопкой (отзыв 23.11: у Discord восемь частей,
+                                            и менять путь каждой по отдельности утомительно). То же окно пути,
+                                            что у части, — выбор пишется всем частям сразу.
+                                        -->
+                                        <Button Grid.Column="4" Style="{StaticResource RowGhost}" Padding="12,6" MinWidth="122"
+                                                Margin="12,0,0,0" Click="OnFolderRoute" Visibility="{Binding GroupRouteShown}"
+                                                AutomationProperties.Name="Путь всего сервиса"
+                                                ToolTip="Путь сразу для всех частей сервиса"
+                                                HorizontalContentAlignment="Stretch">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding GroupRouteLabel}" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="1" FontFamily="{StaticResource IconFont}" Text="&#xE70D;"
+                                                           FontSize="10" Margin="10,1,0,0" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Button>
+
+                                        <Button Grid.Column="5" Style="{StaticResource IconGhost}" Content="&#xE712;"
                                                 Margin="10,0,0,0" Click="OnFolderMore"
                                                 AutomationProperties.Name="Действия с папкой"
                                                 ToolTip="Проверить автоподбором, переименовать, распустить, добавить маршрут" />

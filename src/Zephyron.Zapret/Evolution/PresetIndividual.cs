@@ -41,6 +41,9 @@ public sealed class PresetIndividual
     /// <summary>Родитель B (для кроссовера).</summary>
     public Guid? ParentB { get; init; }
 
+    /// <summary>Средняя скорость потоковой передачи (L7 Throughput) в КБ/с.</summary>
+    public double StreamingSpeedKBps { get; set; }
+
     /// <summary>Была ли особь успешно оценена фитнес-функцией.</summary>
     public bool HasValidFitness => !double.IsNaN(FitnessScore);
 
@@ -48,6 +51,12 @@ public sealed class PresetIndividual
     public string FitnessLabel => HasValidFitness
         ? $"{FitnessScore:P0} ({ProbesPassed}/{ProbesTotal}, {AvgLatencyMs} мс)"
         : "не оценена";
+
+    /// <summary>
+    /// Возвращает детерминированную строку-сигнатуру генома для кэширования фитнеса.
+    /// </summary>
+    public string GetGenomeSignature() =>
+        string.Join("##", Genes.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase).Select(kv => $"{kv.Key}::{kv.Value.GetSignature()}"));
 
     /// <summary>
     /// Создает особь из существующего пресета.

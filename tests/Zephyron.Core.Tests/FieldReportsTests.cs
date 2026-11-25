@@ -127,4 +127,14 @@ public sealed class FieldReportsTests : IDisposable
         Assert.False(DnsTrust.IsIntercepted("9.9.9.9"));
         Assert.Equal("Good", DnsTrust.CleanAlternative(rows));
     }
+
+    /// <summary>С DNSCrypt резолвер из настроек не спрашивается — его подмена не поломка (23.11).</summary>
+    [Fact]
+    public void Intercepted_resolver_is_not_a_fault_under_dnscrypt()
+    {
+        DnsTrust.Record([new DnsSurveyRow { Provider = new DnsProvider("Bad", ["1.1.1.1"], "1.1.1.1", "one.one"), DohMs = 20, UdpAnswered = 1, Intercepted = true }]);
+
+        Assert.Single(Zephyron.Supervisor.Doctor.InterceptedResolver(new AppSettings { DnsServer = "1.1.1.1" }));
+        Assert.Empty(Zephyron.Supervisor.Doctor.InterceptedResolver(new AppSettings { DnsServer = "1.1.1.1", DnsCrypt = "dnscrypt" }));
+    }
 }

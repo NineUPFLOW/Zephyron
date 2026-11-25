@@ -122,7 +122,7 @@ internal static class StartupSweep
                 return;
             }
 
-            var singBox = Path.Combine(AppContext.BaseDirectory, "engines", "sing-box", "sing-box.exe");
+            var singBox = Path.Combine(Zephyron.Core.InstallRoot.AppFolder, "engines", "sing-box", "sing-box.exe");
 
             if (!File.Exists(singBox))
             {

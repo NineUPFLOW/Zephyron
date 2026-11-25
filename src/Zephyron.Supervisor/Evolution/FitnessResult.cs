@@ -27,10 +27,16 @@ public sealed record FitnessResult
     /// <summary>Средняя задержка ответа в миллисекундах.</summary>
     public long AvgLatencyMs { get; init; }
 
+    /// <summary>Замеренная скорость потокового видео (L7 Throughput) в КБ/с.</summary>
+    public double StreamingSpeedKBps { get; init; }
+
+    /// <summary>Успешно ли пройдена проба голосового UDP трафика Discord Voice.</summary>
+    public bool DiscordVoicePassed { get; init; }
+
     /// <summary>Детальные исходы по каждому хосту.</summary>
     public IReadOnlyDictionary<string, ProbeOutcome> HostResults { get; init; } = new Dictionary<string, ProbeOutcome>();
 
-    public string Summary => $"{Score:P0} ({Passed}/{Total}, {AvgLatencyMs} мс)";
+    public string Summary => $"{Score:P0} ({Passed}/{Total}, {AvgLatencyMs} мс, {StreamingSpeedKBps:F0} КБ/с)";
 }
 
 /// <summary>

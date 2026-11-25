@@ -22,33 +22,60 @@ public sealed class ProcessImageResolver
 {
     private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
 
-    private readonly ConcurrentDictionary<int, string?> _cache = new();
+    // Windows раздаёт PID заново: запись живёт недолго, иначе новый процесс
+    // с тем же PID унаследует чужой exe. Неудача не кэшируется вовсе.
+    private const long TtlMs = 30_000;
+
+    private readonly ConcurrentDictionary<int, (string Path, long At)> _cache = new();
 
     public string? Resolve(int processId)
     {
         if (processId <= 0)
             return null;
 
-        return _cache.GetOrAdd(processId, static pid =>
+        var now = Environment.TickCount64;
+
+        if (_cache.TryGetValue(processId, out var hit) && now - hit.At < TtlMs)
+            return hit.Path;
+
+        var path = Query(processId);
+
+        if (path is null)
+            _cache.TryRemove(processId, out _);
+        else
+            _cache[processId] = (path, now);
+
+        if (_cache.Count > 4096)
         {
-            var handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
-            if (handle == IntPtr.Zero)
-                return null;
-
-            try
+            foreach (var (pid, entry) in _cache)
             {
-                var buffer = new StringBuilder(1024);
-                int size = buffer.Capacity;
+                if (now - entry.At >= TtlMs)
+                    _cache.TryRemove(pid, out _);
+            }
+        }
 
-                return QueryFullProcessImageNameW(handle, 0, buffer, ref size)
-                    ? buffer.ToString()
-                    : null;
-            }
-            finally
-            {
-                CloseHandle(handle);
-            }
-        });
+        return path;
+    }
+
+    private static string? Query(int pid)
+    {
+        var handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+        if (handle == IntPtr.Zero)
+            return null;
+
+        try
+        {
+            var buffer = new StringBuilder(1024);
+            int size = buffer.Capacity;
+
+            return QueryFullProcessImageNameW(handle, 0, buffer, ref size)
+                ? buffer.ToString()
+                : null;
+        }
+        finally
+        {
+            CloseHandle(handle);
+        }
     }
 
     [DllImport("kernel32.dll", SetLastError = true, ExactSpelling = true)]

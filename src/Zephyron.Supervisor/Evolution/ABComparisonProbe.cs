@@ -46,25 +46,9 @@ public sealed class ABComparisonProbe
         // 2. Оценка победителя эволюции
         var winnerEval = await _probe.EvaluateAsync(winner, basePreset, settings, ct);
 
-        // 3. Замер L7 Throughput на googlevideo
-        double baseThroughput = 0.0;
-        try
-        {
-            var ips = await System.Net.Dns.GetHostAddressesAsync("googlevideo.com", ct);
-            if (ips.Length > 0)
-            {
-                var speedRes = await L7ThroughputProbe.MeasureSpeedAsync("googlevideo.com", ips[0], 5, ct);
-                baseThroughput = speedRes.SpeedKBps;
-            }
-        }
-        catch
-        {
-            baseThroughput = 220.0;
-        }
-
-        double winnerThroughput = winnerEval.Passed >= baseEval.Passed
-            ? Math.Max(baseThroughput, 350.0)
-            : baseThroughput;
+        // 3. Получение реальных эмпирических данных L7 Throughput из оценок под изолированным winws2
+        double baseThroughput = baseEval.StreamingSpeedKBps;
+        double winnerThroughput = winnerEval.StreamingSpeedKBps;
 
         // 4. Формирование сравнительного вердикта
         int passedDiff = winnerEval.Passed - baseEval.Passed;

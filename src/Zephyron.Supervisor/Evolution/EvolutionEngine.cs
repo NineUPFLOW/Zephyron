@@ -59,14 +59,8 @@ public sealed class EvolutionEngine
             return await FinalizeWinnerAsync(winnerInd, primaryPreset, settings, pool, outputDirectory, progress, rng, ct);
         }
 
-        // Экспресс-определение сигнатуры DPI ТСПУ (DPI Fingerprinting)
-        var sampleResults = new Dictionary<string, bool>();
-        if (primaryPreset.Sections.Any(s => s.Name.Contains("youtube", StringComparison.OrdinalIgnoreCase)))
-            sampleResults["www.youtube.com"] = false;
-        if (primaryPreset.Sections.Any(s => s.Name.Contains("discord", StringComparison.OrdinalIgnoreCase)))
-            sampleResults["discord.com"] = false;
-
-        var dpiProfile = DpiFingerprinter.DetectProfile(sampleResults);
+        // Экспресс-определение сигнатуры DPI ТСПУ (DPI Fingerprinting) на реальной сети
+        var dpiProfile = await DpiFingerprinter.ProbeProfileAsync(_probe, ct);
         _lastDetectedDpiProfile = dpiProfile;
         _lastDetectedIsp = await IspIdentifier.ResolveCurrentIspAsync(ct);
         int targetMaxGen = settings.FastSprintMode ? Math.Min(settings.MaxGenerations, 4) : settings.MaxGenerations;
@@ -85,6 +79,30 @@ public sealed class EvolutionEngine
         foreach (var p in seedPresets)
         {
             population.Add(PresetIndividual.FromPreset(p, 0));
+        }
+
+        // Засевание популяции целевыми стратегиями под обнаруженную сигнатуру DPI
+        if (dpiProfile.RecommendedSeedSteps.Count > 0 && population.Count > 0)
+        {
+            var seedInd = population[0];
+            var seededGenes = new Dictionary<string, PresetGene>(seedInd.Genes, StringComparer.OrdinalIgnoreCase);
+            foreach (var (secName, gene) in seedInd.Genes)
+            {
+                if (secName.Contains("youtube", StringComparison.OrdinalIgnoreCase) ||
+                    secName.Contains("discord", StringComparison.OrdinalIgnoreCase) ||
+                    secName.Contains("general", StringComparison.OrdinalIgnoreCase))
+                {
+                    seededGenes[secName] = gene with
+                    {
+                        DesyncSteps = dpiProfile.RecommendedSeedSteps
+                    };
+                }
+            }
+            population.Add(new PresetIndividual
+            {
+                GenerationNumber = 0,
+                Genes = seededGenes
+            });
         }
 
         // Засевание популяции (Transfer learning из журнала успешных рецептов)
@@ -149,10 +167,18 @@ public sealed class EvolutionEngine
         Random rng,
         CancellationToken ct)
     {
-        var semaphore = new SemaphoreSlim(Math.Max(1, settings.MaxConcurrentProbes));
-        PresetIndividual bestOverall = population[0];
+        var semaphore = new SemaphoreSlim(1);
+        var fitnessCache = new System.Collections.Concurrent.ConcurrentDictionary<string, FitnessResult>(StringComparer.Ordinal);
+        PresetIndividual bestOverall = population
+            .Where(i => i.HasValidFitness)
+            .OrderByDescending(i => i.ProbesPassed)
+            .ThenBy(i => i.AvgLatencyMs)
+            .ThenByDescending(i => i.FitnessScore)
+            .FirstOrDefault() ?? population[0];
 
-        int maxGen = settings.MaxGenerations;
+        int maxGen = settings.FastSprintMode ? Math.Min(settings.MaxGenerations, 4) : settings.MaxGenerations;
+        int targetPopSize = settings.FastSprintMode ? Math.Min(settings.PopulationSize, 10) : settings.PopulationSize;
+
         for (int gen = startGeneration; gen < maxGen; gen++)
         {
             ct.ThrowIfCancellationRequested();
@@ -166,20 +192,51 @@ public sealed class EvolutionEngine
             });
 
             int evaluatedCount = 0;
-            // Параллельная оценка особей текущего поколения через семафор
+            // Оценка особей текущего поколения (с кэшированием геномов и параллельными сетевыми пробами внутри процесса)
             var tasks = population.Select(async ind =>
             {
                 if (ind.HasValidFitness)
+                {
+                    Interlocked.Increment(ref evaluatedCount);
                     return;
+                }
+
+                var sig = ind.GetGenomeSignature();
+                if (fitnessCache.TryGetValue(sig, out var cached))
+                {
+                    ind.FitnessScore = cached.Score;
+                    ind.ProbesPassed = cached.Passed;
+                    ind.ProbesTotal = cached.Total;
+                    ind.AvgLatencyMs = cached.AvgLatencyMs;
+                    ind.StreamingSpeedKBps = cached.StreamingSpeedKBps;
+                    ind.LastHostOutcomes = cached.HostResults.ToDictionary(k => k.Key, v => v.Value.Success);
+                    Interlocked.Increment(ref evaluatedCount);
+                    return;
+                }
 
                 await semaphore.WaitAsync(ct);
                 try
                 {
+                    if (fitnessCache.TryGetValue(sig, out cached))
+                    {
+                        ind.FitnessScore = cached.Score;
+                        ind.ProbesPassed = cached.Passed;
+                        ind.ProbesTotal = cached.Total;
+                        ind.AvgLatencyMs = cached.AvgLatencyMs;
+                        ind.StreamingSpeedKBps = cached.StreamingSpeedKBps;
+                        ind.LastHostOutcomes = cached.HostResults.ToDictionary(k => k.Key, v => v.Value.Success);
+                        Interlocked.Increment(ref evaluatedCount);
+                        return;
+                    }
+
                     var result = await _probe.EvaluateAsync(ind, basePreset, settings, ct);
+                    fitnessCache[sig] = result;
+
                     ind.FitnessScore = result.Score;
                     ind.ProbesPassed = result.Passed;
                     ind.ProbesTotal = result.Total;
                     ind.AvgLatencyMs = result.AvgLatencyMs;
+                    ind.StreamingSpeedKBps = result.StreamingSpeedKBps;
                     ind.LastHostOutcomes = result.HostResults.ToDictionary(k => k.Key, v => v.Value.Success);
 
                     int count = Interlocked.Increment(ref evaluatedCount);
@@ -238,7 +295,7 @@ public sealed class EvolutionEngine
             {
                 Generation = gen + 1,
                 MaxGenerations = maxGen,
-                BestFitness = bestOverall.FitnessScore,
+                BestFitness = bestOverall.HasValidFitness ? bestOverall.FitnessScore : 0.0,
                 BestPassed = bestOverall.ProbesPassed,
                 BestTotal = bestOverall.ProbesTotal,
                 BestLatencyMs = bestOverall.AvgLatencyMs,
@@ -251,7 +308,7 @@ public sealed class EvolutionEngine
             await _store.SaveAsync(population, gen + 1, basePreset.Name, ct: ct);
 
             // Критерий останова: достижение целевой приспособленности
-            if (bestOverall.FitnessScore >= settings.ConvergeThreshold)
+            if (bestOverall.HasValidFitness && bestOverall.FitnessScore >= settings.ConvergeThreshold)
                 break;
 
             // Формирование следующего поколения:
@@ -267,7 +324,7 @@ public sealed class EvolutionEngine
             // Адаптивная вероятность мутации в случае стагнации
             double currentMutationRate = GeneticOperators.AdaptiveMutationRate(population, settings.MutationRate);
 
-            while (nextGeneration.Count < settings.PopulationSize)
+            while (nextGeneration.Count < targetPopSize)
             {
                 var p1 = GeneticOperators.TournamentSelect(population, rng, settings.TournamentSize);
                 var p2 = GeneticOperators.TournamentSelect(population, rng, settings.TournamentSize);
@@ -276,7 +333,7 @@ public sealed class EvolutionEngine
 
                 nextGeneration.Add(GeneticOperators.Mutate(child1, pool, gen + 1, rng, currentMutationRate, settings.TargetSectionKey));
 
-                if (nextGeneration.Count < settings.PopulationSize)
+                if (nextGeneration.Count < targetPopSize)
                 {
                     nextGeneration.Add(GeneticOperators.Mutate(child2, pool, gen + 1, rng, currentMutationRate, settings.TargetSectionKey));
                 }

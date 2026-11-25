@@ -228,7 +228,7 @@ public sealed class OwnCatalog
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
 
-        File.WriteAllText(path, text.ToString().Replace("\r\n", "\n"), new System.Text.UTF8Encoding(false));
+        AtomicFile.WriteAllText(path, text.ToString().Replace("\r\n", "\n"), new System.Text.UTF8Encoding(false));
 
         static string Quote(string value) => "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
     }

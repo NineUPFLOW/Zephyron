@@ -34,12 +34,15 @@ internal static class EngineInputs
     {
         "WindowMaximized", "OfferDiscordRestart", "LearnDiscordVoice", "AutoInstallUpdates",
         "LearnRobloxServers", "LearnArcRaidersServers", "RouteFolders", "RouteOrder", "MadeFolders",
-        "FolderLabels", "PreferredServer", "AutoPickExit", "AutoPickExcluded", "ServerMemoryDays",
+        "FolderLabels", "PreferredServer", "AutoPickExit", "ServerMemoryDays",
         "MeasureOnStart", "Theme", "ThemeBackgroundShown", "ThemeBlur", "ThemeDimSteps", "TrayBlur",
         "TrayDensity", "UiFont", "UiScale", "CheckForUpdates", "DismissedUpdate", "OnboardingDone",
         "SupportCardHidden", "Animations", "HomeFullWidth", "Effects", "HideOwnAddress", "LoadFailed",
         "VerifyTrafficReset", "GameFilterReset", "TelegramProxyAutoReset", "ProgramRulesRemoved",
-        "RemovedProgramRules", "LastRunVersion", "LogsEnabled",
+        "RemovedProgramRules", "LastRunVersion",
+        // Метки одноразовых миграций: сами по себе движки не меняют. LogsEnabled и AutoPickExcluded
+        // движок читает (аргументы супервизора, DeadServerTags) — их тут нет намеренно.
+        "PresetV11Lite", "PresetV12Lite", "PresetAdaptive", "WarpIsPath",
     };
 
     /// <summary>Отпечаток нынешних маршрутов и настроек.</summary>

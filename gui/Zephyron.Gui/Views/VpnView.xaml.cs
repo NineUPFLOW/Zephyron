@@ -946,6 +946,10 @@ public partial class VpnView : UserControl
         {
             Status.Text = "Чтение остановлено.";
         }
+        catch (Exception ex)
+        {
+            Status.Text = "Не удалось обновить: " + ex.GetBaseException().Message;
+        }
         finally
         {
             RefreshButton.IsEnabled = true;
@@ -2206,7 +2210,12 @@ public partial class VpnView : UserControl
         window.ShowDialog();
 
         if (window.Changed)
+        {
             await LoadAsync();
+
+            // Окно пишет настройки туннеля, а движки их уже прочли.
+            this.Offer("Настройки туннеля изменены");
+        }
     }
 
     /// <summary>
@@ -2340,6 +2349,8 @@ public partial class VpnView : UserControl
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
+            // Иначе диалог меняет рабочую папку, и config/, runtime/, engines/ ищутся не там.
+            RestoreDirectory = true,
             Title = "Файл WARP",
             Filter = "Файл WARP (*.conf)|*.conf|Все файлы|*.*",
         };
@@ -3540,7 +3551,7 @@ public partial class VpnView : UserControl
     /// <summary>Где лежит движок; <c>null</c> — не нашли.</summary>
     private static string? FindSingBox()
     {
-        var beside = Path.Combine(AppContext.BaseDirectory, "engines", "sing-box", "sing-box.exe");
+        var beside = Path.Combine(Zephyron.Core.InstallRoot.AppFolder, "engines", "sing-box", "sing-box.exe");
 
         return File.Exists(beside) ? beside : null;
     }

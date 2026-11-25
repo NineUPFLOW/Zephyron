@@ -333,7 +333,14 @@ public partial class PinWindow : Window
             var kind = _target.Match;
 
             if (what == "reset")
-                file.Remove(kind, _target.Value);
+            {
+                // Своего выбора не было — нечего убирать и нечего обещать.
+                if (!file.Remove(kind, _target.Value))
+                {
+                    Status.Text = "Своего выбора здесь нет: действует правило из поставки.";
+                    return;
+                }
+            }
             else
                 file.Set(kind, _target.Value, Mode(what));
 

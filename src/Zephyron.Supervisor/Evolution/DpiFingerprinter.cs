@@ -55,4 +55,34 @@ public static class DpiFingerprinter
             RecommendedSeedSteps = recommended
         };
     }
+
+    /// <summary>
+    /// Выполняет быстрый pre-flight замер доступности хостов без активного обхода для выявления профиля ТСПУ.
+    /// </summary>
+    public static async Task<DpiProfile> ProbeProfileAsync(FitnessProbe probe, CancellationToken ct = default)
+    {
+        var probes = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        string[] testHosts = ["www.youtube.com", "discord.com"];
+
+        var tasks = testHosts.Select(async host =>
+        {
+            try
+            {
+                var outcome = await probe.ProbeHostAsync(host, timeoutSeconds: 2, ct);
+                return (host, outcome.Success);
+            }
+            catch
+            {
+                return (host, false);
+            }
+        });
+
+        var results = await Task.WhenAll(tasks);
+        foreach (var (host, success) in results)
+        {
+            probes[host] = success;
+        }
+
+        return DetectProfile(probes);
+    }
 }

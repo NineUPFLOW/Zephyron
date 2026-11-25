@@ -291,13 +291,15 @@ public sealed record PresetGene
     }
 
     /// <summary>
-    /// Одноточечный кроссовер двух генов.
+    /// Кроссовер двух генов с согласованным наследованием портов протоколов.
     /// </summary>
-    public static PresetGene Crossover(PresetGene a, PresetGene b, Random rng) =>
-        new()
+    public static PresetGene Crossover(PresetGene a, PresetGene b, Random rng)
+    {
+        bool takePortsFromA = rng.Next(2) == 0;
+        return new()
         {
-            TcpPorts    = rng.Next(2) == 0 ? a.TcpPorts    : b.TcpPorts,
-            UdpPorts    = rng.Next(2) == 0 ? a.UdpPorts    : b.UdpPorts,
+            TcpPorts    = takePortsFromA ? a.TcpPorts : b.TcpPorts,
+            UdpPorts    = takePortsFromA ? a.UdpPorts : b.UdpPorts,
             OutRange    = rng.Next(2) == 0 ? a.OutRange    : b.OutRange,
             DesyncSteps = rng.Next(2) == 0 ? a.DesyncSteps : b.DesyncSteps,
             BlobRefs    = rng.Next(2) == 0 ? a.BlobRefs    : b.BlobRefs,
@@ -305,4 +307,11 @@ public sealed record PresetGene
             Payload     = rng.Next(2) == 0 ? a.Payload     : b.Payload,
             Repeats     = rng.Next(2) == 0 ? a.Repeats     : b.Repeats,
         };
+    }
+
+    /// <summary>
+    /// Возвращает детерминированную строку-сигнатуру гена для кэширования фитнеса.
+    /// </summary>
+    public string GetSignature() =>
+        $"{TcpPorts}|{UdpPorts}|{OutRange}|{Payload}|{Repeats}|{IpSetPath}|{string.Join(';', DesyncSteps)}";
 }

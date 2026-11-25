@@ -898,6 +898,7 @@ public static class ServiceCatalog
                     List = "config/lists/minecraft.txt",
                     Note = "без mojang.com игра запускается только в оффлайне — похоже на слетевшую учётку",
                 },
+                new ServicePart { Name = "Minecraft: моды и лаунчеры", List = "config/lists/minecraft-mods.txt" },
                 new ServicePart { Name = "HoYoverse: Genshin и Honkai", List = "config/lists/hoyoverse.txt" },
             ],
         },

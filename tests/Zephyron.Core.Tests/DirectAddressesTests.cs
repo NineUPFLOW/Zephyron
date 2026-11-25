@@ -40,6 +40,36 @@ public sealed class DirectAddressesTests
         }
     }
 
+    /// <summary>Все серверы туннеля — мимо секций, а не только сорок из фильтра перехвата (отчёт 23.11).</summary>
+    [Fact]
+    public void TunnelServersJoinTheDirectNetworks()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "skip-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+
+        try
+        {
+            var user = Path.Combine(dir, "desync-direct.txt");
+            DirectAddresses.Write(["203.0.113.0/24"], user);
+
+            var servers = Enumerable.Range(1, 69).Select(i => System.Net.IPAddress.Parse($"198.51.100.{i}")).ToList();
+            var run = DirectAddresses.WithServers(user, servers, Path.Combine(dir, "desync-skip.txt"));
+
+            var lines = File.ReadAllLines(run!);
+            Assert.Equal(DirectAddresses.Placeholder, lines[0]);
+            Assert.Contains("203.0.113.0/24", lines);
+            Assert.Contains("198.51.100.69", lines);
+            Assert.Equal(1 + 1 + 69, lines.Length);
+
+            // Без туннеля — прежний список человека, нового файла не нужно.
+            Assert.Equal(user, DirectAddresses.WithServers(user, [], Path.Combine(dir, "other.txt")));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
     [Fact]
     public void EverySectionSkipsDirectNetworks()
     {

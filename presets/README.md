@@ -12,7 +12,9 @@ Zephyron Adaptive (с 15.11) — наш пресет и умолчание у в
 где рецепт секции «youtube.com (интерфейс)» подставляет программа: YouTube перестал
 открываться — берётся следующий из YouTubeRecipes (рецепт V12 Lite, рецепты Zapret
 GUI 2.44, рецепт general Flowseal, MIT) и обход перезапускается. `circular` в секции
-по именам сбивал соседние сайты, поэтому смена — в программе. QUIC YouTube глушится,
+по именам сбивал соседние сайты, поэтому смена — в программе. Секции Discord в Adaptive,
+Stable и Strict (с 23.11) меняют рецепт сами `circular`: запасной — рецепт general ALT11
+Flowseal (MIT), с которым Discord работал у человека, где наши не работали. QUIC YouTube глушится,
 браузер уходит на TCP. Секции YouTube и
 Discord читают и наши списки (`zy-youtube.txt`, `zy-discord.txt`).
 

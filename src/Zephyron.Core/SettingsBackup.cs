@@ -150,6 +150,27 @@ public static class SettingsBackup
             File.Copy(current, saved, overwrite: true);
         }
 
+        // Состояние должно стать ровно копией: свои файлы из набора, которых в копии нет
+        // (warp.conf, списки), иначе пережили бы восстановление. Прежнее уже лежит в backupDir.
+        var own = Path.Combine(root, "config", "lists", "own");
+        var stale = Fixed.Select(n => Locate(root, n)).Concat(
+            Directory.Exists(own)
+                ? Directory.EnumerateFiles(own, "*.txt").Where(f => IsSafeListName(Path.GetFileName(f)))
+                : []);
+
+        foreach (var current in stale)
+        {
+            var name = Path.GetRelativePath(root, current).Replace(Path.DirectorySeparatorChar, '/');
+
+            if (files.ContainsKey(name) || !File.Exists(current))
+                continue;
+
+            var saved = Locate(backupDir, name);
+            Directory.CreateDirectory(Path.GetDirectoryName(saved)!);
+            File.Copy(current, saved, overwrite: true);
+            File.Delete(current);
+        }
+
         foreach (var (name, bytes) in files)
         {
             var target = Locate(root, name);

@@ -236,6 +236,8 @@ public partial class UpdatePanel : UserControl
         InstallButton.IsEnabled = false;
         UpdateButton.IsEnabled = false;
 
+        bool wasRunning = false;
+
         try
         {
             // Качаем при работающих движках, гасим — только перед подменой.
@@ -265,7 +267,10 @@ public partial class UpdatePanel : UserControl
 
             // Без движков у человека может не быть DNS: новая версия поднимает их сама.
             if (SupervisorState.Load(SupervisorState.DefaultPath)?.IsSupervisorAlive() == true)
+            {
+                wasRunning = true;
                 File.WriteAllText(App.RestartEnginesMark, string.Empty);
+            }
 
             Say("Останавливаю движки…");
             await EngineControl.StopAsync("обновление программы", CancellationToken.None);
@@ -310,6 +315,20 @@ public partial class UpdatePanel : UserControl
 
             InstallButton.IsEnabled = true;
             UpdateButton.IsEnabled = true;
+
+            // Подмена не началась, программа остаётся — метка не нужна, а обход надо вернуть.
+            if (wasRunning)
+            {
+                try
+                {
+                    File.Delete(App.RestartEnginesMark);
+                    await EngineControl.StartAsync("обновление не удалось", CancellationToken.None);
+                }
+                catch (Exception)
+                {
+                    // Не вышло вернуть — человек увидит это по статусу движков.
+                }
+            }
         }
     }
 

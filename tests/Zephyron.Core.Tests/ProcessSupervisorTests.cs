@@ -210,7 +210,9 @@ public sealed class ProcessSupervisorTests : IDisposable
             CheckInterval = TimeSpan.FromMilliseconds(80),
             ReadinessTimeout = TimeSpan.FromSeconds(2),
             RestartBackoff = TimeSpan.FromMilliseconds(10),
-            StableResetsRestarts = TimeSpan.FromMilliseconds(300),
+            // 300 мс под нагрузкой полного прогона проскакивали между опросами: счёт
+            // успевал стать 1 и обнулиться, и ожидание единицы не дожидалось (23.11).
+            StableResetsRestarts = TimeSpan.FromSeconds(2),
             StatePath = Path.Combine(_dir, "supervisor.state.json"),
             LogPath = Path.Combine(_dir, "supervisor.log"),
         };

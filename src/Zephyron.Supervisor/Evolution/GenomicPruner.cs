@@ -55,6 +55,7 @@ public static class GenomicPruner
             ProbesPassed = individual.ProbesPassed,
             ProbesTotal = individual.ProbesTotal,
             AvgLatencyMs = individual.AvgLatencyMs,
+            StreamingSpeedKBps = individual.StreamingSpeedKBps,
             LastHostOutcomes = individual.LastHostOutcomes,
             ParentA = individual.ParentA,
             ParentB = individual.ParentB

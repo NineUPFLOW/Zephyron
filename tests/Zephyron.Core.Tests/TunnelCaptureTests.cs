@@ -512,6 +512,41 @@ public sealed class TunnelCaptureTests
         }
     }
 
+    /// <summary>
+    /// Имя, которое не разрешилось, запоминается: следующий запуск его не ждёт
+    /// (22.11: мёртвые имена из подписок держали каждый запуск по 2 с).
+    /// </summary>
+    [Fact]
+    public void AnUnresolvedNameDoesNotHoldTheNextStart()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), $"zy-endpoints-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, "singbox.json");
+
+        try
+        {
+            File.WriteAllText(path, $$"""
+                {
+                  "outbounds": [
+                    { "type": "vless", "tag": "A", "server": "77.1.1.1", "server_port": 443 },
+                    { "type": "vless", "tag": "B", "server": "zy-dead-{{Guid.NewGuid():N}}.invalid", "server_port": 443 }
+                  ]
+                }
+                """);
+
+            Assert.Equal([IPAddress.Parse("77.1.1.1")], TunnelEndpoints.Read(path));
+            Assert.True(File.Exists(Path.Combine(dir, TunnelEndpoints.CacheName)));
+
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            Assert.Equal([IPAddress.Parse("77.1.1.1")], TunnelEndpoints.Read(path));
+            Assert.True(watch.Elapsed < TimeSpan.FromSeconds(1), $"второй запуск ждал {watch.Elapsed}");
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
     [Fact]
     public void AMissingConfigGivesNoAddresses()
     {

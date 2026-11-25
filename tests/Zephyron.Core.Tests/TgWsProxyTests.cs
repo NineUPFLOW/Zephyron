@@ -215,6 +215,14 @@ public sealed class TgWsProxyTests
         Assert.Null(TgWsProxy.Switch(new AppSettings(), on: false).TelegramProxySecret);
     }
 
+    /// <summary>Первый запуск включает прокси — и с секретом, иначе он не поднимается (отчёт 23.11).</summary>
+    [Fact]
+    public void FreshSettingsCarryASecret()
+    {
+        Assert.True(AppSettings.Fresh.TelegramProxy);
+        Assert.True(TgWsProxy.IsSecret(AppSettings.Fresh.TelegramProxySecret));
+    }
+
     [Fact]
     public void TheProxyIsNotNeededOnlyWhenTelegramGoesViaTheTunnel()
     {

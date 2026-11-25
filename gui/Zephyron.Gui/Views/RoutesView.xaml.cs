@@ -283,7 +283,16 @@ public sealed record PartRow : INotifyPropertyChanged
     public Visibility MoreShown => Movable ? Visibility.Visible : Visibility.Collapsed;
 
     /// <summary>Выбранный путь словом — на кнопке выбора (макет владельца 13.10).</summary>
-    public string RouteLabel => Choice switch
+    public string RouteLabel => Label(Choice);
+
+    /// <summary>Путь на момент сборки строки словом — для кнопки пути всего сервиса.</summary>
+    /// <remarks>
+    /// По <see cref="Applied"/>, как и итог шапки: <see cref="Choice"/> пишет привязка списка, и у части
+    /// свёрнутой папки он мог разойтись с маршрутом — кнопка Discord писала «разные» при «везде: напрямую» (23.11).
+    /// </remarks>
+    public string AppliedLabel => Label(Applied);
+
+    private string Label(int choice) => choice switch
     {
         0 => "напрямую",
         1 => "десинк",
@@ -552,6 +561,22 @@ public sealed record ServiceRow(string Name, IReadOnlyList<PartRow> Parts) : INo
                 1 => "везде: " + modes[0].Key,
                 _ => string.Join(" · ", modes.Select(g => $"{g.Count()} {g.Key}")),
             };
+        }
+    }
+
+    /// <summary>Части, путь которых можно менять, — их и меняет кнопка пути всего сервиса.</summary>
+    public IReadOnlyList<PartRow> Routable => Parts.Where(p => p.CanRoute).ToList();
+
+    /// <summary>Кнопка пути всего сервиса — где частей больше одной: у одной есть своя кнопка.</summary>
+    public Visibility GroupRouteShown => Routable.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>Путь сервиса словом на кнопке: общий для всех частей или «разные».</summary>
+    public string GroupRouteLabel
+    {
+        get
+        {
+            var labels = Routable.Select(p => p.AppliedLabel).Distinct().ToList();
+            return labels.Count == 1 ? labels[0] : "разные";
         }
     }
 
@@ -1088,6 +1113,7 @@ public partial class RoutesView : UserControl
             Chevrons.Turn(OrderChevron, true);
 
             Status.Text = $"Порядок записан: {source.Value} встал на место {target.Value}. Вступит в силу после следующего запуска движков.";
+            this.Offer("Порядок правил изменён");
         }
         catch (Exception ex)
         {
@@ -2520,6 +2546,8 @@ public partial class RoutesView : UserControl
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
+            // Иначе диалог меняет рабочую папку, и config/, runtime/, engines/ ищутся не там.
+            RestoreDirectory = true,
             Title = "Программа",
             Filter = "Программы|*.exe",
         };

@@ -41,6 +41,8 @@
 -- arg: after=N      — секунд на ответ после приветствия (2)
 -- arg: resetafter=N — мс до сброса молчащего соединения (1000); 0 — без сброса
 -- arg: far=N        — мс задержки, после которой первый срез прощается (35)
+-- arg: scale=N      — (с syn) множитель окна в SYN занизить до N, а не снимать (1 — вдвое быстрее)
+-- arg: ramp         — только пересчёт окна соединения с заниженным множителем
 
 local zy_groups = {}
 local zy_next_id = 0
@@ -70,7 +72,9 @@ local function zy_cut(g, key, arg, now)
 	g.strikes = g.strikes + 1
 
 	local far = tonumber(arg.far or 35) / 1000
-	if g.strikes == 1 and g.rtt and g.rtt > far then
+	-- С 14.11: прощается только группе, которая хоть раз ответила обычным
+	-- соединением — у закрытой наглухо повтор срежут так же, и прощение стоит лишнего сброса.
+	if g.strikes == 1 and g.rtt and g.rtt > far and g.answered then
 		DLOG("zy_video_window: "..key.." far group ("..math.floor(g.rtt * 1000).." ms), first cut forgiven")
 		return
 	end
@@ -104,6 +108,20 @@ function zy_video_window_timer(name, data)
 	rawsend_dissect(dis, { ifout = data.ifin })
 end
 
+-- Окно соединения с заниженным множителем: до первых двух байт ответа — малое, дальше —
+-- окно Windows, умноженное обратно на 2^(настоящий − заниженный), не больше 65535.
+-- Без пересчёта сервер видел бы окно в 128 раз меньше, и соединение почти встало бы.
+function zy_scaled(dis, state)
+	local got = u32add(dis.tcp.th_ack, -state.zy_ack0)
+	if got < 2 then
+		dis.tcp.th_win = state.zy_first
+	else
+		local win = math.floor(dis.tcp.th_win * 2^state.zy_shift)
+		dis.tcp.th_win = win > 65535 and 65535 or win
+	end
+	return VERDICT_MODIFY
+end
+
 function zy_video_window(ctx, desync)
 	local dis = desync.dis
 	if not dis.tcp or not desync.outgoing or not desync.track then return end
@@ -111,6 +129,16 @@ function zy_video_window(ctx, desync)
 	local state = desync.track.lua_state
 	local arg = desync.arg
 	local now = clock_getfloattime()
+
+	-- Шаг ramp (последний в каждой секции TCP, его ставит VideoWindow.Ramp): соединению
+	-- с заниженным множителем — пересчёт окна, остальным — ничего, выключается сразу.
+	if arg.ramp then
+		if not state.zy_shift or not state.zy_ack0 then
+			instance_cutoff_shim(ctx, desync)
+			return
+		end
+		return zy_scaled(dis, state)
+	end
 
 	if bitand(dis.tcp.th_flags, bitor(TH_SYN, TH_ACK)) == TH_SYN then
 		if not arg.syn then return end
@@ -138,7 +166,21 @@ function zy_video_window(ctx, desync)
 		if arg.always or now < g.till then
 			state.zy_window = true
 			local i = find_tcp_option(dis.tcp.options, TCP_KIND_SCALE)
-			if i then table.remove(dis.tcp.options, i) end
+			if not i then return end
+			-- arg scale: множитель окна не снимается, а занижается — окно до 65535·2^scale
+			-- вместо 65535, вдвое быстрее (замер 13–14.11: 11,5–21,5 Мбит/с против 5,1–9,2; 22.11 у владельца — 4K с узла под окном).
+			-- Windows о занижении не знает, и каждое её окно пересчитывает шаг ramp.
+			local keep = tonumber(arg.scale)
+			if keep then
+				local real = u8(dis.tcp.options[i].data)
+				if real <= keep then return end
+				dis.tcp.options[i].data = bu8(keep)
+				state.zy_shift = real - keep
+				-- Два байта первого пакета при множителе 1 — окно 1.
+				state.zy_first = math.max(1, math.floor(2 / 2^keep))
+				return VERDICT_MODIFY
+			end
+			table.remove(dis.tcp.options, i)
 			return VERDICT_MODIFY
 		end
 		return
@@ -190,6 +232,10 @@ function zy_video_window(ctx, desync)
 			g.strikes = 0
 			g.answered = true
 		end
+	end
+
+	if state.zy_window and state.zy_shift then
+		return zy_scaled(dis, state)
 	end
 
 	if state.zy_window and got < 2 then

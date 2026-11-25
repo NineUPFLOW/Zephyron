@@ -23,7 +23,7 @@ public sealed class DnsSpareTests
     [Fact]
     public void AResolverIsNamedWithItsAddress()
     {
-        Assert.Equal("Comss.one (83.220.169.155)", DnsSpare.Describe("83.220.169.155"));
+        Assert.Equal("Comss.one (212.109.221.20)", DnsSpare.Describe("212.109.221.20"));
         Assert.Equal("10.0.0.53", DnsSpare.Describe("10.0.0.53"));
     }
 

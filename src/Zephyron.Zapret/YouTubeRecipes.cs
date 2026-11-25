@@ -50,12 +50,25 @@ public static class YouTubeRecipes
     public static bool Applies(string? presetName) =>
         string.Equals(presetName, AppSettings.DefaultPresetName, StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>Номер выбранного рецепта; нет файла или мусор — первый.</summary>
-    public static int Read(string? path = null)
+    /// <summary>
+    /// Сколько помнить сменённый рецепт. Потом — снова первый: если он не откроет YouTube,
+    /// сторож за пару проверок сменит его опять. Отчёт 23.11: Adaptive шёл со способом 2,
+    /// выбранным ещё в прошлой версии (сторож тогда менял способы из-за ошибки), хотя
+    /// у человека работает первый — на Strict и Stable YouTube открывался.
+    /// </summary>
+    public static readonly TimeSpan Memory = TimeSpan.FromHours(12);
+
+    /// <summary>Номер выбранного рецепта; нет файла, мусор или выбран давно — первый.</summary>
+    public static int Read(string? path = null, DateTime? now = null)
     {
         try
         {
-            var text = File.ReadAllText(path ?? StatePath).Trim();
+            var file = path ?? StatePath;
+
+            if ((now ?? DateTime.UtcNow) - File.GetLastWriteTimeUtc(file) > Memory)
+                return 0;
+
+            var text = File.ReadAllText(file).Trim();
             return int.TryParse(text, out int index) && index >= 0 && index < Recipes.Count ? index : 0;
         }
         catch (Exception)

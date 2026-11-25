@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Zephyron.Zapret.Evolution;
 
 namespace Zephyron.Supervisor.Evolution;
@@ -22,6 +23,7 @@ public sealed class EvolutionStore
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
+        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
     };
 
     public static string DefaultPath => Path.Combine("config", "evolution", "population.json");
