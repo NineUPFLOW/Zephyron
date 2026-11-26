@@ -14,10 +14,10 @@ namespace Zephyron.Supervisor;
 /// общий говорил бы «Главной», что движки запущены.
 /// </para>
 /// <para>
-/// Надзор движков такой прокси не поднимает (<see cref="AppSettings.TelegramProxyWithEngines"/>).
-/// Но надзор, запущенный до включения настройки, свой ещё держит — пока он
-/// жив, этот не поднимается: порт один. Окно зовёт <see cref="Sync"/> снова
-/// после каждого запуска и остановки движков.
+/// С 26.11 окно держит прокси лишь без движков: с движками его держит их надзор
+/// (<see cref="EnginesHoldIt"/>) — иначе «выйти, движки оставить» уносил прокси
+/// вместе с окном. Порт один: окно зовёт <see cref="Sync"/> снова после каждого
+/// запуска и остановки движков.
 /// </para>
 /// </remarks>
 public static class TgWsProxyKeeper
@@ -36,6 +36,30 @@ public static class TgWsProxyKeeper
             lock (Gate)
                 return _running is { IsCompleted: false };
         }
+    }
+
+    /// <summary>Держит ли прокси надзор движков — тогда окну свой не поднимать.</summary>
+    /// <remarks>
+    /// С 26.11 надзор берёт прокси при любом включённом (SupervisorHost.BuildArguments):
+    /// прокси окна жил в его объекте задания и умирал с «выйти, движки оставить».
+    /// Файл состояния надзор пишет, лишь подняв все службы (прокси — последним),
+    /// и пока движки поднимаются или файла ещё нет, верим настройке: окно заняло
+    /// бы порт раньше надзора, а тот при старте снимает чужие tg-ws-proxy (FindOrphans).
+    /// </remarks>
+    /// <param name="starting">Окно прямо сейчас поднимает движки.</param>
+    /// <param name="enginesUp">Надзор движков жив (замок, файл состояния или свой PID).</param>
+    public static bool EnginesHoldIt(AppSettings settings, bool starting, bool enginesUp, SupervisorState? state)
+    {
+        if (starting)
+            return settings.TelegramProxy;
+
+        if (!enginesUp)
+            return false;
+
+        // Надзор, поднятый прежней версией при «всегда», прокси не держит — тогда окно.
+        return state is not null && state.IsSupervisorAlive()
+            ? state.Services.Any(s => s.Name == TgWsProxyService.ServiceName)
+            : settings.TelegramProxy;
     }
 
     /// <summary>Поднимает или гасит прокси по настройкам.</summary>

@@ -23,8 +23,9 @@
 --   и с флагом ACK: сервер повторяет ответ и после того, как клиент сдался.
 --
 -- Сколько держать окно: срез — минута. Группе, которая обычным соединением ни разу
--- не ответила, второй срез подряд — час (узел закрыт наглухо); отвечавшей — час
--- только с третьего. Далёкой группе (наименьшая задержка SYN→приветствие больше far мс)
+-- не ответила, второй срез подряд — долгое окно, 10 минут (узел закрыт наглухо; было час:
+-- одно ложное решение держало узел на малом окне до перезапуска движка); отвечавшей — оно
+-- только с третьего. Когда окно истекло, счёт срезов начинается заново. Далёкой группе (наименьшая задержка SYN→приветствие больше far мс)
 -- первый срез подряд прощается: окно там режет скорость до уровня ниже 1440p.
 -- Удачное обычное соединение счёт сбрасывает.
 --
@@ -37,7 +38,7 @@
 --
 -- arg: syn          — шаг профиля SYN
 -- arg: always       — окно всем соединениям профиля, без учёта истории группы
--- arg: short=N      — секунд окна после среза (60); long=N — «час» (3600)
+-- arg: short=N      — секунд окна после среза (60); long=N — долгое окно (600)
 -- arg: after=N      — секунд на ответ после приветствия (2)
 -- arg: resetafter=N — мс до сброса молчащего соединения (1000); 0 — без сброса
 -- arg: far=N        — мс задержки, после которой первый срез прощается (35)
@@ -80,14 +81,16 @@ local function zy_cut(g, key, arg, now)
 	end
 
 	local long = g.strikes >= (g.answered and 3 or 2)
-	g.till = now + (long and tonumber(arg.long or 3600) or tonumber(arg.short or 60))
+	g.long = long
+	g.till = now + (long and tonumber(arg.long or 600) or tonumber(arg.short or 60))
 	DLOG("zy_video_window: "..key.." cut #"..g.strikes..", window for "..math.floor(g.till - now).." s")
 end
 
 -- Таймер на приветствии: ответа нет — срез, и браузеру RST от имени сервера.
 function zy_video_window_timer(name, data)
 	local state = data.state
-	if state.zy_replied then return end
+	-- Клиент сам закрыл соединение (zy_closed) — это не срез.
+	if state.zy_replied or state.zy_closed then return end
 
 	local g = zy_groups[state.zy_group]
 	if g and g.pending[state.zy_id] then
@@ -163,6 +166,14 @@ function zy_video_window(ctx, desync)
 		state.zy_group = key
 		state.zy_syn = now
 
+		-- Окно истекло: счёт срезов с нуля, чтобы случайные срезы не копились до конца сеанса.
+		if g.till > 0 and now >= g.till then
+			g.till = 0
+			-- счёт обнуляет только отбытое долгое окно: после короткого второй срез подряд по-прежнему ведёт в долгое
+			if g.long then g.strikes = 0 end
+			g.long = false
+		end
+
 		if arg.always or now < g.till then
 			state.zy_window = true
 			local i = find_tcp_option(dis.tcp.options, TCP_KIND_SCALE)
@@ -190,6 +201,13 @@ function zy_video_window(ctx, desync)
 	if not key then return end
 	local g = zy_groups[key]
 	if not g then return end
+
+	-- FIN/RST от клиента: плеер бросил соединение сам (параллельные и отменённые запросы),
+	-- молчание сервера тут не вина фильтра — срез не засчитывается.
+	if bitand(dis.tcp.th_flags, bitor(TH_FIN, TH_RST)) ~= 0 and not state.zy_replied then
+		state.zy_closed = true
+		g.pending[state.zy_id] = nil
+	end
 
 	if not state.zy_ack0 then state.zy_ack0 = dis.tcp.th_ack end
 	local got = u32add(dis.tcp.th_ack, -state.zy_ack0)

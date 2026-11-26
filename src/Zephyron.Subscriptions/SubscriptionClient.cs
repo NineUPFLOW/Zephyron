@@ -307,7 +307,8 @@ public sealed class SubscriptionClient : IDisposable
         // Обёртки клиентов: ссылка подписки лежит внутри (hiddify, v2rayNG, sing-box, Streisand и др.).
         foreach (var prefix in new[]
         {
-            "happ://add/", "clash://install-config?url=", "sn://subscription?url=",
+            "happ://add/", "clash://install-config?url=", "clash://install-config/?url=",
+            "mihomo://install-config?url=", "mihomo://install-config/?url=", "sn://subscription?url=",
             "hiddify://import/", "sing-box://import-remote-profile?url=", "v2rayng://install-config?url=",
             "v2box://install-sub?url=", "streisand://import/", "karing://install-config?url=",
             "flclash://install-config?url=", "stash://install-config?url=", "clashmeta://install-config?url=",

@@ -43,11 +43,10 @@ public partial class StatusView
                 var used = Load.Sample(state);
                 (long Up, long Down)? moved = null;
 
+                // Потоком, без разбора списка соединений: прежнее чтение целиком в строку и дерево каждые
+                // две секунды у держащего тысячи соединений давало сотни МБ в минуту.
                 if (tunnel)
-                {
-                    using var api = new ClashApi();
-                    moved = await api.TotalsAsync(CancellationToken.None);
-                }
+                    moved = await TunnelStatus.TotalsAsync(CancellationToken.None);
 
                 return (used, moved);
             });

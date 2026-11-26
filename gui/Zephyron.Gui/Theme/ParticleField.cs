@@ -30,7 +30,7 @@ public enum FieldMode
 /// </summary>
 /// <remarks>
 /// <para>
-/// Рисует сам в <see cref="OnRender"/>, как NetChart, и ничего не создаёт в
+/// Рисует сам в <see cref="OnRender"/> и ничего не создаёт в
 /// кадре: узлы, пакеты и искры — массивы структур заранее, кисти и
 /// перья — замороженные, восемь ступеней альфы на роль. Тема сменилась —
 /// цвет ключа изменился, кэш пересобирается на ближайшем кадре.
@@ -140,11 +140,6 @@ public sealed class ParticleField : FrameworkElement
         }
     }
 
-    /// <summary>
-    /// Скорость, Мбит/с — только если её реально отдали (StatusView); null —
-    /// частота пакетов фиксированная. Придуманной скорости не бывает.
-    /// </summary>
-    public double? Mbps { get; set; }
 
     /// <summary>Множитель альфы всего слоя: для тем с фоновой картинкой.</summary>
     public double Dim
@@ -511,9 +506,7 @@ public sealed class ParticleField : FrameworkElement
                 rate = 1.5;
                 break;
             case FieldMode.Running:
-                rate = Mbps is { } m
-                    ? .8 + 2.2 * Math.Clamp(Math.Log10(1 + Math.Max(0, m)) / 3, 0, 1)
-                    : .8;
+                rate = .8;
                 break;
             case FieldMode.Degraded:
                 rate = .4;

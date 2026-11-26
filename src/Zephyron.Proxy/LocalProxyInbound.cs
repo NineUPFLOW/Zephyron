@@ -19,7 +19,8 @@ public static class LocalProxyInbound
 
     public static string Address(int port) => $"127.0.0.1:{port}";
 
-    public static bool PortAllowed(int port) => port is >= 1024 and <= 65535 && !Reserved.Contains(port);
+    public static bool PortAllowed(int port) => port is >= 1024 and <= 65535 && !Reserved.Contains(port)
+        && port != EnginePorts.CurrentClashPort() && port != EnginePorts.CurrentHealthPort();
 
     /// <summary>Занят ли порт на петле: пробуем занять сами.</summary>
     public static bool IsBusy(int port)

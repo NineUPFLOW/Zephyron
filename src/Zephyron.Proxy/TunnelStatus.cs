@@ -110,7 +110,7 @@ public static class TunnelStatus
     /// </remarks>
     public static async Task<string?> CurrentServerAsync(
         CancellationToken cancellationToken,
-        int clashPort = DefaultClashPort) =>
+        int? clashPort = null) =>
         (await CurrentExitAsync(cancellationToken, clashPort)).Server;
 
     /// <summary>
@@ -123,13 +123,19 @@ public static class TunnelStatus
     /// </remarks>
     public static async Task<(string? Server, bool Automatic)> CurrentExitAsync(
         CancellationToken cancellationToken,
-        int clashPort = DefaultClashPort)
+        int? clashPort = null)
     {
         try
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+            // Срок — на запрос, а клиент общий (<see cref="Clash"/>): «Главная» спрашивает раз в две секунды.
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            limit.CancelAfter(TimeSpan.FromSeconds(3));
+            cancellationToken = limit.Token;
 
-            var json = await GetAsync(http, $"http://127.0.0.1:{clashPort}/proxies/auto", cancellationToken);
+            var http = Clash;
+            int port = clashPort ?? EnginePorts.CurrentClashPort();
+
+            var json = await GetAsync(http, $"http://127.0.0.1:{port}/proxies/auto", cancellationToken);
 
             using var document = JsonDocument.Parse(json);
 
@@ -144,7 +150,7 @@ public static class TunnelStatus
             if (name is not null && name.StartsWith("auto", StringComparison.OrdinalIgnoreCase))
             {
                 var inner = await GetAsync(
-                    http, $"http://127.0.0.1:{clashPort}/proxies/{Uri.EscapeDataString(name)}", cancellationToken);
+                    http, $"http://127.0.0.1:{port}/proxies/{Uri.EscapeDataString(name)}", cancellationToken);
 
                 using var group = JsonDocument.Parse(inner);
 
@@ -165,6 +171,122 @@ public static class TunnelStatus
             // честнее выдуманного имени сервера.
             return (null, false);
         }
+    }
+
+    /// <summary>
+    /// Один клиент на опросы Clash API с «Главной».
+    /// </summary>
+    /// <remarks>
+    /// Прежде каждый опрос заводил свой клиент с обработчиком и новым соединением —
+    /// раз в две секунды, часами. Адрес — петля, прокси системы ему не нужен.
+    /// </remarks>
+    private static readonly HttpClient Clash = new(
+        new SocketsHttpHandler { UseProxy = false, PooledConnectionLifetime = TimeSpan.FromMinutes(2) })
+    {
+        Timeout = Timeout.InfiniteTimeSpan,
+    };
+
+    /// <summary>
+    /// Сколько байт движок отправил и принял с запуска — по итогам <c>/connections</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Тело ответа — список всех живых соединений (около 600 байт на каждое), а итоги
+    /// стоят в его конце (замер 26.11: ключи по алфавиту, <c>connections</c> первым).
+    /// Прежде тело читалось строкой и целиком разбиралось в <c>JsonNode</c> каждые две секунды:
+    /// у того, кто держит тысячи соединений (торренты, десятки вкладок), это мегабайты
+    /// строк и узлов за опрос, а буферы пула массивов от таких ответов остаются в памяти —
+    /// окно росло на сотню мегабайт в минуту, и сборка мусора его не возвращала.
+    /// Теперь тело читается потоком через 16 КБ буфера, соединения пропускаются, не
+    /// превращаясь в объекты.
+    /// </para>
+    /// </remarks>
+    public static async Task<(long Up, long Down)?> TotalsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            limit.CancelAfter(TimeSpan.FromSeconds(10));
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"http://{EnginePorts.CurrentClashListen()}/connections");
+            EngineKeys.Authorize(request, EngineKeys.Current());
+
+            using var response = await Clash.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, limit.Token);
+
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            await using var body = await response.Content.ReadAsStreamAsync(limit.Token);
+
+            var buffer = new byte[16 * 1024];
+            int filled = 0;
+            var state = default(JsonReaderState);
+            int which = 0;
+            long? up = null, down = null;
+
+            while (true)
+            {
+                int read = await body.ReadAsync(buffer.AsMemory(filled), limit.Token);
+                filled += read;
+
+                int consumed = ScanTotals(buffer.AsSpan(0, filled), read == 0, ref state, ref which, ref up, ref down);
+
+                if (up is { } sent && down is { } received)
+                    return (sent, received);
+
+                if (read == 0)
+                    return null;
+
+                // Недочитанное слово переезжает в начало буфера; не влезает — буфер растёт (до мегабайта).
+                Buffer.BlockCopy(buffer, consumed, buffer, 0, filled - consumed);
+                filled -= consumed;
+
+                if (filled == buffer.Length)
+                {
+                    if (buffer.Length >= 1 << 20)
+                        return null;
+
+                    Array.Resize(ref buffer, buffer.Length * 2);
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // Движок не отвечает или ответил не так — счётчиков нет, строка покажет прочерк.
+            return null;
+        }
+    }
+
+    /// <summary>Проход по куску ответа: берёт только <c>uploadTotal</c> и <c>downloadTotal</c> верхнего уровня.</summary>
+    /// <returns>Сколько байт разобрано; остаток — начало слова, не уместившегося в кусок.</returns>
+    private static int ScanTotals(
+        ReadOnlySpan<byte> data, bool final, ref JsonReaderState state, ref int which, ref long? up, ref long? down)
+    {
+        var reader = new Utf8JsonReader(data, final, state);
+
+        while (reader.Read())
+        {
+            if (reader.CurrentDepth != 1)
+                continue;
+
+            if (reader.TokenType == JsonTokenType.PropertyName)
+            {
+                which = reader.ValueTextEquals("uploadTotal"u8) ? 1 : reader.ValueTextEquals("downloadTotal"u8) ? 2 : 0;
+            }
+            else if (reader.TokenType == JsonTokenType.Number && which != 0)
+            {
+                if (which == 1)
+                    up = reader.GetInt64();
+                else
+                    down = reader.GetInt64();
+
+                which = 0;
+            }
+        }
+
+        state = reader.CurrentState;
+
+        return (int)reader.BytesConsumed;
     }
 
     /// <summary>Отмечает выход в журнале недавних (ExitHistory) и отдаёт ответ как есть.</summary>
@@ -226,7 +348,7 @@ public static class TunnelStatus
     public static async Task<TunnelState> StateAsync(
         string? server,
         CancellationToken cancellationToken,
-        int clashPort = DefaultClashPort)
+        int? clashPort = null)
     {
         // Имени нет — спрашиваем селектор. Он есть всегда, пока движок жив,
         // и запрос задержки к нему заставляет группу выбрать. Прежде здесь
@@ -238,7 +360,7 @@ public static class TunnelStatus
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(12) };
 
-            var url = $"http://127.0.0.1:{clashPort}/proxies/{Uri.EscapeDataString(target)}/delay"
+            var url = $"http://127.0.0.1:{clashPort ?? EnginePorts.CurrentClashPort()}/proxies/{Uri.EscapeDataString(target)}/delay"
                 + "?timeout=5000&url=" + Uri.EscapeDataString("https://www.gstatic.com/generate_204");
 
             using var request = new HttpRequestMessage(HttpMethod.Get, url);

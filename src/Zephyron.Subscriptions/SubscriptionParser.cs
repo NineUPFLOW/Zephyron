@@ -30,7 +30,8 @@ public static class SubscriptionParser
         if (string.IsNullOrWhiteSpace(body))
             return (servers, errors);
 
-        var text = body.Trim();
+        // BOM в начале тела (UTF-8 с сигнатурой) ломает и разбор YAML/JSON, и проверку «://».
+        var text = body.Trim().TrimStart('﻿').Trim();
 
         // Конфиг распознаётся до всего остального. Часть поставщиков отдаёт
         // готовый документ Xray, и серверы в нём лежат в outbounds: ссылок нет
@@ -41,6 +42,11 @@ public static class SubscriptionParser
 
         // Признак открытого вида — наличие схемы. Пробовать base64 первым нельзя:
         // список ссылок иногда случайно проходит проверку на base64-алфавит.
+        // Конфиг mihomo / Clash Meta (YAML с разделом proxies:): проверять до «://»,
+        // потому что в proxy-groups / rule-providers бывают URL.
+        if (MihomoConfigParser.LooksLikeConfig(text))
+            return MihomoConfigParser.Parse(text);
+
         if (!text.Contains("://", StringComparison.Ordinal))
         {
             var decoded = Base64.DecodeToString(text);
@@ -50,12 +56,16 @@ public static class SubscriptionParser
                 return (servers, errors);
             }
 
-            text = decoded;
+            // И BOM внутри base64: его кодирует сам поставщик вместе с текстом.
+            text = decoded.Trim().TrimStart('﻿').Trim();
 
             // И ещё раз после раскодирования: конфиг попадается и запакованным
             // в base64, как обычный список ссылок.
             if (XrayConfigParser.LooksLikeConfig(text))
                 return XrayConfigParser.Parse(text);
+
+            if (MihomoConfigParser.LooksLikeConfig(text))
+                return MihomoConfigParser.Parse(text);
         }
 
         foreach (var rawLine in text.Split('\n'))

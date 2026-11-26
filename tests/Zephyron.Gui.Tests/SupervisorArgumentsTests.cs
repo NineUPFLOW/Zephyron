@@ -284,11 +284,12 @@ public sealed class SupervisorArgumentsTests
     }
 
     /// <summary>
-    /// Прокси «без движков» держит окно (TgWsProxyKeeper, 12.10) — надзору ключа нет,
-    /// иначе два прокси дрались бы за один порт.
+    /// Прокси «без движков» окно держит, лишь пока движки стоят (TgWsProxyKeeper):
+    /// с движками — у надзора и при «всегда», иначе «выйти, движки оставить»
+    /// уносил прокси вместе с окном (26.11).
     /// </summary>
     [Fact]
-    public void Telegram_proxy_kept_by_the_window_is_not_given_to_the_engines()
+    public void Telegram_proxy_goes_to_the_engines_even_when_kept_always()
     {
         var settings = new AppSettings
         {
@@ -297,7 +298,7 @@ public sealed class SupervisorArgumentsTests
             TelegramProxySecret = Zephyron.Core.TgWsProxy.NewSecret(),
         };
 
-        Assert.False(RoundTrip(settings).TelegramProxy);
+        Assert.True(RoundTrip(settings).TelegramProxy);
         Assert.True(RoundTrip(settings with { TelegramProxyAlways = false }).TelegramProxy);
     }
 }

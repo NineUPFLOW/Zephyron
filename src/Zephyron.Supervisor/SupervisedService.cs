@@ -692,7 +692,7 @@ public sealed class SingBoxService : SupervisedService
             // Туннель спрашиваем, только когда не выручили ни TCP, ни запасной:
             // его проверка — запрос через сервер подписки.
             if (tunnel && DnsNeedsTunnel)
-                _dnsLastOk = await CheckTrafficAsync(SingBoxOptions.DefaultHealthPort, cancellationToken);
+                _dnsLastOk = await CheckTrafficAsync(EnginePorts.CurrentHealthPort(_configPath), cancellationToken);
         }
 
         await ApplyDnsPathAsync(tunnel && _dnsLastOk, cancellationToken);
@@ -1812,7 +1812,7 @@ public sealed class SingBoxService : SupervisedService
         // Через вход проверки (прокси), не через Clash API — тот не прокси. В фоне: заблокированный
         // trace не должен держать сторожа по 10 с на каждом опросе.
         if (exit is not null && delay is not null)
-            _ = ExitCountry.MeasureAsync(exit, SingBoxOptions.DefaultHealthPort, EngineKeys.Current(_configPath), CancellationToken.None);
+            _ = ExitCountry.MeasureAsync(exit, EnginePorts.CurrentHealthPort(_configPath), EngineKeys.Current(_configPath), CancellationToken.None);
 
         _exitMisses = delay is null ? _exitMisses + 1 : 0;
 

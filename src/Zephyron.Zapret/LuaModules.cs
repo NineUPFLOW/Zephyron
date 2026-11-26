@@ -69,7 +69,32 @@ public static class LuaModules
         if (!Directory.Exists(folder))
             return [];
 
-        return Directory.GetFiles(folder, "*.lua")
+        var files = Directory.GetFiles(folder, "*.lua");
+
+        // Разбор — чтение нескольких МБ модулей; вкладка «Десинк» звала его на каждом входе
+        // в потоке окна (замер 26.11: 210 мс на быстром диске). Пока файлы те же — прежний ответ.
+        var stamp = string.Join('|', files.Select(f => { var i = new FileInfo(f); return $"{f}:{i.Length}:{i.LastWriteTimeUtc.Ticks}"; }));
+
+        lock (Cache)
+        {
+            if (Cache.TryGetValue(folder, out var hit) && hit.Stamp == stamp)
+                return hit.Modules;
+        }
+
+        var modules = Parse(files);
+
+        lock (Cache)
+            Cache[folder] = (stamp, modules);
+
+        return modules;
+    }
+
+    private static readonly Dictionary<string, (string Stamp, IReadOnlyList<LuaModule> Modules)> Cache =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private static IReadOnlyList<LuaModule> Parse(string[] files)
+    {
+        return files
             .Select(path => new LuaModule
             {
                 File = Path.GetFileName(path),

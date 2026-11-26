@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using Zephyron.Core;
 using Zephyron.Core.Rules;
 using Zephyron.Proxy;
@@ -230,6 +230,12 @@ internal static class TunnelConfig
                 ? AddressListReader.Expand(ProgramCapture.KeepOut(ruleSet), zapretRoot, out _)
                 : [];
 
+            // Служебные порты движка: занятый или зарезервированный Windows (Hyper-V, WinNAT —
+            // «отказано в доступе») меняется на свободный, иначе движок не поднимется вовсе.
+            int[] busy = [settings.LocalProxyPort, settings.TelegramProxyPort];
+            int clashPort = EnginePorts.Pick(TunnelStatus.DefaultClashPort, settings.ProxyConfigPath, busy);
+            int healthPort = EnginePorts.Pick(SingBoxOptions.DefaultHealthPort, settings.ProxyConfigPath, [.. busy, clashPort]);
+
             var result = new SingBoxConfigCompiler().Compile(ruleSet, servers, new SingBoxOptions
             {
                 Scope = narrow ? TunnelScope.ProxyOnly : TunnelScope.Everything,
@@ -283,6 +289,8 @@ internal static class TunnelConfig
                 // в него сам супервизор, решает по-прежнему VerifyTraffic
                 // (SupervisorHost), — лишний вход ему не мешает.
                 HealthInbound = true,
+                HealthPort = healthPort,
+                ClashApiListen = $"127.0.0.1:{clashPort}",
 
                 // Новые пароли служебных входов на каждую сборку: окно, zy
                 // и сторож читают их из этого же конфига (EngineKeys.Current).
@@ -380,7 +388,8 @@ internal static class TunnelConfig
                 return new BuildOutcome(false, "DNS через движок не поднят: резолверы Windows не нашлись.");
 
             var addresses = AddressOverrides.Merge(new Dictionary<string, string>(), AddressOverrides.Load());
-            var result = DnsEngine.Compile(settings, resolvers, addresses, EngineKeys.Generate(), routerDns.Interface?.Name);
+            int clashPort = EnginePorts.Pick(TunnelStatus.DefaultClashPort, settings.ProxyConfigPath, [settings.LocalProxyPort, settings.TelegramProxyPort]);
+            var result = DnsEngine.Compile(settings, resolvers, addresses, EngineKeys.Generate(), routerDns.Interface?.Name, $"127.0.0.1:{clashPort}");
 
             SingBoxConfigCompiler.WriteToFile(settings.ProxyConfigPath, result.Json);
             RouterDnsBuildState.Save(settings.ProxyConfigPath, requestedDns, routerDns.Warning);

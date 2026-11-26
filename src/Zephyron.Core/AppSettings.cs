@@ -430,10 +430,6 @@ public sealed record AppSettings
     /// </remarks>
     public bool TelegramProxyAlways { get; init; }
 
-    /// <summary>Прокси поднимает надзор движков — включён и не держится окном сам.</summary>
-    [JsonIgnore]
-    public bool TelegramProxyWithEngines => TelegramProxy && !TelegramProxyAlways;
-
     /// <summary>Прокси Telegram ходит к DC2 и DC4 напрямую (<see cref="TgWsProxy.DirectMain"/>).</summary>
     /// <remarks>
     /// Без прямых адресов весь Telegram идёт через домены Cloudflare общего

@@ -62,23 +62,15 @@
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
-        <!-- Единица рядом с крупным числом: общая нижняя линия с Metric (поправка на разницу кеглей). -->
-        <Style x:Key="NetUnit" TargetType="TextBlock" BasedOn="{StaticResource MetricUnit}">
-            <Setter Property="VerticalAlignment" Value="Bottom" />
-            <Setter Property="Margin" Value="6,0,0,5" />
-            <Setter Property="Text" Value="Мбит/с" />
-            <Setter Property="Visibility" Value="Collapsed" />
-        </Style>
     </UserControl.Resources>
 
     <!--
         «Главная» в языке «Сигнал»: главная плашка состояния (знак, слово, цвет
-        и дорожки FlowLanes) и справа «Компоненты»; ниже «Сеть» — четыре числа
-        и два графика; затем режим, события, пресет, подключение, автозапуск,
-        обновление. Все карточки, кроме плашки, нейтральные: без акцентных
+        и дорожки FlowLanes) и справа «Компоненты»; ниже режим, события, пресет,
+        подключение, автозапуск, обновление. Карточку «Трафик» (скорость и задержка)
+        владелец убрал 26.11. Все карточки, кроме плашки, нейтральные: без акцентных
         обводок и срезов. Окно уже ~980 — компактная раскладка (Compact в коде):
-        плашка на всю ширину, «Компоненты» двумя плитками под ней, «Сеть» 2x2,
-        графики друг под другом.
+        плашка на всю ширину, «Компоненты» двумя плитками под ней.
 
         Если у темы есть картинка, справа остаётся колонка под арт (SideArt,
         Themes.cs), как прежде: веса 100 к 1, левая берёт всё до своего
@@ -734,106 +726,6 @@
                         <views:UpdatePanel x:Name="Updates" />
                     </views:FitWidth>
                 </Grid>
-
-                <!--
-                    Сеть — полоса в одну строку: заголовок, четыре числа (знак слева от
-                    подписи — он же легенда графика) и два низких графика под ними:
-                    скорость за минуту и задержка за две. Всё — настоящие замеры
-                    StatusView.Net.cs, и только пока обход запущен (SyncNet):
-                    остановленный — «—» и пустые графики, а не нули.
-                -->
-                <Border Style="{StaticResource Card}" Margin="0,0,0,12" Padding="14,10">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="230" />
-                            <ColumnDefinition Width="16" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Text="Трафик" Style="{StaticResource SectionHead}" VerticalAlignment="Center" Margin="0,0,20,6" />
-                        <TextBlock Grid.Column="2" Style="{StaticResource MonoTag}" VerticalAlignment="Center" HorizontalAlignment="Right"
-                                   Margin="0,0,0,6" Text="все адаптеры · ICMP до 1.1.1.1" />
-
-                        <!-- Плитки 2x2: значение с единицей, под ним подпись с маркером цвета линии графика. -->
-                        <UniformGrid x:Name="NetMetrics" Grid.Row="1" Columns="2" VerticalAlignment="Center">
-                            <StackPanel x:Name="NetDownCell" Margin="0,0,12,0" Background="Transparent"
-                                        ToolTip="Приём по всем сетевым адаптерам машины" AutomationProperties.Name="Приём">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock x:Name="NetDown" Style="{StaticResource Metric}" FontSize="15" LineHeight="17"
-                                               LineStackingStrategy="BlockLineHeight" Foreground="{DynamicResource Muted}" Text="—" />
-                                    <TextBlock x:Name="NetDownUnit" Style="{StaticResource NetUnit}" Margin="4,0,0,0" VerticalAlignment="Bottom" />
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                    <Rectangle Width="8" Height="2" Fill="{DynamicResource Accent2}" VerticalAlignment="Center" />
-                                    <TextBlock Style="{StaticResource Caption}" FontSize="10.5" Text="Приём" Margin="6,0,0,0" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </StackPanel>
-                            <StackPanel x:Name="NetUpCell" Margin="0,0,12,0" Background="Transparent"
-                                        ToolTip="Отдача по всем сетевым адаптерам машины" AutomationProperties.Name="Исходящий">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock x:Name="NetUp" Style="{StaticResource Metric}" FontSize="15" LineHeight="17"
-                                               LineStackingStrategy="BlockLineHeight" Foreground="{DynamicResource Muted}" Text="—" />
-                                    <TextBlock x:Name="NetUpUnit" Style="{StaticResource NetUnit}" Margin="4,0,0,0" VerticalAlignment="Bottom" />
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                    <Line X2="8" Y1="1" Y2="1" Width="8" Height="2" Stroke="{DynamicResource Text}" Opacity="0.75"
-                                          StrokeThickness="2" StrokeDashArray="3,2" VerticalAlignment="Center" />
-                                    <TextBlock Style="{StaticResource Caption}" FontSize="10.5" Text="Исходящий" Margin="6,0,0,0" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </StackPanel>
-                            <StackPanel x:Name="NetPingCell" Margin="0,0,12,0" Background="Transparent"
-                                        ToolTip="Задержка до 1.1.1.1 по ICMP, раз в пять секунд" AutomationProperties.Name="Задержка">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock x:Name="NetPing" Style="{StaticResource Metric}" FontSize="15" LineHeight="17"
-                                               LineStackingStrategy="BlockLineHeight" Foreground="{DynamicResource Muted}" Text="—" />
-                                    <TextBlock x:Name="NetPingUnit" Style="{StaticResource NetUnit}" Margin="4,0,0,0" VerticalAlignment="Bottom" Text="мс" />
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                    <Rectangle Width="8" Height="2" Fill="{DynamicResource Accent2}" VerticalAlignment="Center" />
-                                    <TextBlock Style="{StaticResource Caption}" FontSize="10.5" Text="Задержка" Margin="6,0,0,0" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </StackPanel>
-                            <StackPanel x:Name="NetLossCell" Margin="0,0,12,0" Background="Transparent"
-                                        ToolTip="Доля потерянных проверок задержки за последние две минуты" AutomationProperties.Name="Потери">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock x:Name="NetLoss" Style="{StaticResource Metric}" FontSize="15" LineHeight="17"
-                                               LineStackingStrategy="BlockLineHeight" Foreground="{DynamicResource Muted}" Text="—" />
-                                    <TextBlock x:Name="NetLossUnit" Style="{StaticResource NetUnit}" Margin="4,0,0,0" VerticalAlignment="Bottom" Text="%" />
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                    <Path Data="M 4,0 L 8,4 L 4,8 L 0,4 Z" Width="8" Height="8" Fill="{DynamicResource Warn}" VerticalAlignment="Center" />
-                                    <TextBlock Style="{StaticResource Caption}" FontSize="10.5" Text="Потери" Margin="6,0,0,0" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </StackPanel>
-                        </UniformGrid>
-
-                        <!-- Два графика в ряд; в компактной раскладке — друг под другом. -->
-                        <Grid x:Name="Charts" Grid.Row="1" Grid.Column="2">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="12" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition x:Name="ChartRowGap" Height="0" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-
-                            <views:NetChart x:Name="ThroughputChart" Height="60" Capacity="60" Unit="Мбит/с" Floor="1" Title="Скорость · 1 мин"
-                                            Empty="Скорость и задержка пойдут с запуском обхода"
-                                            AutomationProperties.Name="График скорости за минуту" />
-
-                            <views:NetChart x:Name="LatencyChart" Grid.Column="2" Height="60" Capacity="24" Unit="мс" Floor="20" Title="Задержка · 2 мин"
-                                            Empty="" AutomationProperties.Name="График задержки за две минуты" />
-                        </Grid>
-                    </Grid>
-                </Border>
 
 
                 <!--

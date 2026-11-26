@@ -82,7 +82,7 @@ public sealed class FixesSignalTests
 
         try
         {
-            window.FieldPulse(FieldMode.Starting, null);
+            window.FieldPulse(FieldMode.Starting);
 
             // Дольше прежних 30 с и дольше терпения «Главной» (90 с) — без продлений.
             now = t0.AddSeconds(95);
@@ -90,12 +90,12 @@ public sealed class FixesSignalTests
             Assert.Equal(FieldMode.Starting, field.Mode);
 
             // Тик ShowStarting продлевает срок.
-            window.FieldPulse(FieldMode.Starting, null);
+            window.FieldPulse(FieldMode.Starting);
             now = t0.AddSeconds(200);
             ShowState(window);
             Assert.Equal(FieldMode.Starting, field.Mode);
 
-            window.FieldPulse(null, null);
+            window.FieldPulse(null);
             Assert.NotEqual(FieldMode.Starting, field.Mode);
         }
         finally
@@ -120,14 +120,13 @@ public sealed class FixesSignalTests
         {
             Assert.IsType<StatusView>(section.Content);
 
-            window.FieldPulse(FieldMode.Starting, 3);
+            window.FieldPulse(FieldMode.Starting);
             Assert.Equal(FieldMode.Starting, field.Mode);
 
             section.Content = null;
             Pump();
 
             Assert.NotEqual(FieldMode.Starting, field.Mode);
-            Assert.Null(field.Mbps);
         }
         finally
         {

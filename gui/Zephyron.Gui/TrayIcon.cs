@@ -226,6 +226,8 @@ internal sealed class TrayIcon : IDisposable
 
     private void Update()
     {
+        EngineControl.SyncTelegramProxyIfSupervisorChanged();
+
         // Супервизор упал сам — движки ушли с ним (задание Windows), и обход
         // выключен. Перезапускать сами не вправе, но молчать — тоже: человек
         // считал бы, что обход работает.

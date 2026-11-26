@@ -113,4 +113,29 @@ public sealed class UpdateApplierTests : IDisposable
 
         Assert.True(await UpdateApplier.WaitForExitAsync(finished.Id, TimeSpan.FromSeconds(2), CancellationToken.None));
     }
+
+    /// <summary>
+    /// Обновление по описи: файл, который прежняя версия ставила, а новая — нет, уходит;
+    /// свои файлы человека остаются; откат возвращает и файл, и прежнюю опись.
+    /// </summary>
+    [Fact]
+    public async Task StaleShippedFilesAreRemovedAndRollbackRestoresThem()
+    {
+        Write(Target, Path.Combine("presets", "Old.txt"), "снятый пресет");
+        Write(Target, Path.Combine("presets", "Mine.txt"), "свой пресет");
+        Write(Target, StaleFiles.ManifestName, string.Join(Environment.NewLine, "a.txt", "Zephyron.exe", "presets/Old.txt"));
+        Write(Source, StaleFiles.ManifestName, string.Join(Environment.NewLine, "a.txt", "Zephyron.exe", "engines/b.txt"));
+
+        var applier = new UpdateApplier(Source, Target, Backup);
+        Assert.Null(await applier.CopyAsync(null, CancellationToken.None));
+
+        Assert.False(File.Exists(Path.Combine(Target, "presets", "Old.txt")));
+        Assert.Equal("свой пресет", Read(Path.Combine("presets", "Mine.txt")));
+        Assert.Contains("engines/b.txt", Read(StaleFiles.ManifestName));
+
+        Assert.Equal(0, applier.RollBack());
+
+        Assert.Equal("снятый пресет", Read(Path.Combine("presets", "Old.txt")));
+        Assert.Contains("presets/Old.txt", Read(StaleFiles.ManifestName));
+    }
 }

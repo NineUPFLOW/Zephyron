@@ -30,6 +30,11 @@ Flowseal (у него — для list-general и ipset-all). Секция и с�
 (game filter), V5 my, V6, V6 voicefix, V7 и V8 diag. Обновление новые файлы
 кладёт, а лишние не стирает — у тех, кто обновился, они остаются на диске.
 
+«Zephyron YouTube» (с 1.8.4) — Zephyron Stable, где узлам видео googlevideo добавлено малое
+окно приёма `wssize` (рецепт пресета Zapret GUI «Default + YouTube no QUIC + wssize»). Для тех,
+у кого ролик идёт, а потом замирает до перезапуска. QUIC выброшен только к зарубежным узлам видео:
+кэш провайдера (GGC) местами отвечает лишь по QUIC.
+
 «white sni (circular)» и «shadow probes (circular)» (с 08.10) нужны модули
 lua Zapret GUI от 07.10 и новее (`shadow_probe`, `white_seqovl`, детекторы
 `white_*` в `custom_funcs.lua`): со старой установкой Zapret GUI winws2

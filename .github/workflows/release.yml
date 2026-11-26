@@ -49,9 +49,9 @@ env:
   DNSCRYPT_SHA256: d4eaf32b53ed47351d7d4a92675fecd578f1a47f4fcdda0b31464ee6132ee033
   # Сборка форка живёт недолго: старые выпуски там удаляются (22.11 закреплённый дал 404).
   # Проверенный файл лежит в служебном черновике «engines» этого репозитория.
-  WINWS2_TAG: v1.0.7-34-gfd8ae05-native-3-g0de505f-native-106-gf01107c-native
+  WINWS2_TAG: v1.0.7-34-gfd8ae05-native-3-g0de505f-native-113-gbb02010-native
   # Чужой сервер, а движок работает с правами администратора: файл сверяется по хешу.
-  WINWS2_SHA256: cac7f62890e684e867204dfb8bf690d4f92e672d45df0aac4537d972556863df
+  WINWS2_SHA256: d3f878ee511aa81b7b6135bd0fef5e73931a7b55999aa28b30340a6dd53a1c1f
 
 jobs:
   release:
@@ -101,7 +101,10 @@ jobs:
           mkdir -p dl
           curl -fsSL -o dl/singbox.zip "$SINGBOX_URL"
           curl -fsSL -o dl/tgws.zip "$TGWS_URL"
-          gh release download engines --repo "$GITHUB_REPOSITORY" --pattern winws2.exe --dir dl
+          # winws2 — с выпуска форка по закреплённому тегу; форк старые выпуски удаляет, тогда —
+          # проверенная копия из черновика «engines». Подмену в обоих случаях ловит хеш ниже.
+          curl -fsSL -o dl/winws2.exe "https://git.zapret.moe/zapretdiscordyoutube/zapret2-fork/releases/download/$WINWS2_TAG/winws2.exe" \
+            || gh release download engines --repo "$GITHUB_REPOSITORY" --pattern winws2.exe --dir dl --clobber
           curl -fsSL -o dl/dnscrypt.zip "$DNSCRYPT_URL"
           echo "$DNSCRYPT_SHA256  dl/dnscrypt.zip" | sha256sum -c -
           echo "$WINWS2_SHA256  dl/winws2.exe" | sha256sum -c -
@@ -231,6 +234,10 @@ jobs:
             echo "  соберите с -p:IncludeNativeLibrariesForSelfExtract=true" >&2
             exit 1
           fi
+
+          # Опись поставки для обновления: что выпуск перестал отдавать, то оно уберёт
+          # у пользователя (см. StaleFiles). Тронет только перечисленное здесь.
+          ( cd "$STAGE" && find . -type f ! -name shipped-files.txt | sed 's|^\./||' | LC_ALL=C sort > shipped-files.txt )
 
           ( cd "$ROOT/stage" && zip -qr9 "$ROOT/Zephyron-$VERSION.zip" Zephyron )
           echo "Zephyron-$VERSION.zip: $(du -h "$ROOT/Zephyron-$VERSION.zip" | cut -f1)"

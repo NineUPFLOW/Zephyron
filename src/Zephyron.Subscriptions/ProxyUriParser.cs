@@ -760,7 +760,8 @@ public static class Base64
         if (string.IsNullOrWhiteSpace(value))
             return null;
 
-        var text = value.Trim().Replace('-', '+').Replace('_', '/');
+        // BOM (U+FEFF) Trim не снимает, а Convert.FromBase64String на нём падает: убираем до подсчёта остатка % 4.
+        var text = value.Replace("﻿", string.Empty).Trim().Replace('-', '+').Replace('_', '/');
 
         int padding = text.Length % 4;
         if (padding == 1)

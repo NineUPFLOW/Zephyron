@@ -28,20 +28,6 @@ public sealed class HomeStateTests
         });
     }
 
-    [Fact]
-    public void A_metric_without_a_reading_is_a_dash_not_zero()
-    {
-        Sta.Run(() =>
-        {
-            var view = new StatusView();
-
-            Assert.Equal("—", view.NetDown.Text);
-            Assert.Equal("—", view.NetUp.Text);
-            Assert.Equal("—", view.NetPing.Text);
-            Assert.Equal("—", view.NetLoss.Text);
-        });
-    }
-
     /// <summary>
     /// Ширина «Главной» не зависит от состояния: страница во всю ширину предела, по центру.
     /// </summary>

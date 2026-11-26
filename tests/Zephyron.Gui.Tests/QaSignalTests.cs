@@ -296,22 +296,50 @@ public sealed class QaSignalTests
         return (window, status, vpn);
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void Closed_sections_are_collected(bool animations) => Sta.Run(() =>
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static (MainWindow Window, List<(string Tag, WeakReference View)> Seen) CycleAll(int n)
+    {
+        Motion.Use(new AppSettings { Animations = true, Effects = EffectsProfile.Full });
+        var window = new MainWindow { ShowActivated = false };
+        window.Show();
+        Pump();
+
+        var seen = new List<(string, WeakReference)>();
+        var host = (ContentControl)window.FindName("Section");
+
+        for (int i = 0; i < n; i++)
+        {
+            foreach (var tag in new[] { "status", "vpn", "desync", "routes", "tgproxy", "check", "speed", "dns", "hosts", "watch", "doctor", "look", "more" })
+            {
+                Open(window, tag);
+
+                // «Маршруты» прячутся, а не отцепляются (RoutesView.Shared): у них нет вида в Section.
+                if (host.Content is { } view)
+                    seen.Add((tag, new WeakReference(view)));
+            }
+        }
+
+        Open(window, "status");
+        Open(window, "more");
+        return (window, seen);
+    }
+
+    /// <summary>
+    /// Ни один ушедший раздел не остаётся жить: таймеры, статические события и «Rendering»
+    /// держат раздел целиком (утечка «Главной» 1.8.3 была лишь первой из таких).
+    /// </summary>
+    [Fact]
+    public void Departed_sections_of_every_kind_are_collected() => Sta.Run(() =>
     {
         try
         {
-            var (window, status, vpn) = Cycle(6, animations);
+            var (window, seen) = CycleAll(3);
 
             try
             {
-                // Вид может держать начатая операция (пинг «Главной» ждёт до 1,5 с, а в CI
-                // ICMP закрыт): это не утечка, пока она отпускает его сама. Ждём до 5 с.
-                var deadline = DateTime.UtcNow.AddSeconds(5);
+                var deadline = DateTime.UtcNow.AddSeconds(8);
 
-                for (int i = 0; i < 6 || DateTime.UtcNow < deadline && (vpn.Any(r => r.IsAlive) || status.Any(r => r.IsAlive)); i++)
+                for (int i = 0; i < 6 || DateTime.UtcNow < deadline && seen.Any(s => s.View.IsAlive); i++)
                 {
                     GC.Collect(2, GCCollectionMode.Forced, blocking: true);
                     GC.WaitForPendingFinalizers();
@@ -321,8 +349,16 @@ public sealed class QaSignalTests
                         Thread.Sleep(100);
                 }
 
-                Assert.True(vpn.Count(r => r.IsAlive) == 0, $"VpnView удержано: {vpn.Count(r => r.IsAlive)} из {vpn.Count}");
-                Assert.True(status.Count(r => r.IsAlive) == 0, $"StatusView удержано: {status.Count(r => r.IsAlive)} из {status.Count}");
+                // Частые разделы окно держит само (MainWindow.KeptSections) — но по одному экземпляру.
+                string[] kept = ["status", "vpn", "desync", "tgproxy"];
+
+                var held = seen.Where(s => !kept.Contains(s.Tag) && s.View.IsAlive).Select(s => s.Tag).GroupBy(t => t).Select(g => $"{g.Key}×{g.Count()}");
+                Assert.True(!held.Any(), "удержаны разделы: " + string.Join(", ", held));
+
+                var doubled = seen.Where(s => kept.Contains(s.Tag)).GroupBy(s => s.Tag)
+                    .Where(g => g.Select(s => s.View.Target).Where(t => t is not null).Distinct(ReferenceEqualityComparer.Instance).Count() > 1)
+                    .Select(g => g.Key);
+                Assert.True(!doubled.Any(), "удерживаемый раздел создан повторно: " + string.Join(", ", doubled));
             }
             finally
             {
@@ -330,6 +366,50 @@ public sealed class QaSignalTests
                 window.Close();
                 App.Exiting = false;
             }
+        }
+        finally
+        {
+            Reset();
+        }
+    });
+
+    /// <summary>Листает и закрывает окно в своём кадре: ссылка на окно не переживает вызов.</summary>
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static (List<WeakReference> Status, List<WeakReference> Vpn) CycleAndClose(int n, bool animations)
+    {
+        var (window, status, vpn) = Cycle(n, animations);
+        App.Exiting = true;
+        window.Close();
+        App.Exiting = false;
+        return (status, vpn);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Closed_sections_are_collected(bool animations) => Sta.Run(() =>
+    {
+        try
+        {
+            // «Главную» и «VPN» окно держит само (KeptSections): они обязаны уйти вместе с окном.
+            var (status, vpn) = CycleAndClose(6, animations);
+
+            // Вид может держать начатая операция (пинг «Главной» ждёт до 1,5 с, а в CI
+            // ICMP закрыт): это не утечка, пока она отпускает его сама. Ждём до 5 с.
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+
+            for (int i = 0; i < 6 || DateTime.UtcNow < deadline && (vpn.Any(r => r.IsAlive) || status.Any(r => r.IsAlive)); i++)
+            {
+                GC.Collect(2, GCCollectionMode.Forced, blocking: true);
+                GC.WaitForPendingFinalizers();
+                Pump();
+
+                if (i >= 6)
+                    Thread.Sleep(100);
+            }
+
+            Assert.True(vpn.Count(r => r.IsAlive) == 0, $"VpnView удержано: {vpn.Count(r => r.IsAlive)} из {vpn.Count}");
+            Assert.True(status.Count(r => r.IsAlive) == 0, $"StatusView удержано: {status.Count(r => r.IsAlive)} из {status.Count}");
         }
         finally
         {
@@ -590,7 +670,6 @@ public sealed class QaSignalTests
                             Frames(field);
                             field.Mode = FieldMode.Failed;
                             field.Mode = FieldMode.Running;
-                            field.Mbps = x;
                             Frames(field);
                             resize.Invoke(field, [x, y]);
                             Frames(field);

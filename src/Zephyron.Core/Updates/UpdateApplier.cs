@@ -52,17 +52,24 @@ public sealed class UpdateApplier
         _backup = Path.GetFullPath(backup);
         _log = Path.Combine(_target, UpdateInstaller.LogFile);
 
+        _newManifest = StaleFiles.ReadManifest(Path.Combine(_source, StaleFiles.ManifestName));
+        _oldManifest = StaleFiles.ReadManifest(Path.Combine(_target, StaleFiles.ManifestName));
+
         var keep = new HashSet<string>(UpdateInstaller.Preserved, StringComparer.OrdinalIgnoreCase);
 
         // Сама программа — последней: при сбое посреди подмены она остаётся
         // прежней и запускается с прежними файлами вокруг, а не новой среди старых.
         _files = Directory.EnumerateFiles(_source, "*", SearchOption.AllDirectories)
             .Select(f => Path.GetRelativePath(_source, f))
-            .Where(f => !keep.Contains(f)) // по относительному пути: одноимённый файл в другой папке обновляется
+            .Where(f => !keep.Contains(f) && !f.Equals(StaleFiles.ManifestName, StringComparison.OrdinalIgnoreCase)) // по относительному пути: одноимённый файл в другой папке обновляется
             .OrderBy(f => string.Equals(Path.GetFileName(f), UpdateInstaller.Canonical, StringComparison.OrdinalIgnoreCase))
             .ThenBy(f => f, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
+
+    // Опись прежней поставки читается до подмены: потом на её месте лежит новая.
+    private readonly IReadOnlyList<string>? _newManifest;
+    private readonly IReadOnlyList<string>? _oldManifest;
 
     public int Total => _files.Count;
 
@@ -232,8 +239,89 @@ public sealed class UpdateApplier
             progress?.Report(new ApplyProgress(_done.Count, _files.Count, file));
         }
 
+        RemoveStale();
+
         Log("подмена закончена");
         return null;
+    }
+
+    /// <summary>
+    /// Убирает файлы прежней версии, которых нет в новой (<see cref="StaleFiles"/>), и кладёт новую опись.
+    /// Прежнее — в копию, чтобы откат вернул. Сбой здесь не отменяет обновление: лишний файл — не поломка.
+    /// </summary>
+    private void RemoveStale()
+    {
+        if (_newManifest is null)
+            return; // сборка без описи (из исходников): что убирать — неизвестно
+
+        try
+        {
+            var stale = _oldManifest is not null
+                ? StaleFiles.Decide(_oldManifest, _newManifest)
+                : StaleFiles.Legacy(StaleFiles.LegacyCandidates(_target), _newManifest);
+
+            var copied = _files.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            int removed = 0;
+
+            foreach (var file in stale)
+            {
+                var path = Path.Combine(_target, file);
+
+                try
+                {
+                    // Только что положенное новой версией не трогаем, что бы ни говорила опись.
+                    if (!File.Exists(path) || copied.Contains(file))
+                        continue;
+
+                    if (!_backedUp.Contains(file))
+                    {
+                        var saved = Path.Combine(_backup, file);
+                        Directory.CreateDirectory(Path.GetDirectoryName(saved)!);
+                        File.Copy(path, saved, overwrite: true);
+                        _backedUp.Add(file);
+                    }
+
+                    File.Delete(path);
+                    removed++;
+
+                    // Пустые папки поставки — тоже мусор; непустые (там чьё-то своё) остаются.
+                    for (var dir = Path.GetDirectoryName(path);
+                         dir is not null && dir.Length > _target.Length && !Directory.EnumerateFileSystemEntries(dir).Any();
+                         dir = Path.GetDirectoryName(dir))
+                        Directory.Delete(dir);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    Log($"остаток прежней версии не убран: {file} ({ex.Message})");
+                }
+            }
+
+            Log($"убрано файлов прежней версии: {removed}" + (_oldManifest is null ? " (описи не было)" : ""));
+
+            // Прежняя опись — в копию: после отката старая версия должна видеть свою, иначе
+            // следующее обновление сравнит новую с новой и остатков не уберёт.
+            var manifest = Path.Combine(_target, StaleFiles.ManifestName);
+
+            if (File.Exists(manifest))
+            {
+                if (_backedUp.Add(StaleFiles.ManifestName))
+                {
+                    Directory.CreateDirectory(_backup);
+                    File.Copy(manifest, Path.Combine(_backup, StaleFiles.ManifestName), overwrite: true);
+                }
+            }
+            else
+            {
+                _created.Add(StaleFiles.ManifestName);
+            }
+
+            File.Copy(Path.Combine(_source, StaleFiles.ManifestName), manifest, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            // Любой сбой чистки — не повод сорвать уже сделанное обновление: лишний файл не поломка.
+            Log("чистка остатков не удалась: " + ex.Message);
+        }
     }
 
     /// <summary>Возвращает прежние файлы и стирает добавленные; сколько файлов не вернулось.</summary>

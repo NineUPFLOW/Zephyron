@@ -1927,7 +1927,7 @@ public partial class CheckView : UserControl
 
         try
         {
-            if (!await TunnelProbe.IsUpAsync(SingBoxOptions.DefaultHealthPort, token))
+            if (!await TunnelProbe.IsUpAsync(EnginePorts.CurrentHealthPort(), token))
             {
                 sections.Add(new SectionRow(
                     "Через туннель нарочно проверить нечем",
@@ -1952,7 +1952,7 @@ public partial class CheckView : UserControl
                 token.ThrowIfCancellationRequested();
 
                 var report = await BlockCheck.ProbeThroughTunnelAsync(
-                    host, null, SingBoxOptions.DefaultHealthPort, token);
+                    host, null, EnginePorts.CurrentHealthPort(), token);
 
                 if (report.Kind is BlockKind.None or BlockKind.Forbidden)
                     opened++;

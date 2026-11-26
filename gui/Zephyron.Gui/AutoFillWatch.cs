@@ -57,7 +57,9 @@ internal static class AutoFillWatch
                     .Concat(LearnedGames(settings).Select(g => g.Program))
                     .ToList();
 
-                var change = Presence.Update(Running(), wanted, DateTimeOffset.Now);
+                // Следить не за чем — процессы не перебираем: перебор раз в три секунды был
+                // главным источником выделений окна в покое (замер 27.11).
+                var change = Presence.Update(wanted.Count == 0 && Presence.Seen is null ? [] : Running(), wanted, DateTimeOffset.Now);
 
                 if (change == PresenceChange.Appeared && Presence.Seen is { } program)
                     await ui.InvokeAsync(() => Views.WatchView.StartForProgramAsync(program)).Task.Unwrap().ConfigureAwait(false);

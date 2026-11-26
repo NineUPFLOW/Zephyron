@@ -37,9 +37,10 @@ public sealed class ClashApi : IDisposable
     /// (<see cref="EngineKeys.Current"/>). С 27.09 Clash API под секретом,
     /// и запрос без него получает 401.
     /// </param>
-    public ClashApi(string listen = "127.0.0.1:9090", HttpClient? http = null, EngineKeys? keys = null)
+    public ClashApi(string? listen = null, HttpClient? http = null, EngineKeys? keys = null)
     {
-        Address = listen;
+        // Порт Clash API мог быть сдвинут из-за резерва WinNAT: берём фактический из singbox.json.
+        Address = listen ?? EnginePorts.CurrentClashListen();
         _ownsClient = http is null;
         _keys = keys ?? EngineKeys.Current();
 
@@ -326,36 +327,6 @@ public sealed class ClashApi : IDisposable
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
-        }
-        catch (Exception)
-        {
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// Сколько движок провёз с запуска: отдано и получено, байтами;
-    /// <c>null</c> — не ответил.
-    /// </summary>
-    /// <remarks>
-    /// Итоги <c>/connections</c> — счётчик движка, а не сумма живых соединений:
-    /// закрытые в нём остаются. Ответ несёт и сами соединения (замер 19.10:
-    /// 18 соединений — 8,7 КБ), их здесь не разбираем.
-    /// </remarks>
-    public async Task<(long Up, long Down)?> TotalsAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            using var response = await SendAsync(HttpMethod.Get, $"{Root}/connections", null, cancellationToken);
-
-            if (!response.IsSuccessStatusCode)
-                return null;
-
-            var body = JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
-
-            return body?["uploadTotal"]?.GetValue<long>() is { } up && body["downloadTotal"]?.GetValue<long>() is { } down
-                ? (up, down)
-                : null;
         }
         catch (Exception)
         {

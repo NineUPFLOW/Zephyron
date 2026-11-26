@@ -22,3 +22,7 @@ bytedanceapi.com
 bytecdn.cn
 byted.org
 isnssdk.com
+# 26.11: европейские адреса TikTok
+tiktokcdn-eu.com
+tiktokv.eu
+tiktokw.eu

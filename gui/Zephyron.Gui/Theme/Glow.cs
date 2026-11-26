@@ -40,6 +40,9 @@ public static class Glow
     // Слабые ссылки: ореол не должен держать элемент, окно пересоздаётся из трея.
     private static readonly List<WeakReference<FrameworkElement>> Tracked = [];
 
+    private const int PruneEvery = 256;
+    private static int _added;
+
     static Glow() => Motion.Changed += (_, _) => Refresh();
 
     /// <summary>Профиль или выключатель сменились: ореолы гаснут (Lite) или возвращаются.</summary>
@@ -87,7 +90,13 @@ public static class Glow
             element.SetValue(TrackedProperty, true);
 
             lock (Tracked)
+            {
+                // Чистка на добавлении, не только на смене профиля: разделы пересоздаются, список иначе растёт без предела.
+                if (++_added % PruneEvery == 0)
+                    Tracked.RemoveAll(r => !r.TryGetTarget(out _));
+
                 Tracked.Add(new WeakReference<FrameworkElement>(element));
+            }
         }
 
         if (radius <= 0)

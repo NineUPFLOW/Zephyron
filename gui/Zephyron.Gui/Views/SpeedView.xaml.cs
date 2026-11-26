@@ -142,6 +142,13 @@ public partial class SpeedView : UserControl
 
         _watch.Tick += async (_, _) =>
         {
+            // Ушедший раздел гасит свой таймер: включённый таймер держал бы его навсегда.
+            if (!IsLoaded)
+            {
+                _watch.Stop();
+                return;
+            }
+
             // Во время замера путь не трогаем: он выбран и идёт.
             if (_run is null && await LookAtTunnelAsync() && IsLoaded && _run is null)
                 Choose(_tunnel);
@@ -364,7 +371,7 @@ public partial class SpeedView : UserControl
         var options = new SpeedTestOptions
         {
             Proxy = tunnel
-                ? EngineKeys.Loopback(SingBoxOptions.DefaultHealthPort, EngineKeys.Current())
+                ? EngineKeys.Loopback(EnginePorts.CurrentHealthPort(), EngineKeys.Current())
                 : null,
         };
 
@@ -959,7 +966,8 @@ public partial class SpeedView : UserControl
     {
         _target = target;
 
-        if (_moving || _target == _shown)
+        // Ушедший раздел кадры не заводит: статическое Rendering держало бы его до конца замера.
+        if (_moving || _target == _shown || !IsLoaded)
             return;
 
         _moving = true;

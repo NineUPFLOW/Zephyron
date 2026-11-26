@@ -51,7 +51,7 @@ public static class DnsEngine
         AppSettings settings,
         IReadOnlyList<string> systemResolvers,
         IReadOnlyDictionary<string, string> addressOverrides,
-        EngineKeys keys, string? routerInterface = null)
+        EngineKeys keys, string? routerInterface = null, string? clashApiListen = null)
     {
         var provider = DnsSurvey.ByAddress(settings.DnsServer);
 
@@ -82,6 +82,8 @@ public static class DnsEngine
             // и замер «через туннель» мерил бы домашнюю сеть.
             HealthInbound = false,
             Keys = keys,
+            // Порт Clash API мог быть сдвинут из-за резерва WinNAT (см. EnginePorts.Pick).
+            ClashApiListen = clashApiListen ?? "127.0.0.1:9090",
             AddressOverrides = addressOverrides,
         });
     }

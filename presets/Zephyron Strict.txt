@@ -147,20 +147,20 @@
 --ipset=lists/ipset-youtube.txt
 --out-range=-n8
 --payload=all
---lua-desync=fake:blob=quic_google:repeats=2
+--lua-desync=drop
 
 --new
-# ipset-youtube держит лишь часть сетей узлов googlevideo (нет 142.250/15, 172.217/16,
-# 173.194/16 и др. — см. VideoWindow.GoogleFrontEnds): QUIC к ним шёл без подделки.
-# Досылаем по имени из Initial, тем же рецептом.
+# Выброс QUIC, как в Zephyron Adaptive: подделка Initial не спасала — QUIC к узлам видео
+# начинал идти и замирал посреди ролика до перезапуска. Без QUIC браузер сразу берёт TCP.
+# Только зарубежные сети узлов видео, а не весь googlevideo.txt по имени: кэш провайдера
+# (GGC, адрес в сети провайдера) местами отвечает лишь по QUIC, и выброс по имени закрывал его.
 --name=YouTube · QUIC по имени
 --filter-udp=443
 --filter-l7=quic
---hostlist=lists/googlevideo.txt
---hostlist=lists/youtube.txt
+--ipset-ip=74.125.0.0/16,173.194.0.0/16,209.85.128.0/17,172.217.0.0/16
 --out-range=-n8
 --payload=all
---lua-desync=fake:blob=quic_google:repeats=2
+--lua-desync=drop
 
 --new
 

@@ -134,7 +134,7 @@ public partial class SpeedView
             return null;
         }
 
-        var proxy = tunnel ? EngineKeys.Loopback(SingBoxOptions.DefaultHealthPort, EngineKeys.Current()) : null;
+        var proxy = tunnel ? EngineKeys.Loopback(EnginePorts.CurrentHealthPort(), EngineKeys.Current()) : null;
 
         // Progress создан в потоке окна и показывает этапы там же.
         var progress = new Progress<SiteProgress>(p =>

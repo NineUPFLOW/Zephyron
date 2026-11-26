@@ -466,6 +466,9 @@ public partial class App : Application
         // Замер при запуске мог ещё идти — его пробник не должен пережить окно.
         StartupSweep.Stop();
 
+        // Отказы узлов YouTube живут в hosts: без окна их некому вернуть через полчаса.
+        VideoNodeWatch.Release("выход из программы");
+
         _tray?.Dispose();
         SingleInstance.Release();
 

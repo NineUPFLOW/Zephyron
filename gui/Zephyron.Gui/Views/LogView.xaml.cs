@@ -47,6 +47,13 @@ public partial class LogView : UserControl
         // только по «Обновить».
         _follow.Tick += (_, _) =>
         {
+            // Ушедший раздел гасит свой таймер: включённый таймер держал бы его навсегда.
+            if (!IsLoaded)
+            {
+                _follow.Stop();
+                return;
+            }
+
             if (IsVisible)
                 Reload(follow: true);
         };

@@ -190,7 +190,7 @@ echo Bundling tg-ws-proxy
 robocopy "%TGWS_DIR%." "%ENGINES%\tg-ws-proxy" /E /R:2 /W:1 /NJH /NJS /NP /NDL /NFL >nul
 if errorlevel 8 exit /b 1
 
-rem dnscrypt-proxy (pinned 2.1.20) for encrypted DNS, with the signed server lists.
+rem dnscrypt-proxy (pinned 2.1.21) for encrypted DNS, with the signed server lists.
 rem Optional: the mode is off by default and says so when the engine is missing.
 set "DNSCRYPT_DIR="
 for /f "delims=" %%F in ('dir /s /b "%ROOT%tools\dnscrypt-proxy.exe" 2^>nul') do set "DNSCRYPT_DIR=%%~dpF"
@@ -369,6 +369,16 @@ if exist "%STAGE%\engines\zapret\lists\user" (
     echo.
     echo Refusing to archive: engines\zapret\lists\user holds the Zapret GUI
     echo user lists of this machine. Remove them from vendor\zapret-gui.
+    exit /b 1
+)
+
+rem Manifest of shipped files (relative paths). The updater compares the old
+rem manifest with the new one and removes files that a release stopped shipping
+rem (a deleted preset, an old lua) - and only those: anything not listed here
+rem (settings, user lists and themes, reports) is never touched.
+powershell -NoProfile -Command "$s=(Resolve-Path '%STAGE%').Path; Get-ChildItem $s -Recurse -File | ForEach-Object { $_.FullName.Substring($s.Length+1).Replace([char]92,'/') } | Where-Object { $_ -ne 'shipped-files.txt' } | Sort-Object | Set-Content -Encoding utf8 (Join-Path $s 'shipped-files.txt'); if (-not (Get-Content (Join-Path $s 'shipped-files.txt'))) { exit 1 }"
+if %errorlevel% neq 0 (
+    echo Writing shipped-files.txt failed.
     exit /b 1
 )
 

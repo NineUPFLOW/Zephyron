@@ -23,6 +23,10 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        // «Главная» из разметки — первая из удерживаемых (KeptSections).
+        if (Section.Content is StatusView home)
+            _kept["status"] = home;
         // Стартовая высота — не выше рабочей области. Без MaxHeight: он не даёт
         // развёрнутому окну занять экран (08.11, окно «как бы на весь экран»).
         Height = Math.Min(Height, SystemParameters.WorkArea.Height - 40);
@@ -152,6 +156,10 @@ public partial class MainWindow : Window
         {
             _settle.Stop();
             _trim.Stop();
+
+            // Закрытое окно не держится таймерами: включённый таймер роняет его в корень Dispatcher.
+            _release.Stop();
+            _toastTimer.Stop();
         };
         IsVisibleChanged += (_, _) =>
         {
@@ -589,10 +597,6 @@ public partial class MainWindow : Window
         _settle.Stop();
         _settle.Start();
 
-        // Скорость слоя — только с «Главной»: уходим — данных нет.
-        if (name != "status")
-            Field.Mbps = null;
-
         // Ушли из мастера в другой раздел — он закрыт, как «Пропустить».
         (Section.Content as OnboardingView)?.Leave();
 
@@ -605,6 +609,17 @@ public partial class MainWindow : Window
             Section.Content = null;
             Section.Visibility = Visibility.Collapsed;
             RoutesHost.Visibility = Visibility.Visible;
+            return;
+        }
+
+        // Частые разделы (Ctrl+1…5) строятся один раз на окно: сборка страницы из разметки —
+        // ~270 мс и мегабайты мусора на каждый заход, и быстрое листание раздувало память окна
+        // до сотен МБ (замер 26.11). Уход их отцепляет (Unloaded гасит таймеры), возврат —
+        // Loaded перечитывает состояние. Редкие разделы, как прежде, — новые.
+        if (KeptSections.Contains(name) && _kept.TryGetValue(name, out var kept))
+        {
+            ShowPage(kept);
+            Motion.Page(kept);
             return;
         }
 
@@ -624,9 +639,17 @@ public partial class MainWindow : Window
             _ => new StatusView(),
         };
 
+        if (KeptSections.Contains(name))
+            _kept[name] = page;
+
         ShowPage(page);
         Motion.Page(page);
     }
+
+    /// <summary>Разделы, которые окно держит, а не строит заново (см. OnSection).</summary>
+    private static readonly HashSet<string> KeptSections = ["status", "vpn", "desync", "tgproxy"];
+
+    private readonly Dictionary<string, FrameworkElement> _kept = new(StringComparer.Ordinal);
 
     /// <summary>Переходит в раздел по его имени (Tag пункта меню); неизвестное имя игнорируется.</summary>
     public void GoTo(string name)
@@ -815,12 +838,10 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// «Главная» сообщает слою и знаку своё: <paramref name="mode"/> — навязанный режим
-    /// (Starting на время запуска), <c>null</c> — вернуть режим по файлу состояния;
-    /// <paramref name="mbps"/> — реальная скорость приёма или <c>null</c> (нет данных / ушли с «Главной»).
+    /// (Starting на время запуска), <c>null</c> — вернуть режим по файлу состояния.
     /// </summary>
-    internal void FieldPulse(FieldMode? mode, double? mbps)
+    internal void FieldPulse(FieldMode? mode)
     {
-        Field.Mbps = mbps;
         _fieldOverride = mode;
         _fieldOverrideUntil = mode is null ? default : Now() + OverrideLife;
         ShowState();

@@ -139,14 +139,12 @@ public sealed class MainWindowShellTests
 
         try
         {
-            window.FieldPulse(FieldMode.Starting, 12.5);
+            window.FieldPulse(FieldMode.Starting);
             Assert.Equal(FieldMode.Starting, field.Mode);
-            Assert.Equal(12.5, field.Mbps);
 
             // null — вернуть режим по файлу состояния (здесь — «выключен»).
-            window.FieldPulse(null, null);
+            window.FieldPulse(null);
             Assert.NotEqual(FieldMode.Starting, field.Mode);
-            Assert.Null(field.Mbps);
         }
         finally
         {

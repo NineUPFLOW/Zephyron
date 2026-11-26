@@ -115,17 +115,6 @@ public sealed class ScreenshotTests
                 foreach (var (name, state, hint, desync, tunnel) in states)
                 {
                     home.Present(state, hint, desync, tunnel);
-                    home.Lanes.Flow = 24;
-
-                    if (state == Views.HomeState.Running)
-                    {
-                        // Графики с замерами — тоже только для снимка: кривая из синуса.
-                        var down = Enumerable.Range(0, 60).Select(i => 18 + 12 * Math.Sin(i / 6.0)).ToArray();
-                        var up = Enumerable.Range(0, 60).Select(i => 3 + 2 * Math.Cos(i / 5.0)).ToArray();
-                        var ping = Enumerable.Range(0, 24).Select(i => i == 9 ? double.NaN : 32 + 9 * Math.Sin(i / 3.0)).ToArray();
-                        home.ThroughputChart.Show([new(down, (Brush)home.FindResource("Accent2"), true), new(up, (Brush)home.FindResource("Text"), false, Dashed: true, Opacity: 0.75)]);
-                        home.LatencyChart.Show([new(ping, (Brush)home.FindResource("Accent2"), true)], marks: [9]);
-                    }
 
                     Pump(TimeSpan.FromMilliseconds(900));
                     Save((FrameworkElement)window.Content, Path.Combine(folder, $"{width}x{height}-status-{name}.png"));

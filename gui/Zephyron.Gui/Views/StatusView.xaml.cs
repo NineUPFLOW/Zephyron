@@ -296,10 +296,9 @@ public partial class StatusView : UserControl
         // Опрос по времени, а не подписка на события: супервизор — отдельный
         // процесс и пишет своё состояние в файл. Две секунды достаточно,
         // чтобы нажатие «Запустить» отозвалось раньше, чем человек усомнится.
-        _refresh.Tick += (_, _) => Update();
-        _clock.Tick += (_, _) => ShowUptime();
-
-        // Задержка меряется раз в пять секунд — на графике две минуты.
+        // Тик ушедшего раздела гасит свой таймер: включённый таймер держит раздел целиком.
+        _refresh.Tick += (_, _) => { if (IsLoaded) Update(); else _refresh.Stop(); };
+        _clock.Tick += (_, _) => { if (IsLoaded) ShowUptime(); else _clock.Stop(); };
 
         // Лента событий из журнала (StatusView.Events.cs) — пока раздел на экране.
         Loaded += (_, _) => StartEvents();
@@ -328,6 +327,8 @@ public partial class StatusView : UserControl
             // уже после того, как «Главная» показана, — поэтому и подписка.
             // Отписка обязательна: событие статическое, а раздел пересоздаётся
             // при каждом возврате.
+            // -= перед +=: Loaded приходит повторно при переносе в дереве, подписка не должна удваиваться.
+            UpdateNotice.Changed -= OnUpdateChanged;
             UpdateNotice.Changed += OnUpdateChanged;
             ShowUpdate();
 
@@ -342,10 +343,9 @@ public partial class StatusView : UserControl
             UpdateNotice.Changed -= OnUpdateChanged;
             _refresh.Stop();
             _clock.Stop();
-            StopNet();
 
             // «Главная» ушла с экрана — частицам больше нечего показывать от неё.
-            FieldPulse(null, null);
+            FieldPulse(null);
         };
     }
 
@@ -540,7 +540,16 @@ public partial class StatusView : UserControl
                 _updateAgain = false;
 
                 bool starting = _startingSince is not null;
-                Show(await Task.Run(() => Read(starting)));
+                var seen = await Task.Run(() => Read(starting));
+
+                // Раздел ушли, пока читали: показывать некуда, а Show заводит замер сети.
+                // До 1.8.4 так и было: таймер замера ушедшей «Главной» оставался включённым и
+                // держал её навсегда, каждую секунду перебирая адаптеры и пингуя. С каждым
+                // уходом с «Главной» таких копий становилось больше — окно росло на сотни МБ.
+                if (!IsLoaded)
+                    break;
+
+                Show(seen);
             }
             while (_updateAgain);
         }
@@ -593,9 +602,6 @@ public partial class StatusView : UserControl
         ShowState(settings, state, running, seen.SingBoxUp, seen.Coming);
         ShowFooter(state, running, seen.ConfigBuilt);
 
-        // Строка сети меряет, пока обход идёт или поднимается (владелец, 22.10):
-        // запустили — пошла, остановили — встала.
-        SyncNet(running || _startingSince is not null);
         ShowWarnings(settings);
 
         bool tunnelUp = running && state!.Services.Any(s => s.Name == "sing-box");
@@ -891,20 +897,21 @@ public partial class StatusView : UserControl
     }
 
     /// <summary>
-    /// Слою частиц в окне — запуск идёт или кончился (успехом или ошибкой) и
-    /// настоящая скорость приёма; <c>null</c> — замера нет.
+    /// Слою частиц в окне — запуск идёт или кончился (успехом или ошибкой).
+    /// Скорости нет: карточку «Трафик» с замером убрали (владелец, 26.11).
     /// </summary>
-    private void Pulse() =>
-        FieldPulse(_startingSince is not null || _building ? FieldMode.Starting : null, _mbps);
+    private void Pulse()
+    {
+        // Ушедшая «Главная» (запуск или замер дошли после Unloaded) не пишет своё в живое окно.
+        if (IsLoaded)
+            FieldPulse(_startingSince is not null || _building ? FieldMode.Starting : null);
+    }
 
-    private void FieldPulse(FieldMode? mode, double? mbps) =>
-        (Window.GetWindow(this) as MainWindow ?? _host)?.FieldPulse(mode, mbps);
+    private void FieldPulse(FieldMode? mode) =>
+        (Window.GetWindow(this) as MainWindow ?? _host)?.FieldPulse(mode);
 
     /// <summary>Окно, в котором раздел показан (с Loaded): им гасится слой при уходе.</summary>
     private MainWindow? _host;
-
-    /// <summary>Последний настоящий замер приёма, Мбит/с; <c>null</c> — не меряется.</summary>
-    private double? _mbps;
 
     /// <summary>Идёт сборка конфига после «Запустить»: состояние — «Запуск», чтение с диска его не перебивает.</summary>
     private bool _building;
@@ -1042,21 +1049,6 @@ public partial class StatusView : UserControl
         Chips.Columns = compact ? 2 : 1;
         DesyncChip.Margin = new Thickness(0, 0, compact ? 8 : 0, compact ? 0 : 8);
 
-        // Узко: числа под заголовком по два, графики друг под другом по 40; широко — плитки слева, графики справа.
-        NetMetrics.Columns = 2;
-        Grid.SetColumn(NetMetrics, 0);
-        Grid.SetColumnSpan(NetMetrics, compact ? 3 : 1);
-        Grid.SetRow(Charts, compact ? 2 : 1);
-        Grid.SetColumn(Charts, compact ? 0 : 2);
-        Grid.SetColumnSpan(Charts, compact ? 3 : 1);
-        Charts.Margin = new Thickness(0, compact ? 8 : 0, 0, 0);
-
-        ChartRowGap.Height = new GridLength(compact ? 8 : 0);
-        ThroughputChart.Height = LatencyChart.Height = compact ? 40 : 60;
-        Grid.SetColumnSpan(ThroughputChart, compact ? 3 : 1);
-        Grid.SetRow(LatencyChart, compact ? 2 : 0);
-        Grid.SetColumn(LatencyChart, compact ? 0 : 2);
-        Grid.SetColumnSpan(LatencyChart, compact ? 3 : 1);
 
         // Слово 20, кнопки 36 — свои значения, а не стилевые 24 / 40.
         if (compact)

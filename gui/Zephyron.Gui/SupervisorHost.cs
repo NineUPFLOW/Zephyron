@@ -123,9 +123,11 @@ internal static class SupervisorHost
         if (settings.VerifyTraffic)
             arguments += " --verify-traffic";
 
-        // Прокси, который держит само окно (TelegramProxyAlways), надзор
-        // не поднимает: два прокси дрались бы за один порт.
-        if (settings.TelegramProxyWithEngines)
+        // Прокси — у надзора и при «всегда» (TelegramProxyAlways): окно держит
+        // его лишь без движков, а с окном, закрытым «движки оставить», прокси
+        // из его объекта задания уходил (26.11). Порт окно отпускает до запуска
+        // (EngineControl.StartCoreAsync, TgWsProxyKeeper.EnginesHoldIt).
+        if (settings.TelegramProxy)
             arguments += " " + TelegramProxySwitch;
 
         return arguments;
@@ -529,6 +531,9 @@ internal static class SupervisorHost
             return false;
         }
 
+        // Порты — из собранного конфига: при занятых по умолчанию сборка взяла другие (EnginePorts).
+        var ports = EnginePorts.Current(options.ProxyConfig);
+
         // Только ради DNS: выхода нет, так что ни проверки трафика, ни обхода,
         // ни сторожа выхода — им нечего мерить (DnsEngine).
         if (options.DnsOnly)
@@ -536,7 +541,7 @@ internal static class SupervisorHost
             Console.WriteLine("Движок туннеля — только ради DNS: запросы Windows к её резолверам уходят на DoH, выхода VPN нет.");
 
             services.Add(new SingBoxService(
-                singBox, options.ProxyConfig, 9090,
+                singBox, options.ProxyConfig, ports.ClashPort,
                 trafficPort: null,
                 bypassWhenDead: false,
                 exitCheckSeconds: 0,
@@ -551,7 +556,7 @@ internal static class SupervisorHost
         // Порт берётся оттуда же, откуда его берёт компилятор конфига:
         // разъехавшись, эти два значения дают вечно проваливающуюся проверку,
         // а выглядит она как неисправный движок.
-        int? trafficPort = options.VerifyTraffic ? SingBoxOptions.DefaultHealthPort : null;
+        int? trafficPort = options.VerifyTraffic ? ports.HealthPort : null;
 
         // Обход при мёртвых выходах читается из настроек, а не из ключей
         // запуска: решение это не про один запуск, а про то, чем человек
@@ -560,7 +565,7 @@ internal static class SupervisorHost
         var settings = AppSettings.Load(AppSettings.DefaultPath);
 
         var service = new SingBoxService(
-            singBox, options.ProxyConfig, 9090, trafficPort,
+            singBox, options.ProxyConfig, ports.ClashPort, trafficPort,
             // Kill switch запрещает увод мимо туннеля в любом режиме: уводит сам sing-box
             // (его выход «direct»), а ему фильтр выход разрешает — в «Туннеле» это была бы
             // дыра в kill switch, в «Гибриде» — имена «через VPN» с домашнего адреса.

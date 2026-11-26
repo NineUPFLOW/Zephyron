@@ -193,6 +193,33 @@ public sealed class TgWsProxyTests
     }
 
     /// <summary>
+    /// Окно не поднимает свой прокси, пока его держит надзор движков: ни посреди
+    /// их запуска (файла состояния ещё нет), ни при окне, открытом заново поверх
+    /// движков, оставленных при выходе (26.11). Без движков — держит окно.
+    /// </summary>
+    [Fact]
+    public void TheWindowLeavesTheProxyToRunningEngines()
+    {
+        var settings = new AppSettings { TelegramProxy = true, TelegramProxyAlways = true, TelegramProxySecret = TgWsProxy.NewSecret() };
+        var proxy = new ServiceState { Name = TgWsProxyService.ServiceName, Health = ServiceHealth.Healthy };
+        var withProxy = new SupervisorState { SupervisorProcessId = Environment.ProcessId, StartedAt = DateTimeOffset.Now, Services = [proxy] };
+        var without = withProxy with { Services = [] };
+
+        // Движки поднимаются — порт их.
+        Assert.True(TgWsProxyKeeper.EnginesHoldIt(settings, starting: true, enginesUp: false, state: null));
+        // Надзор жив, файла состояния ещё нет — верим настройке.
+        Assert.True(TgWsProxyKeeper.EnginesHoldIt(settings, starting: false, enginesUp: true, state: null));
+        // Окно открыто заново поверх оставленных движков.
+        Assert.True(TgWsProxyKeeper.EnginesHoldIt(settings, starting: false, enginesUp: true, state: withProxy));
+        // Надзор прежней версии без прокси — держит окно.
+        Assert.False(TgWsProxyKeeper.EnginesHoldIt(settings, starting: false, enginesUp: true, state: without));
+        // Движки стоят — держит окно.
+        Assert.False(TgWsProxyKeeper.EnginesHoldIt(settings, starting: false, enginesUp: false, state: withProxy));
+        // Прокси выключен — никому.
+        Assert.False(TgWsProxyKeeper.EnginesHoldIt(settings with { TelegramProxy = false }, starting: true, enginesUp: true, state: null));
+    }
+
+    /// <summary>
     /// Секрет — при первом включении и навсегда: Telegram помнит прокси с ним.
     /// Так включают и вкладка «TG Proxy», и мастер (07.10).
     /// </summary>

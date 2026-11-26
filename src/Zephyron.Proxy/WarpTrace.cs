@@ -39,7 +39,7 @@ public static class WarpTrace
 
         try
         {
-            using var handler = new SocketsHttpHandler { Proxy = keys.Proxy(SingBoxOptions.DefaultHealthPort), UseProxy = true };
+            using var handler = new SocketsHttpHandler { Proxy = keys.Proxy(EnginePorts.CurrentHealthPort()), UseProxy = true };
             using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
 
             return Parse(await http.GetStringAsync("https://www.cloudflare.com/cdn-cgi/trace", cancellationToken));

@@ -268,7 +268,7 @@ if defined TGWS_DIR (
     echo tg-ws-proxy not found in tools\ - the TG Proxy tab will have no proxy.
 )
 
-rem dnscrypt-proxy (ISC, pinned 2.1.20) for the encrypted DNS mode: one executable from
+rem dnscrypt-proxy (ISC, pinned 2.1.21) for the encrypted DNS mode: one executable from
 rem tools\, plus the signed server lists from config\dnscrypt (without a list it does
 rem not start, and GitHub does not always answer). Optional - the mode is off by default.
 set "DNSCRYPT_DIR="

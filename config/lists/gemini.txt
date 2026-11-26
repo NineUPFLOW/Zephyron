@@ -43,3 +43,15 @@ labs.google.com
 opal.google.com
 jules.google
 generativeai.google
+
+# 26.11: аттестация веб-Gemini (jnn-pa), NotebookLM по новому адресу, служебные API
+# и Antigravity (редактор кода Google) — без них страница Gemini падала с ошибкой проверки.
+jnn-pa.googleapis.com
+waa-pa.clients6.google.com
+tailwind-pa.googleapis.com
+notebook.google
+notebook.google.com
+antigravity.google
+antigravity-pa.googleapis.com
+antigravity.googleapis.com
+antigravity-unleash.goog

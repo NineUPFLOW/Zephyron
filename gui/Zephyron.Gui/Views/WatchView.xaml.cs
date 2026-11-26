@@ -178,7 +178,14 @@ public partial class WatchView : UserControl
         InitializeComponent();
 
         Rows.ItemsSource = _rows;
-        _flush.Tick += (_, _) => Flush();
+        _flush.Tick += (_, _) =>
+        {
+            // Ушедший раздел гасит свой таймер: включённый таймер держал бы его навсегда.
+            if (IsLoaded)
+                Flush();
+            else
+                _flush.Stop();
+        };
 
         Loaded += (_, _) =>
         {

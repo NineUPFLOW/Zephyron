@@ -67,6 +67,28 @@ internal static class EngineControl
         Volatile.Read(ref _stopping) == 0
         && (Volatile.Read(ref _starting) > 0 || IsRunning);
 
+    /// <summary>Чей замок надзора видели в прошлый раз; <c>-1</c> — ещё не смотрели.</summary>
+    private static int? _seenHolder = -1;
+
+    /// <summary>
+    /// Сменился надзор движков — пересогласовать прокси Telegram (зовёт трей раз в две секунды).
+    /// </summary>
+    /// <remarks>
+    /// Движки поднимают и гасят не только из окна: автозапуск, ключи --start и --stop, второй
+    /// экземпляр. Без этого окно не замечало чужого запуска и держало свой прокси, а надзор —
+    /// свой: два процесса дрались за порт и перезапускали друг друга по кругу (замер 26.11).
+    /// </remarks>
+    public static void SyncTelegramProxyIfSupervisorChanged()
+    {
+        var holder = SupervisorLock.Holder();
+
+        if (holder == _seenHolder)
+            return;
+
+        _seenHolder = holder;
+        SyncTelegramProxy();
+    }
+
     /// <summary>
     /// Поднять или погасить прокси Telegram, который окно держит без движков
     /// (<see cref="TgWsProxyKeeper"/>), — в пуле, не в потоке окна.
@@ -88,8 +110,10 @@ internal static class EngineControl
             var settings = AppSettings.Load(AppSettings.DefaultPath);
             var state = SupervisorState.Load(SupervisorState.DefaultPath);
 
-            bool enginesHoldIt = state is not null && state.IsSupervisorAlive()
-                && state.Services.Any(s => s.Name == TgWsProxyService.ServiceName);
+            bool enginesHoldIt = TgWsProxyKeeper.EnginesHoldIt(settings,
+                starting: Volatile.Read(ref _starting) > 0,
+                enginesUp: SupervisorHost.IsRunning(_spawned),
+                state);
 
             TgWsProxyKeeper.Sync(settings, enginesHoldIt);
         }
@@ -185,6 +209,7 @@ internal static class EngineControl
         catch (OperationCanceledException) when (!caller.IsCancellationRequested)
         {
             Journal.Write("движки", $"запуск — {who}: отменён остановкой");
+            SyncTelegramProxy(); // запуск успел погасить прокси окна (StartCoreAsync) — вернуть, раз движков нет
             return new EngineOutcome(false, "Запуск отменён: движки остановили.");
         }
     }
@@ -285,6 +310,11 @@ internal static class EngineControl
         // Последняя точка, где запуск ещё можно отменить: дальше супервизор
         // поднят, и снимать его будет уже остановка.
         cancellationToken.ThrowIfCancellationRequested();
+
+        // Прокси берёт надзор (BuildArguments) — порт окно отпускает до него:
+        // надзор при старте снял бы прокси окна как сироту, а то поднимало бы его снова.
+        if (settings.TelegramProxy)
+            TgWsProxyKeeper.Stop();
 
         int spawned;
 

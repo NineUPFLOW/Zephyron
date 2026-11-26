@@ -111,21 +111,23 @@ public partial class TgProxyView : UserControl
                 "Выключен", "Включите прокси переключателем выше.");
         }
 
-        // Держит окно само (TgWsProxyKeeper) — движки тут ни при чём.
-        if (settings.TelegramProxyAlways)
+        // Держит окно само (TgWsProxyKeeper) — движков нет, а «всегда» включено.
+        if (settings.TelegramProxyAlways && TgWsProxyKeeper.Running)
         {
-            return TgWsProxyKeeper.Running
-                ? new Look(Tone.Good, "Работает", $"{address} — работает без движков, пока открыта программа.",
-                    "Готов к соединениям", "Держит программа — и без движков, пока она открыта.")
-                : new Look(Tone.Wait, "Неисправен",
-                    "Включён без движков, но сейчас не запущен: ждёт, пока движки, запущенные до этой настройки, отпустят порт, — перезапустите их.",
-                    "Ждёт освобождения порта", "Порт держат движки, запущенные до этой настройки.");
+            return new Look(Tone.Good, "Работает", $"{address} — работает без движков, пока открыта программа.",
+                "Готов к соединениям", "Держит программа — и без движков, пока она открыта.");
         }
 
         var state = SupervisorState.Load(SupervisorState.DefaultPath);
 
         if (state is null || !state.IsSupervisorAlive())
         {
+            if (settings.TelegramProxyAlways)
+            {
+                return new Look(Tone.Wait, "Запускается", "Включён без движков; программа поднимает его — подождите несколько секунд.",
+                    "Запускается", "Поднимает программа, без движков.");
+            }
+
             return new Look(Tone.Off, "Ждёт движки", "Включён; поднимется вместе с движками — сейчас они остановлены.",
                 "Ждёт движки", "Поднимется вместе с ними.");
         }
@@ -298,16 +300,13 @@ public partial class TgProxyView : UserControl
         {
             (AppSettings.Load(AppSettings.DefaultPath) with { TelegramProxyAlways = on }).Save(AppSettings.DefaultPath);
 
-            // Окно поднимает свой прокси сразу, если порт свободен; а надзор
-            // движков держит или отпускает свой только с перезапуском.
+            // Пока движки работают, прокси держат они при любой настройке (иначе выход из окна
+            // гасил прокси вместе с окном); окно поднимает свой, только когда движков нет.
             EngineControl.SyncTelegramProxy();
 
             Status.Text = on
-                ? "Прокси будет работать и без движков. Если движки запущены, перезапустите их — тогда прокси перейдёт к программе."
-                : "Прокси снова поднимается вместе с движками — перезапустите их.";
-
-            if (EngineControl.IsRunning)
-                (Window.GetWindow(this) as MainWindow)?.OfferRestart(on ? "Прокси Telegram — без движков" : "Прокси Telegram — с движками");
+                ? "Прокси будет работать и без движков, пока открыта программа; с движками он работает и после выхода из окна."
+                : "Прокси поднимается только вместе с движками.";
         }
         catch (Exception ex)
         {
@@ -433,7 +432,7 @@ public partial class TgProxyView : UserControl
             settings.Save(AppSettings.DefaultPath);
 
             bool byWindow = TgWsProxyKeeper.Running;
-            bool byEngines = !byWindow && settings.TelegramProxyWithEngines && EngineControl.IsRunning;
+            bool byEngines = !byWindow && settings.TelegramProxy && EngineControl.IsRunning;
 
             // Остановка ждёт ухода процесса до 10 с — не на потоке окна; плашку
             // перерисовываем, когда он поднялся, иначе застрянет «Не запущен».

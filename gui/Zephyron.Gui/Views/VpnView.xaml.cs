@@ -401,6 +401,13 @@ public partial class VpnView : UserControl
 
         _exitTimer.Tick += async (_, _) =>
         {
+            // Ушедший раздел гасит свой таймер: включённый таймер держал бы его навсегда.
+            if (!IsLoaded)
+            {
+                _exitTimer.Stop();
+                return;
+            }
+
             // Режим, путь или локальный прокси сменили в трее или на другой вкладке.
             var stamp = SettingsStamp();
             if (stamp != _settingsStamp)
@@ -1569,6 +1576,10 @@ public partial class VpnView : UserControl
     /// </remarks>
     private void ReshowSoon()
     {
+        // Ответ замера пришёл уже ушедшему разделу: включённый таймер держал бы его навсегда.
+        if (!IsLoaded)
+            return;
+
         var now = DateTime.UtcNow;
 
         if (now >= _reshowAllowedAt)
@@ -1590,7 +1601,9 @@ public partial class VpnView : UserControl
     private void OnReshowTimer(object? sender, EventArgs e)
     {
         _reshowTimer?.Stop();
-        ReshowTimed();
+
+        if (IsLoaded)
+            ReshowTimed();
     }
 
     private void ReshowTimed()

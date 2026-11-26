@@ -298,11 +298,12 @@
 # QUIC провайдер режет по имени в рукопожатии, и подделка проходит не везде:
 # браузер ждал QUIC 20–30 с. QUIC к YouTube глушится — браузер сразу идёт по TCP
 # (так же «YouTube no QUIC» Zapret GUI 2.44 и присланный V13, 15.11).
+# Только зарубежные сети узлов видео, не весь googlevideo.txt по имени: кэш провайдера
+# (GGC) местами отвечает лишь по QUIC, и выброс по имени закрывал его целиком.
 --name=youtube.com (QUIC по имени)
 --filter-udp=443
 --filter-l7=quic
---hostlist=lists/googlevideo.txt
---hostlist=lists/youtube.txt
+--ipset-ip=74.125.0.0/16,173.194.0.0/16,209.85.128.0/17,172.217.0.0/16
 --out-range=-n8
 --payload=all
 --lua-desync=drop

@@ -77,6 +77,12 @@ public partial class StatusView
 
     private void OnEvents(object? sender, EventArgs e)
     {
+        if (!IsLoaded)
+        {
+            _events.Stop();
+            return;
+        }
+
         if (_eventsBusy || !IsVisible)
             return;
 

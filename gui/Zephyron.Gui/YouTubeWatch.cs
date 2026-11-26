@@ -11,7 +11,8 @@ namespace Zephyron.Gui;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Только в нашем пресете (<see cref="YouTubeRecipes.Applies"/>) и только когда YouTube
+/// Только в своих пресетах Zephyron (рецепт меняется лишь в Adaptive — <see cref="YouTubeRecipes.Applies"/>,
+/// в остальных — перезапуск обхода) и только когда YouTube
 /// идёт десинком: через VPN рецепт ни при чём. Сначала проверяется, есть ли сеть вообще
 /// (ya.ru): без неё молчит всё, и менять способ не за что.
 /// </para>
@@ -70,7 +71,13 @@ internal static class YouTubeWatch
     {
         var settings = AppSettings.Load(AppSettings.DefaultPath);
 
-        if (!EngineControl.IsRunning || !YouTubeRecipes.Applies(settings.PresetName) || !settings.NeedsDesync
+        bool adaptive = YouTubeRecipes.Applies(settings.PresetName);
+
+        // Свои пресеты кроме Adaptive рецепт не меняют, но «замерло, после перезапуска хорошо»
+        // (отчёты 1.8.3, Stable и Adaptive) лечится и там: у движка свежее состояние окон и соединений.
+        bool own = settings.PresetName?.StartsWith("Zephyron ", StringComparison.OrdinalIgnoreCase) == true;
+
+        if (!EngineControl.IsRunning || !(adaptive || own) || !settings.NeedsDesync
             || settings.Mode is OperatingMode.ProxyAll or OperatingMode.ProxyStrict || ThroughVpn())
         {
             _streak = 0;
@@ -102,7 +109,7 @@ internal static class YouTubeWatch
         if (results.All(r => r.Kind == BlockKind.None))
         {
             if (_switched)
-                Journal.Write("YouTube", $"YouTube снова открывается — способ обхода {YouTubeRecipes.Read() + 1}.");
+                Journal.Write("YouTube", adaptive ? $"YouTube снова открывается — способ обхода {YouTubeRecipes.Read() + 1}." : "YouTube снова открывается.");
 
             _streak = 0;
             _switched = false;
@@ -124,9 +131,23 @@ internal static class YouTubeWatch
 
         if (!Due(_streak, DateTime.UtcNow, _lastSwitch, Switches))
         {
-            if (Exhausted(_streak, DateTime.UtcNow, _lastSwitch, Switches) && ZapretPaths.FindPreset(YouTubeRecipes.FallbackPreset) is not null)
+            if (adaptive && Exhausted(_streak, DateTime.UtcNow, _lastSwitch, Switches) && ZapretPaths.FindPreset(YouTubeRecipes.FallbackPreset) is not null)
                 await ToStrongAsync(settings, results).ConfigureAwait(false);
 
+            return;
+        }
+
+        if (!adaptive)
+        {
+            _lastSwitch = DateTime.UtcNow;
+            Switches.Enqueue(_lastSwitch);
+            _streak = 0;
+            _switched = true;
+
+            Journal.Write("YouTube", $"YouTube перестал открываться ({string.Join("; ", results.Select(r => r.Describe()))}) — "
+                + "перезапускаю обход: у движка свежее состояние.");
+
+            await RestartAsync("YouTube: перезапуск обхода").ConfigureAwait(false);
             return;
         }
 

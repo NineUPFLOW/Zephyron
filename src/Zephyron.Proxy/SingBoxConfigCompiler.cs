@@ -443,6 +443,12 @@ public sealed class SingBoxOptions
     public const int DefaultHealthPort = 21090;
 
     /// <summary>
+    /// Порт служебного входа <c>health-in</c>. По умолчанию <see cref="DefaultHealthPort"/>,
+    /// но сдвигается (<see cref="EnginePorts.Pick"/>), если порт попал в резерв Hyper-V/WinNAT.
+    /// </summary>
+    public int HealthPort { get; init; } = DefaultHealthPort;
+
+    /// <summary>
     /// Поднимать рядом с TUN локальный инбаунд <c>mixed</c> на
     /// <see cref="DefaultHealthPort"/> для глубокой проверки.
     /// </summary>
@@ -1393,7 +1399,7 @@ public sealed class SingBoxConfigCompiler
                 ["type"] = "mixed",
                 ["tag"] = "health-in",
                 ["listen"] = "127.0.0.1",
-                ["listen_port"] = SingBoxOptions.DefaultHealthPort,
+                ["listen_port"] = options.HealthPort,
             };
 
             // С паролем: вход ведёт в туннель, и открытым он отдавал адрес VPN

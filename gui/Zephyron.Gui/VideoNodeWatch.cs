@@ -37,6 +37,8 @@ internal static class VideoNodeWatch
 
     private static volatile bool _on;
 
+    private static readonly TimeSpan RunningEvery = TimeSpan.FromSeconds(2);
+
     /// <summary>
     /// Раз в четверть секунды — байты соединений браузера к узлам видео. Таблица TCP и счётчики
     /// только к этим адресам: пакеты не трогаются, нагрузка — опрос таблицы.
@@ -49,6 +51,9 @@ internal static class VideoNodeWatch
         var addresses = new Dictionary<string, System.Net.IPAddress>(StringComparer.OrdinalIgnoreCase);
         var refreshed = DateTime.MinValue;
         int? supervisor = null;
+        bool running = false;
+        int? holder = null;
+        var runningAt = DateTime.MinValue;
 
         while (true)
         {
@@ -56,10 +61,20 @@ internal static class VideoNodeWatch
 
             try
             {
-                // Движки перезапустились — счёт заново, с прогревом (HangTracker.WarmUp).
-                if (!_on || !EngineControl.IsRunning || EngineControl.Supervisor != supervisor)
+                // Жив ли надзор — раз в две секунды, а не на каждом круге: проверка читает файлы
+                // состояния и замка и перебирает процессы системы (замер 26.11: главный источник
+                // выделений окна в покое — четыре раза в секунду).
+                if (DateTime.UtcNow - runningAt >= RunningEvery)
                 {
-                    supervisor = EngineControl.Supervisor;
+                    runningAt = DateTime.UtcNow;
+                    running = EngineControl.IsRunning;
+                    holder = Zephyron.Supervisor.SupervisorLock.Holder();
+                }
+
+                // Движки перезапустились — счёт заново, с прогревом (HangTracker.WarmUp).
+                if (!_on || !running || holder != supervisor)
+                {
+                    supervisor = holder;
                     tracker = new HangTracker();
                     enabled.Clear();
                     continue;
@@ -93,6 +108,34 @@ internal static class VideoNodeWatch
         }
     }
 
+    /// <summary>Сколько ждать после запуска движков, прежде чем судить узлы.</summary>
+    private static readonly TimeSpan WarmUp = TimeSpan.FromSeconds(90);
+
+    private static int? _judgedSupervisor;
+    private static bool _released;
+
+    /// <summary>Снимает отказы узлов из hosts — при остановке движков и выходе из программы.</summary>
+    public static void Release(string why)
+    {
+        // Снимать нечего, пока сторож с прошлого снятия ничего не отключал: без этого
+        // при стоящих движках hosts и файл состояния переписывались бы каждые три секунды.
+        if (_released)
+            return;
+
+        try
+        {
+            if (VideoNodeGuard.Clear() is var cleared and > 0)
+                Journal.Write("видео YouTube", $"{why} — сняты отказы узлов: {cleared}");
+
+            _released = true;
+        }
+        catch (Exception)
+        {
+            // hosts занят или недоступен — снимет следующий круг сторожа.
+        }
+    }
+    private static DateTime _upSince = DateTime.UtcNow;
+
     private static async Task RunAsync()
     {
         while (true)
@@ -101,7 +144,8 @@ internal static class VideoNodeWatch
 
             try
             {
-                bool on = Core.AppSettings.Load(Core.AppSettings.DefaultPath).GuardVideoNodes;
+                var settings = Core.AppSettings.Load(Core.AppSettings.DefaultPath);
+                bool on = settings.GuardVideoNodes;
 
                 if (!on)
                 {
@@ -117,7 +161,42 @@ internal static class VideoNodeWatch
                 _on = true;
 
                 if (!EngineControl.IsRunning)
+                {
+                    // Отказы живут в hosts и без программы: движки встали — узлы вернуть сразу,
+                    // иначе YouTube оставался отрезан от них, пока окно снова не поднимет сторож.
+                    Release("движки остановлены");
                     continue;
+                }
+
+                // Судить узлы можно только при поднятом и прогретом десинке. Сразу после запуска
+                // (а в «Туннеле» — всегда) узел не отвечает не по своей вине, и сторож отключал
+                // живые узлы на полчаса через hosts: YouTube «вообще не открывался» (замер 27.11).
+                // Надзор — по замку, а не по своему запуску: движки поднимают и автозапуск, и --start.
+                var holder = Zephyron.Supervisor.SupervisorLock.Holder();
+
+                if (!settings.Engines.Desync || holder != _judgedSupervisor)
+                {
+                    if (holder != _judgedSupervisor)
+                    {
+                        _judgedSupervisor = holder;
+                        _upSince = DateTime.UtcNow;
+                    }
+
+                    if (!settings.Engines.Desync)
+                    {
+                        while (Hung.TryDequeue(out _)) { }
+                        Release("десинк выключен");
+                        continue;
+                    }
+                }
+
+                if (DateTime.UtcNow - _upSince < WarmUp)
+                {
+                    while (Hung.TryDequeue(out _)) { }
+                    continue;
+                }
+
+                _released = false;
 
                 var hung = new List<(string, System.Net.IPAddress)>();
 

@@ -7,18 +7,6 @@ namespace Zephyron.Gui.Tests;
 /// <summary>Расчёты новой «Главной»: шкала графика, хвост журнала и цвет события.</summary>
 public sealed class NexusHomeTests
 {
-    [Theory]
-    [InlineData(0.3, 0.5)]
-    [InlineData(1, 1)]
-    [InlineData(1.2, 2)]
-    [InlineData(37, 50)]
-    [InlineData(80, 100)]
-    [InlineData(0, 1)]
-    public void The_chart_scale_tops_out_at_a_round_number(double peak, double top)
-    {
-        Assert.Equal(top, NetChart.Nice(peak), 6);
-    }
-
     [Fact]
     public void The_events_are_the_last_lines_of_the_journal()
     {

@@ -150,7 +150,6 @@ public class ParticleFieldTests
             try
             {
                 field.Mode = FieldMode.Running;
-                field.Mbps = 100;
                 field.Pointer(new Point(200, 150));
                 var visual = new DrawingVisual();
                 var sw = Stopwatch.StartNew();
